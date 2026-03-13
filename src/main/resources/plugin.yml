@@ -1,0 +1,6 @@
+name: ${project.name}
+version: ${project.version}
+main: dev.awabi2048.mwmchanpon.MWMChanponPlugin
+api-version: '1.21'
+author: awabi2048
+description: ${project.description}
