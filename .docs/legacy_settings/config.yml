@@ -1,0 +1,189 @@
+world_name:
+  min_length: 3
+  max_length: 16
+
+world_tags:
+  - shop
+  - minigame
+  - building
+  - facility
+  - streaming
+
+validation:
+  blocked_strings:
+    - "admin"
+    - "gm"
+    - "server"
+    - "test"
+
+# メニュー設定
+menu_command: "mwm"
+
+# CC-System連携設定
+# CC-Systemプラグインが導入されている場合、プレイヤーの言語設定をCC-Systemから取得します
+# false の場合は内部システム（PlayerStats）から言語設定を取得します
+use_cc_system: false
+
+# 翻訳キーが現在言語で見つからない場合に参照するフォールバック言語
+fallback_language: "ja_jp"
+
+
+creation:
+  max_create_count_default: 3
+  max_total_world_count: 50
+  max_world_slots_limit: 10 # Default max slots a player can reach using World Seeds
+  cancel_word: "__cancel__"
+
+creation_cost:
+  template: 0
+  seed: 200
+  random: 50
+
+deletion:
+  reduce_owner_slot: false
+
+default_expiration:
+  initial_days: 90
+  extension_days: 30
+  automatic_archive: true
+
+expansion:
+  initial_size: 100
+  costs:
+    1: 100
+    2: 200
+    3: 400
+
+invite:
+  timeout_seconds: 60
+
+chat_click:
+  timeout_seconds: 60
+
+# ワールド作成セッションのタイムアウト設定（秒）
+creation_session:
+  timeout_seconds: 300
+
+evacuation_location:
+  world: "world"
+  x: -18.0
+  y: -52.0
+  z: 33.0
+  yaw: 90.0
+  pitch: 0.0
+
+favorite:
+  max_count: 1000
+
+# テンプレートプレビュー設定
+template_preview:
+  duration_seconds: 15  # 360度回転に要する秒数
+  pitch: 0.0           # 俯瞰視点のピッチ角
+  height: 10.0           # 初期座標からの高さ
+
+world_display_names:
+  world: "メインワールド"
+  world_nether: "ネザー"
+  world_the_end: "ジ・エンド"
+
+portal_targets:
+  world: "メインワールド"
+  world_nether: "ネザー"
+  world_the_end: "ジ・エンド"
+  lobby: "ロビー"
+
+portal:
+  world_gate:
+    point_cost_per_block: 1
+    remove_refund_rate: 0.5
+    particle_density_per_block: 0.8
+    particle_min_count: 16
+    particle_max_count: 320
+
+# 移行コマンドの設定
+migration:
+  enable_world_migration: false
+  enable_player_migration: false
+  enable_portal_migration: false
+
+# 重大な設定の払い戻し割合・アーカイブクールダウン設定
+critical_settings:
+  refund_percentage: 0.5
+  # ワールドの能動的アーカイブ・復旧のクールダウン時間（時間単位）
+  archive_cooldown_hours: 24
+
+# 環境設定
+environment:
+  gravity:
+    options:
+      zero: 0.0
+      moon: 0.17
+      mars: 0.38
+      earth: 1.0
+    cost: 100
+  weather:
+    options:
+      - "DEFAULT"
+      - "CLEAR"
+      - "RAIN"
+      - "THUNDER"
+    cost: 50
+  biome:
+    options:
+      - "DEFAULT"
+      - "PLAINS"
+      - "DESERT"
+      - "FOREST"
+      - "JUNGLE"
+      - "SWAMP"
+      - "OCEAN"
+      - "THE_VOID"
+    cost: 500
+
+# プレイヤー案内機能の設定
+announcement:
+  max_lines: 5           # 最大行数
+  max_line_length: 100   # 1行の最大文字数
+  blocked_strings:       # 禁止文字列
+    - "http"
+    - "www."
+
+# 自動アンロード設定
+world_unload:
+  enabled: true
+  time_minutes: 5
+  max_per_cycle: 1
+  failure_retry_minutes: 5
+  failure_retry_max_minutes: 30
+  exclude_worlds:
+    - "world"
+    - "world_nether"
+    - "world_the_end"
+
+# サウンド設定
+sounds:
+  global_click:
+    sound: "UI_BUTTON_CLICK"
+    pitch: 2.0
+  mspt_warning:
+    sound: "BLOCK_NOTE_BLOCK_BASS"
+    pitch: 0.5
+
+# MSPT監視設定
+mspt_monitor:
+  enabled: true
+  interval_seconds: 30
+  threshold: 40.0
+
+# 統合版プレイヤー設定
+bedrock:
+  # 統合版プレイヤーのプレイヤー名接頭辞（GeyserMC等で使用される接頭辞）
+  # 例: "." を設定すると、統合版プレイヤーは ".PlayerName" の形式で検出されます
+  player_name_prefix: "."
+  ui:
+    # auto: FormUI利用可能時はForm、失敗時はInventoryへ自動フォールバック
+    # form: FormUIを優先利用（利用不可時はInventoryへフォールバック）
+    # inventory: 常にBedrock専用Inventoryを利用
+    mode: "auto"
+    # Form送信失敗後、再試行までInventoryを使うクールダウン時間（分）
+    form_failure_cooldown_minutes: 10

@@ -1,0 +1,4 @@
+# SPOTLIGHT (おすすめワールド) のリスト
+# 登録されたワールドのUUIDがここに保存されます。
+worlds: []
+description: ""

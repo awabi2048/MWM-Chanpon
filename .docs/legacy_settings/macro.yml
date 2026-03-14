@@ -1,0 +1,36 @@
+# マクロ設定
+# 特定のタイミングで実行されるコンソールコマンドを設定します。
+# 利用可能なプレースホルダー:
+#   %owner%: ワールド所有者のユーザー名
+#   %old_owner%: 移譲前のオーナーのユーザー名
+#   %new_owner%: 移譲後のオーナーのユーザー名
+#   %player%: ワールドに移ったプレイヤーのユーザー名
+#   %member%: 管理されたメンバーのユーザー名
+#   %world_uuid%: 対象ワールドのUUID
+#   %world_name%: 対象ワールドの名前
+#   %template_name%: 使用されたテンプレート名
+
+macros:
+  # ワールドが新規作成されたとき
+  on_world_create:
+    # - "say %owner% がテンプレート %template_name% で %world_name% (%world_uuid%) を作成しました"
+  
+  # オーナー権限が譲渡されたとき
+  on_owner_transfer:
+    # - "say %old_owner% が %new_owner% にワールド %world_uuid% を譲渡しました"
+  
+  # プレイヤーがワールドにワープしたとき
+  on_world_warp:
+    # - "say %player% がワールド %world_uuid% にワープしました"
+  
+  # プレイヤーがワールドメンバーに追加されたとき
+  on_member_add:
+    # - "say %member% がワールド %world_uuid% のメンバーに追加されました"
+  
+  # プレイヤーがワールドメンバーから削除されたとき
+  on_member_remove:
+    # - "say %member% がワールド %world_uuid% のメンバーから削除されました"
+  
+  # ワールドが削除されたとき
+  on_world_delete:
+    # - "say ワールド %world_uuid% が削除されました"

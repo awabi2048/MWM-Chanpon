@@ -1,4 +1,4 @@
-package dev.awabi2048.mwmchanpon
+package me.awabi2048.mwmchanpon
 
 import org.bukkit.plugin.java.JavaPlugin
 

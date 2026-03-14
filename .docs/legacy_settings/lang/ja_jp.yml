@@ -1,0 +1,2205 @@
+# MyWorldManager 言語ファイル (日本語)
+
+# 全般
+colors:
+  white: "白色"
+  silver: "薄灰色"
+  gray: "灰色"
+  black: "黒"
+  red: "赤"
+  maroon: "濃い赤色"
+  yellow: "黄色"
+  olive: "濃い黄色"
+  lime: "黄緑色"
+  green: "緑色"
+  aqua: "空色"
+  teal: "水色"
+  blue: "青"
+  navy: "紺色"
+  fuchsia: "赤紫色"
+  purple: "紫色"
+  orange: "オレンジ色"
+
+general:
+  prefix: "§7[§aMyWorldManager§7] "
+  no_permission: "§c権限がありません。"
+  player_only: "§cこのコマンドはプレイヤーのみ実行可能です。"
+  world_not_found: "§cワールドが見つかりませんでした。"
+  player_not_found: "§cプレイヤーが見つかりませんでした。"
+  unknown: "不明"
+  direction:
+    north_west: "北西"
+    north_east: "北東"
+    south_west: "南西"
+    south_east: "南東"
+    unknown: "不明"
+  
+  commands:
+    settings:
+      description: "個人設定メニューを表示します。"
+
+  status:
+    join_me: "Join Me"
+    ask_me: "Ask Me"
+    busy: "Busy"
+    description:
+      join_me: "§f誰でもあなたのいるワールドにワープできます。"
+      ask_me: "§f許可を出したプレイヤーのみワープできます。"
+      busy: "§f/meetメニューに表示されず、ワープもできません。"
+      
+  meet_request:
+    sent: "§a{player}にワープ申請を送りました！"
+    received: "§e{player}さんがあなたのいるワールドに訪れたいそうです！"
+    accept_button: "§a§l【ワープを許可する】"
+    hover_accept: "§7クリックしてワープを許可"
+    accepted: "§aワープを許可しました"
+    accepted_by_target: "§a{target}さんがワープを許可しました！"
+  
+  language:
+    ja_jp: "日本語"
+    en_us: "English"
+
+# 公開レベル
+world_tag:
+  shop: "ショップ"
+  minigame: "ミニゲーム"
+  building: "建築"
+  facility: "共用施設"
+  streaming: "配信・撮影歓迎"
+
+publish_level:
+  public: "公開"
+  friend: "限定公開"
+  private: "非公開"
+  locked: "封鎖中"
+  description:
+    public: "§f誰でも訪問可能です。ディスカバリーメニューに掲載されます。"
+    friend: "§f誰でも訪問可能ですが、ディスカバリーメニューには掲載されません。"
+    private: "§fメンバーが招待した人のみ訪問可能です。"
+    locked: "§fメンバー以外は訪問できず、ポータルからのワープもできません。"
+  
+  color:
+    public: "§a"
+    friend: "§e"
+    private: "§c"
+    locked: "§c"
+    owner: "§6"
+    moderator: "§b"
+    member: "§f"
+    online: "§a"
+    offline: "§c"
+    active: "§a"
+    inactive: "§7"
+    uuid: "§8"
+    debug: "§8"
+
+# GUI Settings
+gui:
+  common:
+    back: "§7戻る"
+    next_page: "§a次のページへ"
+    prev_page: "§a前のページへ"
+    page_info: "§f§l| §7ページ §a{page}§7/{total_pages}"
+    page_shift_next: "§e§l| §eShift + クリック§7 5ページ進む"
+    page_shift_prev: "§e§l| §eShift + クリック§7 5ページ戻る"
+    confirm_action: "§e操作の確認"
+    confirm: "§a実行する"
+    confirm_desc: "§7クリックして決定します"
+    cancel: "§cキャンセル"
+    cancel_desc: "§7クリックして中断します"
+    separator: "§8§m－－－－－－－－－－－－－－－－－－"
+    status_display: "§7ステータス: {color}{status}"
+    return: "§e戻る"
+    return_desc: "§7前のメニューに戻る"
+    world_item_name: "§f【§a{world}§f】"
+    world_item_name_simple: "§f「§a{world}§f」"
+    world_desc: "§f{description}"
+    confirmation: "確認"
+    confirm_warning: "§cこの操作は重要な変更を伴います！"
+
+  bedrock:
+    player_world:
+      title: "マイワールド [BE]"
+      page_content: "ページ {current}/{total}"
+      archived_prefix: "[A] "
+      button:
+        prev: "前のページ"
+        next: "次のページ"
+        settings: "個人設定"
+        current_world: "現在のワールド"
+        return: "戻る"
+        close: "閉じる"
+
+    world_action:
+      title: "ワールド: {world}"
+      content:
+        owner: "オーナー: {owner}"
+        status: "状態: {status}"
+        publish: "公開: {publish}"
+      status:
+        archived: "アーカイブ中"
+        active: "アクティブ"
+      button:
+        warp: "ワープ"
+        cycle_publish: "公開設定切替 ({level})"
+        archive: "アーカイブ"
+        unarchive: "復旧"
+        advanced_settings: "詳細設定 GUI"
+        back_to_worlds: "ワールド一覧に戻る"
+        settings: "個人設定"
+        return: "戻る"
+        close: "閉じる"
+
+    settings:
+      title: "個人設定 [BE]"
+      form_content: "統合版向けのクイック設定"
+      button:
+        notification: "訪問通知: {status}"
+        language: "言語: {language}"
+        critical: "重大設定: {status}"
+        beta: "ベータ機能: {status}"
+        back_to_worlds: "ワールド一覧に戻る"
+        return: "戻る"
+        close: "閉じる"
+
+    world_item:
+      publish: "公開: {publish}"
+      favorite: "お気に入り: {favorite}"
+      open_actions: "タップして操作を開く"
+
+    input:
+      info_form:
+        title: "ワールド情報の編集"
+      rename:
+        title: "ワールド名の変更"
+        label: "新しいワールド名"
+        placeholder: "ワールド名を入力"
+      description:
+        title: "説明文の変更"
+        label: "新しい説明文"
+        placeholder: "説明文を入力"
+      member_invite:
+        title: "メンバー招待"
+        label: "招待するプレイヤー名"
+        placeholder: "プレイヤー名を入力"
+      creation_name:
+        title: "ワールド名の入力"
+        label: "ワールド名"
+        placeholder: "ワールド名を入力"
+      creation_seed:
+        title: "シード値の入力"
+        label: "シード値（空欄可）"
+        placeholder: "シード値または文字列を入力"
+      admin_player_filter:
+        title: "プレイヤーフィルター"
+        label: "対象プレイヤー名"
+        placeholder: "プレイヤー名を入力"
+      template_wizard_name:
+        title: "テンプレート名の入力"
+        label: "テンプレート名"
+        placeholder: "テンプレート名を入力"
+      template_wizard_desc:
+        title: "テンプレート説明の入力"
+        label: "テンプレート説明"
+        placeholder: "説明文を入力"
+      announcement_menu:
+        title: "案内メッセージ"
+        content: "操作を選択してください"
+        edit: "編集"
+        reset: "リセット"
+      announcement_edit:
+        title: "案内メッセージ編集 ({max_lines}行/{max_length}文字)"
+        label: "{line}行目"
+        placeholder: "空欄で行をスキップ"
+      info_selector:
+        title: "編集項目の選択"
+        content: "変更したい項目を選んでください"
+        rename: "ワールド名"
+        description: "説明文"
+
+  creation:
+    title_type: "ワールドタイプを選択"
+    title_template: "テンプレートを選択"
+    title_confirm: "最終確認"
+    dialog:
+      name_title: "ワールド名の入力"
+      seed_title: "シード値の入力"
+    type:
+      template:
+        name: "テンプレートから作成"
+        lore:
+          - "用意されたテンプレートからワールドを作成します。"
+      seed:
+        name: "シード値を指定"
+        lore:
+          - "シード値を指定してワールドを生成します。"
+      random:
+        name: "ランダム生成"
+        lore:
+          - "ワールドをランダムに生成します。"
+      cost: "§f§l| §7必要ポイント §6🛖 §e{cost}"
+      points: "§f§l| §7所持ポイント §6🛖 §e{points}"
+      available: "§a作成可能です！"
+      insufficient: "§cポイントが足りません。(§6🛖 §e{shortage}不足)"
+    insufficient: "§cポイントが足りません。(§6🛖 §e{shortage}不足)"
+    limit_reached: "§cワールド作成数の上限に達しています。(現在: {current}/{max})"
+    limit_reached_total: "§cサーバー全体のワールド作成数が上限（{max}）に達しています。"
+    command_limit_reached_total: "§c[Warning] サーバー全体のワールド作成数が上限（{max}）に達しているため、作成できません。"
+    command_limit_reached: "§c[Warning] 対象プレイヤー（{player}）のワールド作成数が上限に達しているため、作成できません。(現在: {current}/{max})"
+    template_item:
+      preview_hint: "§7右クリックでプレビュー"
+    confirm:
+      name: "この内容で確定して作成"
+      # プレースホルダー: {name}, {type}, {template}, {seed}, {cost}
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7ワールド名 §a{name}"
+        - "§f§l| §7作成方法 §e{type}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{template}"
+        - "{seed}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7消費ポイント §6🛖 §e{cost}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      template_line: "§f§l| §7テンプレート §f{template}"
+      seed_line: "§f§l| §7シード値 §f{seed}"
+      name_label: "ワールド名"
+      type_label: "作成方法"
+      cost_label: "消費ポイント"
+      select_action: "アクションを選択"
+      action_create: "作成する"
+      action_preview: "テンプレートをプレビュー"
+      action_back: "戻る"
+      action_cancel: "中断する"
+      proceed_button: "実行"
+      cancel_button: "閉じる"
+
+  portal:
+    title: "ポータルの設定"
+    id_format: "§8PORTAL_ID: {id}"
+    toggle_text:
+      name: "§a浮遊テキストの表示"
+      lore:
+        - "§f現在の設定: {status}"
+        - ""
+        - "§e§nクリックで切り替え"
+    destination_label: "§7行き先 "
+    color:
+      name: "§eパーティクルの色"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7現在の色 {color}"
+        - ""
+        - "§7« {prev_color}"
+        - "§7{next_color} »"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックで変更"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+    remove:
+      name: "§cポータルを撤去する"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7設置されたポータルを撤去します。"
+        - "§e§nクリックで実行"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+
+  portal_item:
+    name: "§bワールドポータル"
+    lore_unbound:
+      - "§8§m－－－－－－－－－－－－－－－－－－"
+      - "§e§l| §e右クリック §7現在のマイワールドをリンクする"
+      - "§e§l| §eShift + 右クリック §7リンクを解除する"
+      - "§8§m－－－－－－－－－－－－－－－－－－"
+    lore_bound:
+      - "§8§m－－－－－－－－－－－－－－－－－－"
+      - "§f§l| §bリンク先 §f§n{destination}"
+      - "§8§m－－－－－－－－－－－－－－－－－－"
+      - "§f右クリックで設置して§dワールドポータル§f作成します！"
+      - "§e§l| §eShift + 右クリック §7リンクを解除する"
+      - "§8§m－－－－－－－－－－－－－－－－－－"
+
+  world_gate_item:
+    name: "§3ワールドゲート"
+    lore_unbound:
+      - "§8§m－－－－－－－－－－－－－－－－－－"
+      - "§e§l| §eShift + 右クリック §7現在のマイワールドをリンクする"
+      - "§e§l| §e右クリック §7範囲指定の2点を選択する"
+      - "§8§m－－－－－－－－－－－－－－－－－－"
+    lore_bound:
+      - "§8§m－－－－－－－－－－－－－－－－－－"
+      - "§f§l| §bリンク先 §f§n{destination}"
+      - "§8§m－－－－－－－－－－－－－－－－－－"
+      - "§f右クリックで2点選択し、3回目で§3ワールドゲート§fを設置します"
+      - "§e§l| §eShift + 右クリック §7リンク先を再設定する"
+      - "§8§m－－－－－－－－－－－－－－－－－－"
+      
+  template_wizard:
+    title: "テンプレート作成ウィザード"
+    name_input:
+      display: "§eテンプレート名・IDの設定"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7テンプレートの表示名とIDを設定します。"
+        - " §f名前 {name}"
+        - " §fID {id}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックで設定"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+    desc_input:
+      display: "§eテンプレート説明文の設定"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7テンプレートの説明文を設定します。"
+        - "§7現在の設定"
+        - "{desc}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックで設定"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+    icon_select:
+      display: "§eテンプレートアイコンの選択"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7テンプレートのアイコンを設定します。"
+        - "§7現在の設定 {icon}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックで設定"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+    origin_set:
+      display: "§e原点座標の設定"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7スポーン地点やオフセットの基準となる原点を設定します。"
+        - "§7現在の設定 {origin}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックで設定"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+    save_confirm:
+      display: "§6テンプレートを保存・登録"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7現在の設定でテンプレートを保存します。"
+        - "§c※既存のファイルは上書きされます。"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックで実行"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+
+  unarchive_confirm:
+    title: "§6アーカイブ解除の確認"
+    lore:
+      - "§8§m－－－－－－－－－－－－－－－－－－"
+      - "§fこのワールドは現在アーカイブされています。"
+      - "§f解除してワープしますか？"
+      - "§8§m－－－－－－－－－－－－－－－－－－"
+      - "§e§nクリックで解除してワープ"
+      - "§8§m－－－－－－－－－－－－－－－－－－"
+
+
+
+  admin_portals:
+    title: "ポータルの遠隔管理"
+    portal_item:
+      name: "§bポータル: §f{id}"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7所有者: §f{owner}"
+        - "§f§l| §7設置ワールド: §f{world}"
+        - "§f§l| §7座標: §f{x}, {y}, {z}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§l| §e左クリック §7ポータルの位置にテレポート"
+        - "§e§l| §e右クリック §7ポータルを撤去"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      lore_management:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7座標: §f{x}, {y}, {z}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§l| §e左クリック §7ポータルの位置にテレポート"
+        - "§e§l| §e右クリック §7ポータルを撤去"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      lore_management_bedrock:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7座標: §f{x}, {y}, {z}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§l| §eクリック §7ポータルの位置にテレポート"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+    sort:
+      display: "§e並び替え方法"
+      created_desc: "設置日（新しい順）"
+      created_asc: "設置日（古い順）"
+  
+  settings:
+    title: "ワールド設定({world})"
+    info:
+      display: "§aワールド情報の設定"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§l| §e左クリック §7ワールド名を変更"
+        - "§e§l| §e右クリック §7ワールド説明を変更"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7クリック後、チャット欄に入力して設定します"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      lore_bedrock:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックしてフォームを開く"
+        - "§7ワールド名と説明文をまとめて編集します"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+    spawn:
+      display: "§aスポーン地点の設定"
+      type:
+        guest: "ゲスト用"
+        member: "メンバー用"
+        both: "ゲスト/メンバー共通"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§l| §e左クリック §7ゲスト用スポーン地点を設定"
+        - "§e§l| §e右クリック §7メンバー用スポーン地点を設定"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7クリック後、設定したい地点のブロックを"
+        - "§7クリックして決定します。"
+        - "§e※設定時のプレイヤーの向きが保存されます"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      lore_bedrock:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックで設定を開始"
+        - "§7クリックした地点をゲスト/メンバー両方に設定します"
+        - "§e※設定時のプレイヤーの向きが保存されます"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+    error:
+      must_be_in_world_lore: "§c※この設定を変更するにはワールド内にいる必要があります"
+    icon:
+      display: "§aワールドアイコンの変更"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7クリックした後、インベントリ内のアイテムを"
+        - "§7クリックしてアイコンを設定します"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+    tags:
+      display: "§aワールドタグの設定"
+      # プレースホルダー: {tags_list}
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7設定中のタグ"
+        - "{tags_list}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックしてタグを編集"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      lore_empty: "  §fなし"
+      lore_item: "  §6・{tag}"
+    expand:
+      display: "§6ワールドの拡張"
+      cost: "§f§l| §7必要ポイント §6🛖 §e{cost}"
+      # プレースホルダー: {current}, {max}, {cost}, {level_before}, {level_after}, {points}
+      lore_upgrade:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7現在の拡張レベル §e§l{current}/{max}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7コスト §6🛖 §e{cost} §7({level_before} §f→ §e§l{level_after}§7)"
+        - "§f§l| §7あなたの所有ポイント §6🛖 §e{points}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      # プレースホルダー: {current}, {max}, {cost}, {level_before}, {level_after}, {points}, {shortage}
+      lore_insufficient:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7現在の拡張レベル §e§l{current}/{max}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7コスト §6🛖 §c§n{cost}§r §8({level_before} → {level_after}) §c§n{shortage}ポイント§c不足しています。"
+        - "§f§l| §7あなたの所有ポイント §6🛖 §e{points}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      # プレースホルダー: {current}, {max}
+      lore_max:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7現在の拡張レベル §e§l{current}/{max}"
+        - "§f§l| §cこれ以上拡張できません！"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      lore_open_menu_hint_je:
+        - "§e§l| §e左クリック §7ボーダー拡張メニューを開く"
+      lore_open_menu_hint_be:
+        - "§e§l| §eクリック §7ボーダー拡張メニューを開く"
+      lore_border_info:
+        - "§f§l| §7現在のボーダー中心 §fX: §e{x} §7/ §fZ: §e{z}"
+        - "§f§l| §7現在のボーダーサイズ §e{size}"
+      lore_teleport_hint:
+        - "§e§l| §e右クリック §7ボーダー中心の地表へテレポート"
+      lore_no_border:
+        - "§aこのワールドにボーダーはありません。"
+    environment:
+      display: "§aワールド環境の設定"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7ワールドのバイオーム、天気、重力を"
+        - "§7変更することができます。"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックで表示"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+    publish:
+      display: "§6公開レベルの変更"
+      # プレースホルダー: {current_color}, {current_level}, {level_list}, {description}
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7現在の設定 {current_color}{current_level}"
+        - "{description}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{level_list}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§l| §e左クリック §7前のページへ移動"
+        - "§e§l| §e右クリック §7次のページへ移動"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      lore_bedrock:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7現在の設定 {current_color}{current_level}"
+        - "{description}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{level_list}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックで次の公開レベルへ"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      active_prefix: "§6» "
+      inactive_prefix: "  "
+    member:
+      display: "§6メンバーの管理"
+      # プレースホルダー: {count}, {member_list}
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7現在のメンバー数 §b{count}人"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §bメンバーの一覧"
+        - "{member_list}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックで一覧を表示"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      role_owner: "オーナー"
+      role_moderator: "モデレーター"
+      role_member: "メンバー"
+      list_item: "  {debug_color}[{role_color}{role}{debug_color}] {name_color}{player}"
+      list_item_member: "  {name_color}{player}"
+      more_members: "  §7+{remaining}人 (§a{online}人オンライン§7)"
+      actions:
+        promote: "§e§l| §e左クリック §7モデレーターに変更する"
+        demote: "§e§l| §e右クリック §7メンバーに変更する"
+        remove: "§e§l| §eShift + 左クリック §7メンバーから削除する"
+        transfer: "§e§l| §eShift + 右クリック §7オーナー権限を移譲する"
+    main_info:
+      name: "§f【§a{world}§f】"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §f{description}"
+        - "§f§l| §7オーナー §b{owner}"
+        - "§f§l| §7拡張レベル §e§l{level}§7/{max_level}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7作成日 §e{created_at_date_formatted} §8({created_days_ago})"
+        - "§f§l| §7自動アーカイブまで §6{days_until_archive}日 §8({archive_date} にアーカイブ)"
+        - "§f§l| §7メンバー §f{member_count}人 §8(オンライン: {online_count}人)"
+        - "§f§l| §7公開レベル {publish_color}{publish_level}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7お気に入り数 §c{favorites}"
+        - "§f§l| §7最近訪れたプレイヤー §b{visitors}人"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      lore_special:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §f{description}"
+        - "§f§l| §7オーナー §b{owner}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7作成日 §e{created_at_date_formatted} §8({created_days_ago})"
+        - "§f§l| §7メンバー §f{member_count}人 §8(オンライン: {online_count}人)"
+        - "§f§l| §7公開レベル {publish_color}{publish_level}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7お気に入り数 §c{favorites}"
+        - "§f§l| §7最近訪れたプレイヤー §b{visitors}人"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+    visitors:
+      display: "§a訪問中のプレイヤー一覧"
+      # プレースホルダー: {count}
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7現在ワールドを訪れているプレイヤー §e{count}人"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックで一覧を表示"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+    notification:
+      display: "§a訪問通知の切り替え"
+      "on": "オン"
+      "off": "オフ"
+      # プレースホルダー: {color}, {status}
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7現在の設定 {color}{status}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7オンの場合、メンバー以外の訪問者が"
+        - "§7来た際にメンバー全員に通知します"
+        - "§7個人設定からオフにすることもできます"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックで切り替え"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+    announcement:
+      display: "§aプレイヤー案内の設定"
+      # プレースホルダー: {message_preview}
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7訪問者に向けて表示する"
+        - "§7案内メッセージを設定します。"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§l| §e左クリック §7メッセージを設定"
+        - "§e§l| §e右クリック §7設定をリセット"
+        - "{message_preview}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      lore_bedrock:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7案内メッセージの編集・リセットを行います"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックで操作メニューを開く"
+        - "{message_preview}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      preview_header: "§f§l| §7現在の案内メッセージ"
+      preview_footer: "§e§nクリックして編集・リセット"
+    critical:
+      display: "§c§n重大な設定"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§cワールドの削除や、拡張の初期化など"
+        - "§c取り返しのつかない操作を行います。"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックで表示"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+    portals:
+      display: "§b設置済みポータルの管理"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7ワールド内に設置されているポータルを"
+        - "§7一括で管理・確認します。"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックで表示"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+
+  critical:
+    title: "重大な設定"
+    reset_expansion:
+      display: "§c§nワールド拡張を初期化"
+      # Placeholder: {level}, {points}
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7現在の拡張レベル §e§l{level}"
+        - "§f§l| §7返還されるポイント §6🛖 §e{points}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックして初期化を実行（この操作は取り消せません）"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      lore_unavailable:
+        - "§cまた拡張されていないため、初期化できません"
+    archive_world:
+      display: "§6§nワールドをアーカイブ"
+      # Placeholder: {cooldown_hours}, {hours_remaining} (クールダウン中のみ)
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7ワールドをアーカイブします。"
+        - "§7アーカイブされたワールドはプレイヤーが"
+        - "§7アクセスできなくなりますが、データは保持されます。"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックして実行"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      lore_cooldown:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7ワールドをアーカイブします。"
+        - "§7アーカイブされたワールドはプレイヤーが"
+        - "§7アクセスできなくなりますが、データは保持されます。"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§c前回の操作から {cooldown_hours} 時間経過するまで実行できません。"
+        - "§8(残り約 {hours_remaining} 時間)"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+    delete_world:
+      display: "§4§l§nワールドを削除"
+      # Placeholder: {points}, {percent}
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7ワールドを完全に削除します。"
+        - "§7この操作は取り消せません。"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7返還されるポイント: §6🛖 §e{points}"
+        - "§8(消費したポイントのうち、{percent}%が返還されます)"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§4§lクリックして削除を実行（この操作は取り消せません）"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+
+  confirm:
+    reset_expansion:
+      title: "確認"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§c本当に拡張を初期化しますか？"
+        - "§7ワールド拡張がリセットされ、使用したポイントの一部が返還されます"
+        - "§7ワールドボーダーも初期サイズに戻ります"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+    delete_1:
+      title: "確認"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§c§n本当にワールドを削除しますか？"
+        - "§7ワールドの全データが失われ、復旧できなくなります！"
+        - "§c※次の画面でもう一度確認があります！"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      next: "§c次へ進む"
+    delete_2:
+      title: "§n最終確認"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§4§l本当に本当に削除しますか？"
+        - "§c§l【警告】クリックすることでワールドを完全に削除します！"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      confirm_btn: "§4§l【実行する】"
+
+  expansion:
+    method_title: "拡張方法の選択"
+    confirm_title: "確認"
+    center_expand:
+      name: "§a中心を変えずに拡張"
+      lore:
+        - "§7現在の中心を変更せずに"
+        - "§7ワールドを広げます"
+    direction_expand:
+      name: "§a方角を指定して拡張"
+      lore:
+        - "§7現在のワールドの四隅のいずれかへワールドを広げます"
+        - "§7(クリック後、方角の指定を行います)"
+    confirm_info: "§a拡張内容の確認"
+    method: "§f§l| §7拡張方法 {method}"
+    method_center: "中心を変えずに拡張"
+    method_direction: "§f§l| §7方角 {direction}"
+    cost: "§f§l| §7消費ポイント §6🛖 §e{cost}"
+    warning: "§eこの操作は取り消せません！"
+    execute: "§a拡張を実行"
+    execute_desc: "§7ポイントを消費して拡張します"
+    cancel: "§cキャンセル"
+    cancel_desc: "§7選択画面に戻ります"
+
+  announcement_dialog:
+    title: "案内メッセージの編集"
+    line_label: "行{number}"
+    help: "訪問者に表示する案内メッセージを入力してください"
+    max_lines: "最大{max}行まで設定できます"
+    max_length: "1行あたり最大{max}文字まで入力できます"
+    save: "保存"
+    cancel: "キャンセル"
+    reset: "リセット"
+
+  member_management:
+    title: "ワールドメンバーの管理"
+    invite:
+      name: "§aメンバーを招待"
+      desc: "§7クリックした後、名前を入力して招待します"
+      click_normal: "§e§l| §eクリック §7通常モードで実行"
+      click_force: "§e§l| §eShift + クリック §7強制追加モードで実行"
+    remove_confirm:
+      title: "確認"
+      # Placeholder: {player}, {world}
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§c本当に削除しますか？"
+        - "§f§l| §7プレイヤー §f{player}"
+        - "§f§l| §7ワールド §f{world}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§c※§c§nメンバーから削除すると、このワールドへのアクセス権限が失われます"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      cancel: "§aキャンセル"
+      cancel_desc: "§7メンバー一覧に戻る"
+      confirm: "§c削除する"
+      confirm_desc: "§7このプレイヤーをワールドメンバーから削除します"
+    item:
+      last_online_label: "最終オンライン"
+      # Placeholder: {last_online}, {role}
+      # {last_online} should be empty if online or hidden logic in code
+      lore_info:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{last_online}"
+        - "§f§l| §7権限 §f{role}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      # Placeholder: {next_role}
+      lore_actions:
+        - "§e§l| §e左クリック §7権限を{next_role}に変更する"
+        - "§e§l| §eShift + 左クリック §7オーナー権限を譲渡"
+        - "§e§l| §eShift + 右クリック §7ワールドメンバーから削除"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      lore_actions_bedrock:
+        - "§e§l| §eクリック §7権限を{next_role}に変更する"
+        - "§e§l| §eクリック §7削除/譲渡は /myworld コマンドを使用"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+
+    pending_item:
+      name: "§e{player} §7(招待中)"
+      status_online: "§e招待中 §7(§aオンライン§7)"
+      status_offline: "§e招待中 §7(§cオフライン§7)"
+      click_java: "§e§l| §e左クリック §7招待を取り消す"
+      click_bedrock: "§e§l| §eクリック §7招待を取り消す"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7状態 {status}"
+        - "§f§l| §7送信日時 §f{datetime}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{click}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+
+    pending_cancel_confirm:
+      title: "招待のキャンセル確認"
+      body: "§c{player}さんへのメンバー招待を取り消しますか？"
+      cancel: "§a戻る"
+      confirm: "§c実行"
+    
+    transfer_confirm:
+      title: "オーナー権限の譲渡"
+      # Placeholder: {player}, {world}
+      lore:
+        - "§c本当にオーナー権限を譲渡しますか？"
+        - "§f§l| §7新しいオーナー §f{player}"
+        - "§f§l| §7対象ワールド §f{world}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§c※§c§n譲渡すると、あなたはこのワールドのオーナーではなくなります"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      cancel: "§aキャンセル"
+      cancel_desc: "§7メンバー一覧に戻る"
+      confirm: "§c譲渡する"
+      confirm_desc: "§dこのプレイヤーにオーナー権限を譲渡します"
+
+  visitor_management:
+    title: "訪問中のプレイヤー"
+    no_visitors: "§7現在、このワールドに訪問者はいません。"
+    kick_confirm:
+      title: "確認"
+      question: "§c本当にキックしますか？"
+      player: "§f§l| §7プレイヤー §f{player}"
+      cancel: "§aキャンセル"
+      cancel_desc: "§7一覧に戻る"
+      confirm: "§cキックする"
+      confirm_desc: "§7このプレイヤーをワールドから追い出します"
+    item:
+      kick: "§e§nクリックでキックする"
+      kick_bedrock: "§e§nクリックでキックする"
+
+  tag_editor:
+    title: "ワールドタグの編集"
+    status_active: "§a有効"
+    status_inactive: "§c無効"
+    click_toggle: "§e§nクリックで切り替え"
+
+  admin_menu:
+    title: "管理者メニュー"
+    update_data:
+      display: "§eデータ更新"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7全ワールド・プレイヤーデータの整合性を確認し、"
+        - "§7修復・更新を行います。"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックで確認画面を開く"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      confirm_title: "データ更新の確認"
+    repair_templates:
+      display: "§eテンプレート修復"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7欠損しているテンプレートワールドを検出し、"
+        - "§7再生成を試みます。"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックで確認画面を開く"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      confirm_title: "テンプレート修復の確認"
+    create_template:
+      display: "§aテンプレート作成"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7テンプレート作成ウィザードを開きます。"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックで開始"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+    archive:
+      display: "§cアーカイブ実行"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7期限切れのワールドを一括アーカイブします。"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックで確認画面を開く"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      confirm_title: "一括アーカイブの確認"
+    convert:
+      display: "§6ワールド変換"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7現在のワールドをMyWorld管理下に登録します。"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§l §e左クリック§7 Normalモードで変換"
+        - "§7(ディレクトリをリネームして標準管理)"
+        - "§e§l §e右クリック§7 Adminモードで変換"
+        - "§7(現在の構成を維持して管理のみ適用)"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      confirm_normal: "変換確認 (Normal)"
+      confirm_admin: "変換確認 (Admin)"
+    unlink:
+      display: "§c紐づけ解除"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7現在のワールドのマイワールド設定を削除し、"
+        - "§7通常のワールドに戻します。"
+        - "§7(ワールドデータ自体は削除されません)"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックで確認画面を開く"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      confirm_title: "紐づけ解除の確認"
+    export:
+      display: "§bワールドのエクスポート"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7現在のワールドをZIP形式でエクスポートします。"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックで確認画面を開く"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      confirm_title: "エクスポート確認"
+      target_world: "§f§l| §7対象ワールド §b{world}"
+    archive_world:
+      confirm_title: "アーカイブの確認"
+      target_world: "§f§l| §7対象ワールド §b{world}"
+    unarchive_world:
+      confirm_title: "アーカイブ解除の確認"
+      target_world: "§f§l| §7対象ワールド §b{world}"
+    info:
+      display: "§aワールド一覧"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7全ワールドの一覧を表示・管理します。"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックで開く"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+    current_world:
+      display: "§b現在のワールド情報"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7ワールドディレクトリ §8{world_directory}"
+        - "§f§l| §7ワールド名 §a{world}"
+        - "§f§l| §7オーナー §b{owner}"
+        - "§f§l| §7生成方法 §e{generation}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{action_settings}"
+        - "{action_archive}"
+        - "{uuid_copy_hint}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+    portals:
+      display: "§bポータル管理"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7設置済みポータルの一覧を表示します。"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックで開く"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+
+  admin:
+    title: "マイワールドの管理"
+    info:
+      display: "§f統計情報"
+      total_count: "§f§l| §7検索結果 §b{count}件"
+      page: "§7表示中: §a{page}§7/{total_pages} ページ"
+    world_item:
+      # Placeholder: {uuid_line}, {world_name_line}, {owner_line}, {status_line}, {publish_line}, {generation_line}, {created_line}, {expire_line}, {mspt_line}, {world_size_line}, {action_warp}...
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{uuid_line}"
+        - "{world_name_line}"
+        - "{owner_line}"
+        - "{status_line}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{publish_line}"
+        - "{generation_line}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{created_line}"
+        - "{expire_line}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{mspt_line}"
+        - "{world_size_line}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{action_warp}"
+        - "{action_settings}"
+        - "{action_archive}"
+        - "{uuid_copy_hint}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+
+      uuid: "§f§l| §7ワールドディレクトリ §8{uuid}"
+      world_name_line: "§f§l| §7ワールド名 §a{world}"
+      # Line Formats used by code to construct lines above
+      owner: "§f§l| §7オーナー {owner}{status_color}"
+      status: "§f§l| §7状態 {status}"
+      status_archived: "§cアーカイブ済み"
+      status_active: "§bアクティブ"
+      publish: "§f§l| §7公開レベル {color}{level}"
+      generation: "§f§l| §7生成方法 §e{method}"
+      generation_type:
+        convert: "変換"
+        template: "テンプレート"
+        template_with_id: "テンプレート ({template_id})"
+        seed: "シード指定"
+        random: "ランダム生成"
+        unknown: "{source}"
+      expansion: "§f§l| §7拡張レベル §e{level}"
+      
+      expires_at: "§f§l| §7自動アーカイブ予定 §e{date} §8({days_remain}§8)"
+      archived_at: "§f§l| §7アーカイブ実施日 §e{date} §8({mode}§8)"
+      created_at: "§f§l| §7作成日 §e{date} §8({days_ago}§8)"
+      
+      created_info_days: "§7{days}日前"
+      created_info_today: "§7今日"
+      expire_info_remaining: "§7{days}日後"
+      expire_info_overdue: "§7{days}日前"
+      archive_mode_auto: "自動切り替え"
+      archive_mode_manual: "手動切り替え"
+      
+      mspt: "§f§l| §7MSPT {mspt}"
+      mspt_with_status: "§f§l| §7MSPT {mspt} §7({status}§7)"
+      mspt_value_low: "§a0.1§7 ms未満"
+      mspt_status_unloaded: "§7アンロード中"
+      mspt_error_with_reason: "§f§l| §7MSPT §c読み込み失敗 §7({reason}§7)"
+      mspt_reason_chiyogami_inactive: "Chiyogamiが無効"
+      mspt_reason_directory_not_found: "ワールドディレクトリが見つからない"
+      mspt_reason_load_failed: "ワールドの読み込み状態を確認できない"
+      mspt_reason_metrics_not_found: "MSPT計測データが見つからない"
+      world_size_line: "§f§l| §7ワールドサイズ §e{size}{suffix}"
+      world_size_measuring: "§f§l| §7ワールドサイズ §8(計測中...)"
+      world_size_unavailable: "§f§l| §7ワールドサイズ §c取得不可"
+      world_size_archived_suffix: " §8(アーカイブ中)"
+      
+      action_archive: "§e§l| §eShift + 右クリック §7アーカイブ状態を切り替え"
+      action_settings: "§e§l| §e右クリック §7ワールド設定を開く"
+      action_warp: "§e§l| §e左クリック §7このワールドへワープ"
+      uuid_copy_hint: "§e§l| §eホイールクリック §7チャット欄に出力してディレクトリ名をコピー"
+    filter:
+      archive:
+        display: "§eアーカイブフィルター"
+        all: "すべて表示"
+        active: "アクティブのみ"
+        archived: "アーカイブのみ"
+      publish:
+        display: "§e公開レベルフィルター"
+        all: "すべて表示"
+        public: "公開のみ"
+        friend: "限定公開のみ"
+        private: "非公開のみ"
+        locked: "封鎖中のみ"
+      player:
+        display: "§eプレイヤーフィルター"
+        # プレースホルダー: {type}, {player}
+        lore:
+          - "§8§m－－－－－－－－－－－－－－－－－－"
+          - "§f§l| §7フィルタータイプ §f{type}"
+          - "§f§l| §7対象プレイヤー §b{player}"
+          - "§8§m－－－－－－－－－－－－－－－－－－"
+          - "§e§l| §e左クリック §7タイプを変更"
+          - "§e§l| §e右クリック §7プレイヤーを設定"
+          - "§8§m－－－－－－－－－－－－－－－－－－"
+        none: "フィルターなし"
+        owner: "オーナーのワールド"
+        member: "メンバーのワールド"
+        current_type: "§f§l| §7フィルタータイプ §f{type}"
+        current_player: "§f§l| §7対象プレイヤー §b{player}"
+        click_left: "§e§l| §e左クリック §7タイプを変更"
+        click_right: "§e§l| §e右クリック §7プレイヤーを設定"
+      click_cycle: "§e§nクリックで切り替え"
+      click_lr: "§e§l| §e左/右クリック §7変更"
+    sort:
+      display: "§eソート方法"
+      created_desc: "§a作成日（新しい順）"
+      created_asc: "§a作成日（古い順）"
+      expire_asc: "§aアーカイブ予定（近い順）"
+      expire_desc: "§aアーカイブ予定（遠い順）"
+      world_size_desc: "§aワールドサイズ（大きい順）"
+      mspt_desc: "§aMSPT（高い順）"
+
+
+  environment:
+    title: "環境設定"
+    gravity:
+      display: "§e重力の設定"
+      current: "§f§l| §7現在の倍率: §6{multiplier}"
+      click_hint: "§e§n月の石§7を持った状態でクリックで変更"
+      cost: "§f§l| §7必要ポイント §6🛖 §e{cost}"
+      options:
+        zero: "無重力 (x0.0)"
+        moon: "月 (x0.17)"
+        mars: "火星 (x0.38)"
+        earth: "地球 (x1.0)"
+    weather:
+      display: "§b天候の設定"
+      current: "§f§l| §7現在の天候: §b{weather}"
+      click_cycle: "§e§l| §e左クリック §7切り替える"
+      click_confirm: "§e§l| §e右クリック §7確定してポイントを消費"
+      cost: "§f§l| §7必要ポイント §6🛖 §e{cost}"
+      desc: "§7設定した天候で固定されます。"
+    biome:
+      display: "§aバイオームの設定"
+      current: "§f§l| §7現在のバイオーム: §a{biome}"
+      click_hint: "§e§nバイオームの瓶§7を持った状態でクリックで変更"
+      click_bottle_hint: "§7バイオーム入りの瓶を持ってクリックしてください"
+      cost: "§f§l| §7必要ポイント §6🛖 §e{cost}"
+      desc: "§7ワールド全体のバイオームを変更します。"
+
+
+  meet:
+    title: "{player}のところに行く"
+    title_list: "プレイヤーのところに行く"
+    empty_message: "§7表示できるプレイヤーはいません"
+    world_item:
+      current_world: "§f§l| §7現在のワールド §f{world}"
+      current_world_same: "§f§l| §7現在のワールド §6{world} §7(このワールド)"
+      status: "§f§l| §7ステータス §e{status}"
+      click_visit: "§e§l| §eクリック §7このワールドへワープ"
+      click_request: "§e§l| §eクリック §7ワープ申請を送信"
+    status_button:
+      display: "§e{player}"
+      current: "§f§l| §7現在のステータス §e{status}"
+      next: "§f§l| §7次のステータス §7{next_status}"
+      click: "§e§nクリックで切り替え"
+
+  meet_settings:
+    title: "/meet 設定"
+    status_selector:
+      display: "§aステータス設定"
+      current: "§f§l| §7現在のステータス §e{status}"
+      active_prefix: "§6» "
+      inactive_prefix: "  "
+      desc_header: "§f§l| §f説明 "
+      click_cycle: "§e§nクリックで切り替え"
+
+  invite:
+    target_head:
+      click_invite: "§e§l| §eクリック §7このプレイヤーを招待する"
+
+  discovery:
+    title: "ワールドディスカバリー"
+    world_item:
+      # プレースホルダー: {description}, {owner}, {status_color}, {favorites}, {visitors}, {tags}, {warp_hint}, {preview_hint}, {member_request_hint}, {favorite_hint}
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{description}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7オーナー {owner}{status_color}"
+        - "§f§l| §7お気に入り §c{favorites}"
+        - "§f§l| §7最近の来訪者 §a{visitors}"
+        - "{tags}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{warp_hint}"
+        - "{preview_hint}"
+        - "{member_request_hint}"
+        - "{favorite_hint}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      lore_bedrock:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{description}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7オーナー {owner}{status_color}"
+        - "§f§l| §7お気に入り §c{favorites}"
+        - "§f§l| §7最近の来訪者 §a{visitors}"
+        - "{tags}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{warp_hint}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      owner: "§f§l| §7オーナー {owner}{status_color}"
+      tag: "§f§l| §7タグ §e{tags}"
+      favorite: "§f§l| §7お気に入り §c{count}"
+      recent_visitors: "§f§l| §7最近訪れたプレイヤー §a{count}人"
+      warp: "§e§l| §e左クリック §7このワールドへワープ"
+      preview: "§e§l| §e右クリック §7プレビューを表示"
+      warp_hint: "§e§l| §e左クリック §7このワールドへワープ"
+      warp_hint_bedrock: "§e§l| §eクリック §7このワールドへワープ"
+      preview_hint: "§e§l| §e右クリック §7プレビューを表示"
+      member_request_hint: "§e§l| §eShift + 左クリック §7参加申請を表示"
+      favorite_hint_add: "§e§l| §eShift + 右クリック §7お気に入りに追加"
+      favorite_hint_remove: "§e§l| §eShift + 右クリック §7お気に入りを解除"
+      favorite_toggle: "§e§l| §eShift + 右クリック §7お気に入りを切り替える"
+      fav_add: "§e§l| §e右クリック §7お気に入りに追加"
+      fav_remove: "§e§l| §e右クリック §7お気に入りを解除"
+      spotlight_remove: "§e§l| §eShift + 右クリック §7SPOTLIGHTから削除する"
+    spotlight_empty:
+      name: "§7« 未登録のSPOTLIGHT »"
+      lore_admin:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7現在このスロットにはワールドが登録されていません。"
+        - "§e§l| §e左クリック §7現在のマイワールドを登録"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      lore_admin_bedrock:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7現在このスロットにはワールドが登録されていません。"
+        - "§e§l| §eクリック §7現在のマイワールドを登録"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      lore_visitor:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7現在このスロットにはワールドが登録されていません。"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+    sort:
+      display: "§a並び替え方法の選択"
+      # プレースホルダー: {current_prefix}, {sort_name}, {sort_desc}, {sort_list}
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7{current_prefix} §f{sort_name}"
+        - "  §f{sort_desc}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{sort_list}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックで切り替え"
+      lore_spotlight_admin:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7選択中 §6{sort_name}"
+        - "  §f{sort_desc}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{sort_list}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§l| §e左右クリック §7ソートを切り替え"
+        - "§e§l| §eShift + 左クリック §7SPOTLIGHTの説明文を編集"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      name: "§a並び替え方法の選択"
+      click: "§e§nクリックで切り替え"
+      type:
+        hot: "§cHOT"
+        new: "§aNEW"
+        favorites: "§eFAVORITES"
+        spotlight: "§6SPOTLIGHT"
+        random: "§bRANDOM"
+    tag_select:
+      display: "§aタグの選択"
+      # プレースホルダー: {tag}, {tag_list}
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| 選択中のタグ §6{tag}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{tag_list}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§l| §e左クリック §7次へ進む"
+        - "§e§l| §e右クリック §7選択を解除"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      current: "§f§l| 選択中のタグ §6{tag}"
+      none: "§fなし"
+      active: "§a» {tag}"
+      inactive: "§8- {tag}"
+      click_next: "§e§l| §e左クリック §7次へ進む"
+      click_reset: "§e§l| §e右クリック §7選択を解除"
+    tag_filter:
+      name: "タグフィルター"
+      # プレースホルダー: {tag}, {tag_list}, {click_left}, {click_right}
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7選択中 §6{tag}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{tag_list}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{click_left}"
+        - "{click_right}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      lore_bedrock:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7選択中 §6{tag}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{tag_list}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{click_left}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      current_prefix: "選択中"
+      active: "§e» "
+      inactive: "§7  "
+      no_selection: "設定なし"
+      all: "すべて"
+      click_left: "§e§l| §e左クリック §7フィルターを切り替え"
+      click_right: "§e§l| §e右クリック §7フィルターを解除"
+      click_bedrock: "§e§l| §eクリック §7フィルターを切り替え"
+    spotlight_description_dialog:
+      title: "SPOTLIGHT説明文の編集"
+      body: "SPOTLIGHTソート中に表示する説明文を入力してください（最大{max}文字）。空欄でデフォルトに戻せます。"
+      input_label: "説明文"
+    stats:
+      name: "§f統計情報"
+      # プレースホルダー: {sort}, {tag}, {count}, {desc}
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7並び順: §b{sort}"
+        - "§f§l| §7タグ: §b{tag}"
+        - "§f§l| §7検索結果 §b{count}件"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7{desc}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      sort: "§f§l| §7並び順: §b{sort}"
+      tag: "§f§l| §7タグ: §b{tag}"
+      count: "§f§l| §7検索結果 §b{count}件"
+      desc: "§7条件に一致するワールドを表示しています"
+    sort_info:
+      hot: "直近の来訪者が多い順"
+      new: "公開日時が新しい順"
+      favorites: "お気に入り登録数が多い順"
+      spotlight: "運営によるピックアップ"
+      random: "日替わりランダム"
+    no_result: "§7条件に一致するワールドが見つかりませんでした"
+
+    spotlight_remove_confirm:
+      title: "SPOTLIGHTからの削除"
+      lore:
+        - "§fワールド「§a{world}§f」を"
+        - "§6SPOTLIGHT§fから削除しますか？"
+
+  favorite:
+    title: "お気に入りリスト"
+    empty_message: "§7フィルターに一致するお気に入りはありません"
+    empty_message_no_favorites: "§7まだお気に入りがありません"
+    current_world:
+      name: "§b現在のワールド"
+      world_name: "§f§l| §7ワールド名 §a{world}"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{world_line}"
+        - "{description}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{owner_line}"
+        - "{favorite_line}"
+        - "{visitor_line}"
+        - "{tag_line}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+    world_item:
+      # Placeholder: {description}, {owner_line}, {favorite_line}, {visitor_line}, {tag_line}, {warp_line}, {archived_line}, {unfavorite_line}
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{description}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{owner_line}"
+        - "{favorite_line}"
+        - "{visitor_line}"
+        - "{tag_line}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{warp_line}"
+        - "{archived_line}"
+        - "{unfavorite_line}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+
+      owner: "§f§l| §7オーナー §b{owner}{status_color}"
+      favorite: "§f§l| §7お気に入り §c{count}"
+      recent_visitors: "§f§l| §7最近の来訪者 §a{count}"
+      tag: "§f§l| §7タグ §e{tags}"
+      warp: "§e§l| §e左クリック §7このワールドへワープ"
+      warp_bedrock: "§e§l| §eクリック §7このワールドへワープ"
+      unfavorite: "§e§l| §eShift + 右クリック §7お気に入りを解除"
+      archived_label: "§c【アーカイブされています】"
+      unfavorite_archived: "§e§nクリックでお気に入りを解除"
+    info:
+      display: "§f統計情報"
+      # プレースホルダー: {count}, {current_page}, {max_page}
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7登録中 §f{count}件"
+        - "§7表示中 §a{current_page}§7/{max_page}ページ"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      count: "§7登録中 §f{count}件"
+      page: "§7表示中 §a{current}§7/{max}ページ"
+    player_icon:
+      name: "§b{player}"
+      lore_count: "§f§l| §7お気に入りしたワールド数 §a{count} §7個"
+    
+    favorite_menu:
+      title: "お気に入りメニュー"
+      other_worlds:
+        name: "§aこのプレイヤーのほかのワールド"
+        lore:
+          - ""
+          - "§7このワールドのオーナーが所有する"
+          - "§7ほかのワールド一覧を表示します。"
+          - ""
+          - "§e§nクリックで表示"
+      toggle:
+        name_add: "§bお気に入りに追加"
+        name_remove: "§cお気に入りから削除"
+        name_restricted: "§7お気に入り登録不可"
+        lore_add: "§7このワールドをお気に入りリストに追加します。"
+        lore_remove: "§7このワールドをお気に入りリストから削除します。"
+        lore_restricted_owner: "§c自分のワールドはお気に入り登録できません。"
+        lore_restricted_not_managed: "§cこの場所はお気に入り登録できません。"
+        click: "§e§nクリックで切り替え"
+      list:
+        name: "§dお気に入り一覧"
+        lore:
+          - "§7あなたが登録したお気に入りワールドの"
+          - "§7一覧を表示します。"
+          - ""
+          - "§e§nクリックで表示"
+    
+    remove_confirm:
+      title: "お気に入り解除の確認"
+      lore:
+        - "§fワールド「§a{world}§f」を"
+        - "§cお気に入りから解除§fしますか？"
+        - ""
+        - "§7解除すると、お気に入りリストから削除されます。"
+
+  member_request_confirm:
+    title: "メンバー参加申請の確認"
+    confirm: "§a申請を送信"
+    cancel: "§cキャンセル"
+    lore:
+      - "§fワールド「§a{world}§f」のオーナーに"
+      - "§dメンバー参加申請§fを送信しますか？"
+      - ""
+      - "§7オーナーが承認すると、メンバーとして参加できます。"
+    
+  member_request_owner_confirm:
+    title: "メンバー参加申請の承認"
+    confirm: "§a承認する"
+    reject: "§c却下する"
+    lore:
+      - "§fプレイヤー「§a{player}§f」からの"
+      - "§dメンバー参加申請§fを承認しますか？"
+      - ""
+      - "§7承認すると、このプレイヤーはワールドのメンバーになります。"
+
+  member_invite_accept_confirm:
+    title: "メンバー招待の確認"
+    confirm: "§a承諾する"
+    cancel: "§c辞退する"
+    lore:
+      - "§fプレイヤー「§a{player}§f」からの"
+      - "§dメンバー招待§fを承諾しますか？"
+      - ""
+      - "§7対象ワールド: §a{world}"
+
+  spotlight_confirm:
+    title: "SPOTLIGHTへの登録"
+    lore:
+      - "§fワールド「§a{world}§f」を"
+      - "§6SPOTLIGHT§fに登録しますか？"
+      - ""
+      - "§7登録するとディスカバリーメニューの最上位に"
+      - "§7優先的に表示されるようになります。"
+  
+  world_seed_confirm:
+    title: "ワールドの種の使用"
+    lore:
+      - "§dワールドの種§fを使用しますか？"
+      - ""
+      - "§7現在のマイワールドスロット: §a{current}"
+      - "§7使用後のマイワールドスロット: §a{next}"
+      - ""
+      - "§7スロットを拡張すると、作成できる"
+      - "§7マイワールドの数が増えます。"
+
+  visit:
+    input:
+      title: "訪問先プレイヤーの入力"
+      label: "プレイヤー名"
+      placeholder: "プレイヤー名を入力"
+    title: "{player}のワールド"
+    world_item:
+      # Placeholder: {description}, {owner_line}, {favorite_line}, {visitor_line}, {tag_line}, {warp_line}, {fav_action_line}
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{description}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{owner_line}"
+        - "{favorite_line}"
+        - "{visitor_line}"
+        - "{tag_line}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{warp_line}"
+        - "{fav_action_line}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+
+      owner: "§f§l| §7オーナー §b{owner}{status_color}"
+      tag: "§f§l| §7タグ §b{tags}"
+      favorite: "§f§l| §7お気に入り §c{count}"
+      recent_visitors: "§f§l| §7最近の来訪者 §a{count}"
+      warp: "§e§l| §e左クリック §7このワールドへワープ"
+      warp_bedrock: "§e§l| §eクリック §7このワールドへワープ"
+      fav_add: "§e§l| §e右クリック §7お気に入りに追加"
+      fav_remove: "§e§l| §e右クリック §7お気に入りを解除"
+
+  visitworld:
+    input:
+      title: "訪問ワールド検索"
+      label: "検索キーワード"
+      placeholder: "ワールド名で検索"
+    title: "ワールド検索: {query}"
+    info:
+      name: "§6検索情報"
+      query: "§f§l| §7検索キーワード §f{query}"
+      hit: "§f§l| §7ヒット件数 §a{hit}"
+      shown: "§f§l| §7表示件数 §b{shown}"
+      page: "§f§l| §7ページ §e{current}/{total}"
+
+  player_world:
+    title: "マイワールドの一覧"
+    world_item:
+      # Placeholder: {description}, {owner_line}, {publish_line}, {favorite_line}, {visitor_line}, {tag_line}, {expires_at_line}, {expired_line}, {warp_action}, {settings_action}
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{description}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{owner_line}"
+        - "{publish_line}"
+        - "{favorite_line}"
+        - "{visitor_line}"
+        - "{tag_line}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{expires_at_line}"
+        - "{expired_line}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "{warp_action}"
+        - "{settings_action}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+
+      owner: "§f§l| §7オーナー §f{owner}"
+      publish: "§f§l| §7公開設定 §b{level}{status_color}"
+      favorite: "§f§l| §7お気に入り §c{count}"
+      recent_visitors: "§f§l| §7最近訪れたプレイヤー §a{count}人"
+      tag: "§f§l| §7タグ §e{tags}"
+      warp: "§e§l| §e左クリック §7このワールドへワープ"
+      warp_bedrock: "§e§l| §eクリック §7このワールドへワープ"
+      settings: "§e§l| §e右クリック §7ワールド設定を開く"
+      settings_bedrock: "§7ワールド設定は /worldmenu から開けます"
+      expired: "§c§nこのワールドはアーカイブされています"
+      expires_at: "§f§l| §7アーカイブまでの日数 §f{days}日 §8({date} にアーカイブ)"
+    
+    creation_button:
+      display: "§a§lマイワールドを新規作成"
+
+
+      lore:
+        - "§7新しいマイワールドを作成します。"
+        - "§7テンプレートや公開範囲を自由に設定可能です。"
+        - ""
+        - "§e§nクリックで作成を開始"
+    
+    stats_button:
+      display: "§e{player}"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7ワールドポイント §6{icon} {point}"
+        - "§7マイワールドの新規作成や、拡張などに使えるポイントです"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7ワールドスロット §a§l{current_occupied}§7/{unlocked}"
+        - "§7新規にマイワールドを作成することができる枠数です"
+        - "§7「ワールドの種」を使用することで解放することができます"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7未処理の招待/申請 §e{pending_count}件"
+        - "§f§l| §7最新受信日時 §b{latest_pending_at}"
+        - "§e§nクリックで招待/申請一覧を開く"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      lore_bypass:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7ワールドポイント §6{icon} {point}"
+        - "§7マイワールドの新規作成や、拡張などに使えるポイントです"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7ワールド数 §a§l{current_occupied}"
+        - "§7上限を貫通する権限が付与されています"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7未処理の招待/申請 §e{pending_count}件"
+        - "§f§l| §7最新受信日時 §b{latest_pending_at}"
+        - "§e§nクリックで招待/申請一覧を開く"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+
+  user_settings:
+    title: "個人設定"
+    notification:
+      display: "§a訪問者の通知"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7誰かがあなたのワールドを訪れたときに"
+        - "§7通知を送信するかどうかを設定します。"
+        - ""
+        - "§f§l| §7現在の状態 {status}"
+        - ""
+        - "§e§nクリックで切り替え"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+    language:
+      display: "§a言語設定"
+      format: "§f{language}"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7メニューやメッセージの表示言語を変更します。"
+        - ""
+        - "§f§l| §7現在の設定: §f{language}"
+        - ""
+        - "§e§nクリックで次へ"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+    critical_settings_visibility:
+      display: "§a重大な設定の表示"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7ワールド管理メニュー内の"
+        - "§7「重大な設定」アイコンを表示するか設定します。"
+        - ""
+        - "§f§l| §7現在の設定 {status}"
+        - ""
+        - "§e§nクリックで切り替え"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+    tour_navigation:
+      display: "§bワールドツアーのナビゲーション"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7ワールドツアー中のナビ表示方法を切り替えます。"
+        - "§7メッセージは常に表示されます。"
+        - ""
+        - "§f§l| §7現在の設定 §b{status}"
+        - ""
+        - "§e§nクリックで切り替え"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+      mode:
+        bossbar_only: "ボスバーのみ"
+        all: "すべて"
+        none: "なし"
+    beta_features:
+      display: "§eベータ機能（実験的機能）"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7開発中の機能を有効化します。"
+        - "§7現在は、従来のチャット入力の代わりに"
+        - "§7新しいダイアログ入力を使用します。"
+        - "§c※ 1.21.8より古いクライアントでは動作しないため、"
+        - "§c将来的にサポート終了予定です！"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§f§l| §7現在の状態 {status}"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§e§nクリックで切り替え"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+    button:
+      display: "§6個人設定"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7表示言語や通知などを変更します。"
+        - "§e§nクリックで開く"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+
+  pending_list:
+    title: "招待・申請通知"
+    type:
+      member_invite: "メンバー招待"
+      member_request: "参加申請"
+    item:
+      name: "§e{player} §7({type})"
+      type_line: "§f§l| §7種別 §e{type}"
+      world_line: "§f§l| §7対象ワールド §a{world}"
+      status_line: "§f§l| §7状態 {status}"
+      received_line: "§f§l| §7受信日時 §f{datetime}"
+      status_online: "§aオンライン"
+      status_offline: "§cオフライン"
+      action_review: "§e§l| §eクリック §7承諾/辞退を開く"
+      action_cancel_java: "§e§l| §e左クリック §7招待を取り消す"
+      action_cancel_bedrock: "§e§l| §eクリック §7招待を取り消す"
+    empty:
+      name: "§7未処理の通知はありません"
+      lore:
+        - "§8現在、処理が必要な招待/申請はありません。"
+    confirm:
+      title: "招待・申請の確認"
+      body: "§7種別: §e{type}\n§7相手: §b{player}\n§7ワールド: §a{world}\n§7受信日時: §f{datetime}\n\n§fこの通知を処理しますか？"
+      accept: "§a承諾する"
+      deny: "§c辞退する"
+
+  like_sign:
+    placement:
+      title: "Like看板の設置"
+      description: "§7Like看板の設定を入力してください"
+    edit:
+      title: "Like看板の編集"
+      current_likes: "§7現在のLike数"
+    display_type:
+      sign: "看板"
+      hologram: "ホログラム"
+    input:
+      title: "タイトル"
+      description: "説明文"
+      display_type: "表示形式"
+    button:
+      place: "設置する"
+      cancel: "キャンセル"
+      save: "保存"
+      delete: "削除"
+    unlike_confirm:
+      title: "Likeの取り消し"
+      description: "§cLikeを取り消しますか？"
+
+  tour_sign:
+    placement:
+      title: "Tour看板の設置"
+      description: "§7Tour看板の設定を入力してください"
+    edit_text:
+      title: "Tour看板の表示情報を変更"
+      description: "§7看板名と説明を入力してください"
+    input:
+      title: "看板名"
+      description: "説明文"
+    button:
+      place: "設置する"
+      cancel: "キャンセル"
+
+  tour:
+    worldmenu:
+      display: "§bワールドツアー"
+      lore:
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+        - "§7ツアーの作成・編集を行います。"
+        - "§e§nクリックで開く"
+        - "§8§m－－－－－－－－－－－－－－－－－－"
+    edit_text:
+      title: "ツアーの表示情報を変更"
+      description: "§7ツアー名と説明を入力してください"
+    input:
+      name: "ツアー名"
+      description: "説明文"
+
+# メッセージ
+messages:
+  # 設定操作
+  world_name_prompt: "§eワールド名を入力してください"
+  chat_input_cancel_hint: "§7(キャンセルするにはチャットで §e{word} §7と入力してください)"
+  wizard_cancel_word: "§7(キャンセルするにはチャットで §e{word} §7と入力してください)"
+  unlink_success: "§aワールドの紐づけを解除しました。"
+  unlink_failed: "§c解除に失敗しました。"
+  unlink_not_myworld: "§cこのワールドはマイワールドではありません。"
+  world_desc_prompt: "§eワールド説明文を入力してください"
+  world_name_change: "§aワールド名を変更しました！"
+  world_name_invalid: "§cワールド名は3〜16文字で入力してください"
+  world_desc_change: "§aワールド説明を変更しました！"
+  publish_updated: "§a公開設定を更新しました: {level}"
+  icon_prompt: "§eインベントリ内のアイテムをクリックして、アイコンを設定します"
+  icon_changed: "§aワールドアイコンを「{icon}」に変更しました！"
+  icon_cancelled: "§cアイコン設定をキャンセルしました"
+  operation_cancelled: "§c操作をキャンセルしました。"
+  insufficient_points: "§cポイントが不足しています。"
+  creation_insufficient_points: "§cポイントが不足しています。"
+  invalid_biome_data: "§cバイオームデータが不適切です。"
+  creation_cancelled: "§cマイワールドの作成をキャンセルしました。"
+  creation_success: "§aワールド作成完了！"
+  creation_failed: "§c作成に失敗しました。"
+  world_not_found: "§cワールドが見つかりませんでした。"
+  spawn_set_start: "§e{type}スポーン地点の設定を開始しました。設置したい場所を向いてクリックしてください。"
+  spawn_set_start_bedrock: "§e{type}スポーン地点の設定を開始しました。設置したい場所を向いてクリックしてください。"
+  spawn_guest_set: "§aゲスト用のスポーン位置を設定しました！"
+  spawn_member_set: "§aメンバー用のスポーン位置を設定しました！"
+  spawn_both_set: "§aゲスト/メンバー共通のスポーン位置を設定しました！"
+  favorite_removed: "§cお気に入りを解除しました"
+  tag_max_reached: "§cタグは最大{limit}個まで設定可能です"
+  
+  # 招待関連
+  member_invite_input: "§e招待したいプレイヤーのIDを入力してください"
+  member_force_add_input: "§c強制追加モードです。追加したいプレイヤーのIDを入力してください"
+  visit_target_input: "§e訪問したいプレイヤーのIDを入力してください"
+  visitworld_query_input: "§e検索したいワールド名のキーワードを入力してください"
+  visitworld_query_empty: "§c検索キーワードを入力してください。"
+  visitworld_no_result: "§c「{query}」に一致する公開ワールドが見つかりませんでした。"
+  member_deleted: "§cメンバーを削除しました"
+  owner_transferred: "§a{old_owner}さんへオーナー権限を譲渡しました。"
+  owner_transfer_failed_limit: "§c譲渡先のプレイヤーのワールドスロットがいっぱいです"
+  invite_locked_error: "§c閉鎖中のワールドには招待できません"
+  portal_dest_locked: "§cこのポータルの先は現在閉鎖されています！"
+  portal_warped: "§aポータルで「{destination}」へワープしました！"
+  invite_expired: "§c招待が見つからないか、期限切れです"
+  invite_world_not_found: "§cワールドデータが見つかりませんでした"
+  invite_already_member: "§c既にこのワールドのメンバーです"
+  member_invite_already_sent: "§cそのプレイヤーには既にメンバー招待を送信しています"
+  invite_accepted_self: "§aワールド【{world}】のメンバーになりました！"
+  invite_accepted_sender: "§e{player} §fさんがワールド【§a{world}§f】のメンバー招待を承諾しました"
+  member_joined_notify: "§a{player} §fさんがワールド【§a{world}§f】のメンバーになりました"
+  invite_sent_success: "§e{player} §fさんを「§a{world}§f」に招待しました！"
+  member_force_add_success: "§a{player} §fさんをワールド「§a{world}§f」に強制追加しました"
+  member_force_added_self: "§aワールド「§a{world}§a」のメンバーに強制追加されました"
+  invite_target_offline: "§c{player}さんは現在オフラインです"
+  invite_no_available_targets: "§c現在招待可能なプレイヤーがいません。"
+  invite_queued_offline: "§7{player}さんはオフラインです。次回ログイン時に通知されます。"
+  invite_not_in_myworld: "§c招待を送信するには、マイワールドにいる必要があります！"
+  invite_not_member: "§cこのワールドのメンバーではないため、招待を送信できません"
+  invite_hover: "クリックしてワールドに参加します"
+  invite_text: "{player}さんがあなたを【{world}】に招待しました！"
+  invite_click_text: "§e§n§lクリックしてワープ"
+  member_invite_text: "{player}さんがあなたを「{world}」のメンバーに招待しました。"
+  member_invite_click_text: "§e§n§lクリックしてワープ"
+  member_invite_click: "§e§n§lクリックして承諾"
+  member_invite_hover: "クリックしてメンバー招待を承諾します"
+  member_request_sent: "§aワールドメンバー参加の申請を送信しました"
+  member_request_received: "§d{player}さんがワールドメンバーの参加を希望しています"
+  member_request_click_approve: "§a【承認】"
+  member_request_click_reject: "§c【却下】"
+  member_request_hover_approve: "クリックして承認"
+  member_request_hover_reject: "クリックして却下"
+  member_request_approved: "§aワールドメンバー参加の申請が承認されました"
+  member_request_rejected: "§cワールドメンバー参加の申請が却下されました"
+  member_request_expired: "§c申請の有効期限が切れました"
+  visitor_notified: "§a{player} §fさんが【§a{world}§f】を訪れました"
+  kicked: "§cこのワールドからキックされました"
+  kicked_success: "§c{player}さんをキックしました"
+  admin_player_filter_set: "§aフィルター対象のプレイヤーを「{player}」に設定しました。"
+  announcement_prompt: "§7設定する案内メッセージをチャット欄に入力してください。§6exit§7と入力して編集を終了します。"
+  announcement_set: "§a案内メッセージを設定しました！"
+  announcement_reset: "§e案内メッセージをリセットしました。"
+  announcement_invalid_length: "§cメッセージが長すぎます。（{max_lines}行まで、各行{max_length}文字まで）"
+  announcement_blocked_string: "§c禁止文字列が含まれています: {string}"
+  announcement_preview: "§7«案内プレビュー» {message}"
+  bedrock_option_unavailable: "§cこの機能は統合版インベントリUIでは利用できません。"
+  bedrock_form_unavailable: "§c統合版フォームを開けませんでした。"
+  env_gravity_changed: "§a重力を「{gravity}」に変更しました（倍率: {multiplier}）"
+  env_weather_changed: "§a天候を「{weather}」に規定しました"
+  env_biome_changed: "§aバイオームを「{biome}」に変更しました"
+  env_cost_paid: "§6🛖 §e{cost} §aポイントを消費しました。{remaining_info}"
+  env_cost_paid_remaining: "(残り: §6🛖 §e{remaining})"
+  creation_start: "§aワールドを作成しています..."
+  creation_seed_prompt: "§a生成に使用するシード値をチャットに入力してください。"
+  wizard_input_mode_ended: "§e入力モードを終了しました。"
+  wizard_name_set: "§aテンプレート名を設定しました: {name} (ID: {id})"
+  wizard_desc_set: "§a説明文を設定しました。"
+  wizard_icon_prompt: "§e[MyWorldManager] アイコンにするアイテムをクリックしてください。"
+  wizard_origin_set: "§a原点位置を設定しました。"
+  wizard_id_missing: "§cIDが設定されていません。"
+  wizard_id_exists: "§cそのIDは既に存在します。"
+  wizard_registered: "§aテンプレート「{template}」を登録しました！"
+  oage_ganbaru_messages:
+    - "§eおあげちゃんがワールドを拡げてくれています...§7「よいしょ！」"
+    - "§eおあげちゃんが境界線を押し広げています！"
+    - "§eおあげちゃんが新しい土地を開拓しています..."
+  oage_ganbaru_default: "§e拡張の準備をしています..."
+  
+  # Like看板
+  like_sign:
+    placed: "§aLike看板を設置しました！"
+    saved: "§aLike看板を更新しました！"
+    deleted: "§cLike看板を削除しました。"
+    liked: "§c❤ §aLikeしました！"
+    unliked: "§cLikeを取り消しました。"
+  tour_sign:
+    placed: "§aTour看板を設置しました！"
+  tour:
+    available: "§eこのワールドではツアーを開始できます。§bクリックで開く"
+    none_available: "§7このワールドでは現在ツアーを開始できません。"
+    started: "§aツアー「{tour}」を開始しました！"
+    next_marker: "§e次の目的地: §b{marker} §7(ツアー: {tour})"
+    completed: "§aツアー「{tour}」を完了しました！"
+    stopped: "§eツアーを終了しました。"
+    stopped_world_change: "§eワールドを離れたため、進行中のツアーを終了しました。"
+    cancelled_edited: "§e進行中のツアー内容が変更されたため、ツアーをキャンセルしました。"
+    cancelled_deleted: "§e進行中のツアーが削除されたため、ツアーをキャンセルしました。"
+
+  # 拡張・削除・アーカイブ
+  expand_direction_prompt: "§a拡張したい方角（北西・北東・南西・南東）を向いて左クリックしてください"
+  expand_direction_prompt_bedrock: "§a拡張したい方角（北西・北東・南西・南東）を向いてクリックしてください"
+  expand_direction_selected: "§a指定した方角: {direction}"
+  expand_confirm_chat: "§a変更後のワールドボーダーのプレビューを表示しています。この内容で拡張しますか？"
+  expand_confirm_button: "§a§l【拡張を確定する】"
+  expand_confirm_hover: "§7クリックしてポイントを消費し、拡張を実行します"
+  expand_retry_button: "§c§l【方角を選び直す】"
+  expand_retry_hover: "§7クリックしてボーダープレビューを消去し、方角を選択し直します"
+  expand_complete: "§aワールドの拡張が完了しました！ §7{level_before} §f→ §e§l{level_after} §7(残りポイント §6🛖 §e{remaining}§7)"
+  expansion_reset_success: "§a拡張段階を初期化し、§6🛖 §e{points} §aポイントを返還しました。"
+  world_delete_start: "§cワールド「{world}」を削除しています..."
+  world_delete_success: "§aワールドを削除し、合計 §6🛖 §e{points} §aポイントを返還しました。"
+  world_delete_fail: "§cワールドの削除に失敗しました。"
+  archive_start: "§eワールドをアーカイブしています..."
+  archive_success: "§cワールド「{world}」をアーカイブしました。"
+  archive_cooldown: "§c前回のアーカイブ/復旧操作から {cooldown_hours} 時間が経過するまで実行できません。（残り約 {hours_remaining} 時間）"
+  archive_failed: "§cワールドのアーカイブに失敗しました。"
+
+  # プレビュー
+  preview_start: "§aテンプレート「{template}」のプレビューを開始しました… §7(Shiftキーで中断可能)"
+  preview_end: "§eプレビューが終了しました。"
+  preview_cancel: "§eプレビューをキャンセルしました。"
+  preview_restored: "§eプレビュー中に遊離したため、元の位置に復帰しました。"
+  preview_archived: "§cこのワールドは現在アーカイブされているため、プレビューできません。"
+
+  unarchive_start: "§eワールドをアーカイブから復旧しています..."
+  unarchive_success: "§aワールドを復旧しました。"
+  unarchive_cooldown: "§c前回のアーカイブ/復旧操作から {cooldown_hours} 時間が経過するまで実行できません。（残り約 {hours_remaining} 時間）"
+  archive_access_denied: "§cこのワールドは現在アーカイブされているため、アクセスできません。"
+  unknown_world: "未知のワールド"
+  item_not_found_hand: "§cアイテムを手に持っていません。"
+  
+  # 管理者向け
+  admin_update_data_start: "§eプレイヤーデータを更新しています..."
+  admin_repair_template_none_missing: "§a欠損しているテンプレートディレクトリはありません。"
+  admin_repair_template_start: "§e欠損しているテンプレートの修復を開始します ({count}件)..."
+  admin_repair_template_progress: "§7- {template} を生成中... ({path})"
+  admin_repair_template_success: "§a  -> {template} の生成に成功しました。"
+  admin_repair_template_complete: "§a修復処理が完了しました。"
+  admin_convert_start: "§eワールドの変換を開始します。しばらくお待ちください..."
+  admin_convert_success: "§a現在のワールド '{world}' をMyWorldとして登録しました。(UUID: {uuid})"
+  admin_convert_success_normal: "§aディレクトリが標準形式にリネームされ、通常のマイワールド管理が適用されます。"
+  admin_convert_success_admin: "§a設定ファイルのみ生成されました。管理用ワールドとして扱われます。"
+
+  # ワープ・ロード
+  warp_success: "§aワールド【{world}】にワープしました。"
+  warp_invite_success: "§a招待されたワールドにワープしました。"
+  warp_generic: "§aワールドにワープしました。"
+  admin_warp_success: "§aワールド【{world}】にワープしました。"
+  admin_warp_archived_error: "§cアーカイブ中のワールドには直接ワープできません。"
+  portal_warp_success: "§aポータルを介して【{destination}】へ移動しました。"
+  world_loading: "§aワールドをロード中です..."
+  evacuated: "§cワールドがアンロードされたため、スポーン地点へ移動しました。"
+  no_in_myworld: "§cマイワールド内に滞在している必要があります。"
+  admin_player_filter_prompt: "§eフィルタリングするプレイヤー名を入力してください。"
+  
+  # その他
+  favorite_added: "§bこのワールドをお気に入りに追加しました！"
+  portal_removed: "§aポータルを撤去しました"
+  portal_bind_success: "§aこのポータルを「{destination}」に紐づけました"
+  portal_unbind_success: "§eポータルの紐づけを解除しました"
+  portal_place_success: "§aワールドポータルを設置しました"
+  portal_broken: "§eワールドポータルが破壊されました"
+  world_gate_bind_success: "§aこのワールドゲートを「{destination}」に紐づけました"
+  world_gate_unbind_success: "§aワールドゲートのリンクを解除しました。"
+  world_gate_select_first: "§eワールドゲートの1点目を右クリックで選択してください。"
+  world_gate_select_second: "§eワールドゲートの2点目を右クリックで選択してください。"
+  world_gate_point_selected: "§a{point}点目を選択: §f({x}, {y}, {z})"
+  world_gate_confirm_place: "§e3回目の右クリックでワールドゲートを設置します。"
+  world_gate_confirm_title: "§6ワールドゲート設置確認"
+  world_gate_confirm_body:
+    - "§f次の範囲でワールドゲートを設置します。"
+    - "§7最小: §f({min_x}, {min_y}, {min_z})"
+    - "§7最大: §f({max_x}, {max_y}, {max_z})"
+    - "§7消費ポイント: §6🛖 §e{required}"
+    - "§7現在ポイント: §6🛖 §e{current}"
+    - "§7設置後ポイント: §6🛖 §e{remaining}"
+  world_gate_place_cancelled: "§eワールドゲートの設置をキャンセルしました。"
+  world_gate_place_success: "§aワールドゲートを設置しました"
+  world_gate_removed_refund: "§aワールドゲートを撤去しました。設置者 §e{owner} §aに §6🛖 §e{points} §aポイントを返還しました。(返還率: §e{percent}%§a)"
+  world_gate_world_mismatch: "§c同じワールド内の2点を選択してください。1点目を再設定しました。"
+  world_created_warp: "§a作成されたワールドに移動しました"
+  status_on: "オン"
+  status_off: "オフ"
+  status_visible: "§a表示中"
+  status_hidden: "§c非表示"
+  wizard_start: "§aワールド作成ウィザードを開始します。"
+  wizard_name_prompt: "§eまずは作成するワールドの名前を入力してください。"
+  wizard_seed_prompt: "§e生成に使用するシード値を入力してください。"
+  creation_timeout: "§c長時間操作がなかったため、ワールド作成セッションがタイムアウトしました。"
+  wizard_started_for: "§a{player} に対してワールド作成ウィザードを開始しました。"
+  reload_success: "§aMyWorldManager の設定を再読み込みしました。"
+  daily_update_success: "§aデイリーメンテナンスを完了しました。（統計更新: {updated}件, アーカイブ: {archived}件）"
+  data_update_success: "§a全てのワールドデータ ({world_count}件) とプレイヤーデータ ({player_count}件) を最新の状態に更新しました。"
+  spotlight_added: "§aマイワールド「{world}」をSPOTLIGHTに登録しました！"
+  spotlight_removed: "§cマイワールド「{world}」をSPOTLIGHTから削除しました。"
+  discovery_spotlight_description_updated: "§aSPOTLIGHTの説明文を更新しました。"
+  discovery_spotlight_description_reset: "§aSPOTLIGHTの説明文をデフォルトに戻しました。"
+  world_creation_started: "§eマイワールド「{world}」の作成を開始しました..."
+  world_creation_success: "§aマイワールド「§a{world}§a」の作成に成功しました！"
+  world_unloading_evacuation: "§cワールドがアンロードされたため、スポーン地点へ移動します。"
+  mspt_warning_chat: "§c【WARNING】 §fワールド「§a{world}§f」のMSPTが§e{mspt}ms§fに達しています。§7(負荷が高い可能性があります)"
+  
+  # /meet 関連
+  meet:
+    busy: "§c対象のプレイヤーは現在取り込み中です。"
+    request_accepted: "§e{player}§aのワープ申請を許可しました"
+    request_accepted_by_target: "§e{player}§aにワープ申請が許可されました！"
+    request_denied: "§cワープ申請を却下しました。"
+    request_denied_by_target: "§c{player}さんにワープ申請を却下されました。"
+    not_in_valid_world: "§c有効なワールド内にいません。"
+    requester_offline: "§c申請したプレイヤーがオフラインになりました。"
+    no_pending_request: "§c保留中の申請が見つかりませんでした。"
+
+  # コマンドエラー・管理者操作
+  invalid_field: "§c無効な項目名です。"
+  invalid_action: "§c無効な操作名です (get, set, add, remove)。"
+  value_required: "§c値を指定してください。"
+  value_negative: "§c負の値は設定できません。"
+  stats_get: "§e{player} §7の §b{key}§7: {value}"
+  stats_set: "§a{player} の {key} を {value} §aに設定しました。"
+  stats_add: "§a{player} の {key} に {value} §aを加算しました。"
+  stats_remove: "§a{player} の {key} から {value} §aを減算しました。"
+  stats_remove_error: "§cエラー: 減算後の値が負になります。（現在の値: {value}）"
+  give_success: "§a{player} に {item} を {amount}個 付与しました。"
+  give_inventory_full: "§e{player} のインベントリが満杯だったため、{item} を {amount}個 足元にドロップしました。"
+  migration_file_not_found: "§c移行元のファイル ({file}) が見つかりませんでした。"
+  migration_error: "§cエラー: {error} の移行に失敗しました。"
+  migration_success: "§a移行が完了しました。項目数: {count}"
+  migration_archive_start: "§e{count}件のワールドがアーカイブ対象です。処理を開始します（推定: {eta}秒）"
+  migration_archive_progress: "§7アーカイブ進捗: {current}/{total} - {world}"
+  migration_archive_complete: "§aアーカイブ処理が完了しました（{count}件）"
+  migration_folder_not_found: "§c[Error] ワールドフォルダが見つからないためスキップしました: {path} (ID: {id})"
+  usage_create: "§c使用法: /mwm create <プレイヤー名>"
+  usage_stats: "§c使用法: /mwm stats <プレイヤー名> <項目> <get/set/add/remove> [値]"
+  usage_stats_fields: "§7項目: points, warp-slots, world-slots"
+  usage_give: "§c使用法: /mwm give <プレイヤー名> <アイテムID> [個数]"
+  myworld_command_usage: "§c使用法: /myworld accept | deny | transfer <プレイヤー> | remove_member <プレイヤー>"
+  myworld_command_bedrock_only: "§cこのサブコマンドは統合版プレイヤー専用です。"
+  myworld_target_not_member: "§c対象プレイヤーはこのワールドのメンバーではありません。"
+  myworld_owner_remove_forbidden: "§cオーナーをメンバー削除することはできません。"
+  myworld_pending_hint: "§e保留中の招待/申請があります。/myworld を開いてプレイヤーアイコンから確認できます。 §7(保留: {count}件)"
+  myworld_pending_none: "§c処理可能な招待/申請はありません。"
+  myworld_pending_remaining: "§e未処理の招待/申請がまだあります。 §7(残り: {count}件)"
+  myworld_pending_login_notice: "§e未処理の招待/申請が {count} 件あります。最新受信: §b{datetime}"
+  invite_declined: "§cワールド招待を辞退しました。"
+  member_invite_declined: "§cメンバー招待を辞退しました。"
+  member_invite_declined_sender: "§e{player}§c がメンバー招待を辞退しました。"
+  member_invite_cancelled: "§a{player}さんへのメンバー招待を取り消しました。"
+  member_invite_cancel_not_found: "§c対象の招待はすでに存在しません。"
+  
+  # 内部データコピー
+
+  internal_data_extracted: "§7マイワールド§a【{world}】§7に関する内部データを抽出しました。"
+  copy_world_uuid: "§7- §b§nマイワールドのディレクトリ名"
+  copy_owner_uuid: "§7- §b§nオーナーのUUID"
+  copy_world_uuid_hover: "クリックしてワールドディレクトリ名をクリップボードにコピー"
+  copy_owner_uuid_hover: "クリックしてオーナーUUIDをクリップボードにコピー"
+
+  custom_item:
+    bottle_fill: "§aバイオームの空気を瓶に詰めました！（バイオーム: {biome}）"
+    partial_biome_applied: "§a周囲のバイオームを {biome} に変更しました！"
+    world_seed_expanded: "§aマイワールドスロットを拡張しました！ 現在のスロット数: {slots}"
+
+# 共通ステータス/ロール
+status:
+  online: "オンライン"
+  offline: "オフライン"
+role:
+  owner: "オーナー"
+  moderator: "モデレーター"
+  member: "メンバー"
+
+# 外部からの変更点
+custom_item:
+  empty_biome_bottle:
+    name: "§f空のバイオームの瓶(仮)"
+    lore:
+      - "§8§m－－－－－－－－－－－－－－－－－－"
+      - "§7特定のバイオームで使用すると、そのバイオームの空気を詰めることができます！"
+      - "§7瓶済みした空気は、マイワールドの§6バイオーム設定§7に使うことができます。"
+      - "§8§m－－－－－－－－－－－－－－－－－－"
+  bottled_biome_air:
+    name: "§fバイオームの雰囲気入りの瓶【{biome}】"
+    lore:
+      - "§8§m－－－－－－－－－－－－－－－－－－"
+      - "§7§o濃厚なバイオームの空気が詰まっている"
+      - "§7マイワールドの§6バイオーム設定§7に使うことができます！"
+      - "§8§m－－－－－－－－－－－－－－－－－－"
+  moon_stone:
+    name: "§f月の石"
+    lore:
+      - "§8§m－－－－－－－－－－－－－－－－－－"
+      - "§7§o一見普通の石に見えても、紛れもない月の石である"
+      - "§7マイワールドの§b重力設定§7に使うことができます！"
+      - "§8§m－－－－－－－－－－－－－－－－－－"
+  world_seed:
+    name: "§dワールドの種"
+    lore:
+      - "§8§m－－－－－－－－－－－－－－－－－－"
+      - "§7使用することで、§bマイワールドスロット§7を"
+      - "§71つ拡張することができます！"
+      - "§8§m－－－－－－－－－－－－－－－－－－"
+      - "§e§l| §e右クリックで使用"
+      - "§8§m－－－－－－－－－－－－－－－－－－"
+  tour_sign:
+    name: "§bTour看板"
+    lore:
+      - "§8§m－－－－－－－－－－－－－－－－－－"
+      - "§7ワールドツアーのマーカーになる看板です。"
+      - "§7マイワールド内に設置できます。"
+      - "§8§m－－－－－－－－－－－－－－－－－－"
+      - "§e§l| §e右クリックで設置"
+      - "§8§m－－－－－－－－－－－－－－－－－－"
+
+
+biomes:
+  plains: "平原"
+  sunflower_plains: "ヒマワリ平原"
+  snowy_plains: "雪原"
+  ice_spikes: "樹氷"
+  desert: "砂漠"
+  swamp: "湿地"
+  mangrove_swamp: "マングローブの湿地"
+  forest: "森"
+  flower_forest: "花の森"
+  birch_forest: "シラカバの森"
+  old_growth_birch_forest: "古いシラカバの森"
+  dark_forest: "暗い森"
+  jungle: "ジャングル"
+  sparse_jungle: "まばらなジャングル"
+  bamboo_jungle: "竹林"
+  river: "川"
+  frozen_river: "凍った川"
+  beach: "砂浜"
+  snowy_beach: "雪の積もった砂浜"
+  stony_shore: "石の海岸"
+  mountains: "山岳"
+  stony_peaks: "石だらけの山頂"
+  jagged_peaks: "険しい山頂"
+  frozen_peaks: "凍った山頂"
+  meadow: "草原"
+  cherry_grove: "桜の林"
+  grove: "林"
+  snowy_slopes: "雪の斜面"
+  taiga: "タイガ"
+  snowy_taiga: "雪のタイガ"
+  old_growth_pine_taiga: "古い松のタイガ"
+  old_growth_spruce_taiga: "古いトウヒのタイガ"
+  savanna: "サバンナ"
+  savanna_plateau: "サバンナの高原"
+  windswept_savanna: "吹きらさしのサバンナ"
+  badlands: "荒野"
+  wooded_badlands: "樹木のある荒野"
+  eroded_badlands: "浸食された荒野"
+  deep_ocean: "深海"
+  ocean: "海"
+  warm_ocean: "ぬるい海"
+  lukewarm_ocean: "少しぬるい海"
+  cold_ocean: "冷たい海"
+  frozen_ocean: "凍った海"
+  mushroom_fields: "キノコ島"
+  dripstone_caves: "鍾乳洞"
+  lush_caves: "茂った洞窟"
+  deep_dark: "ディープダーク"
+  nether_wastes: "ネザーの荒野"
+  soul_sand_valley: "ソウルサンドの谷"
+  crimson_forest: "真紅の森"
+  warped_forest: "歪んだ森"
+  basalt_deltas: "玄武岩の三角州"
+  the_end: "ジ・エンド"
+  small_end_islands: "エンドの小さな島々"
+  end_midlands: "エンドの中地"
+  end_highlands: "エンドの高地"
+  end_barrens: "エンドの痩せた地"
+
+error:
+  spotlight_not_in_myworld: "§cMyWorldワールド内にいる必要があります。"
+  spotlight_not_owner: "§cあなたはこのワールドの所有者ではありません。"
+  spotlight_already_registered: "§cこのワールドは既にSPOTLIGHTに登録されています。"
+  spotlight_limit_reached: "§cこれ以上SPOTLIGHTに登録できません。"
+  discovery_spotlight_description_too_long: "§c説明文が長すぎます（最大{max}文字）。"
+  member_request_owner_offline: "§cワールドオーナーがオフラインのため、申請できません"
+  member_request_already_member: "§c既にこのワールドのメンバーです"
+  console_only: "§cこのコマンドはコンソールからのみ実行可能です。"
+  custom_item:
+    item_not_found_hand: "§cアイテムを手に持っていません。"
+    no_permission: "§c変更する権限がありません。"
+    world_seed_limit_reached: "§cこれ以上スロットを拡張できません。(上限: {limit})"
+  delete_failed: "§cワールドの削除に失敗しました。"
+  expand_failed: "§c拡張に失敗しました。(ワールドがロードされていない可能性があります)"
+  expand_insufficient_points: "§cポイントが不足しています。(必要: §6🛖 §e{cost}§c)"
+  favorite_limit_reached: "§cお気に入り登録数が上限({limit})に達しています。"
+  internal_error: "§c内部エラーが発生しました。"
+  invalid_item_id: "§c無効なアイテムIDです。"
+  invite_already_member: "§c既にこのワールドのメンバーです"
+  invite_expired: "§c招待が見つからないか、期限切れです"
+  invite_locked_error: "§c閉鎖中のワールドには招待できません"
+  invite_world_not_found: "§cワールドデータが見つかりませんでした"
+  load_failed: "§cワールドのロードに失敗しました。"
+  max_expansion_reached: "§cこのワールドは既に最大レベルです。"
+  migration_disabled: "§c移行コマンドが無効です。config.ymlの「{config_key}」をtrueに設定してください。"
+  no_portals_found: "§cポータルが見つかりませんでした。"
+  player_not_found: "§cプレイヤーが見つかりませんでした。"
+  portal_bind_invalid_publish: "§c公開か限定公開のワールドのみ紐づけ可能です。"
+  portal_bind_myworld_only: "§cポータルはマイワールド内でのみ紐づけ可能です。"
+  portal_dest_locked: "§cこのポータルの先は現在閉鎖されています！"
+  portal_not_bound: "§cこのポータルはまだワールドに紐づけられていません。"
+  world_gate_bind_required: "§cワールドゲートを使うには、先にShift+右クリックでワールドを紐づけてください。"
+  world_gate_item_required: "§cワールドゲートアイテムを手に持った状態で確認してください。"
+  world_gate_insufficient_points: "§cポイントが不足しています。(必要: §6🛖 §e{required}§c / 現在: §6🛖 §e{current}§c / 不足: §6🛖 §e{shortage}§c)"
+  preview_template_not_found: "§cテンプレートが見つかりませんでした。"
+  preview_world_load_failed: "§cプレビュー用ワールドのロードに失敗しました。"
+  target_not_in_myworld: "§c対象のプレイヤーはマイワールド内にいません。"
+  target_offline: "§c対象のプレイヤーはオフラインです"
+  unarchive_failed: "§cワールドの復旧に失敗しました。"
+  unknown_subcommand: "§c不明なサブコマンドです。"
+  unlink_not_myworld: "§cこのワールドはマイワールドではありません。"
+  world_already_exists: "§cそのワールドは既に存在します。"
+  world_creation_failed: "§c作成に失敗しました。"
+  world_creation_in_progress: "§cワールド作成処理が進行中です。"
+  world_load_failed: "§cワールドのロードに失敗しました。"
+  spawn_set_blocked: "§cその場所にはスポーンを設定できません。占有ブロック（足元/頭上）が空気または水の場所を選んでください。"
+  world_not_public: "§cこのワールドは現在公開されていません。"
+  like_sign:
+    my_world_only: "§cLike看板はマイワールド内でのみ設置できます。"
+    no_permission: "§cこのワールドにLike看板を設置する権限がありません。"
+    limit_reached: "§cこのワールドには既に10個のLike看板が設置されています。"
+    title_required: "§cタイトルを入力してください。"
+    cooldown: "§cしばらく待ってからもう一度お試しください。"
+  tour:
+    my_world_only: "§cTour看板はマイワールド内でのみ設置できます。"
+    no_permission: "§cこのワールドを編集する権限がありません。"
+    title_required: "§c名前を入力してください。"
+    not_managed_world: "§cここは管理対象のマイワールドではありません。"
+    not_enough_signs: "§cツアーを保存するにはTour看板が2個以上必要です。"

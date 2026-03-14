@@ -1,0 +1,140 @@
+name: MyWorldManager
+version: '${project.version}'
+main: me.awabi2048.myworldmanager.MyWorldManager
+api-version: '1.21'
+authors: [awabi2048]
+description: ""
+commands:
+  mwm:
+    description: MyWorldManager main command
+    usage: /<command>
+  myworld:
+    description: List your worlds
+    usage: /<command>
+    permission: myworldmanager.command.myworld
+  worldmenu:
+    description: Open world settings menu
+    usage: /<command>
+    permission: myworldmanager.command.worldmenu
+  visit:
+    description: Visit another player's public worlds
+    usage: /visit [player]
+    permission: myworldmanager.command.visit
+  findworld:
+    description: 公開中のマイワールドをワールド名で検索します。
+    usage: /findworld <検索キーワード>
+    permission: myworldmanager.command.findworld
+  invite:
+    description: Invite a player to your current world
+    usage: /invite [player]
+    permission: myworldmanager.command.invite
+
+  favorite:
+    description: お気に入り登録したワールドの一覧を表示します。
+    permission: myworldmanager.command.favorite
+  discovery:
+    description: 公開されているワールドを検索・探索します。
+    permission: myworldmanager.command.discovery
+
+  meet:
+    description: オンラインプレイヤーの現在のワールド情報を表示・訪問します。
+    usage: /meet <player>
+    permission: myworldmanager.command.meet
+  settings:
+    description: 個人設定メニューを開きます。
+    usage: /<command>
+    permission: myworldmanager.command.settings
+  tour:
+    description: 現在のワールドのツアー一覧を開きます。
+    usage: /<command>
+    permission: myworldmanager.command.tour
+  mwm_internal:
+    description: Internal command for MyWorldManager
+    usage: ''
+    permission: myworldmanager.command.mwm_internal
+    permission-message: ''
+permissions:
+  myworldmanager.admin:
+    description: Allows full access to MyWorldManager
+    default: op
+    children:
+      myworldmanager.citizen: true
+      myworldmanager.command.mwm: true
+      myworldmanager.admin.world_list: true
+      myworldmanager.force_add_member: true
+  myworldmanager.admin.world_list:
+    description: Allows access to admin world list menu (/mwm list)
+    default: false
+    children:
+      myworldmanager.command.mwm.list: true
+  myworldmanager.admin.bypass_world_limits:
+    description: Bypass all MyWorld world count limits
+    default: false
+  myworldmanager.force_add_member:
+    description: Allows force adding members from member management
+    default: false
+  myworldmanager.citizen:
+    description: Allows access to basic player commands
+    default: true
+    children:
+      myworldmanager.command.discovery: true
+      myworldmanager.command.favorite: true
+      myworldmanager.command.findworld: true
+      myworldmanager.command.invite: true
+      myworldmanager.command.meet: true
+      myworldmanager.command.myworld: true
+      myworldmanager.command.settings: true
+      myworldmanager.command.tour: true
+      myworldmanager.command.visit: true
+      myworldmanager.command.worldmenu: true
+  myworldmanager.command.discovery:
+    description: Allows use of /discovery
+    default: false
+  myworldmanager.command.favorite:
+    description: Allows use of /favorite
+    default: false
+  myworldmanager.command.findworld:
+    description: Allows use of /findworld
+    default: false
+  myworldmanager.command.invite:
+    description: Allows use of /invite
+    default: false
+  myworldmanager.command.meet:
+    description: Allows use of /meet
+    default: false
+  myworldmanager.command.myworld:
+    description: Allows use of /myworld
+    default: false
+  myworldmanager.command.settings:
+    description: Allows use of /settings
+    default: false
+  myworldmanager.command.tour:
+    description: Allows use of /tour
+    default: false
+  myworldmanager.command.visit:
+    description: Allows use of /visit
+    default: false
+  myworldmanager.command.worldmenu:
+    description: Allows use of /worldmenu
+    default: false
+  myworldmanager.command.mwm:
+    description: Allows full access to /mwm
+    default: false
+  myworldmanager.command.mwm.create:
+    description: Allows use of /mwm create
+    default: false
+  myworldmanager.command.mwm.reload:
+    description: Allows use of /mwm reload
+    default: false
+  myworldmanager.command.mwm.stats:
+    description: Allows use of /mwm stats
+    default: false
+  myworldmanager.command.mwm.give:
+    description: Allows use of /mwm give
+    default: false
+  myworldmanager.command.mwm.list:
+    description: Allows use of /mwm list
+    default: false
+  myworldmanager.command.mwm_internal:
+    description: Allows MyWorldManager internal command visibility
+    default: false
