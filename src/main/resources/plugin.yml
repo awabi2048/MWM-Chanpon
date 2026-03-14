@@ -4,3 +4,17 @@ main: me.awabi2048.mwmchanpon.MWMChanponPlugin
 api-version: '1.21'
 author: awabi2048
 description: ${project.description}
+softdepend:
+  - floodgate
+commands:
+  mwm:
+    description: MWM-Chanpon main command
+    usage: /<command>
+    permission: mwmchanpon.command.mwm
+permissions:
+  mwmchanpon.command.mwm:
+    description: Allows use of /mwm
+    default: op
+  mwmchanpon.command.mwm.create:
+    description: Allows use of /mwm create
+    default: op

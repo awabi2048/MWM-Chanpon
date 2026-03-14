@@ -1,0 +1,74 @@
+gui:
+  common:
+    separator: "§8§m――――――――――――――――――――――――――――"
+    action_single: "§e§nクリックして{action}"
+    action_multi: "§e§l| §e{operation} §7{action}"
+    warning: "§c§n※ {content}"
+    back: "§c§l戻る"
+    cancel: "§c§lキャンセル"
+    close_message: "§e作成ウィザードを終了しました。"
+    expired_message: "§c作成セッションの有効期限が切れました。"
+    offline_target: "§c対象プレイヤーがオフラインです。"
+  creation:
+    method:
+      title: "ワールド作成方式"
+      template:
+        display: "§6テンプレートからコピー"
+        description:
+          - "既存テンプレートを複製して"
+          - "マイワールドを作成します。"
+        action: "テンプレート一覧を開く"
+        unavailable: "利用可能なテンプレートがありません"
+      random:
+        display: "§aランダム生成"
+        description:
+          - "通常ワールドを新規生成して"
+          - "マイワールドを作成します。"
+        action: "名前入力へ進む"
+      seed:
+        display: "§bシード値指定"
+        description:
+          - "シード値を指定して"
+          - "マイワールドを作成します。"
+        action: "シード値入力へ進む"
+      cancel_action: "ウィザードをキャンセル"
+    template:
+      title: "テンプレート選択"
+      action: "このテンプレートを選択"
+      back_action: "作成方式選択へ戻る"
+    confirm:
+      title: "最終確認"
+      display: "§6作成内容の確認"
+      description_template: "テンプレート: {template}"
+      description_random: "ランダム生成"
+      description_seed: "シード: {seed}"
+      name_line: "ワールド名: {name}"
+      action: "ワールドを作成"
+      back_action: "前の画面へ戻る"
+    input:
+      world_name:
+        title: "ワールド名入力"
+        message: "ワールド名を入力してください。"
+        label: "ワールド名"
+        back: "作成方式選択へ戻る"
+      seed:
+        title: "シード値入力"
+        message: "シード値を入力してください。"
+        label: "シード値"
+        back: "作成方式選択へ戻る"
+      submit: "決定"
+      back: "戻る"
+messages:
+  usage_create: "/mwm create <player>"
+  no_permission: "§cこのコマンドを実行する権限がありません。"
+  player_only: "§cこのコマンドはプレイヤーのみ実行できます。"
+  target_offline: "§c対象プレイヤーがオンラインではありません。"
+  wizard_started: "§a{player} のマイワールド作成ウィザードを開始しました。"
+  value_required: "§c値を入力してください。"
+  world_name_invalid_length: "§cワールド名は {min}..{max} 文字で入力してください。"
+  world_name_blocked: "§cそのワールド名は使用できません。"
+  creation_in_progress: "§eワールドを作成しています。しばらくお待ちください。"
+  creation_success: "§aマイワールド {name} を作成しました。"
+  creation_failed: "§cワールド作成に失敗しました: {reason}"
+  cancelled: "§cワールド作成をキャンセルしました。"
+  cannot_create_more: "§c対象プレイヤーはこれ以上マイワールドを所有できません。"

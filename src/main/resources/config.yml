@@ -1,0 +1,40 @@
+world_name:
+  min_length: 3
+  max_length: 16
+
+validation:
+  blocked_strings:
+    - "admin"
+    - "gm"
+    - "server"
+    - "test"
+
+menu_command: "mwm"
+
+fallback_language: "ja_jp"
+
+creation:
+  max_create_count_default: 3
+  cancel_word: "__cancel__"
+
+creation_session:
+  timeout_seconds: 300
+
+sounds:
+  global_click:
+    sound: "UI_BUTTON_CLICK"
+    pitch: 2.0
+  world_create:
+    sound: "BLOCK_PORTAL_TRIGGER"
+    pitch: 1.0
+
+expansion:
+  initial_size: 100
+
+evacuation_location:
+  world: "world"
+  x: 0.0
+  y: 80.0
+  z: 0.0
+  yaw: 0.0
+  pitch: 0.0

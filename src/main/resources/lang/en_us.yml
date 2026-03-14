@@ -1,0 +1,74 @@
+gui:
+  common:
+    separator: "§8§m――――――――――――――――――――――――――――"
+    action_single: "§e§nClick to {action}"
+    action_multi: "§e§l| §e{operation} §7{action}"
+    warning: "§c§n※ {content}"
+    back: "§c§lBack"
+    cancel: "§c§lCancel"
+    close_message: "§eThe creation wizard has ended."
+    expired_message: "§cThe creation session has expired."
+    offline_target: "§cThe target player is offline."
+  creation:
+    method:
+      title: "World Creation Method"
+      template:
+        display: "§6Copy From Template"
+        description:
+          - "Create a My World by"
+          - "copying an existing template."
+        action: "open the template list"
+        unavailable: "No available templates were found"
+      random:
+        display: "§aRandom Generation"
+        description:
+          - "Create a My World by"
+          - "generating a normal world."
+        action: "go to name input"
+      seed:
+        display: "§bUse Seed Value"
+        description:
+          - "Create a My World by"
+          - "specifying a seed."
+        action: "go to seed input"
+      cancel_action: "cancel the wizard"
+    template:
+      title: "Template Selection"
+      action: "select this template"
+      back_action: "return to creation method selection"
+    confirm:
+      title: "Final Confirmation"
+      display: "§6Review Creation Settings"
+      description_template: "Template: {template}"
+      description_random: "Random Generation"
+      description_seed: "Seed: {seed}"
+      name_line: "World Name: {name}"
+      action: "create the world"
+      back_action: "return to the previous screen"
+    input:
+      world_name:
+        title: "World Name Input"
+        message: "Please enter the world name."
+        label: "World Name"
+        back: "return to creation method selection"
+      seed:
+        title: "Seed Input"
+        message: "Please enter the seed value."
+        label: "Seed Value"
+        back: "return to creation method selection"
+      submit: "Confirm"
+      back: "Back"
+messages:
+  usage_create: "/mwm create <player>"
+  no_permission: "§cYou do not have permission to use this command."
+  player_only: "§cThis command can only be used by players."
+  target_offline: "§cThe target player is not online."
+  wizard_started: "§aStarted the My World creation wizard for {player}."
+  value_required: "§cPlease enter a value."
+  world_name_invalid_length: "§cThe world name must be {min}..{max} characters."
+  world_name_blocked: "§cThat world name cannot be used."
+  creation_in_progress: "§eCreating the world. Please wait."
+  creation_success: "§aCreated My World {name}."
+  creation_failed: "§cFailed to create the world: {reason}"
+  cancelled: "§cCancelled world creation."
+  cannot_create_more: "§cThe target player cannot own any more My Worlds."
