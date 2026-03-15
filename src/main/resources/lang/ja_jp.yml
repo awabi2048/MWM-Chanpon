@@ -58,6 +58,48 @@ gui:
         back: "作成方式選択へ戻る"
       submit: "決定"
       back: "戻る"
+  myworld:
+    list:
+      title: "マイワールドの一覧"
+      create:
+        display: "§bマイワールドを新規作成"
+        action: "ワールド作成を開始"
+      profile:
+        display: "§f{player} の情報"
+        owned: "保有数"
+      personal_settings:
+        action: "個人設定を開く"
+      page:
+        previous: "§e前のページ"
+        previous_action: "前のページへ戻る"
+        next: "§e次のページ"
+        next_action: "次のページへ進む"
+    world_icon:
+      data:
+        owner: "オーナー"
+        publish: "公開設定"
+      actions:
+        left_click: "左クリック"
+        right_click: "右クリック"
+        teleport: "このワールドへテレポート"
+        settings: "ワールド設定を開く"
+      source:
+        random: "ランダム生成"
+        template: "テンプレート {name}"
+        seed: "シード値指定"
+      publish:
+        public: "§a公開"
+        wip: "§b非公開"
+        closed: "§cクローズ"
+  personal_settings:
+    title: "個人設定"
+    back_action: "ワールド一覧へ戻る"
+    language:
+      display: "§6言語設定"
+      description:
+        - "現在: {language}"
+        - "クリックで次の言語へ切り替えます。"
+      action: "言語を切り替える"
 messages:
   usage_create: "/mwm create <player>"
   no_permission: "§cこのコマンドを実行する権限がありません。"
@@ -72,3 +114,9 @@ messages:
   creation_failed: "§cワールド作成に失敗しました: {reason}"
   cancelled: "§cワールド作成をキャンセルしました。"
   cannot_create_more: "§c対象プレイヤーはこれ以上マイワールドを所有できません。"
+  teleport_success: "§a{name} へテレポートします。"
+  teleport_failed: "§cテレポートに失敗しました: {reason}"
+  world_settings_mock: "§e{name} のワールド設定はまだ実装されていません。"
+  language_updated: "§a表示言語を {language} に変更しました。"
+  reload_success: "§aMWM-Chanpon を再初期化しました。"
+  reload_failed: "§cMWM-Chanpon の再初期化に失敗しました: {reason}"

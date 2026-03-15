@@ -16,15 +16,13 @@ class WorldRepository(private val plugin: MWMChanponPlugin) {
         get() = File(plugin.dataFolder.parentFile, "my_worlds")
 
     fun countByOwner(owner: UUID): Int {
-        val files = rootDirectory.listFiles { file -> file.isFile && file.extension.equals("yml", ignoreCase = true) } ?: return 0
-        return files.count { file ->
-            if (!file.exists()) {
-                false
-            } else {
-                val config = YamlConfiguration.loadConfiguration(file)
-                config.getString("world_data.owner") == owner.toString()
-            }
-        }
+        return loadAll().count { it.owner == owner }
+    }
+
+    fun findAccessibleByPlayer(playerUuid: UUID): List<MyWorldData> {
+        return loadAll()
+            .filter { it.owner == playerUuid || it.members.contains(playerUuid) }
+            .sortedBy { it.createdAt }
     }
 
     fun save(worldData: MyWorldData) {
@@ -52,6 +50,15 @@ class WorldRepository(private val plugin: MWMChanponPlugin) {
 
     fun load(worldUuid: UUID): MyWorldData? {
         val file = File(rootDirectory, "$worldUuid.yml")
+        return loadFromFile(file)
+    }
+
+    fun loadAll(): List<MyWorldData> {
+        val files = rootDirectory.listFiles { file -> file.isFile && file.extension.equals("yml", ignoreCase = true) } ?: return emptyList()
+        return files.mapNotNull { file -> loadFromFile(file) }
+    }
+
+    private fun loadFromFile(file: File): MyWorldData? {
         if (!file.exists()) {
             return null
         }

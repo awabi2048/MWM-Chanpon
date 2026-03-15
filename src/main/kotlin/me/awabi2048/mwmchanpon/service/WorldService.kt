@@ -40,8 +40,41 @@ class WorldService(
     }
 
     fun canCreateMore(targetPlayer: Player): Boolean {
-        val maxCount = plugin.config.getInt("creation.max_create_count_default", 3)
-        return worldRepository.countByOwner(targetPlayer.uniqueId) < maxCount
+        return getOwnedWorldCount(targetPlayer.uniqueId) < getMaxCreateCount()
+    }
+
+    fun getMaxCreateCount(): Int {
+        return plugin.config.getInt("creation.max_create_count_default", 3)
+    }
+
+    fun getOwnedWorldCount(playerUuid: UUID): Int {
+        return worldRepository.countByOwner(playerUuid)
+    }
+
+    fun getRemainingCreateCount(player: Player): Int {
+        return (getMaxCreateCount() - getOwnedWorldCount(player.uniqueId)).coerceAtLeast(0)
+    }
+
+    fun getAccessibleWorlds(player: Player): List<MyWorldData> {
+        return worldRepository.findAccessibleByPlayer(player.uniqueId)
+    }
+
+    fun teleportToWorld(player: Player, worldData: MyWorldData): Result<Unit> {
+        return runCatching {
+            val world = Bukkit.getWorld(worldData.customWorldName)
+                ?: Bukkit.createWorld(WorldCreator(worldData.customWorldName))
+                ?: throw IllegalStateException("ワールドの読み込みに失敗しました。")
+            val location = Location(
+                world,
+                worldData.spawnPosMember.x,
+                worldData.spawnPosMember.y,
+                worldData.spawnPosMember.z,
+                worldData.spawnPosMember.yaw,
+                worldData.spawnPosMember.pitch,
+            )
+            world.getChunkAt(location).load(true)
+            player.teleportAsync(location)
+        }
     }
 
     fun createWorld(session: WizardSession, callback: (Result<MyWorldData>) -> Unit) {

@@ -1,5 +1,6 @@
 package me.awabi2048.mwmchanpon.command
 
+import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.service.LocalizationService
 import me.awabi2048.mwmchanpon.service.PlatformUiService
 import me.awabi2048.mwmchanpon.service.WizardSessionService
@@ -11,6 +12,7 @@ import org.bukkit.command.TabCompleter
 import org.bukkit.entity.Player
 
 class MwmCommand(
+    private val plugin: MWMChanponPlugin,
     private val messages: LocalizationService,
     private val sessionService: WizardSessionService,
     private val uiService: PlatformUiService,
@@ -49,6 +51,21 @@ class MwmCommand(
             return true
         }
 
+        if (args[0].equals("reload", ignoreCase = true)) {
+            if (!sender.hasPermission("mwmchanpon.command.mwm.reload")) {
+                sender.sendMessage(messages.getString(sender as? Player, "messages.no_permission"))
+                return true
+            }
+            runCatching {
+                plugin.reloadPluginState()
+            }.onSuccess {
+                sender.sendMessage(messages.getString(sender as? Player, "messages.reload_success"))
+            }.onFailure {
+                sender.sendMessage(messages.getString(sender as? Player, "messages.reload_failed", mapOf("reason" to (it.message ?: "unknown"))))
+            }
+            return true
+        }
+
         sender.sendMessage(messages.getString(sender as? Player, "messages.usage_create"))
         return true
     }
@@ -60,7 +77,7 @@ class MwmCommand(
         args: Array<out String>,
     ): List<String> {
         return when (args.size) {
-            1 -> listOf("create").filter { it.startsWith(args[0], ignoreCase = true) }
+            1 -> listOf("create", "reload").filter { it.startsWith(args[0], ignoreCase = true) }
             2 -> if (args[0].equals("create", ignoreCase = true)) {
                 Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[1], ignoreCase = true) }
             } else {
