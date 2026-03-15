@@ -5,8 +5,15 @@ import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.entity.Player
 import java.io.File
 
-class LocalizationService(private val plugin: MWMChanponPlugin) {
+class LocalizationService(
+    private val plugin: MWMChanponPlugin,
+    private val playerSettingsService: PlayerSettingsService,
+) {
     private val cache = linkedMapOf<String, YamlConfiguration>()
+
+    fun clearCache() {
+        cache.clear()
+    }
 
     fun getString(player: Player?, key: String, placeholders: Map<String, String> = emptyMap()): String {
         val locale = resolveLocale(player)
@@ -28,6 +35,7 @@ class LocalizationService(private val plugin: MWMChanponPlugin) {
         if (player == null) {
             return plugin.config.getString("fallback_language", "ja_jp") ?: "ja_jp"
         }
+        playerSettingsService.getLanguage(player.uniqueId)?.let { return it }
         return player.locale().toLanguageTag().replace('-', '_').lowercase()
     }
 

@@ -58,6 +58,48 @@ gui:
         back: "return to creation method selection"
       submit: "Confirm"
       back: "Back"
+  myworld:
+    list:
+      title: "My World List"
+      create:
+        display: "§bCreate New My World"
+        action: "start world creation"
+      profile:
+        display: "§f{player}'s Profile"
+        owned: "Owned Worlds"
+      personal_settings:
+        action: "open personal settings"
+      page:
+        previous: "§ePrevious Page"
+        previous_action: "return to the previous page"
+        next: "§eNext Page"
+        next_action: "go to the next page"
+    world_icon:
+      data:
+        owner: "Owner"
+        publish: "Visibility"
+      actions:
+        left_click: "Left Click"
+        right_click: "Right Click"
+        teleport: "teleport to this world"
+        settings: "open world settings"
+      source:
+        random: "Random Generation"
+        template: "Template {name}"
+        seed: "Seed Value"
+      publish:
+        public: "§aPublic"
+        wip: "§bPrivate"
+        closed: "§cClosed"
+  personal_settings:
+    title: "Personal Settings"
+    back_action: "return to My World list"
+    language:
+      display: "§6Language Settings"
+      description:
+        - "Current: {language}"
+        - "Click to rotate to the next language."
+      action: "change language"
 messages:
   usage_create: "/mwm create <player>"
   no_permission: "§cYou do not have permission to use this command."
@@ -72,3 +114,9 @@ messages:
   creation_failed: "§cFailed to create the world: {reason}"
   cancelled: "§cCancelled world creation."
   cannot_create_more: "§cThe target player cannot own any more My Worlds."
+  teleport_success: "§aTeleporting to {name}."
+  teleport_failed: "§cFailed to teleport: {reason}"
+  world_settings_mock: "§eWorld settings for {name} are not implemented yet."
+  language_updated: "§aChanged the display language to {language}."
+  reload_success: "§aMWM-Chanpon was reinitialized."
+  reload_failed: "§cFailed to reinitialize MWM-Chanpon: {reason}"

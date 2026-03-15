@@ -5,6 +5,8 @@ import me.awabi2048.mwmchanpon.service.PlatformUiService
 import me.awabi2048.mwmchanpon.service.WizardSessionService
 import me.awabi2048.mwmchanpon.ui.ConfirmationHolder
 import me.awabi2048.mwmchanpon.ui.MethodSelectionHolder
+import me.awabi2048.mwmchanpon.ui.MyWorldListHolder
+import me.awabi2048.mwmchanpon.ui.PersonalSettingsHolder
 import me.awabi2048.mwmchanpon.ui.TemplateSelectionHolder
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
@@ -37,6 +39,16 @@ class WizardListener(
             is ConfirmationHolder -> {
                 event.isCancelled = true
                 uiService.handleConfirmation(player, event.rawSlot)
+            }
+
+            is MyWorldListHolder -> {
+                event.isCancelled = true
+                uiService.handleMyWorldListClick(player, event.rawSlot, event.click, holder.worldIds, holder.page, holder.fromMenuCommand)
+            }
+
+            is PersonalSettingsHolder -> {
+                event.isCancelled = true
+                uiService.handlePersonalSettingsClick(player, event.rawSlot, holder.fromMenuCommand)
             }
         }
     }

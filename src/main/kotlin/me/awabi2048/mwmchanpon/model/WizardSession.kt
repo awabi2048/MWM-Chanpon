@@ -11,4 +11,6 @@ data class WizardSession(
     var templateKey: String? = null,
     var seedText: String? = null,
     var worldName: String? = null,
+    var returnToMyWorldMenu: Boolean = false,
+    var returnToMenuCommand: Boolean = false,
 )

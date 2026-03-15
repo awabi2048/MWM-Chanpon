@@ -11,6 +11,10 @@ commands:
     description: MWM-Chanpon main command
     usage: /<command>
     permission: mwmchanpon.command.mwm
+  myworld:
+    description: Open My World list menu
+    usage: /<command>
+    permission: mwmchanpon.command.myworld
 permissions:
   mwmchanpon.command.mwm:
     description: Allows use of /mwm
@@ -18,3 +22,9 @@ permissions:
   mwmchanpon.command.mwm.create:
     description: Allows use of /mwm create
     default: op
+  mwmchanpon.command.mwm.reload:
+    description: Allows use of /mwm reload
+    default: op
+  mwmchanpon.command.myworld:
+    description: Allows use of /myworld
+    default: true
