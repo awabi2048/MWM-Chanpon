@@ -8,6 +8,7 @@ import me.awabi2048.mwmchanpon.ui.MethodSelectionHolder
 import me.awabi2048.mwmchanpon.ui.MyWorldListHolder
 import me.awabi2048.mwmchanpon.ui.PersonalSettingsHolder
 import me.awabi2048.mwmchanpon.ui.TemplateSelectionHolder
+import me.awabi2048.mwmchanpon.ui.WorldSettingsHolder
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
@@ -50,6 +51,8 @@ class WizardListener(
                 event.isCancelled = true
                 uiService.handlePersonalSettingsClick(player, event.rawSlot, holder.fromMenuCommand)
             }
+
+            is WorldSettingsHolder -> uiService.handleWorldSettingsClick(player, event, holder)
         }
     }
 
@@ -63,6 +66,7 @@ class WizardListener(
         val player = event.player as? Player ?: return
         when (event.inventory.holder) {
             is MethodSelectionHolder, is TemplateSelectionHolder, is ConfirmationHolder -> uiService.handleInventoryClosed(player)
+            is WorldSettingsHolder -> uiService.handleMenuInventoryClosed(player, event.inventory.holder as WorldSettingsHolder)
         }
     }
 }

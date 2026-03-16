@@ -2,6 +2,7 @@ package me.awabi2048.mwmchanpon
 
 import me.awabi2048.mwmchanpon.command.MyWorldCommand
 import me.awabi2048.mwmchanpon.command.MwmCommand
+import me.awabi2048.mwmchanpon.command.WorldMenuCommand
 import me.awabi2048.mwmchanpon.repository.PlayerSettingsRepository
 import me.awabi2048.mwmchanpon.listener.WizardListener
 import me.awabi2048.mwmchanpon.repository.WorldRepository
@@ -75,6 +76,7 @@ class MWMChanponPlugin : JavaPlugin() {
         }
         registerCommand(command, mwmCommand)
         registerCommand(requireNotNull(getCommand("myworld")) { "myworld コマンドが plugin.yml に見つかりません" }, MyWorldCommand(localizationService, platformUiService))
+        registerCommand(requireNotNull(getCommand("worldmenu")) { "worldmenu コマンドが plugin.yml に見つかりません" }, WorldMenuCommand(localizationService, worldService, platformUiService))
 
         wizardListener = WizardListener(this, wizardSessionService, platformUiService)
         server.pluginManager.registerEvents(wizardListener!!, this)

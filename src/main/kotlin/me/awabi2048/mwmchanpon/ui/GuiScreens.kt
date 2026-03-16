@@ -45,6 +45,18 @@ class PersonalSettingsHolder(title: String, size: Int, val fromMenuCommand: Bool
     }
 }
 
+enum class WorldSettingsBackTarget {
+    NONE,
+    MENU_COMMAND,
+    MYWORLD_LIST,
+}
+
+class WorldSettingsHolder(title: String, val worldId: String, val backTarget: WorldSettingsBackTarget, val myWorldPage: Int) : GuiInventoryHolder() {
+    init {
+        backingInventory = GuiComponents.createInventory(this, 54, title)
+    }
+}
+
 data class PersonalSettingsMenuItem(
     val material: Material,
     val displayName: String,
@@ -266,5 +278,216 @@ object GuiScreens {
         }
         holder.inventory.setItem(GuiComponents.footerBase(bodyRows) + 4, GuiComponents.backButton(messages.getString(player, "gui.common.back")))
         return holder.inventory
+    }
+
+    fun createWorldSettings(
+        player: Player,
+        messages: LocalizationService,
+        worldData: MyWorldData,
+        backTarget: WorldSettingsBackTarget,
+        myWorldPage: Int,
+        isBedrock: Boolean,
+    ): Inventory {
+        val holder = WorldSettingsHolder(
+            title = messages.getString(player, "gui.world_settings.title", mapOf("world" to worldData.name)),
+            worldId = worldData.uuid.toString(),
+            backTarget = backTarget,
+            myWorldPage = myWorldPage,
+        )
+        GuiComponents.decorate(holder.inventory)
+        val isInWorld = player.world.name == worldData.customWorldName
+
+        holder.inventory.setItem(
+            19,
+            GuiComponents.button(
+                Material.NAME_TAG,
+                messages.getString(player, "gui.world_settings.info.display"),
+                GuiLoreBuilder(messages, player)
+                    .block(
+                        messages.getStringList(
+                            player,
+                            "gui.world_settings.info.description",
+                            mapOf("name" to worldData.name, "description" to worldData.description.ifBlank { messages.getString(player, "gui.world_settings.common.unset") }),
+                        ),
+                    )
+                    .singleAction(messages.getString(player, "gui.world_settings.info.action"))
+                    .build(),
+            ),
+        )
+        holder.inventory.setItem(
+            20,
+            GuiComponents.button(
+                Material.ITEM_FRAME,
+                messages.getString(player, "gui.world_settings.icon.display"),
+                GuiLoreBuilder(messages, player)
+                    .componentBlock(
+                        listOf(
+                            GuiComponents.legacyText(messages.getString(player, "gui.world_settings.icon.current_prefix"))
+                                .append(GuiComponents.materialNameComponent(worldData.icon)),
+                            GuiComponents.legacyText(messages.getString(player, "gui.world_settings.icon.description_line")),
+                        ),
+                    )
+                    .singleAction(messages.getString(player, "gui.world_settings.icon.action"))
+                    .build(),
+            ),
+        )
+        holder.inventory.setItem(
+            21,
+            GuiComponents.button(
+                Material.COMPASS,
+                messages.getString(player, "gui.world_settings.spawn.display"),
+                GuiLoreBuilder(messages, player)
+                    .block(messages.getStringList(player, "gui.world_settings.spawn.description"))
+                    .apply {
+                        if (!isInWorld) {
+                            warning(messages.getString(player, "gui.world_settings.common.must_be_in_world"))
+                        }
+                    }
+                    .multiActions(
+                        listOf(
+                            LoreAction(messages.getString(player, "gui.world_settings.click.left"), messages.getString(player, "gui.world_settings.spawn.left_action")),
+                            LoreAction(messages.getString(player, "gui.world_settings.click.right"), messages.getString(player, "gui.world_settings.spawn.right_action")),
+                        ),
+                    )
+                    .build(),
+            ),
+        )
+        holder.inventory.setItem(
+            23,
+            GuiComponents.button(
+                Material.MAP,
+                messages.getString(player, "gui.world_settings.expand.display"),
+                GuiLoreBuilder(messages, player)
+                    .block(messages.getStringList(player, "gui.world_settings.expand.description"))
+                    .apply {
+                        if (!isInWorld) {
+                            warning(messages.getString(player, "gui.world_settings.common.must_be_in_world"))
+                        }
+                    }
+                    .singleAction(messages.getString(player, "gui.world_settings.expand.action"))
+                    .build(),
+            ),
+        )
+        holder.inventory.setItem(
+            24,
+            GuiComponents.button(
+                Material.OAK_DOOR,
+                messages.getString(player, "gui.world_settings.publish.display"),
+                GuiLoreBuilder(messages, player)
+                    .block(
+                        messages.getStringList(
+                            player,
+                            "gui.world_settings.publish.description",
+                            mapOf(
+                                "level" to GuiComponents.publishLevelText(messages, player, worldData.publishLevel),
+                                "detail" to messages.getString(player, "gui.world_settings.publish.detail.${worldData.publishLevel.name.lowercase()}"),
+                                "list" to buildPublishLevelList(messages, player, worldData.publishLevel),
+                            ),
+                        ),
+                    )
+                    .apply {
+                        if (isBedrock) {
+                            singleAction(messages.getString(player, "gui.world_settings.publish.action_bedrock"))
+                        } else {
+                            multiActions(
+                                listOf(
+                                    LoreAction(messages.getString(player, "gui.world_settings.click.left"), messages.getString(player, "gui.world_settings.publish.action_previous")),
+                                    LoreAction(messages.getString(player, "gui.world_settings.click.right"), messages.getString(player, "gui.world_settings.publish.action_next")),
+                                ),
+                            )
+                        }
+                    }
+                    .build(),
+            ),
+        )
+        holder.inventory.setItem(
+            25,
+            GuiComponents.button(
+                Material.PLAYER_HEAD,
+                messages.getString(player, "gui.world_settings.members.display"),
+                GuiLoreBuilder(messages, player)
+                    .block(messages.getStringList(player, "gui.world_settings.members.description", mapOf("count" to (worldData.members.size + 1).toString())))
+                    .singleAction(messages.getString(player, "gui.world_settings.members.action"))
+                    .build(),
+            ),
+        )
+        holder.inventory.setItem(
+            28,
+            GuiComponents.button(
+                Material.BOOK,
+                messages.getString(player, "gui.world_settings.tags.display"),
+                GuiLoreBuilder(messages, player)
+                    .block(messages.getStringList(player, "gui.world_settings.tags.description", mapOf("count" to worldData.tags.size.toString())))
+                    .singleAction(messages.getString(player, "gui.world_settings.tags.action"))
+                    .build(),
+            ),
+        )
+        holder.inventory.setItem(
+            29,
+            GuiComponents.button(
+                Material.OAK_SIGN,
+                messages.getString(player, "gui.world_settings.announcement.display"),
+                GuiLoreBuilder(messages, player)
+                    .block(
+                        messages.getStringList(
+                            player,
+                            "gui.world_settings.announcement.description",
+                            mapOf("message" to worldData.announcementMessage.ifBlank { messages.getString(player, "gui.world_settings.common.unset") }),
+                        ),
+                    )
+                    .singleAction(messages.getString(player, "gui.world_settings.announcement.action"))
+                    .build(),
+            ),
+        )
+        holder.inventory.setItem(
+            30,
+            GuiComponents.button(
+                Material.BELL,
+                messages.getString(player, "gui.world_settings.notification.display"),
+                GuiLoreBuilder(messages, player)
+                    .block(
+                        messages.getStringList(
+                            player,
+                            "gui.world_settings.notification.description",
+                            mapOf("status" to messages.getString(player, if (worldData.notificationEnabled) "gui.common.state.on" else "gui.common.state.off")),
+                        ),
+                    )
+                    .singleAction(messages.getString(player, "gui.world_settings.notification.action"))
+                    .build(),
+            ),
+        )
+        holder.inventory.setItem(
+            32,
+            GuiComponents.button(
+                Material.GRASS_BLOCK,
+                messages.getString(player, "gui.world_settings.environment.display"),
+                GuiLoreBuilder(messages, player)
+                    .block(messages.getStringList(player, "gui.world_settings.environment.description"))
+                    .apply {
+                        if (!isInWorld) {
+                            warning(messages.getString(player, "gui.world_settings.common.must_be_in_world"))
+                        }
+                    }
+                    .singleAction(messages.getString(player, "gui.world_settings.environment.action"))
+                    .build(),
+            ),
+        )
+
+        if (backTarget != WorldSettingsBackTarget.NONE) {
+            holder.inventory.setItem(45, GuiComponents.backButton(messages.getString(player, "gui.common.back")))
+        }
+        holder.inventory.setItem(49, GuiComponents.worldIconButton(messages, player, worldData, showActions = false))
+        return holder.inventory
+    }
+
+    private fun buildPublishLevelList(messages: LocalizationService, player: Player, current: me.awabi2048.mwmchanpon.model.WorldPublishLevel): String {
+        return me.awabi2048.mwmchanpon.model.WorldPublishLevel.entries.joinToString("\n") { level ->
+            val key = "gui.world_settings.publish.option.${level.name.lowercase()}"
+            if (level == current) {
+                messages.getString(player, "gui.world_settings.publish.option_active", mapOf("level" to messages.getString(player, key)))
+            } else {
+                messages.getString(player, "gui.world_settings.publish.option_inactive", mapOf("level" to messages.getString(player, key)))
+            }
+        }
     }
 }

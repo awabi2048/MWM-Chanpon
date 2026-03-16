@@ -15,6 +15,10 @@ commands:
     description: Open My World list menu
     usage: /<command>
     permission: mwmchanpon.command.myworld
+  worldmenu:
+    description: Open current world settings menu
+    usage: /<command>
+    permission: mwmchanpon.command.worldmenu
 permissions:
   mwmchanpon.command.mwm:
     description: Allows use of /mwm
@@ -27,4 +31,7 @@ permissions:
     default: op
   mwmchanpon.command.myworld:
     description: Allows use of /myworld
+    default: true
+  mwmchanpon.command.worldmenu:
+    description: Allows use of /worldmenu
     default: true

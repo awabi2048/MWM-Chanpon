@@ -2,6 +2,9 @@ world_name:
   min_length: 3
   max_length: 16
 
+world_description:
+  max_length: 100
+
 validation:
   blocked_strings:
     - "admin"

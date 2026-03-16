@@ -39,6 +39,17 @@ class WorldService(
         return null
     }
 
+    fun validateWorldDescription(description: String): String? {
+        val maxLength = plugin.config.getInt("world_description.max_length", 100)
+        if (description.length > maxLength) {
+            return plugin.localizationService.getString(null, "messages.world_description_invalid_length", mapOf("max" to maxLength.toString()))
+        }
+        if (description.contains('\n') || description.contains('\r')) {
+            return plugin.localizationService.getString(null, "messages.world_description_single_line")
+        }
+        return null
+    }
+
     fun canCreateMore(targetPlayer: Player): Boolean {
         return getOwnedWorldCount(targetPlayer.uniqueId) < getMaxCreateCount()
     }
@@ -57,6 +68,65 @@ class WorldService(
 
     fun getAccessibleWorlds(player: Player): List<MyWorldData> {
         return worldRepository.findAccessibleByPlayer(player.uniqueId)
+    }
+
+    fun getWorldByUuid(worldUuid: UUID): MyWorldData? {
+        return worldRepository.load(worldUuid)
+    }
+
+    fun getWorldByCustomWorldName(worldName: String): MyWorldData? {
+        return worldRepository.findByCustomWorldName(worldName)
+    }
+
+    fun canOpenSettings(player: Player, worldData: MyWorldData): Boolean {
+        return worldData.owner == player.uniqueId || worldData.members.contains(player.uniqueId)
+    }
+
+    fun isPlayerInWorld(player: Player, worldData: MyWorldData): Boolean {
+        return player.world.name == worldData.customWorldName
+    }
+
+    fun getNotificationTargets(worldData: MyWorldData): List<UUID> {
+        return buildList {
+            add(worldData.owner)
+            addAll(worldData.members)
+        }.distinct()
+    }
+
+    fun rotatePublishLevel(worldData: MyWorldData, forward: Boolean = true): MyWorldData {
+        val levels = WorldPublishLevel.entries
+        val currentIndex = levels.indexOf(worldData.publishLevel).coerceAtLeast(0)
+        val nextIndex = if (forward) {
+            (currentIndex + 1) % levels.size
+        } else {
+            (currentIndex - 1 + levels.size) % levels.size
+        }
+        return updateWorld(worldData.copy(publishLevel = levels[nextIndex]))
+    }
+
+    fun updateWorldInfo(worldData: MyWorldData, name: String, description: String): Result<MyWorldData> {
+        val nameError = validateWorldName(name)
+        if (nameError != null) {
+            return Result.failure(IllegalArgumentException(nameError))
+        }
+        val descriptionError = validateWorldDescription(description)
+        if (descriptionError != null) {
+            return Result.failure(IllegalArgumentException(descriptionError))
+        }
+        return Result.success(updateWorld(worldData.copy(name = name, description = description)))
+    }
+
+    fun updateWorldIcon(worldData: MyWorldData, icon: Material): MyWorldData {
+        return updateWorld(worldData.copy(icon = icon))
+    }
+
+    fun toggleVisitNotification(worldData: MyWorldData): MyWorldData {
+        return updateWorld(worldData.copy(notificationEnabled = !worldData.notificationEnabled))
+    }
+
+    private fun updateWorld(worldData: MyWorldData): MyWorldData {
+        worldRepository.save(worldData)
+        return worldData
     }
 
     fun teleportToWorld(player: Player, worldData: MyWorldData): Result<Unit> {
@@ -200,9 +270,13 @@ class WorldService(
             owner = targetPlayer.uniqueId,
             members = emptyList(),
             publishLevel = WorldPublishLevel.WIP,
+            spawnPosGuest = spawnLocation,
             spawnPosMember = spawnLocation,
             borderCenterPos = borderCenter,
             borderSize = world.worldBorder.size,
+            notificationEnabled = true,
+            announcementMessage = "",
+            tags = emptyList(),
             customWorldName = customWorldName,
             createdAt = LocalDateTime.now(),
         )

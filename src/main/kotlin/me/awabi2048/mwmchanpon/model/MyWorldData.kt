@@ -13,9 +13,13 @@ data class MyWorldData(
     val owner: UUID,
     val members: List<UUID>,
     val publishLevel: WorldPublishLevel,
+    val spawnPosGuest: SerializableLocation?,
     val spawnPosMember: SerializableLocation,
     val borderCenterPos: SerializableLocation,
     val borderSize: Double,
+    val notificationEnabled: Boolean,
+    val announcementMessage: String,
+    val tags: List<String>,
     val customWorldName: String,
     val createdAt: LocalDateTime,
 )

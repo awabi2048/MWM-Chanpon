@@ -4,6 +4,9 @@ gui:
     action_single: "§e§nClick to {action}"
     action_multi: "§e§l| §e{operation} §7{action}"
     warning: "§c§n※ {content}"
+    state:
+      on: "§aOn"
+      off: "§cOff"
     back: "§c§lBack"
     cancel: "§c§lCancel"
     close_message: "§eThe creation wizard has ended."
@@ -89,8 +92,8 @@ gui:
         seed: "Seed Value"
       publish:
         public: "§aPublic"
-        wip: "§bPrivate"
-        closed: "§cClosed"
+        wip: "§eIn Progress"
+        closed: "§cPrivate"
   personal_settings:
     title: "Personal Settings"
     back_action: "return to My World list"
@@ -100,6 +103,89 @@ gui:
         - "Current: {language}"
         - "Click to rotate to the next language."
       action: "change language"
+  world_settings:
+    title: "World Settings ({world})"
+    common:
+      unset: "Not set"
+      must_be_in_world: "You must be inside the target world to change this setting"
+    click:
+      left: "Left Click"
+      right: "Right Click"
+    info:
+      display: "§aWorld Info Settings"
+      description:
+        - "World Name: {name}"
+        - "World Description: {description}"
+      action: "edit world name and description"
+      form:
+        title: "World Info Settings"
+        message: "Enter the world name and description."
+        name: "World Name"
+        description: "World Description"
+    icon:
+      display: "§aChange World Icon"
+      current_prefix: "§f§l| §7Current Icon "
+      description_line: "§7After clicking, select an item in your inventory."
+      action: "start icon selection mode"
+    spawn:
+      display: "§aWorld Spawn Settings"
+      description:
+        - "This release only shows a message for this setting."
+      left_action: "set guest spawn"
+      right_action: "set member spawn"
+    expand:
+      display: "§6World Expansion"
+      description:
+        - "This release only shows a message for this setting."
+      action: "open expansion menu"
+    publish:
+      display: "§6Change Visibility"
+      description:
+        - "Current Setting: {level}"
+        - "{detail}"
+        - "{list}"
+      detail:
+        public: "§fAnyone can visit this world."
+        wip: "§fOnly players invited by members can visit this world."
+        closed: "§fNon-members cannot visit this world."
+      option:
+        public: "§aPublic"
+        wip: "§eIn Progress"
+        closed: "§cPrivate"
+      option_active: "§6» {level}"
+      option_inactive: "  {level}"
+      action_bedrock: "switch to the next visibility level"
+      action_previous: "switch to the previous visibility level"
+      action_next: "switch to the next visibility level"
+    members:
+      display: "§6Member Management"
+      description:
+        - "Current Member Count: {count}"
+        - "This release only shows a message for this setting."
+      action: "open member management"
+    tags:
+      display: "§aWorld Tag Settings"
+      description:
+        - "Configured Tags: {count}"
+        - "This release only shows a message for this setting."
+      action: "open tag settings"
+    announcement:
+      display: "§aVisitor Guide Settings"
+      description:
+        - "Current Guide: {message}"
+        - "This release only shows a message for this setting."
+      action: "open guide settings"
+    notification:
+      display: "§aToggle Visit Notifications"
+      description:
+        - "Current Setting: {status}"
+        - "Toggle whether non-members trigger a notification."
+      action: "toggle visit notifications"
+    environment:
+      display: "§aWorld Environment Settings"
+      description:
+        - "This release only shows a message for this setting."
+      action: "open environment settings"
 messages:
   usage_create: "/mwm create <player>"
   no_permission: "§cYou do not have permission to use this command."
@@ -114,9 +200,28 @@ messages:
   creation_failed: "§cFailed to create the world: {reason}"
   cancelled: "§cCancelled world creation."
   cannot_create_more: "§cThe target player cannot own any more My Worlds."
+  world_description_invalid_length: "§cThe world description must be at most {max} characters."
+  world_description_single_line: "§cThe world description must be a single line."
   teleport_success: "§aTeleporting to {name}."
   teleport_failed: "§cFailed to teleport: {reason}"
-  world_settings_mock: "§eWorld settings for {name} are not implemented yet."
+  world_not_found: "§cWorld data could not be found."
+  worldmenu_not_myworld: "§cYou are not currently in a My World."
+  worldmenu_no_access: "§cYou do not have permission to open this world's settings."
+  world_info_updated: "§aUpdated the world information."
+  world_icon_select_start: "§eClick an item in your inventory to set the world icon."
+  world_icon_invalid: "§cAn empty slot cannot be used as the world icon."
+  world_icon_updated_prefix: "§aChanged the world icon to "
+  world_icon_updated_suffix: "§a."
+  world_icon_selection_cancelled: "§cCancelled world icon selection."
+  world_publish_updated: "§aUpdated visibility: {level}"
+  world_notification_updated: "§aChanged visit notifications to {status}."
+  world_setting_requires_current_world: "§cThis setting can only be used while you are inside the target world."
+  world_spawn_unimplemented: "§eWorld spawn settings are not implemented in this release."
+  world_expand_unimplemented: "§eWorld expansion is not implemented in this release."
+  world_members_unimplemented: "§eMember management only shows a message in this release."
+  world_tags_unimplemented: "§eWorld tag settings only show a message in this release."
+  world_announcement_unimplemented: "§eVisitor guide settings only show a message in this release."
+  world_environment_unimplemented: "§eWorld environment settings only show a message in this release."
   language_updated: "§aChanged the display language to {language}."
   reload_success: "§aMWM-Chanpon was reinitialized."
   reload_failed: "§cFailed to reinitialize MWM-Chanpon: {reason}"

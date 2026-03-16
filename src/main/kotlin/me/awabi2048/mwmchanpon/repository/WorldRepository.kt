@@ -25,6 +25,10 @@ class WorldRepository(private val plugin: MWMChanponPlugin) {
             .sortedBy { it.createdAt }
     }
 
+    fun findByCustomWorldName(worldName: String): MyWorldData? {
+        return loadAll().firstOrNull { it.customWorldName == worldName }
+    }
+
     fun save(worldData: MyWorldData) {
         if (!rootDirectory.exists()) {
             rootDirectory.mkdirs()
@@ -40,9 +44,13 @@ class WorldRepository(private val plugin: MWMChanponPlugin) {
         section.set("owner", worldData.owner.toString())
         section.set("members", worldData.members.map(UUID::toString))
         section.set("publish_level", worldData.publishLevel.name)
+        worldData.spawnPosGuest?.let { section.createSection("spawn_pos_guest", it.toMap()) }
         section.createSection("spawn_pos_member", worldData.spawnPosMember.toMap())
         section.createSection("border_center_pos", worldData.borderCenterPos.toMap())
         section.set("border_size", worldData.borderSize)
+        section.set("notification_enabled", worldData.notificationEnabled)
+        section.set("announcement_message", worldData.announcementMessage)
+        section.set("tags", worldData.tags)
         section.set("created_at", worldData.createdAt.toString())
         section.set("custom_world_name", worldData.customWorldName)
         config.save(File(rootDirectory, "${worldData.uuid}.yml"))
@@ -65,6 +73,7 @@ class WorldRepository(private val plugin: MWMChanponPlugin) {
 
         val config = YamlConfiguration.loadConfiguration(file)
         val section = config.getConfigurationSection("world_data") ?: return null
+        val spawnGuestSection = section.getConfigurationSection("spawn_pos_guest")
         val spawnSection = section.getConfigurationSection("spawn_pos_member") ?: return null
         val borderSection = section.getConfigurationSection("border_center_pos") ?: return null
 
@@ -79,9 +88,13 @@ class WorldRepository(private val plugin: MWMChanponPlugin) {
             publishLevel = runCatching {
                 WorldPublishLevel.valueOf(section.getString("publish_level") ?: WorldPublishLevel.WIP.name)
             }.getOrDefault(WorldPublishLevel.WIP),
+            spawnPosGuest = spawnGuestSection?.let(::fromSection),
             spawnPosMember = fromSection(spawnSection),
             borderCenterPos = fromSection(borderSection),
             borderSize = section.getDouble("border_size"),
+            notificationEnabled = section.getBoolean("notification_enabled", true),
+            announcementMessage = section.getString("announcement_message").orEmpty(),
+            tags = section.getStringList("tags"),
             customWorldName = section.getString("custom_world_name") ?: return null,
             createdAt = LocalDateTime.parse(section.getString("created_at") ?: return null),
         )

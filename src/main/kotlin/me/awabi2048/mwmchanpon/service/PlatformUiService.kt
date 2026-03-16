@@ -14,6 +14,8 @@ import me.awabi2048.mwmchanpon.model.WizardSession
 import me.awabi2048.mwmchanpon.ui.GuiComponents
 import me.awabi2048.mwmchanpon.ui.GuiScreens
 import me.awabi2048.mwmchanpon.ui.PersonalSettingsMenuItem
+import me.awabi2048.mwmchanpon.ui.WorldSettingsBackTarget
+import me.awabi2048.mwmchanpon.ui.WorldSettingsHolder
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.event.ClickCallback
 import org.bukkit.Bukkit
@@ -21,6 +23,7 @@ import org.bukkit.Material
 import org.bukkit.Sound
 import org.bukkit.entity.Player
 import org.bukkit.event.inventory.ClickType
+import org.bukkit.event.inventory.InventoryClickEvent
 import org.geysermc.cumulus.form.CustomForm
 import org.geysermc.cumulus.response.result.InvalidFormResponseResult
 import org.geysermc.floodgate.api.FloodgateApi
@@ -39,6 +42,7 @@ class PlatformUiService(
     private val worldService: WorldService,
 ) {
     private val suppressedInventoryClose = ConcurrentHashMap.newKeySet<UUID>()
+    private val iconSelectionWorlds = ConcurrentHashMap<UUID, UUID>()
 
     fun openMethodSelection(player: Player) {
         val session = session(player) ?: return
@@ -81,6 +85,16 @@ class PlatformUiService(
             ),
         )
         openMenuInventory(player, GuiScreens.createPersonalSettings(player, messages, items, fromMenuCommand))
+    }
+
+    fun openWorldSettings(
+        player: Player,
+        worldData: MyWorldData,
+        backTarget: WorldSettingsBackTarget = WorldSettingsBackTarget.NONE,
+        myWorldPage: Int = 0,
+    ) {
+        clearWorldSettingsState(player)
+        openMenuInventory(player, GuiScreens.createWorldSettings(player, messages, worldData, backTarget, myWorldPage, isBedrock(player)))
     }
 
     fun requestWorldName(player: Player) {
@@ -196,6 +210,13 @@ class PlatformUiService(
             sessionService.clear(player.uniqueId)
             player.sendMessage(messages.getString(player, "gui.common.close_message"))
         }
+    }
+
+    fun handleMenuInventoryClosed(player: Player, holder: WorldSettingsHolder) {
+        if (suppressedInventoryClose.remove(player.uniqueId)) {
+            return
+        }
+        handleWorldSettingsClosed(player, holder)
     }
 
     fun handleMethodSelection(player: Player, slot: Int) {
@@ -319,7 +340,7 @@ class PlatformUiService(
             click.isLeftClick -> teleportToMyWorld(player, worldData)
             click.isRightClick -> {
                 playClickSound(player)
-                player.sendMessage(messages.getString(player, "messages.world_settings_mock", mapOf("name" to worldData.name)))
+                openWorldSettings(player, worldData, WorldSettingsBackTarget.MYWORLD_LIST, page)
             }
         }
     }
@@ -339,6 +360,112 @@ class PlatformUiService(
         }
     }
 
+    fun handleWorldSettingsClick(player: Player, event: InventoryClickEvent, holder: WorldSettingsHolder) {
+        val worldData = worldService.getWorldByUuid(UUID.fromString(holder.worldId)) ?: run {
+            player.sendMessage(messages.getString(player, "messages.world_not_found"))
+            player.closeInventory()
+            return
+        }
+        if (!worldService.canOpenSettings(player, worldData)) {
+            player.sendMessage(messages.getString(player, "messages.worldmenu_no_access"))
+            player.closeInventory()
+            return
+        }
+
+        if (iconSelectionWorlds[player.uniqueId] == worldData.uuid && event.clickedInventory == player.inventory) {
+            event.isCancelled = true
+            val clickedItem = event.currentItem ?: return
+            val material = clickedItem.type
+            if (material == Material.AIR) {
+                player.sendMessage(messages.getString(player, "messages.world_icon_invalid"))
+                return
+            }
+            playClickSound(player)
+            iconSelectionWorlds.remove(player.uniqueId)
+            val updated = worldService.updateWorldIcon(worldData, material)
+            player.sendMessage(
+                Component.text(messages.getString(player, "messages.world_icon_updated_prefix"))
+                    .append(GuiComponents.materialNameComponent(material))
+                    .append(Component.text(messages.getString(player, "messages.world_icon_updated_suffix"))),
+            )
+            openWorldSettings(player, updated, holder.backTarget, holder.myWorldPage)
+            return
+        }
+
+        event.isCancelled = true
+        if (event.clickedInventory == player.inventory) {
+            return
+        }
+
+        when (event.rawSlot) {
+            19 -> {
+                playClickSound(player)
+                requestWorldInfo(player, worldData, holder.backTarget, holder.myWorldPage)
+            }
+
+            20 -> {
+                playClickSound(player)
+                iconSelectionWorlds[player.uniqueId] = worldData.uuid
+                player.sendMessage(messages.getString(player, "messages.world_icon_select_start"))
+            }
+
+            21 -> handleWorldBoundMock(player, worldData, "messages.world_spawn_unimplemented")
+            23 -> handleWorldBoundMock(player, worldData, "messages.world_expand_unimplemented")
+
+            24 -> {
+                playClickSound(player)
+                val updated = worldService.rotatePublishLevel(worldData, forward = !event.click.isLeftClick || isBedrock(player))
+                player.sendMessage(
+                    messages.getString(
+                        player,
+                        "messages.world_publish_updated",
+                        mapOf("level" to messages.getString(player, publishLevelKey(updated))),
+                    ),
+                )
+                openWorldSettings(player, updated, holder.backTarget, holder.myWorldPage)
+            }
+
+            25 -> sendWorldSettingsMock(player, "messages.world_members_unimplemented")
+            28 -> sendWorldSettingsMock(player, "messages.world_tags_unimplemented")
+            29 -> sendWorldSettingsMock(player, "messages.world_announcement_unimplemented")
+
+            30 -> {
+                playClickSound(player)
+                val updated = worldService.toggleVisitNotification(worldData)
+                player.sendMessage(
+                    messages.getString(
+                        player,
+                        "messages.world_notification_updated",
+                        mapOf("status" to messages.getString(player, if (updated.notificationEnabled) "gui.common.state.on" else "gui.common.state.off")),
+                    ),
+                )
+                openWorldSettings(player, updated, holder.backTarget, holder.myWorldPage)
+            }
+
+            32 -> handleWorldBoundMock(player, worldData, "messages.world_environment_unimplemented")
+
+            45 -> {
+                when (holder.backTarget) {
+                    WorldSettingsBackTarget.NONE -> return
+                    WorldSettingsBackTarget.MENU_COMMAND -> {
+                        playClickSound(player)
+                        executeConfiguredMenuCommand(player)
+                    }
+                    WorldSettingsBackTarget.MYWORLD_LIST -> {
+                        playClickSound(player)
+                        openMyWorldList(player, holder.myWorldPage, false)
+                    }
+                }
+            }
+        }
+    }
+
+    fun handleWorldSettingsClosed(player: Player, holder: WorldSettingsHolder) {
+        if (iconSelectionWorlds.remove(player.uniqueId, UUID.fromString(holder.worldId))) {
+            player.sendMessage(messages.getString(player, "messages.world_icon_selection_cancelled"))
+        }
+    }
+
     private fun session(player: Player): WizardSession? {
         return sessionService.getSession(player.uniqueId) ?: run {
             player.sendMessage(messages.getString(player, "gui.common.expired_message"))
@@ -352,6 +479,40 @@ class PlatformUiService(
             CreationMethod.RANDOM -> openMethodSelection(player)
             CreationMethod.SEED -> requestSeed(player)
             null -> openMethodSelection(player)
+        }
+    }
+
+    private fun requestWorldInfo(player: Player, worldData: MyWorldData, backTarget: WorldSettingsBackTarget, myWorldPage: Int) {
+        if (isBedrock(player)) {
+            openBedrockWorldInfoForm(player, worldData, backTarget, myWorldPage)
+        } else {
+            openJavaWorldInfoDialog(player, worldData, backTarget, myWorldPage)
+        }
+    }
+
+    private fun validateWorldInfo(name: String, description: String): String? {
+        return worldService.validateWorldName(name)
+            ?: worldService.validateWorldDescription(description)
+    }
+
+    private fun sendWorldSettingsMock(player: Player, messageKey: String) {
+        playClickSound(player)
+        player.sendMessage(messages.getString(player, messageKey))
+    }
+
+    private fun handleWorldBoundMock(player: Player, worldData: MyWorldData, messageKey: String) {
+        if (!worldService.isPlayerInWorld(player, worldData)) {
+            player.sendMessage(messages.getString(player, "messages.world_setting_requires_current_world"))
+            return
+        }
+        sendWorldSettingsMock(player, messageKey)
+    }
+
+    private fun publishLevelKey(worldData: MyWorldData): String {
+        return when (worldData.publishLevel) {
+            me.awabi2048.mwmchanpon.model.WorldPublishLevel.PUBLIC -> "gui.myworld.world_icon.publish.public"
+            me.awabi2048.mwmchanpon.model.WorldPublishLevel.WIP -> "gui.myworld.world_icon.publish.wip"
+            me.awabi2048.mwmchanpon.model.WorldPublishLevel.CLOSED -> "gui.myworld.world_icon.publish.closed"
         }
     }
 
@@ -370,6 +531,10 @@ class PlatformUiService(
     }
 
     private fun defaultLanguage(player: Player): String = player.locale().toLanguageTag().replace('-', '_').lowercase()
+
+    private fun clearWorldSettingsState(player: Player) {
+        iconSelectionWorlds.remove(player.uniqueId)
+    }
 
     private fun isBedrock(player: Player): Boolean {
         val floodgatePlugin = Bukkit.getPluginManager().getPlugin("floodgate") ?: return false
@@ -480,6 +645,105 @@ class PlatformUiService(
                     .afterAction(DialogBase.DialogAfterAction.CLOSE)
                     .body(listOf(DialogBody.plainMessage(Component.text(messages.getString(player, messageKey)), 240)))
                     .inputs(listOf(DialogInput.text(inputKey, 240, Component.text(messages.getString(player, titleKey.replace(".title", ".label"))), true, initialValue, 64, null)))
+                    .build(),
+            ).type(DialogType.multiAction(listOf(submitButton, backButton), null, 2))
+        }
+
+        player.showDialog(dialog)
+    }
+
+    private fun openBedrockWorldInfoForm(player: Player, worldData: MyWorldData, backTarget: WorldSettingsBackTarget, myWorldPage: Int) {
+        val floodgateApi = runCatching { FloodgateApi.getInstance() }.getOrNull()
+        if (floodgateApi == null) {
+            player.sendMessage(messages.getString(player, "gui.common.offline_target"))
+            return
+        }
+
+        suppressNextInventoryClose(player)
+        player.closeInventory()
+
+        val form = CustomForm.builder()
+            .title(messages.getString(player, "gui.world_settings.info.form.title"))
+            .label(messages.getString(player, "gui.world_settings.info.form.message"))
+            .input(messages.getString(player, "gui.world_settings.info.form.name"), "", worldData.name)
+            .input(messages.getString(player, "gui.world_settings.info.form.description"), "", worldData.description)
+            .validResultHandler { response ->
+                val name = response.asInput(0)?.trim().orEmpty()
+                val description = response.asInput(1)?.trim().orEmpty()
+                val error = validateWorldInfo(name, description)
+                if (error != null) {
+                    player.sendMessage(error)
+                    requestWorldInfo(player, worldData, backTarget, myWorldPage)
+                    return@validResultHandler
+                }
+
+                val latest = worldService.getWorldByUuid(worldData.uuid) ?: worldData
+                val result = worldService.updateWorldInfo(latest, name, description)
+                result.onSuccess {
+                    playClickSound(player)
+                    player.sendMessage(messages.getString(player, "messages.world_info_updated"))
+                    openWorldSettings(player, it, backTarget, myWorldPage)
+                }.onFailure {
+                    player.sendMessage(it.message ?: messages.getString(player, "messages.world_not_found"))
+                }
+            }
+            .closedResultHandler(Runnable { openWorldSettings(player, worldData, backTarget, myWorldPage) })
+            .invalidResultHandler(Consumer<InvalidFormResponseResult<org.geysermc.cumulus.response.CustomFormResponse>> { openWorldSettings(player, worldData, backTarget, myWorldPage) })
+            .build()
+
+        floodgateApi.sendForm(player.uniqueId, form)
+    }
+
+    private fun openJavaWorldInfoDialog(player: Player, worldData: MyWorldData, backTarget: WorldSettingsBackTarget, myWorldPage: Int) {
+        suppressNextInventoryClose(player)
+        player.closeInventory()
+
+        val options = ClickCallback.Options.builder().uses(1).lifetime(Duration.ofMinutes(5)).build()
+        val submitButton = ActionButton.builder(Component.text(messages.getString(player, "gui.creation.input.submit")))
+            .width(120)
+            .action(DialogAction.customClick({ response, audience ->
+                val target = audience as? Player ?: return@customClick
+                val name = response.getText("world_settings_name")?.trim().orEmpty()
+                val description = response.getText("world_settings_description")?.trim().orEmpty()
+                val error = validateWorldInfo(name, description)
+                if (error != null) {
+                    target.sendMessage(error)
+                    requestWorldInfo(target, worldData, backTarget, myWorldPage)
+                    return@customClick
+                }
+
+                val latest = worldService.getWorldByUuid(worldData.uuid) ?: worldData
+                val result = worldService.updateWorldInfo(latest, name, description)
+                result.onSuccess {
+                    playClickSound(target)
+                    target.sendMessage(messages.getString(target, "messages.world_info_updated"))
+                    openWorldSettings(target, it, backTarget, myWorldPage)
+                }.onFailure {
+                    target.sendMessage(it.message ?: messages.getString(target, "messages.world_not_found"))
+                }
+            }, options))
+            .build()
+        val backButton = ActionButton.builder(Component.text(messages.getString(player, "gui.creation.input.back")))
+            .width(120)
+            .action(DialogAction.customClick({ _, audience ->
+                val target = audience as? Player ?: return@customClick
+                openWorldSettings(target, worldData, backTarget, myWorldPage)
+            }, options))
+            .build()
+
+        val dialog = Dialog.create { factory ->
+            factory.empty().base(
+                DialogBase.builder(Component.text(messages.getString(player, "gui.world_settings.info.form.title")))
+                    .canCloseWithEscape(false)
+                    .pause(false)
+                    .afterAction(DialogBase.DialogAfterAction.CLOSE)
+                    .body(listOf(DialogBody.plainMessage(Component.text(messages.getString(player, "gui.world_settings.info.form.message")), 240)))
+                    .inputs(
+                        listOf(
+                            DialogInput.text("world_settings_name", 240, Component.text(messages.getString(player, "gui.world_settings.info.form.name")), true, worldData.name, 64, null),
+                            DialogInput.text("world_settings_description", 240, Component.text(messages.getString(player, "gui.world_settings.info.form.description")), false, worldData.description, plugin.config.getInt("world_description.max_length", 100), null),
+                        ),
+                    )
                     .build(),
             ).type(DialogType.multiAction(listOf(submitButton, backButton), null, 2))
         }

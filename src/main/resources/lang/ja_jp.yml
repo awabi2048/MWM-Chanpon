@@ -4,6 +4,9 @@ gui:
     action_single: "§e§nクリックして{action}"
     action_multi: "§e§l| §e{operation} §7{action}"
     warning: "§c§n※ {content}"
+    state:
+      on: "§aオン"
+      off: "§cオフ"
     back: "§c§l戻る"
     cancel: "§c§lキャンセル"
     close_message: "§e作成ウィザードを終了しました。"
@@ -89,8 +92,8 @@ gui:
         seed: "シード値指定"
       publish:
         public: "§a公開"
-        wip: "§b非公開"
-        closed: "§cクローズ"
+        wip: "§e制作中"
+        closed: "§c非公開"
   personal_settings:
     title: "個人設定"
     back_action: "ワールド一覧へ戻る"
@@ -100,6 +103,89 @@ gui:
         - "現在: {language}"
         - "クリックで次の言語へ切り替えます。"
       action: "言語を切り替える"
+  world_settings:
+    title: "ワールド設定({world})"
+    common:
+      unset: "未設定"
+      must_be_in_world: "この設定を変更するには対象ワールド内にいる必要があります"
+    click:
+      left: "左クリック"
+      right: "右クリック"
+    info:
+      display: "§aワールド情報の設定"
+      description:
+        - "ワールド名: {name}"
+        - "ワールド説明: {description}"
+      action: "ワールド名と説明を編集"
+      form:
+        title: "ワールド情報の設定"
+        message: "ワールド名と説明を入力してください。"
+        name: "ワールド名"
+        description: "ワールド説明"
+    icon:
+      display: "§aワールドアイコンの変更"
+      current_prefix: "§f§l| §7現在のアイコン "
+      description_line: "§7クリック後にインベントリ内のアイテムを選択します。"
+      action: "アイコン設定モードを開始"
+    spawn:
+      display: "§aスポーン地点の設定"
+      description:
+        - "今回は設定メッセージのみ実装しています。"
+      left_action: "ゲスト用スポーンを設定"
+      right_action: "メンバー用スポーンを設定"
+    expand:
+      display: "§6ワールドの拡張"
+      description:
+        - "今回は設定メッセージのみ実装しています。"
+      action: "拡張メニューを開く"
+    publish:
+      display: "§6公開レベルの変更"
+      description:
+        - "現在の設定: {level}"
+        - "{detail}"
+        - "{list}"
+      detail:
+        public: "§f誰でも訪問可能です。"
+        wip: "§fメンバーが招待した人のみ訪問可能です。"
+        closed: "§fメンバー以外は訪問できません。"
+      option:
+        public: "§a公開"
+        wip: "§e制作中"
+        closed: "§c非公開"
+      option_active: "§6» {level}"
+      option_inactive: "  {level}"
+      action_bedrock: "次の公開レベルへ切り替える"
+      action_previous: "前の公開レベルへ切り替える"
+      action_next: "次の公開レベルへ切り替える"
+    members:
+      display: "§6メンバーの管理"
+      description:
+        - "現在のメンバー数: {count}人"
+        - "今回はメッセージのみ実装しています。"
+      action: "メンバー管理を開く"
+    tags:
+      display: "§aワールドタグの設定"
+      description:
+        - "設定中のタグ数: {count}"
+        - "今回はメッセージのみ実装しています。"
+      action: "タグ設定を開く"
+    announcement:
+      display: "§aプレイヤー案内の設定"
+      description:
+        - "現在の案内: {message}"
+        - "今回はメッセージのみ実装しています。"
+      action: "案内設定を開く"
+    notification:
+      display: "§a訪問通知の切り替え"
+      description:
+        - "現在の設定: {status}"
+        - "メンバー以外の訪問時に通知するか切り替えます。"
+      action: "訪問通知を切り替える"
+    environment:
+      display: "§aワールド環境の設定"
+      description:
+        - "今回はメッセージのみ実装しています。"
+      action: "環境設定を開く"
 messages:
   usage_create: "/mwm create <player>"
   no_permission: "§cこのコマンドを実行する権限がありません。"
@@ -114,9 +200,28 @@ messages:
   creation_failed: "§cワールド作成に失敗しました: {reason}"
   cancelled: "§cワールド作成をキャンセルしました。"
   cannot_create_more: "§c対象プレイヤーはこれ以上マイワールドを所有できません。"
+  world_description_invalid_length: "§cワールド説明は最大 {max} 文字で入力してください。"
+  world_description_single_line: "§cワールド説明は1行で入力してください。"
   teleport_success: "§a{name} へテレポートします。"
   teleport_failed: "§cテレポートに失敗しました: {reason}"
-  world_settings_mock: "§e{name} のワールド設定はまだ実装されていません。"
+  world_not_found: "§cワールドデータが見つかりませんでした。"
+  worldmenu_not_myworld: "§cここはマイワールドではありません。"
+  worldmenu_no_access: "§cこのワールド設定を開く権限がありません。"
+  world_info_updated: "§aワールド情報を更新しました。"
+  world_icon_select_start: "§eインベントリ内のアイテムをクリックしてワールドアイコンを設定してください。"
+  world_icon_invalid: "§c空のスロットはアイコンに設定できません。"
+  world_icon_updated_prefix: "§aワールドアイコンを "
+  world_icon_updated_suffix: "§a に変更しました。"
+  world_icon_selection_cancelled: "§cワールドアイコンの設定をキャンセルしました。"
+  world_publish_updated: "§a公開設定を更新しました: {level}"
+  world_notification_updated: "§a訪問通知を {status} に変更しました。"
+  world_setting_requires_current_world: "§cこの設定は対象ワールド内にいるときのみ実行できます。"
+  world_spawn_unimplemented: "§eワールドスポーン設定は今回は未実装です。"
+  world_expand_unimplemented: "§eワールド拡張は今回は未実装です。"
+  world_members_unimplemented: "§eメンバー管理は今回はメッセージ表示のみです。"
+  world_tags_unimplemented: "§eワールドタグ設定は今回はメッセージ表示のみです。"
+  world_announcement_unimplemented: "§eプレイヤー案内設定は今回はメッセージ表示のみです。"
+  world_environment_unimplemented: "§eワールド環境設定は今回はメッセージ表示のみです。"
   language_updated: "§a表示言語を {language} に変更しました。"
   reload_success: "§aMWM-Chanpon を再初期化しました。"
   reload_failed: "§cMWM-Chanpon の再初期化に失敗しました: {reason}"
