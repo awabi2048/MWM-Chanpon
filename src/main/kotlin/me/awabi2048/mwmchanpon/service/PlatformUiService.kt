@@ -432,7 +432,7 @@ class PlatformUiService(
 
             24 -> {
                 playClickSound(player)
-                val updated = worldService.rotatePublishLevel(worldData, forward = !event.click.isLeftClick || isBedrock(player))
+                val updated = worldService.rotatePublishLevel(worldData, forward = event.click.isLeftClick || isBedrock(player))
                 player.sendMessage(
                     messages.getString(
                         player,

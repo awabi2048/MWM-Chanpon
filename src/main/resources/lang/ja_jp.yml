@@ -151,9 +151,8 @@ gui:
     publish:
       display: "§6公開レベルの変更"
       description:
-        - "現在の設定: {level}"
+        - "§f§l| §7現在の設定 {level}"
         - "{detail}"
-        - "{list}"
       detail:
         public: "§f誰でも訪問可能です。"
         wip: "§fメンバーが招待した人のみ訪問可能です。"
@@ -165,8 +164,8 @@ gui:
       option_active: "§6» {level}"
       option_inactive: "  {level}"
       action_bedrock: "次の公開レベルへ切り替える"
-      action_previous: "前の公開レベルへ切り替える"
-      action_next: "次の公開レベルへ切り替える"
+      action_previous: "前の公開レベルへ移動"
+      action_next: "次の公開レベルへ移動"
     members:
       display: "§6メンバーの管理"
       description:

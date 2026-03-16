@@ -392,18 +392,18 @@ object GuiScreens {
                             mapOf(
                                 "level" to GuiComponents.publishLevelText(messages, player, worldData.publishLevel),
                                 "detail" to messages.getString(player, "gui.world_settings.publish.detail.${worldData.publishLevel.name.lowercase()}"),
-                                "list" to buildPublishLevelList(messages, player, worldData.publishLevel),
                             ),
                         ),
                     )
+                    .block(buildPublishLevelList(messages, player, worldData.publishLevel))
                     .apply {
                         if (isBedrock) {
                             singleAction(messages.getString(player, "gui.world_settings.publish.action_bedrock"))
                         } else {
                             multiActions(
                                 listOf(
-                                    LoreAction(messages.getString(player, "gui.world_settings.click.left"), messages.getString(player, "gui.world_settings.publish.action_previous")),
-                                    LoreAction(messages.getString(player, "gui.world_settings.click.right"), messages.getString(player, "gui.world_settings.publish.action_next")),
+                                    LoreAction(messages.getString(player, "gui.world_settings.click.left"), messages.getString(player, "gui.world_settings.publish.action_next")),
+                                    LoreAction(messages.getString(player, "gui.world_settings.click.right"), messages.getString(player, "gui.world_settings.publish.action_previous")),
                                 ),
                             )
                         }
@@ -491,8 +491,8 @@ object GuiScreens {
         return holder.inventory
     }
 
-    private fun buildPublishLevelList(messages: LocalizationService, player: Player, current: me.awabi2048.mwmchanpon.model.WorldPublishLevel): String {
-        return me.awabi2048.mwmchanpon.model.WorldPublishLevel.entries.joinToString("\n") { level ->
+    private fun buildPublishLevelList(messages: LocalizationService, player: Player, current: me.awabi2048.mwmchanpon.model.WorldPublishLevel): List<String> {
+        return me.awabi2048.mwmchanpon.model.WorldPublishLevel.entries.map { level ->
             val key = "gui.world_settings.publish.option.${level.name.lowercase()}"
             if (level == current) {
                 messages.getString(player, "gui.world_settings.publish.option_active", mapOf("level" to messages.getString(player, key)))

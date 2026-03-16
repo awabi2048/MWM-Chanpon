@@ -20,16 +20,21 @@ private val legacySerializer = LegacyComponentSerializer.legacySection()
 
 data class LoreAction(val operation: String? = null, val action: String)
 
+private data class LoreSection(
+    val lines: List<Component>,
+    val showClosingSeparator: Boolean = true,
+)
+
 class GuiLoreBuilder(
     private val messages: LocalizationService,
     private val player: Player?,
 ) {
-    private val sections = mutableListOf<List<Component>>()
+    private val sections = mutableListOf<LoreSection>()
 
-    private fun addSection(lines: List<Component>) {
+    private fun addSection(lines: List<Component>, showClosingSeparator: Boolean = true) {
         val normalized = lines.filter { it != Component.empty() }
         if (normalized.isNotEmpty()) {
-            sections += normalized
+            sections += LoreSection(normalized, showClosingSeparator)
         }
     }
 
@@ -60,7 +65,7 @@ class GuiLoreBuilder(
     }
 
     fun singleAction(action: String): GuiLoreBuilder {
-        addSection(listOf(legacy(messages.getString(player, "gui.common.action_single", mapOf("action" to action)))))
+        addSection(listOf(legacy(messages.getString(player, "gui.common.action_single", mapOf("action" to action)))), showClosingSeparator = false)
         return this
     }
 
@@ -95,9 +100,11 @@ class GuiLoreBuilder(
         return buildList {
             sections.forEach { section ->
                 add(separator)
-                addAll(section)
+                addAll(section.lines)
             }
-            add(separator)
+            if (sections.last().showClosingSeparator) {
+                add(separator)
+            }
         }
     }
 }

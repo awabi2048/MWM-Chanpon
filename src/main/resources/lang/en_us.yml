@@ -151,9 +151,8 @@ gui:
     publish:
       display: "§6Change Visibility"
       description:
-        - "Current Setting: {level}"
+        - "§f§l| §7Current Setting {level}"
         - "{detail}"
-        - "{list}"
       detail:
         public: "§fAnyone can visit this world."
         wip: "§fOnly players invited by members can visit this world."
@@ -165,8 +164,8 @@ gui:
       option_active: "§6» {level}"
       option_inactive: "  {level}"
       action_bedrock: "switch to the next visibility level"
-      action_previous: "switch to the previous visibility level"
-      action_next: "switch to the next visibility level"
+      action_previous: "move to the previous visibility level"
+      action_next: "move to the next visibility level"
     members:
       display: "§6Member Management"
       description:
