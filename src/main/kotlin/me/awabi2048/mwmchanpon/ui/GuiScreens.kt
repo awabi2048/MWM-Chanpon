@@ -337,18 +337,29 @@ object GuiScreens {
                 Material.COMPASS,
                 messages.getString(player, "gui.world_settings.spawn.display"),
                 GuiLoreBuilder(messages, player)
-                    .block(messages.getStringList(player, "gui.world_settings.spawn.description"))
+                    .block(
+                        messages.getStringList(
+                            player,
+                            if (isBedrock) "gui.world_settings.spawn.description_bedrock" else "gui.world_settings.spawn.description",
+                        ),
+                    )
                     .apply {
                         if (!isInWorld) {
                             warning(messages.getString(player, "gui.world_settings.common.must_be_in_world"))
                         }
                     }
-                    .multiActions(
-                        listOf(
-                            LoreAction(messages.getString(player, "gui.world_settings.click.left"), messages.getString(player, "gui.world_settings.spawn.left_action")),
-                            LoreAction(messages.getString(player, "gui.world_settings.click.right"), messages.getString(player, "gui.world_settings.spawn.right_action")),
-                        ),
-                    )
+                    .apply {
+                        if (isBedrock) {
+                            singleAction(messages.getString(player, "gui.world_settings.spawn.bedrock_action"))
+                        } else {
+                            multiActions(
+                                listOf(
+                                    LoreAction(messages.getString(player, "gui.world_settings.click.left"), messages.getString(player, "gui.world_settings.spawn.left_action")),
+                                    LoreAction(messages.getString(player, "gui.world_settings.click.right"), messages.getString(player, "gui.world_settings.spawn.right_action")),
+                                ),
+                            )
+                        }
+                    }
                     .build(),
             ),
         )

@@ -129,10 +129,20 @@ gui:
       action: "アイコン設定モードを開始"
     spawn:
       display: "§aスポーン地点の設定"
+      type:
+        guest: "ゲスト用"
+        member: "メンバー用"
+        both: "ゲスト/メンバー共通"
       description:
-        - "今回は設定メッセージのみ実装しています。"
+        - "クリック後、設定したい地点のブロックを"
+        - "クリックして決定します。"
+        - "§e※設定時のプレイヤーの向きが保存されます"
+      description_bedrock:
+        - "クリックした地点をゲスト/メンバー両方に設定します。"
+        - "§e※設定時のプレイヤーの向きが保存されます"
       left_action: "ゲスト用スポーンを設定"
       right_action: "メンバー用スポーンを設定"
+      bedrock_action: "ゲスト/メンバー共通スポーンを設定"
     expand:
       display: "§6ワールドの拡張"
       description:
@@ -216,7 +226,12 @@ messages:
   world_publish_updated: "§a公開設定を更新しました: {level}"
   world_notification_updated: "§a訪問通知を {status} に変更しました。"
   world_setting_requires_current_world: "§cこの設定は対象ワールド内にいるときのみ実行できます。"
-  world_spawn_unimplemented: "§eワールドスポーン設定は今回は未実装です。"
+  spawn_set_start: "§e{type}スポーン地点の設定を開始しました。設置したい場所を向いてクリックしてください。"
+  spawn_set_start_bedrock: "§e{type}スポーン地点の設定を開始しました。設置したい場所を向いてクリックしてください。"
+  spawn_guest_set: "§aゲスト用のスポーン位置を設定しました！"
+  spawn_member_set: "§aメンバー用のスポーン位置を設定しました！"
+  spawn_both_set: "§aゲスト/メンバー共通のスポーン位置を設定しました！"
+  spawn_set_blocked: "§cその場所にはスポーンを設定できません。足元と頭上が空気または水の場所を選んでください。"
   world_expand_unimplemented: "§eワールド拡張は今回は未実装です。"
   world_members_unimplemented: "§eメンバー管理は今回はメッセージ表示のみです。"
   world_tags_unimplemented: "§eワールドタグ設定は今回はメッセージ表示のみです。"

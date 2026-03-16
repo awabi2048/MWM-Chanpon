@@ -10,6 +10,7 @@ import io.papermc.paper.registry.data.dialog.type.DialogType
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.model.CreationMethod
 import me.awabi2048.mwmchanpon.model.MyWorldData
+import me.awabi2048.mwmchanpon.model.SerializableLocation
 import me.awabi2048.mwmchanpon.model.WizardSession
 import me.awabi2048.mwmchanpon.ui.GuiComponents
 import me.awabi2048.mwmchanpon.ui.GuiScreens
@@ -19,11 +20,18 @@ import me.awabi2048.mwmchanpon.ui.WorldSettingsHolder
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.event.ClickCallback
 import org.bukkit.Bukkit
+import org.bukkit.Color
+import org.bukkit.Location
 import org.bukkit.Material
+import org.bukkit.Particle
 import org.bukkit.Sound
 import org.bukkit.entity.Player
+import org.bukkit.event.block.Action
 import org.bukkit.event.inventory.ClickType
 import org.bukkit.event.inventory.InventoryClickEvent
+import org.bukkit.event.player.PlayerInteractEvent
+import org.bukkit.inventory.EquipmentSlot
+import org.bukkit.scheduler.BukkitTask
 import org.geysermc.cumulus.form.CustomForm
 import org.geysermc.cumulus.response.result.InvalidFormResponseResult
 import org.geysermc.floodgate.api.FloodgateApi
@@ -43,6 +51,16 @@ class PlatformUiService(
 ) {
     private val suppressedInventoryClose = ConcurrentHashMap.newKeySet<UUID>()
     private val iconSelectionWorlds = ConcurrentHashMap<UUID, UUID>()
+    private val spawnSelectionStates = ConcurrentHashMap<UUID, SpawnSelectionState>()
+    private val spawnPreviewTasks = ConcurrentHashMap<UUID, BukkitTask>()
+
+    private data class SpawnSelectionState(
+        val worldId: UUID,
+        val guest: Boolean,
+        val setBoth: Boolean,
+        val backTarget: WorldSettingsBackTarget,
+        val myWorldPage: Int,
+    )
 
     fun openMethodSelection(player: Player) {
         val session = session(player) ?: return
@@ -409,7 +427,7 @@ class PlatformUiService(
                 player.sendMessage(messages.getString(player, "messages.world_icon_select_start"))
             }
 
-            21 -> handleWorldBoundMock(player, worldData, "messages.world_spawn_unimplemented")
+            21 -> handleSpawnSettingClick(player, worldData, holder, event.click)
             23 -> handleWorldBoundMock(player, worldData, "messages.world_expand_unimplemented")
 
             24 -> {
@@ -466,6 +484,59 @@ class PlatformUiService(
         }
     }
 
+    fun handleWorldSpawnInteract(player: Player, event: PlayerInteractEvent) {
+        val state = spawnSelectionStates[player.uniqueId] ?: return
+        if (event.hand != null && event.hand != EquipmentSlot.HAND) {
+            return
+        }
+        if (event.action != Action.RIGHT_CLICK_BLOCK && event.action != Action.LEFT_CLICK_BLOCK) {
+            return
+        }
+
+        event.isCancelled = true
+        val clickedBlock = event.clickedBlock ?: return
+        val worldData = worldService.getWorldByUuid(state.worldId) ?: run {
+            clearSpawnSelection(player)
+            player.sendMessage(messages.getString(player, "messages.world_not_found"))
+            return
+        }
+
+        if (!worldService.isPlayerInWorld(player, worldData)) {
+            clearSpawnSelection(player)
+            player.sendMessage(messages.getString(player, "messages.world_setting_requires_current_world"))
+            return
+        }
+
+        val loc = clickedBlock.location.clone().add(0.5, 1.0, 0.5)
+        loc.yaw = normalizeToCardinalYaw(player.location.yaw)
+        loc.pitch = 0.0f
+
+        if (!isSpawnAreaPlaceable(loc)) {
+            player.sendMessage(messages.getString(player, "messages.spawn_set_blocked"))
+            return
+        }
+
+        playClickSound(player)
+        val serializable = loc.toSerializableLocation()
+        val updated = if (state.setBoth) {
+            player.sendMessage(messages.getString(player, "messages.spawn_both_set"))
+            worldService.updateWorldSpawn(worldData, serializable, serializable)
+        } else if (state.guest) {
+            player.sendMessage(messages.getString(player, "messages.spawn_guest_set"))
+            worldService.updateWorldSpawn(worldData, serializable, worldData.spawnPosMember)
+        } else {
+            player.sendMessage(messages.getString(player, "messages.spawn_member_set"))
+            worldService.updateWorldSpawn(worldData, worldData.spawnPosGuest, serializable)
+        }
+
+        clearSpawnSelection(player)
+        openWorldSettings(player, updated, state.backTarget, state.myWorldPage)
+    }
+
+    fun handlePlayerQuit(player: Player) {
+        clearSpawnSelection(player)
+    }
+
     private fun session(player: Player): WizardSession? {
         return sessionService.getSession(player.uniqueId) ?: run {
             player.sendMessage(messages.getString(player, "gui.common.expired_message"))
@@ -495,6 +566,39 @@ class PlatformUiService(
             ?: worldService.validateWorldDescription(description)
     }
 
+    private fun handleSpawnSettingClick(player: Player, worldData: MyWorldData, holder: WorldSettingsHolder, click: ClickType) {
+        if (!worldService.isPlayerInWorld(player, worldData)) {
+            player.sendMessage(messages.getString(player, "messages.world_setting_requires_current_world"))
+            return
+        }
+
+        playClickSound(player)
+        val bedrock = isBedrock(player)
+        val guest = bedrock || click.isLeftClick
+        val typeKey = when {
+            bedrock -> "gui.world_settings.spawn.type.both"
+            guest -> "gui.world_settings.spawn.type.guest"
+            else -> "gui.world_settings.spawn.type.member"
+        }
+        spawnSelectionStates[player.uniqueId] = SpawnSelectionState(
+            worldId = worldData.uuid,
+            guest = guest,
+            setBoth = bedrock,
+            backTarget = holder.backTarget,
+            myWorldPage = holder.myWorldPage,
+        )
+        player.sendMessage(
+            messages.getString(
+                player,
+                if (bedrock) "messages.spawn_set_start_bedrock" else "messages.spawn_set_start",
+                mapOf("type" to messages.getString(player, typeKey)),
+            ),
+        )
+        startSpawnPreview(player)
+        suppressNextInventoryClose(player)
+        player.closeInventory()
+    }
+
     private fun sendWorldSettingsMock(player: Player, messageKey: String) {
         playClickSound(player)
         player.sendMessage(messages.getString(player, messageKey))
@@ -516,6 +620,151 @@ class PlatformUiService(
         }
     }
 
+    private fun startSpawnPreview(player: Player) {
+        stopSpawnPreview(player)
+        spawnPreviewTasks[player.uniqueId] = plugin.server.scheduler.runTaskTimer(
+            plugin,
+            Runnable {
+                val state = spawnSelectionStates[player.uniqueId]
+                if (!player.isOnline || state == null) {
+                    clearSpawnSelection(player)
+                    return@Runnable
+                }
+                val worldData = worldService.getWorldByUuid(state.worldId)
+                if (worldData == null || !worldService.isPlayerInWorld(player, worldData)) {
+                    clearSpawnSelection(player)
+                    return@Runnable
+                }
+                val targetBlock = player.getTargetBlockExact(6) ?: return@Runnable
+                val spawnLoc = targetBlock.location.clone().add(0.5, 1.0, 0.5)
+                val yaw = normalizeToCardinalYaw(player.location.yaw)
+                spawnSpawnPreview(player, spawnLoc, yaw, isSpawnAreaPlaceable(spawnLoc))
+            },
+            0L,
+            1L,
+        )
+    }
+
+    private fun stopSpawnPreview(player: Player) {
+        spawnPreviewTasks.remove(player.uniqueId)?.cancel()
+    }
+
+    private fun clearSpawnSelection(player: Player) {
+        spawnSelectionStates.remove(player.uniqueId)
+        stopSpawnPreview(player)
+    }
+
+    private fun normalizeToCardinalYaw(yawRaw: Float): Float {
+        var yaw = yawRaw
+        while (yaw < 0) yaw += 360f
+        while (yaw >= 360f) yaw -= 360f
+        return when {
+            yaw >= 45f && yaw < 135f -> 90f
+            yaw >= 135f && yaw < 225f -> 180f
+            yaw >= 225f && yaw < 315f -> 270f
+            else -> 0f
+        }
+    }
+
+    private fun isSpawnAreaPlaceable(spawnLoc: Location): Boolean {
+        val feetBlock = spawnLoc.block
+        val headBlock = spawnLoc.clone().add(0.0, 1.0, 0.0).block
+        return isAirOrWater(feetBlock.type) && isAirOrWater(headBlock.type)
+    }
+
+    private fun isAirOrWater(material: Material): Boolean {
+        return material.isAir || material == Material.WATER
+    }
+
+    private fun spawnSpawnPreview(player: Player, spawnLoc: Location, yaw: Float, placeable: Boolean) {
+        val world = spawnLoc.world ?: return
+        val frameColor = if (placeable) Color.fromRGB(64, 255, 120) else Color.fromRGB(255, 80, 80)
+        val frameDust = Particle.DustOptions(frameColor, 0.5f)
+        val arrowDust = Particle.DustOptions(Color.fromRGB(80, 160, 255), 0.5f)
+        val feetBlockY = spawnLoc.blockY
+
+        spawnSpawnBlockOutline(player, spawnLoc.blockX, feetBlockY, spawnLoc.blockZ, frameDust, drawBottomFace = true, drawTopFace = false)
+        spawnSpawnBlockOutline(player, spawnLoc.blockX, feetBlockY + 1, spawnLoc.blockZ, frameDust, drawBottomFace = false, drawTopFace = true)
+
+        val rad = Math.toRadians(yaw.toDouble())
+        val forwardX = -kotlin.math.sin(rad)
+        val forwardZ = kotlin.math.cos(rad)
+        val arrowStart = Location(world, spawnLoc.x - forwardX * 0.5, spawnLoc.y + 0.15, spawnLoc.z - forwardZ * 0.5)
+        spawnDirectionArrow(player, arrowStart, yaw, arrowDust)
+    }
+
+    private fun spawnSpawnBlockOutline(
+        player: Player,
+        blockX: Int,
+        blockY: Int,
+        blockZ: Int,
+        dust: Particle.DustOptions,
+        drawBottomFace: Boolean,
+        drawTopFace: Boolean,
+    ) {
+        val minX = blockX.toDouble()
+        val minY = blockY.toDouble()
+        val minZ = blockZ.toDouble()
+        val maxX = blockX + 1.0
+        val maxY = blockY + 1.0
+        val maxZ = blockZ + 1.0
+
+        if (drawBottomFace) {
+            spawnLineWithParticles(player, minX, minY, minZ, maxX, minY, minZ, 10, dust)
+            spawnLineWithParticles(player, minX, minY, maxZ, maxX, minY, maxZ, 10, dust)
+            spawnLineWithParticles(player, minX, minY, minZ, minX, minY, maxZ, 10, dust)
+            spawnLineWithParticles(player, maxX, minY, minZ, maxX, minY, maxZ, 10, dust)
+        }
+        if (drawTopFace) {
+            spawnLineWithParticles(player, minX, maxY, minZ, maxX, maxY, minZ, 10, dust)
+            spawnLineWithParticles(player, minX, maxY, maxZ, maxX, maxY, maxZ, 10, dust)
+            spawnLineWithParticles(player, minX, maxY, minZ, minX, maxY, maxZ, 10, dust)
+            spawnLineWithParticles(player, maxX, maxY, minZ, maxX, maxY, maxZ, 10, dust)
+        }
+
+        spawnLineWithParticles(player, minX, minY, minZ, minX, maxY, minZ, 10, dust)
+        spawnLineWithParticles(player, maxX, minY, minZ, maxX, maxY, minZ, 10, dust)
+        spawnLineWithParticles(player, minX, minY, maxZ, minX, maxY, maxZ, 10, dust)
+        spawnLineWithParticles(player, maxX, minY, maxZ, maxX, maxY, maxZ, 10, dust)
+    }
+
+    private fun spawnDirectionArrow(player: Player, start: Location, yaw: Float, dust: Particle.DustOptions) {
+        val rad = Math.toRadians(yaw.toDouble())
+        val forwardX = -kotlin.math.sin(rad)
+        val forwardZ = kotlin.math.cos(rad)
+        val tipX = start.x + forwardX * 1.0
+        val tipZ = start.z + forwardZ * 1.0
+        spawnLineWithParticles(player, start.x, start.y, start.z, tipX, start.y, tipZ, 10, dust)
+
+        val baseX = tipX - forwardX * 0.4
+        val baseZ = tipZ - forwardZ * 0.4
+        val sideX = -forwardZ * 0.2
+        val sideZ = forwardX * 0.2
+        spawnLineWithParticles(player, tipX, start.y, tipZ, baseX + sideX, start.y, baseZ + sideZ, 5, dust)
+        spawnLineWithParticles(player, tipX, start.y, tipZ, baseX - sideX, start.y, baseZ - sideZ, 5, dust)
+    }
+
+    private fun spawnLineWithParticles(
+        player: Player,
+        startX: Double,
+        startY: Double,
+        startZ: Double,
+        endX: Double,
+        endY: Double,
+        endZ: Double,
+        points: Int,
+        dust: Particle.DustOptions,
+    ) {
+        val lastIndex = (points - 1).coerceAtLeast(1)
+        for (i in 0 until points) {
+            val t = i.toDouble() / lastIndex.toDouble()
+            val x = startX + (endX - startX) * t
+            val y = startY + (endY - startY) * t
+            val z = startZ + (endZ - startZ) * t
+            player.spawnParticle(Particle.DUST, x, y, z, 1, 0.0, 0.0, 0.0, 0.0, dust)
+        }
+    }
+
     private fun executeConfiguredMenuCommand(player: Player) {
         val command = plugin.config.getString("menu_command", "mwm") ?: "mwm"
         player.performCommand(command)
@@ -534,6 +783,18 @@ class PlatformUiService(
 
     private fun clearWorldSettingsState(player: Player) {
         iconSelectionWorlds.remove(player.uniqueId)
+        clearSpawnSelection(player)
+    }
+
+    private fun Location.toSerializableLocation(): SerializableLocation {
+        return SerializableLocation(
+            world = world?.name.orEmpty(),
+            x = x,
+            y = y,
+            z = z,
+            yaw = yaw,
+            pitch = pitch,
+        )
     }
 
     private fun isBedrock(player: Player): Boolean {

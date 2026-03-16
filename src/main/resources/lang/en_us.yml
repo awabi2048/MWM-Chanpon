@@ -129,10 +129,20 @@ gui:
       action: "start icon selection mode"
     spawn:
       display: "§aWorld Spawn Settings"
+      type:
+        guest: "Guest"
+        member: "Member"
+        both: "Guest/Member"
       description:
-        - "This release only shows a message for this setting."
+        - "After clicking, click the block at the target position"
+        - "to confirm the spawn point."
+        - "§e* Your facing direction is saved as well"
+      description_bedrock:
+        - "The clicked position is applied to both guest and member spawn."
+        - "§e* Your facing direction is saved as well"
       left_action: "set guest spawn"
       right_action: "set member spawn"
+      bedrock_action: "set guest/member shared spawn"
     expand:
       display: "§6World Expansion"
       description:
@@ -216,7 +226,12 @@ messages:
   world_publish_updated: "§aUpdated visibility: {level}"
   world_notification_updated: "§aChanged visit notifications to {status}."
   world_setting_requires_current_world: "§cThis setting can only be used while you are inside the target world."
-  world_spawn_unimplemented: "§eWorld spawn settings are not implemented in this release."
+  spawn_set_start: "§eStarted setting the {type} spawn point. Face the desired location and click it."
+  spawn_set_start_bedrock: "§eStarted setting the {type} spawn point. Face the desired location and click it."
+  spawn_guest_set: "§aSet the guest spawn point."
+  spawn_member_set: "§aSet the member spawn point."
+  spawn_both_set: "§aSet the shared guest/member spawn point."
+  spawn_set_blocked: "§cYou cannot set a spawn point there. Choose a location where both feet and head space are air or water."
   world_expand_unimplemented: "§eWorld expansion is not implemented in this release."
   world_members_unimplemented: "§eMember management only shows a message in this release."
   world_tags_unimplemented: "§eWorld tag settings only show a message in this release."

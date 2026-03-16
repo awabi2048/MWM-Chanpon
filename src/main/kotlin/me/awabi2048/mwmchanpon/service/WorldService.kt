@@ -124,6 +124,15 @@ class WorldService(
         return updateWorld(worldData.copy(notificationEnabled = !worldData.notificationEnabled))
     }
 
+    fun updateWorldSpawn(worldData: MyWorldData, guestSpawn: SerializableLocation?, memberSpawn: SerializableLocation): MyWorldData {
+        return updateWorld(
+            worldData.copy(
+                spawnPosGuest = guestSpawn,
+                spawnPosMember = memberSpawn,
+            ),
+        )
+    }
+
     private fun updateWorld(worldData: MyWorldData): MyWorldData {
         worldRepository.save(worldData)
         return worldData
@@ -134,16 +143,26 @@ class WorldService(
             val world = Bukkit.getWorld(worldData.customWorldName)
                 ?: Bukkit.createWorld(WorldCreator(worldData.customWorldName))
                 ?: throw IllegalStateException("ワールドの読み込みに失敗しました。")
+            val spawn = resolveSpawnForPlayer(player, worldData)
             val location = Location(
                 world,
-                worldData.spawnPosMember.x,
-                worldData.spawnPosMember.y,
-                worldData.spawnPosMember.z,
-                worldData.spawnPosMember.yaw,
-                worldData.spawnPosMember.pitch,
+                spawn.x,
+                spawn.y,
+                spawn.z,
+                spawn.yaw,
+                spawn.pitch,
             )
             world.getChunkAt(location).load(true)
             player.teleportAsync(location)
+        }
+    }
+
+    private fun resolveSpawnForPlayer(player: Player, worldData: MyWorldData): SerializableLocation {
+        val isMember = worldData.owner == player.uniqueId || worldData.members.contains(player.uniqueId)
+        return if (isMember) {
+            worldData.spawnPosMember
+        } else {
+            worldData.spawnPosGuest ?: worldData.spawnPosMember
         }
     }
 
