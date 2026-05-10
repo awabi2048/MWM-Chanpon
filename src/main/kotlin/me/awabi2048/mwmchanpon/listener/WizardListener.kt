@@ -6,6 +6,9 @@ import me.awabi2048.mwmchanpon.service.WizardSessionService
 import me.awabi2048.mwmchanpon.ui.ConfirmationHolder
 import me.awabi2048.mwmchanpon.ui.MethodSelectionHolder
 import me.awabi2048.mwmchanpon.ui.MyWorldListHolder
+import me.awabi2048.mwmchanpon.ui.MemberInviteCancelConfirmHolder
+import me.awabi2048.mwmchanpon.ui.MemberManagementHolder
+import me.awabi2048.mwmchanpon.ui.MemberRemoveConfirmHolder
 import me.awabi2048.mwmchanpon.ui.PersonalSettingsHolder
 import me.awabi2048.mwmchanpon.ui.TemplateSelectionHolder
 import me.awabi2048.mwmchanpon.ui.WorldSettingsHolder
@@ -54,6 +57,9 @@ class WizardListener(
             }
 
             is WorldSettingsHolder -> uiService.handleWorldSettingsClick(player, event, holder)
+            is MemberManagementHolder -> uiService.handleMemberManagementClick(player, event, holder)
+            is MemberRemoveConfirmHolder -> uiService.handleMemberRemoveConfirmClick(player, event, holder)
+            is MemberInviteCancelConfirmHolder -> uiService.handleMemberInviteCancelConfirmClick(player, event, holder)
         }
     }
 

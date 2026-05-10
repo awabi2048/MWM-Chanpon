@@ -5,6 +5,7 @@ import me.awabi2048.mwmchanpon.model.MyWorldData
 import me.awabi2048.mwmchanpon.model.TemplateDefinition
 import me.awabi2048.mwmchanpon.model.WizardSession
 import me.awabi2048.mwmchanpon.service.LocalizationService
+import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.bukkit.inventory.Inventory
@@ -54,6 +55,48 @@ enum class WorldSettingsBackTarget {
 class WorldSettingsHolder(title: String, val worldId: String, val backTarget: WorldSettingsBackTarget, val myWorldPage: Int) : GuiInventoryHolder() {
     init {
         backingInventory = GuiComponents.createInventory(this, 54, title)
+    }
+}
+
+class MemberManagementHolder(
+    title: String,
+    val worldId: String,
+    val backTarget: WorldSettingsBackTarget,
+    val myWorldPage: Int,
+    val page: Int,
+    val bodyRows: Int,
+) : GuiInventoryHolder() {
+    val slotEntries = linkedMapOf<Int, MemberManagementEntry>()
+
+    init {
+        backingInventory = GuiComponents.createInventory(this, GuiComponents.inventorySizeForBodyRows(bodyRows), title)
+    }
+}
+
+class MemberRemoveConfirmHolder(
+    title: String,
+    val worldId: String,
+    val targetUuid: String,
+    val backTarget: WorldSettingsBackTarget,
+    val myWorldPage: Int,
+    val page: Int,
+) : GuiInventoryHolder() {
+    init {
+        backingInventory = GuiComponents.createInventory(this, 27, title)
+    }
+}
+
+class MemberInviteCancelConfirmHolder(
+    title: String,
+    val worldId: String,
+    val inviteId: String,
+    val targetUuid: String,
+    val backTarget: WorldSettingsBackTarget,
+    val myWorldPage: Int,
+    val page: Int,
+) : GuiInventoryHolder() {
+    init {
+        backingInventory = GuiComponents.createInventory(this, 27, title)
     }
 }
 
@@ -417,8 +460,17 @@ object GuiScreens {
                 Material.PLAYER_HEAD,
                 messages.getString(player, "gui.world_settings.members.display"),
                 GuiLoreBuilder(messages, player)
-                    .block(messages.getStringList(player, "gui.world_settings.members.description", mapOf("count" to (worldData.members.size + 1).toString())))
-                    .singleAction(messages.getString(player, "gui.world_settings.members.action"))
+                    .block(
+                        messages.getStringList(
+                            player,
+                            "gui.world_settings.members.description",
+                            mapOf(
+                                "count" to (worldData.members.size + 1).toString(),
+                                "access" to messages.getString(player, if (worldData.owner == player.uniqueId) "gui.world_settings.members.access_owner" else "gui.world_settings.members.access_member"),
+                            ),
+                        ),
+                    )
+                    .singleAction(messages.getString(player, if (worldData.owner == player.uniqueId) "gui.world_settings.members.action_owner" else "gui.world_settings.members.action_member"))
                     .build(),
             ),
         )
@@ -489,6 +541,265 @@ object GuiScreens {
         }
         holder.inventory.setItem(49, GuiComponents.worldIconButton(messages, player, worldData, showActions = false))
         return holder.inventory
+    }
+
+    fun createMemberManagement(
+        player: Player,
+        messages: LocalizationService,
+        worldData: MyWorldData,
+        memberManagementService: me.awabi2048.mwmchanpon.service.MemberManagementService,
+        backTarget: WorldSettingsBackTarget,
+        myWorldPage: Int,
+        page: Int,
+        isBedrock: Boolean,
+    ): Inventory {
+        val entries = memberManagementService.buildEntries(worldData)
+        val pageSize = 28
+        val pageCount = ((entries.size + pageSize - 1) / pageSize).coerceAtLeast(1)
+        val normalizedPage = page.coerceIn(0, pageCount - 1)
+        val pageEntries = entries.drop(normalizedPage * pageSize).take(pageSize)
+        val bodyRows = maxOf(1, (pageEntries.size + 6) / 7)
+        val holder = MemberManagementHolder(
+            title = messages.getString(player, "gui.member_management.title", mapOf("world" to worldData.name)),
+            worldId = worldData.uuid.toString(),
+            backTarget = backTarget,
+            myWorldPage = myWorldPage,
+            page = normalizedPage,
+            bodyRows = bodyRows,
+        )
+        GuiComponents.decorate(holder.inventory)
+
+        val canManage = memberManagementService.canManage(player, worldData)
+        val canForceAdd = canManage && memberManagementService.canForceAdd(player)
+
+        GuiComponents.centeredBodySlots(bodyRows).zip(pageEntries).forEach { (slot, entry) ->
+            holder.slotEntries[slot] = entry
+            holder.inventory.setItem(
+                slot,
+                buildMemberItem(player, messages, worldData, entry, memberManagementService, canManage),
+            )
+        }
+
+        val footerBase = GuiComponents.footerBase(bodyRows)
+        holder.inventory.setItem(footerBase, GuiComponents.backButton(messages.getString(player, "gui.common.back")))
+
+        holder.inventory.setItem(
+            footerBase + 4,
+            GuiComponents.button(
+                Material.PAPER,
+                messages.getString(player, "gui.member_management.invite.display"),
+                GuiLoreBuilder(messages, player)
+                    .block(
+                        if (canManage) {
+                            buildList {
+                                add(messages.getString(player, "gui.member_management.invite.description"))
+                                add(messages.getString(player, "gui.member_management.invite.online_only"))
+                                add(
+                                    if (canForceAdd) {
+                                        messages.getString(player, "gui.member_management.invite.force_available")
+                                    } else {
+                                        messages.getString(player, "gui.member_management.invite.normal_only")
+                                    },
+                                )
+                            }
+                        } else {
+                            listOf(messages.getString(player, "gui.member_management.invite.view_only"))
+                        },
+                    )
+                    .singleAction(
+                        if (canManage) {
+                            messages.getString(player, "gui.member_management.invite.action")
+                        } else {
+                            messages.getString(player, "gui.member_management.invite.view_only_action")
+                        },
+                    )
+                    .build(),
+            ),
+        )
+
+        if (pageCount > 1 && normalizedPage > 0) {
+            holder.inventory.setItem(
+                footerBase + 1,
+                GuiComponents.button(
+                    Material.ARROW,
+                    messages.getString(player, "gui.member_management.page.previous"),
+                    GuiLoreBuilder(messages, player)
+                        .singleAction(messages.getString(player, "gui.member_management.page.previous_action"))
+                        .build(),
+                ),
+            )
+        }
+        if (pageCount > 1 && normalizedPage < pageCount - 1) {
+            holder.inventory.setItem(
+                footerBase + 8,
+                GuiComponents.button(
+                    Material.SPECTRAL_ARROW,
+                    messages.getString(player, "gui.member_management.page.next"),
+                    GuiLoreBuilder(messages, player)
+                        .singleAction(messages.getString(player, "gui.member_management.page.next_action"))
+                        .build(),
+                ),
+            )
+        }
+        return holder.inventory
+    }
+
+    fun createMemberRemoveConfirm(
+        player: Player,
+        messages: LocalizationService,
+        worldData: MyWorldData,
+        targetUuid: java.util.UUID,
+        backTarget: WorldSettingsBackTarget,
+        myWorldPage: Int,
+        page: Int,
+    ): Inventory {
+        val holder = MemberRemoveConfirmHolder(
+            title = messages.getString(player, "gui.member_management.remove_confirm.title"),
+            worldId = worldData.uuid.toString(),
+            targetUuid = targetUuid.toString(),
+            backTarget = backTarget,
+            myWorldPage = myWorldPage,
+            page = page,
+        )
+        GuiComponents.decorate(holder.inventory)
+        val targetName = Bukkit.getOfflinePlayer(targetUuid).name ?: targetUuid.toString()
+        holder.inventory.setItem(
+            13,
+            GuiComponents.playerHeadButton(
+                Bukkit.getOfflinePlayer(targetUuid),
+                messages.getString(player, "gui.member_management.remove_confirm.player_name", mapOf("player" to targetName)),
+                GuiLoreBuilder(messages, player)
+                    .block(messages.getStringList(player, "gui.member_management.remove_confirm.lore", mapOf("player" to targetName, "world" to worldData.name)))
+                    .build(),
+            ),
+        )
+        holder.inventory.setItem(
+            11,
+            GuiComponents.button(
+                Material.LIME_WOOL,
+                messages.getString(player, "gui.member_management.remove_confirm.cancel"),
+                emptyList(),
+            ),
+        )
+        holder.inventory.setItem(
+            15,
+            GuiComponents.button(
+                Material.RED_WOOL,
+                messages.getString(player, "gui.member_management.remove_confirm.confirm"),
+                GuiLoreBuilder(messages, player)
+                    .singleAction(messages.getString(player, "gui.member_management.remove_confirm.confirm_desc"))
+                    .build(),
+            ),
+        )
+        return holder.inventory
+    }
+
+    fun createMemberInviteCancelConfirm(
+        player: Player,
+        messages: LocalizationService,
+        worldData: MyWorldData,
+        targetUuid: java.util.UUID,
+        inviteId: java.util.UUID,
+        backTarget: WorldSettingsBackTarget,
+        myWorldPage: Int,
+        page: Int,
+    ): Inventory {
+        val holder = MemberInviteCancelConfirmHolder(
+            title = messages.getString(player, "gui.member_management.pending_cancel_confirm.title"),
+            worldId = worldData.uuid.toString(),
+            inviteId = inviteId.toString(),
+            targetUuid = targetUuid.toString(),
+            backTarget = backTarget,
+            myWorldPage = myWorldPage,
+            page = page,
+        )
+        GuiComponents.decorate(holder.inventory)
+        val targetName = Bukkit.getOfflinePlayer(targetUuid).name ?: targetUuid.toString()
+        holder.inventory.setItem(
+            13,
+            GuiComponents.playerHeadButton(
+                Bukkit.getOfflinePlayer(targetUuid),
+                messages.getString(player, "gui.member_management.pending_item.name", mapOf("player" to targetName)),
+                GuiLoreBuilder(messages, player)
+                    .block(messages.getStringList(player, "gui.member_management.pending_cancel_confirm.body", mapOf("player" to targetName)))
+                    .build(),
+            ),
+        )
+        holder.inventory.setItem(
+            11,
+            GuiComponents.button(
+                Material.LIME_WOOL,
+                messages.getString(player, "gui.member_management.pending_cancel_confirm.cancel"),
+                emptyList(),
+            ),
+        )
+        holder.inventory.setItem(
+            15,
+            GuiComponents.button(
+                Material.RED_WOOL,
+                messages.getString(player, "gui.member_management.pending_cancel_confirm.confirm"),
+                GuiLoreBuilder(messages, player)
+                    .singleAction(messages.getString(player, "gui.member_management.pending_cancel_confirm.confirm_desc"))
+                    .build(),
+            ),
+        )
+        return holder.inventory
+    }
+
+    private fun buildMemberItem(
+        player: Player,
+        messages: LocalizationService,
+        worldData: MyWorldData,
+        entry: MemberManagementEntry,
+        memberManagementService: me.awabi2048.mwmchanpon.service.MemberManagementService,
+        canManage: Boolean,
+    ): org.bukkit.inventory.ItemStack {
+        val offlinePlayer = Bukkit.getOfflinePlayer(entry.playerUuid)
+        val displayName = memberManagementService.resolveDisplayName(entry.playerUuid)
+        val isOnline = memberManagementService.isOnline(entry.playerUuid)
+        val roleKey = when (entry.type) {
+            MemberManagementEntryType.OWNER -> "gui.member_management.role.owner"
+            MemberManagementEntryType.MEMBER -> "gui.member_management.role.member"
+            MemberManagementEntryType.INVITE -> "gui.member_management.role.invite"
+        }
+        val statusKey = if (isOnline) "gui.member_management.item.online" else "gui.member_management.item.offline"
+        val lore = mutableListOf<String>()
+        lore += "§f§l| §7${messages.getString(player, "gui.member_management.item.status")} §f${messages.getString(player, statusKey)}"
+        if (entry.type == MemberManagementEntryType.INVITE && entry.createdAt != null) {
+            lore += "§f§l| §7${messages.getString(player, "gui.member_management.item.sent_at")} §f${memberManagementService.formatInviteTime(player, entry.createdAt)}"
+        } else if (entry.type != MemberManagementEntryType.INVITE && !isOnline) {
+            val lastSeen = offlinePlayer.lastSeen
+            lore += if (lastSeen > 0L) {
+                "§f§l| §7${messages.getString(player, "gui.member_management.item.last_online")} §f${memberManagementService.formatInviteTime(player, lastSeen)}"
+            } else {
+                "§f§l| §7${messages.getString(player, "gui.member_management.item.last_online")} §f-"
+            }
+        }
+        lore += "§f§l| §7${messages.getString(player, "gui.member_management.item.role")} §f${messages.getString(player, roleKey)}"
+
+        if (canManage) {
+            when (entry.type) {
+                MemberManagementEntryType.MEMBER -> lore += messages.getString(player, "gui.member_management.item.remove_action")
+                MemberManagementEntryType.INVITE -> lore += messages.getString(player, "gui.member_management.item.cancel_action")
+                MemberManagementEntryType.OWNER -> Unit
+            }
+        }
+
+        val color = when {
+            entry.type == MemberManagementEntryType.OWNER -> "§6"
+            isOnline -> "§a"
+            else -> "§7"
+        }
+        val titleKey = when (entry.type) {
+            MemberManagementEntryType.OWNER -> "gui.member_management.item.owner_name"
+            MemberManagementEntryType.MEMBER -> "gui.member_management.item.member_name"
+            MemberManagementEntryType.INVITE -> "gui.member_management.item.invite_name"
+        }
+        return GuiComponents.playerHeadButton(
+            offlinePlayer,
+            "$color${messages.getString(player, titleKey, mapOf("player" to displayName))}",
+            GuiLoreBuilder(messages, player).block(lore).build(),
+        )
     }
 
     private fun buildPublishLevelList(messages: LocalizationService, player: Player, current: me.awabi2048.mwmchanpon.model.WorldPublishLevel): List<String> {

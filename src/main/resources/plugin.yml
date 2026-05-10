@@ -35,3 +35,11 @@ permissions:
   mwmchanpon.command.worldmenu:
     description: Allows use of /worldmenu
     default: true
+  myworldmanager.admin:
+    description: Allows full access to member force-add features
+    default: op
+    children:
+      myworldmanager.force_add_member: true
+  myworldmanager.force_add_member:
+    description: Allows force adding members from member management
+    default: false

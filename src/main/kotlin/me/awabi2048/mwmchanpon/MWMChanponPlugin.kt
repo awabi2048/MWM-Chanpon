@@ -3,10 +3,13 @@ package me.awabi2048.mwmchanpon
 import me.awabi2048.mwmchanpon.command.MyWorldCommand
 import me.awabi2048.mwmchanpon.command.MwmCommand
 import me.awabi2048.mwmchanpon.command.WorldMenuCommand
+import me.awabi2048.mwmchanpon.listener.MemberInviteListener
 import me.awabi2048.mwmchanpon.repository.PlayerSettingsRepository
+import me.awabi2048.mwmchanpon.repository.MemberInviteRepository
 import me.awabi2048.mwmchanpon.listener.WizardListener
 import me.awabi2048.mwmchanpon.repository.WorldRepository
 import me.awabi2048.mwmchanpon.service.LocalizationService
+import me.awabi2048.mwmchanpon.service.MemberManagementService
 import me.awabi2048.mwmchanpon.service.PlayerSettingsService
 import me.awabi2048.mwmchanpon.service.PlatformUiService
 import me.awabi2048.mwmchanpon.service.TemplateService
@@ -21,11 +24,15 @@ class MWMChanponPlugin : JavaPlugin() {
         private set
     lateinit var worldRepository: WorldRepository
         private set
+    lateinit var memberInviteRepository: MemberInviteRepository
+        private set
     lateinit var playerSettingsRepository: PlayerSettingsRepository
         private set
     lateinit var wizardSessionService: WizardSessionService
         private set
     lateinit var worldService: WorldService
+        private set
+    lateinit var memberManagementService: MemberManagementService
         private set
     lateinit var platformUiService: PlatformUiService
         private set
@@ -34,6 +41,7 @@ class MWMChanponPlugin : JavaPlugin() {
     lateinit var localizationService: LocalizationService
         private set
     private var wizardListener: WizardListener? = null
+    private var memberInviteListener: MemberInviteListener? = null
 
     override fun onEnable() {
         initializePluginState()
@@ -43,6 +51,7 @@ class MWMChanponPlugin : JavaPlugin() {
     fun reloadPluginState() {
         wizardSessionService.clearAll()
         wizardListener?.let(HandlerList::unregisterAll)
+        memberInviteListener?.let(HandlerList::unregisterAll)
         reloadConfig()
         initializePluginState()
     }
@@ -50,6 +59,7 @@ class MWMChanponPlugin : JavaPlugin() {
     override fun onDisable() {
         wizardSessionService.clearAll()
         wizardListener?.let(HandlerList::unregisterAll)
+        memberInviteListener?.let(HandlerList::unregisterAll)
         logger.info("MWM-Chanpon has been disabled.")
     }
 
@@ -60,6 +70,7 @@ class MWMChanponPlugin : JavaPlugin() {
         saveResource("lang/en_us.yml", false)
 
         worldRepository = WorldRepository(this)
+        memberInviteRepository = MemberInviteRepository(this)
         playerSettingsRepository = PlayerSettingsRepository(this)
         playerSettingsService = PlayerSettingsService(playerSettingsRepository)
         localizationService = LocalizationService(this, playerSettingsService)
@@ -67,7 +78,8 @@ class MWMChanponPlugin : JavaPlugin() {
         templateService = TemplateService(this)
         wizardSessionService = WizardSessionService(this)
         worldService = WorldService(this, worldRepository, templateService)
-        platformUiService = PlatformUiService(this, localizationService, playerSettingsService, wizardSessionService, templateService, worldService)
+        memberManagementService = MemberManagementService(this, worldRepository, memberInviteRepository)
+        platformUiService = PlatformUiService(this, localizationService, playerSettingsService, wizardSessionService, templateService, worldService, memberManagementService)
 
         val mwmCommand = MwmCommand(this, localizationService, wizardSessionService, platformUiService)
         val commandName = config.getString("menu_command", "mwm") ?: "mwm"
@@ -75,11 +87,13 @@ class MWMChanponPlugin : JavaPlugin() {
             "menu_command で指定されたコマンドが plugin.yml に見つかりません"
         }
         registerCommand(command, mwmCommand)
-        registerCommand(requireNotNull(getCommand("myworld")) { "myworld コマンドが plugin.yml に見つかりません" }, MyWorldCommand(localizationService, platformUiService))
+        registerCommand(requireNotNull(getCommand("myworld")) { "myworld コマンドが plugin.yml に見つかりません" }, MyWorldCommand(localizationService, platformUiService, memberManagementService))
         registerCommand(requireNotNull(getCommand("worldmenu")) { "worldmenu コマンドが plugin.yml に見つかりません" }, WorldMenuCommand(localizationService, worldService, platformUiService))
 
         wizardListener = WizardListener(this, wizardSessionService, platformUiService)
         server.pluginManager.registerEvents(wizardListener!!, this)
+        memberInviteListener = MemberInviteListener(memberManagementService)
+        server.pluginManager.registerEvents(memberInviteListener!!, this)
         templateService.reload()
     }
 

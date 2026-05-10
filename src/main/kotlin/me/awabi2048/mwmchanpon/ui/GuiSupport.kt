@@ -235,7 +235,7 @@ object GuiComponents {
     }
 
     fun createInventory(holder: InventoryHolder, size: Int, title: String): Inventory {
-        return org.bukkit.Bukkit.createInventory(holder, size, plainTitle(title))
+        return org.bukkit.Bukkit.createInventory(holder, size, legacy(title))
     }
 
     private fun legacy(raw: String): Component {

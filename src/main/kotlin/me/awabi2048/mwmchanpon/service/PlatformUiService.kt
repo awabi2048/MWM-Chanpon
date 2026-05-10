@@ -14,6 +14,11 @@ import me.awabi2048.mwmchanpon.model.SerializableLocation
 import me.awabi2048.mwmchanpon.model.WizardSession
 import me.awabi2048.mwmchanpon.ui.GuiComponents
 import me.awabi2048.mwmchanpon.ui.GuiScreens
+import me.awabi2048.mwmchanpon.ui.MemberManagementEntry
+import me.awabi2048.mwmchanpon.ui.MemberManagementEntryType
+import me.awabi2048.mwmchanpon.ui.MemberInviteCancelConfirmHolder
+import me.awabi2048.mwmchanpon.ui.MemberManagementHolder
+import me.awabi2048.mwmchanpon.ui.MemberRemoveConfirmHolder
 import me.awabi2048.mwmchanpon.ui.PersonalSettingsMenuItem
 import me.awabi2048.mwmchanpon.ui.WorldSettingsBackTarget
 import me.awabi2048.mwmchanpon.ui.WorldSettingsHolder
@@ -23,7 +28,9 @@ import org.bukkit.Bukkit
 import org.bukkit.Color
 import org.bukkit.Location
 import org.bukkit.Material
+import org.bukkit.NamespacedKey
 import org.bukkit.Particle
+import org.bukkit.Registry
 import org.bukkit.Sound
 import org.bukkit.entity.Player
 import org.bukkit.event.block.Action
@@ -37,6 +44,7 @@ import org.geysermc.cumulus.response.result.InvalidFormResponseResult
 import org.geysermc.floodgate.api.FloodgateApi
 import java.lang.Runnable
 import java.time.Duration
+import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.function.Consumer
@@ -48,6 +56,7 @@ class PlatformUiService(
     private val sessionService: WizardSessionService,
     private val templateService: TemplateService,
     private val worldService: WorldService,
+    private val memberManagementService: MemberManagementService,
 ) {
     private val suppressedInventoryClose = ConcurrentHashMap.newKeySet<UUID>()
     private val iconSelectionWorlds = ConcurrentHashMap<UUID, UUID>()
@@ -115,6 +124,78 @@ class PlatformUiService(
         openMenuInventory(player, GuiScreens.createWorldSettings(player, messages, worldData, backTarget, myWorldPage, isBedrock(player)))
     }
 
+    fun openMemberManagement(
+        player: Player,
+        worldData: MyWorldData,
+        backTarget: WorldSettingsBackTarget = WorldSettingsBackTarget.NONE,
+        myWorldPage: Int = 0,
+        page: Int = 0,
+    ) {
+        if (!memberManagementService.canView(player, worldData)) {
+            player.sendMessage(messages.getString(player, "messages.worldmenu_no_access"))
+            return
+        }
+        openMenuInventory(
+            player,
+            GuiScreens.createMemberManagement(
+                player = player,
+                messages = messages,
+                worldData = worldData,
+                memberManagementService = memberManagementService,
+                backTarget = backTarget,
+                myWorldPage = myWorldPage,
+                page = page,
+                isBedrock = isBedrock(player),
+            ),
+        )
+    }
+
+    private fun openMemberRemoveConfirm(
+        player: Player,
+        worldData: MyWorldData,
+        targetUuid: UUID,
+        backTarget: WorldSettingsBackTarget,
+        myWorldPage: Int,
+        page: Int,
+    ) {
+        openMenuInventory(
+            player,
+            GuiScreens.createMemberRemoveConfirm(
+                player = player,
+                messages = messages,
+                worldData = worldData,
+                targetUuid = targetUuid,
+                backTarget = backTarget,
+                myWorldPage = myWorldPage,
+                page = page,
+            ),
+        )
+    }
+
+    private fun openMemberInviteCancelConfirm(
+        player: Player,
+        worldData: MyWorldData,
+        targetUuid: UUID,
+        inviteId: UUID,
+        backTarget: WorldSettingsBackTarget,
+        myWorldPage: Int,
+        page: Int,
+    ) {
+        openMenuInventory(
+            player,
+            GuiScreens.createMemberInviteCancelConfirm(
+                player = player,
+                messages = messages,
+                worldData = worldData,
+                targetUuid = targetUuid,
+                inviteId = inviteId,
+                backTarget = backTarget,
+                myWorldPage = myWorldPage,
+                page = page,
+            ),
+        )
+    }
+
     fun requestWorldName(player: Player) {
         val session = session(player) ?: return
         if (isBedrock(player)) {
@@ -157,6 +238,254 @@ class PlatformUiService(
                 onBack = { backFromWorldName(player, session) },
             )
         }
+    }
+
+    fun handleMemberManagementClick(player: Player, event: InventoryClickEvent, holder: MemberManagementHolder) {
+        val worldData = worldService.getWorldByUuid(UUID.fromString(holder.worldId)) ?: run {
+            player.sendMessage(messages.getString(player, "messages.world_not_found"))
+            player.closeInventory()
+            return
+        }
+        if (!memberManagementService.canView(player, worldData)) {
+            player.sendMessage(messages.getString(player, "messages.worldmenu_no_access"))
+            player.closeInventory()
+            return
+        }
+
+        event.isCancelled = true
+        if (event.clickedInventory == player.inventory) {
+            return
+        }
+
+        val footerBase = GuiComponents.footerBase(holder.bodyRows)
+        when (event.rawSlot) {
+            footerBase -> {
+                playClickSound(player)
+                openWorldSettings(player, worldData, holder.backTarget, holder.myWorldPage)
+            }
+
+            footerBase + 1 -> {
+                if (holder.page > 0) {
+                    playClickSound(player)
+                    openMemberManagement(player, worldData, holder.backTarget, holder.myWorldPage, holder.page - 1)
+                }
+            }
+
+            footerBase + 8 -> {
+                val totalPages = ((memberManagementService.buildEntries(worldData).size + 27) / 28).coerceAtLeast(1)
+                if (holder.page < totalPages - 1) {
+                    playClickSound(player)
+                    openMemberManagement(player, worldData, holder.backTarget, holder.myWorldPage, holder.page + 1)
+                }
+            }
+
+            footerBase + 4 -> {
+                if (!memberManagementService.canManage(player, worldData)) {
+                    player.sendMessage(messages.getString(player, "messages.worldmenu_no_access"))
+                    return
+                }
+                playClickSound(player)
+                if (event.click.isShiftClick && memberManagementService.canForceAdd(player)) {
+                    requestMemberInviteTarget(player, worldData, holder.backTarget, holder.myWorldPage, holder.page, forceAdd = true)
+                } else {
+                    requestMemberInviteTarget(player, worldData, holder.backTarget, holder.myWorldPage, holder.page, forceAdd = false)
+                }
+            }
+
+            else -> {
+                val entry = holder.slotEntries[event.rawSlot] ?: return
+                if (!memberManagementService.canManage(player, worldData)) {
+                    return
+                }
+                when (entry.type) {
+                    MemberManagementEntryType.MEMBER -> openMemberRemoveConfirm(player, worldData, entry.playerUuid, holder.backTarget, holder.myWorldPage, holder.page)
+                    MemberManagementEntryType.INVITE -> openMemberInviteCancelConfirm(player, worldData, entry.playerUuid, entry.inviteId ?: return, holder.backTarget, holder.myWorldPage, holder.page)
+                    MemberManagementEntryType.OWNER -> Unit
+                }
+            }
+        }
+    }
+
+    fun handleMemberRemoveConfirmClick(player: Player, event: InventoryClickEvent, holder: MemberRemoveConfirmHolder) {
+        val worldData = worldService.getWorldByUuid(UUID.fromString(holder.worldId)) ?: run {
+            player.sendMessage(messages.getString(player, "messages.world_not_found"))
+            player.closeInventory()
+            return
+        }
+        event.isCancelled = true
+        if (event.clickedInventory == player.inventory) {
+            return
+        }
+        when (event.rawSlot) {
+            11 -> {
+                playClickSound(player)
+                openMemberManagement(player, worldData, holder.backTarget, holder.myWorldPage, holder.page)
+            }
+
+            15 -> {
+                playClickSound(player)
+                val targetUuid = UUID.fromString(holder.targetUuid)
+                val result = memberManagementService.removeMember(player, worldData, targetUuid)
+                result.onSuccess { updated ->
+                    openMemberManagement(player, updated, holder.backTarget, holder.myWorldPage, holder.page)
+                }.onFailure { error ->
+                    player.sendMessage(error.message ?: messages.getString(player, "messages.worldmenu_no_access"))
+                    openMemberManagement(player, worldData, holder.backTarget, holder.myWorldPage, holder.page)
+                }
+            }
+        }
+    }
+
+    fun handleMemberInviteCancelConfirmClick(player: Player, event: InventoryClickEvent, holder: MemberInviteCancelConfirmHolder) {
+        val worldData = worldService.getWorldByUuid(UUID.fromString(holder.worldId)) ?: run {
+            player.sendMessage(messages.getString(player, "messages.world_not_found"))
+            player.closeInventory()
+            return
+        }
+        event.isCancelled = true
+        if (event.clickedInventory == player.inventory) {
+            return
+        }
+        when (event.rawSlot) {
+            11 -> {
+                playClickSound(player)
+                openMemberManagement(player, worldData, holder.backTarget, holder.myWorldPage, holder.page)
+            }
+
+            15 -> {
+                playClickSound(player)
+                val inviteId = UUID.fromString(holder.inviteId)
+                val result = memberManagementService.cancelInvite(player, worldData, inviteId)
+                result.onSuccess {
+                    openMemberManagement(player, worldData, holder.backTarget, holder.myWorldPage, holder.page)
+                }.onFailure { error ->
+                    player.sendMessage(error.message ?: messages.getString(player, "messages.worldmenu_no_access"))
+                    openMemberManagement(player, worldData, holder.backTarget, holder.myWorldPage, holder.page)
+                }
+            }
+        }
+    }
+
+    private fun requestMemberInviteTarget(
+        player: Player,
+        worldData: MyWorldData,
+        backTarget: WorldSettingsBackTarget,
+        myWorldPage: Int,
+        page: Int,
+        forceAdd: Boolean,
+    ) {
+        if (isBedrock(player)) {
+            openBedrockMemberInviteForm(player, worldData, backTarget, myWorldPage, page, forceAdd)
+        } else {
+            openJavaMemberInviteDialog(player, worldData, backTarget, myWorldPage, page, forceAdd)
+        }
+    }
+
+    private fun openJavaMemberInviteDialog(
+        player: Player,
+        worldData: MyWorldData,
+        backTarget: WorldSettingsBackTarget,
+        myWorldPage: Int,
+        page: Int,
+        forceAdd: Boolean,
+    ) {
+        suppressNextInventoryClose(player)
+        player.closeInventory()
+
+        val titleKey = if (forceAdd) "gui.member_management.force_add_input.title" else "gui.member_management.invite_input.title"
+        val messageKey = if (forceAdd) "gui.member_management.force_add_input.message" else "gui.member_management.invite_input.message"
+        val inputKey = if (forceAdd) "member_force_add_target" else "member_invite_target"
+        val options = ClickCallback.Options.builder().uses(1).lifetime(Duration.ofMinutes(5)).build()
+        val submitButton = ActionButton.builder(Component.text(messages.getString(player, "gui.creation.input.submit")))
+            .width(120)
+            .action(DialogAction.customClick({ response, audience ->
+                val target = audience as? Player ?: return@customClick
+                val value = response.getText(inputKey)?.trim().orEmpty()
+                if (value.isBlank()) {
+                    target.sendMessage(messages.getString(target, "messages.value_required"))
+                    requestMemberInviteTarget(target, worldData, backTarget, myWorldPage, page, forceAdd)
+                    return@customClick
+                }
+                memberManagementService.invitePlayer(target, worldData, value, forceAdd)
+                    .onSuccess {
+                        val latest = worldService.getWorldByUuid(worldData.uuid) ?: worldData
+                        openMemberManagement(target, latest, backTarget, myWorldPage, page)
+                    }
+                    .onFailure { error ->
+                        target.sendMessage(error.message ?: messages.getString(target, "messages.worldmenu_no_access"))
+                        openMemberManagement(target, worldData, backTarget, myWorldPage, page)
+                    }
+            }, options))
+            .build()
+        val backButton = ActionButton.builder(Component.text(messages.getString(player, "gui.creation.input.back")))
+            .width(120)
+            .action(DialogAction.customClick({ _, audience ->
+                val target = audience as? Player ?: return@customClick
+                openMemberManagement(target, worldData, backTarget, myWorldPage, page)
+            }, options))
+            .build()
+
+        val dialog = Dialog.create { factory ->
+            factory.empty().base(
+                DialogBase.builder(Component.text(messages.getString(player, titleKey)))
+                    .canCloseWithEscape(false)
+                    .pause(false)
+                    .afterAction(DialogBase.DialogAfterAction.CLOSE)
+                    .body(listOf(DialogBody.plainMessage(Component.text(messages.getString(player, messageKey)), 240)))
+                    .inputs(listOf(DialogInput.text(inputKey, 240, Component.text(messages.getString(player, titleKey.replace(".title", ".label"))), true, "", 64, null)))
+                    .build(),
+            ).type(DialogType.multiAction(listOf(submitButton, backButton), null, 2))
+        }
+
+        player.showDialog(dialog)
+    }
+
+    private fun openBedrockMemberInviteForm(
+        player: Player,
+        worldData: MyWorldData,
+        backTarget: WorldSettingsBackTarget,
+        myWorldPage: Int,
+        page: Int,
+        forceAdd: Boolean,
+    ) {
+        val floodgateApi = runCatching { FloodgateApi.getInstance() }.getOrNull()
+        if (floodgateApi == null) {
+            player.sendMessage(messages.getString(player, "gui.common.offline_target"))
+            return
+        }
+
+        suppressNextInventoryClose(player)
+        player.closeInventory()
+
+        val titleKey = if (forceAdd) "gui.member_management.force_add_input.title" else "gui.member_management.invite_input.title"
+        val messageKey = if (forceAdd) "gui.member_management.force_add_input.message" else "gui.member_management.invite_input.message"
+        val inputKey = if (forceAdd) "member_force_add_target" else "member_invite_target"
+        val form = CustomForm.builder()
+            .title(messages.getString(player, titleKey))
+            .label(messages.getString(player, messageKey))
+            .input(messages.getString(player, titleKey.replace(".title", ".label")), "", "")
+            .validResultHandler { response ->
+                val value = response.asInput(0)?.trim().orEmpty()
+                if (value.isBlank()) {
+                    player.sendMessage(messages.getString(player, "messages.value_required"))
+                    requestMemberInviteTarget(player, worldData, backTarget, myWorldPage, page, forceAdd)
+                    return@validResultHandler
+                }
+                memberManagementService.invitePlayer(player, worldData, value, forceAdd)
+                    .onSuccess {
+                        val latest = worldService.getWorldByUuid(worldData.uuid) ?: worldData
+                        openMemberManagement(player, latest, backTarget, myWorldPage, page)
+                    }
+                    .onFailure { error ->
+                        player.sendMessage(error.message ?: messages.getString(player, "messages.worldmenu_no_access"))
+                        openMemberManagement(player, worldData, backTarget, myWorldPage, page)
+                    }
+            }
+            .closedResultHandler(Runnable { openMemberManagement(player, worldData, backTarget, myWorldPage, page) })
+            .invalidResultHandler(Consumer<InvalidFormResponseResult<org.geysermc.cumulus.response.CustomFormResponse>> { openMemberManagement(player, worldData, backTarget, myWorldPage, page) })
+            .build()
+
+        floodgateApi.sendForm(player.uniqueId, form)
     }
 
     fun requestSeed(player: Player) {
@@ -443,7 +772,10 @@ class PlatformUiService(
                 openWorldSettings(player, updated, holder.backTarget, holder.myWorldPage)
             }
 
-            25 -> sendWorldSettingsMock(player, "messages.world_members_unimplemented")
+            25 -> {
+                playClickSound(player)
+                openMemberManagement(player, worldData, holder.backTarget, holder.myWorldPage)
+            }
             28 -> sendWorldSettingsMock(player, "messages.world_tags_unimplemented")
             29 -> sendWorldSettingsMock(player, "messages.world_announcement_unimplemented")
 
@@ -1013,15 +1345,21 @@ class PlatformUiService(
     }
 
     private fun playClickSound(player: Player) {
-        val sound = Sound.valueOf(plugin.config.getString("sounds.global_click.sound", "UI_BUTTON_CLICK") ?: "UI_BUTTON_CLICK")
+        val sound = resolveConfiguredSound("sounds.global_click.sound", Sound.UI_BUTTON_CLICK)
         val pitch = plugin.config.getDouble("sounds.global_click.pitch", 2.0).toFloat()
         player.playSound(player.location, sound, 1.0f, pitch)
     }
 
     private fun playWorldCreateSound(player: Player) {
-        val sound = Sound.valueOf(plugin.config.getString("sounds.world_create.sound", "BLOCK_PORTAL_TRIGGER") ?: "BLOCK_PORTAL_TRIGGER")
+        val sound = resolveConfiguredSound("sounds.world_create.sound", Sound.BLOCK_PORTAL_TRIGGER)
         val pitch = plugin.config.getDouble("sounds.world_create.pitch", 1.0).toFloat()
         player.playSound(player.location, sound, 1.0f, pitch)
+    }
+
+    private fun resolveConfiguredSound(path: String, fallback: Sound): Sound {
+        val raw = plugin.config.getString(path).orEmpty()
+        val key = raw.lowercase(Locale.ROOT).replace('_', '.')
+        return NamespacedKey.fromString(key)?.let { Registry.SOUND_EVENT.get(it) } ?: fallback
     }
 
     private fun teleportToMyWorld(player: Player, worldData: MyWorldData) {
