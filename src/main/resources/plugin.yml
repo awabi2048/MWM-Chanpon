@@ -1,45 +1,12 @@
-name: ${project.name}
-version: ${project.version}
+name: MWMChanpon
 main: me.awabi2048.mwmchanpon.MWMChanponPlugin
-api-version: '1.21'
-author: awabi2048
-description: ${project.description}
+version: ${project.version}
+api-version: "1.21"
 softdepend:
+  - MyWorldManager
   - floodgate
-commands:
-  mwm:
-    description: MWM-Chanpon main command
-    usage: /<command>
-    permission: mwmchanpon.command.mwm
-  myworld:
-    description: Open My World list menu
-    usage: /<command>
-    permission: mwmchanpon.command.myworld
-  worldmenu:
-    description: Open current world settings menu
-    usage: /<command>
-    permission: mwmchanpon.command.worldmenu
+
 permissions:
-  mwmchanpon.command.mwm:
-    description: Allows use of /mwm
+  mwmchanpon.admin:
+    description: 管理者ウィザードを使用する権限
     default: op
-  mwmchanpon.command.mwm.create:
-    description: Allows use of /mwm create
-    default: op
-  mwmchanpon.command.mwm.reload:
-    description: Allows use of /mwm reload
-    default: op
-  mwmchanpon.command.myworld:
-    description: Allows use of /myworld
-    default: true
-  mwmchanpon.command.worldmenu:
-    description: Allows use of /worldmenu
-    default: true
-  myworldmanager.admin:
-    description: Allows full access to member force-add features
-    default: op
-    children:
-      myworldmanager.force_add_member: true
-  myworldmanager.force_add_member:
-    description: Allows force adding members from member management
-    default: false

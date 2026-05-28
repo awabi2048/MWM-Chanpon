@@ -1,8 +1,0 @@
-# Default Templates Configuration
-# basic:
-#   path: world
-#   name: 基本ワールド
-#   description:
-#     - "ワールドテンプレート"
-#   icon: GRASS_BLOCK
-#   origin_location: 0, 64, 0

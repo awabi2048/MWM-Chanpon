@@ -1,36 +1,61 @@
 package me.awabi2048.mwmchanpon.service
 
-import me.awabi2048.mwmchanpon.MWMChanponPlugin
-import me.awabi2048.mwmchanpon.model.WizardSession
-import java.time.Duration
-import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.logging.Logger
 
-class WizardSessionService(private val plugin: MWMChanponPlugin) {
+data class WizardSession(
+    val adminUuid: UUID,
+    val targetPlayerName: String,
+    var targetPlayerUuid: UUID? = null,
+    var selectedTemplateId: String? = null,
+    var worldName: String? = null,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+enum class WizardStep {
+    TEMPLATE_SELECT,
+    NAME_INPUT,
+    CONFIRM
+}
+
+class WizardSessionService(
+    private val timeoutSeconds: Long,
+    private val logger: Logger
+) {
     private val sessions = ConcurrentHashMap<UUID, WizardSession>()
 
-    fun startSession(adminUuid: UUID, targetPlayerUuid: UUID): WizardSession {
-        val session = WizardSession(adminUuid = adminUuid, targetPlayerUuid = targetPlayerUuid)
+    fun createSession(adminUuid: UUID, targetPlayerName: String): WizardSession {
+        val session = WizardSession(adminUuid = adminUuid, targetPlayerName = targetPlayerName)
         sessions[adminUuid] = session
         return session
     }
 
     fun getSession(adminUuid: UUID): WizardSession? {
-        val session = sessions[adminUuid] ?: return null
-        val timeout = plugin.config.getLong("creation_session.timeout_seconds", 300L)
-        if (Duration.between(session.startedAt, Instant.now()).seconds > timeout) {
+        val session = sessions[adminUuid]
+        if (session != null && isExpired(session)) {
             sessions.remove(adminUuid)
             return null
         }
         return session
     }
 
-    fun clear(adminUuid: UUID) {
+    fun removeSession(adminUuid: UUID) {
         sessions.remove(adminUuid)
     }
 
     fun clearAll() {
         sessions.clear()
+    }
+
+    fun cleanupExpired() {
+        val now = System.currentTimeMillis()
+        sessions.entries.removeIf { (_, session) ->
+            (now - session.createdAt) / 1000 > timeoutSeconds
+        }
+    }
+
+    private fun isExpired(session: WizardSession): Boolean {
+        return (System.currentTimeMillis() - session.createdAt) / 1000 > timeoutSeconds
     }
 }
