@@ -120,6 +120,55 @@ class WorldService(
         return updateWorld(worldData.copy(icon = icon))
     }
 
+    fun expandWorldBorder(worldData: MyWorldData, world: World): MyWorldData {
+        val increment = plugin.config.getDouble("expansion.increment_size", 50.0)
+        val maxSize = plugin.config.getDouble("expansion.max_size", 500.0)
+        val currentSize = world.worldBorder.size.coerceAtLeast(worldData.borderSize)
+        val nextSize = (currentSize + increment).coerceAtMost(maxSize)
+        if (nextSize <= currentSize) {
+            throw IllegalStateException(plugin.localizationService.getString(null, "messages.world_expand_max_reached"))
+        }
+
+        world.worldBorder.size = nextSize
+        return updateWorld(worldData.copy(borderSize = nextSize))
+    }
+
+    fun updateWorldTags(worldData: MyWorldData, tags: List<String>): Result<MyWorldData> {
+        val maxCount = plugin.config.getInt("world_tags.max_count", 5)
+        val maxLength = plugin.config.getInt("world_tags.max_length", 16)
+        if (tags.size > maxCount) {
+            return Result.failure(
+                IllegalArgumentException(
+                    plugin.localizationService.getString(null, "messages.world_tags_too_many", mapOf("max" to maxCount.toString())),
+                ),
+            )
+        }
+        val tooLong = tags.firstOrNull { it.length > maxLength }
+        if (tooLong != null) {
+            return Result.failure(
+                IllegalArgumentException(
+                    plugin.localizationService.getString(null, "messages.world_tag_too_long", mapOf("tag" to tooLong, "max" to maxLength.toString())),
+                ),
+            )
+        }
+        return Result.success(updateWorld(worldData.copy(tags = tags)))
+    }
+
+    fun updateAnnouncement(worldData: MyWorldData, message: String): Result<MyWorldData> {
+        val maxLength = plugin.config.getInt("world_announcement.max_length", 100)
+        if (message.length > maxLength) {
+            return Result.failure(
+                IllegalArgumentException(
+                    plugin.localizationService.getString(null, "messages.world_announcement_too_long", mapOf("max" to maxLength.toString())),
+                ),
+            )
+        }
+        if (message.contains('\n') || message.contains('\r')) {
+            return Result.failure(IllegalArgumentException(plugin.localizationService.getString(null, "messages.world_announcement_single_line")))
+        }
+        return Result.success(updateWorld(worldData.copy(announcementMessage = message)))
+    }
+
     fun toggleVisitNotification(worldData: MyWorldData): MyWorldData {
         return updateWorld(worldData.copy(notificationEnabled = !worldData.notificationEnabled))
     }

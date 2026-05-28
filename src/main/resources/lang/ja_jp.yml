@@ -146,8 +146,9 @@ gui:
     expand:
       display: "§6ワールドの拡張"
       description:
-        - "今回は設定メッセージのみ実装しています。"
-      action: "拡張メニューを開く"
+        - "現在の境界サイズ: {size}"
+        - "ワールド境界を1段階広げます。"
+      action: "ワールド境界を拡張する"
     publish:
       display: "§6公開レベルの変更"
       description:
@@ -179,14 +180,23 @@ gui:
       display: "§aワールドタグの設定"
       description:
         - "設定中のタグ数: {count}"
-        - "今回はメッセージのみ実装しています。"
-      action: "タグ設定を開く"
+        - "現在のタグ: {tags}"
+        - "複数のタグはカンマ区切りで入力します。"
+      action: "タグを編集する"
+      form:
+        title: "ワールドタグの設定"
+        message: "タグをカンマ区切りで入力します。空欄にすると全て削除します。"
+        tags: "タグ"
     announcement:
       display: "§aプレイヤー案内の設定"
       description:
         - "現在の案内: {message}"
-        - "今回はメッセージのみ実装しています。"
-      action: "案内設定を開く"
+        - "訪問者向けの短い案内として表示できます。"
+      action: "案内を編集する"
+      form:
+        title: "プレイヤー案内の設定"
+        message: "短い案内文を入力します。空欄にすると削除します。"
+        announcement: "案内文"
     notification:
       display: "§a訪問通知の切り替え"
       description:
@@ -196,8 +206,25 @@ gui:
     environment:
       display: "§aワールド環境の設定"
       description:
-        - "今回はメッセージのみ実装しています。"
+        - "読み込まれているワールドの天候と時刻を変更します。"
+        - "変更は現在のワールドへ即時反映されます。"
       action: "環境設定を開く"
+  world_environment:
+    title: "ワールド環境 ({world})"
+    weather:
+      display: "§a天候"
+      description:
+        - "晴れと雨を切り替えます。"
+      action: "天候を切り替える"
+      clear: "晴れ"
+      rain: "雨"
+    time:
+      display: "§a時刻"
+      description:
+        - "昼と夜を切り替えます。"
+      action: "時刻を切り替える"
+      day: "昼"
+      night: "夜"
   member_management:
     title: "ワールドメンバーの管理"
     invite:
@@ -263,6 +290,7 @@ messages:
   target_offline: "§c対象プレイヤーがオンラインではありません。"
   wizard_started: "§a{player} のマイワールド作成ウィザードを開始しました。"
   value_required: "§c値を入力してください。"
+  value_too_long: "§c{max} 文字以内で入力してください。"
   world_name_invalid_length: "§cワールド名は {min}..{max} 文字で入力してください。"
   world_name_blocked: "§cそのワールド名は使用できません。"
   creation_in_progress: "§eワールドを作成しています。しばらくお待ちください。"
@@ -292,10 +320,17 @@ messages:
   spawn_member_set: "§aメンバー用のスポーン位置を設定しました！"
   spawn_both_set: "§aゲスト/メンバー共通のスポーン位置を設定しました！"
   spawn_set_blocked: "§cその場所にはスポーンを設定できません。足元と頭上が空気または水の場所を選んでください。"
-  world_expand_unimplemented: "§eワールド拡張は今回は未実装です。"
-  world_tags_unimplemented: "§eワールドタグ設定は今回はメッセージ表示のみです。"
-  world_announcement_unimplemented: "§eプレイヤー案内設定は今回はメッセージ表示のみです。"
-  world_environment_unimplemented: "§eワールド環境設定は今回はメッセージ表示のみです。"
+  world_expand_updated: "§aワールド境界を {size} ブロックに拡張しました。"
+  world_expand_failed: "§cワールド境界の拡張に失敗しました。"
+  world_expand_max_reached: "§eワールド境界はすでに最大サイズです。"
+  world_tags_updated: "§aワールドタグを更新しました。"
+  world_tags_too_many: "§cタグは最大 {max} 個まで設定できます。"
+  world_tag_too_long: "§cタグ「{tag}」は最大 {max} 文字で入力してください。"
+  world_announcement_updated: "§aプレイヤー案内を更新しました。"
+  world_announcement_too_long: "§cプレイヤー案内は最大 {max} 文字で入力してください。"
+  world_announcement_single_line: "§cプレイヤー案内は1行で入力してください。"
+  world_weather_updated: "§a天候を {weather} に変更しました。"
+  world_time_updated: "§a時刻を {time} に変更しました。"
   member_invite_target_offline: "§c{player}さんは現在オフラインです。"
   member_invite_target_self: "§c自分自身は招待できません。"
   member_invite_target_already_member: "§c{player}さんは既にこのワールドのメンバーです。"

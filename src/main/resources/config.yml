@@ -5,6 +5,13 @@ world_name:
 world_description:
   max_length: 100
 
+world_tags:
+  max_count: 5
+  max_length: 16
+
+world_announcement:
+  max_length: 100
+
 validation:
   blocked_strings:
     - "admin"
@@ -33,6 +40,8 @@ sounds:
 
 expansion:
   initial_size: 100
+  increment_size: 50
+  max_size: 500
 
 evacuation_location:
   world: "world"

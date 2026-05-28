@@ -58,6 +58,12 @@ class WorldSettingsHolder(title: String, val worldId: String, val backTarget: Wo
     }
 }
 
+class WorldEnvironmentHolder(title: String, val worldId: String, val backTarget: WorldSettingsBackTarget, val myWorldPage: Int) : GuiInventoryHolder() {
+    init {
+        backingInventory = GuiComponents.createInventory(this, 45, title)
+    }
+}
+
 class MemberManagementHolder(
     title: String,
     val worldId: String,
@@ -412,7 +418,13 @@ object GuiScreens {
                 Material.MAP,
                 messages.getString(player, "gui.world_settings.expand.display"),
                 GuiLoreBuilder(messages, player)
-                    .block(messages.getStringList(player, "gui.world_settings.expand.description"))
+                    .block(
+                        messages.getStringList(
+                            player,
+                            "gui.world_settings.expand.description",
+                            mapOf("size" to formatWorldSize(worldData.borderSize)),
+                        ),
+                    )
                     .apply {
                         if (!isInWorld) {
                             warning(messages.getString(player, "gui.world_settings.common.must_be_in_world"))
@@ -480,7 +492,16 @@ object GuiScreens {
                 Material.BOOK,
                 messages.getString(player, "gui.world_settings.tags.display"),
                 GuiLoreBuilder(messages, player)
-                    .block(messages.getStringList(player, "gui.world_settings.tags.description", mapOf("count" to worldData.tags.size.toString())))
+                    .block(
+                        messages.getStringList(
+                            player,
+                            "gui.world_settings.tags.description",
+                            mapOf(
+                                "count" to worldData.tags.size.toString(),
+                                "tags" to formatTags(messages, player, worldData.tags),
+                            ),
+                        ),
+                    )
                     .singleAction(messages.getString(player, "gui.world_settings.tags.action"))
                     .build(),
             ),
@@ -540,6 +561,46 @@ object GuiScreens {
             holder.inventory.setItem(45, GuiComponents.backButton(messages.getString(player, "gui.common.back")))
         }
         holder.inventory.setItem(49, GuiComponents.worldIconButton(messages, player, worldData, showActions = false))
+        return holder.inventory
+    }
+
+    fun createWorldEnvironmentSettings(
+        player: Player,
+        messages: LocalizationService,
+        worldData: MyWorldData,
+        backTarget: WorldSettingsBackTarget,
+        myWorldPage: Int,
+    ): Inventory {
+        val holder = WorldEnvironmentHolder(
+            title = messages.getString(player, "gui.world_environment.title", mapOf("world" to worldData.name)),
+            worldId = worldData.uuid.toString(),
+            backTarget = backTarget,
+            myWorldPage = myWorldPage,
+        )
+        GuiComponents.decorate(holder.inventory)
+        holder.inventory.setItem(
+            20,
+            GuiComponents.button(
+                Material.WATER_BUCKET,
+                messages.getString(player, "gui.world_environment.weather.display"),
+                GuiLoreBuilder(messages, player)
+                    .block(messages.getStringList(player, "gui.world_environment.weather.description"))
+                    .singleAction(messages.getString(player, "gui.world_environment.weather.action"))
+                    .build(),
+            ),
+        )
+        holder.inventory.setItem(
+            24,
+            GuiComponents.button(
+                Material.CLOCK,
+                messages.getString(player, "gui.world_environment.time.display"),
+                GuiLoreBuilder(messages, player)
+                    .block(messages.getStringList(player, "gui.world_environment.time.description"))
+                    .singleAction(messages.getString(player, "gui.world_environment.time.action"))
+                    .build(),
+            ),
+        )
+        holder.inventory.setItem(40, GuiComponents.backButton(messages.getString(player, "gui.common.back")))
         return holder.inventory
     }
 
@@ -810,6 +871,22 @@ object GuiScreens {
             } else {
                 messages.getString(player, "gui.world_settings.publish.option_inactive", mapOf("level" to messages.getString(player, key)))
             }
+        }
+    }
+
+    private fun formatTags(messages: LocalizationService, player: Player, tags: List<String>): String {
+        return if (tags.isEmpty()) {
+            messages.getString(player, "gui.world_settings.common.unset")
+        } else {
+            tags.joinToString(", ")
+        }
+    }
+
+    private fun formatWorldSize(size: Double): String {
+        return if (size % 1.0 == 0.0) {
+            size.toInt().toString()
+        } else {
+            "%.1f".format(java.util.Locale.US, size)
         }
     }
 }

@@ -146,8 +146,9 @@ gui:
     expand:
       display: "§6World Expansion"
       description:
-        - "This release only shows a message for this setting."
-      action: "open expansion menu"
+        - "Current border size: {size}"
+        - "Expands the border by one step."
+      action: "expand the world border"
     publish:
       display: "§6Change Visibility"
       description:
@@ -179,14 +180,23 @@ gui:
       display: "§aWorld Tag Settings"
       description:
         - "Configured Tags: {count}"
-        - "This release only shows a message for this setting."
-      action: "open tag settings"
+        - "Current Tags: {tags}"
+        - "Separate multiple tags with commas."
+      action: "edit tags"
+      form:
+        title: "World Tag Settings"
+        message: "Enter tags separated by commas. Leave blank to clear all tags."
+        tags: "Tags"
     announcement:
       display: "§aVisitor Guide Settings"
       description:
         - "Current Guide: {message}"
-        - "This release only shows a message for this setting."
-      action: "open guide settings"
+        - "Visitors can use it as a short guide for the world."
+      action: "edit visitor guide"
+      form:
+        title: "Visitor Guide Settings"
+        message: "Enter a short guide message. Leave blank to clear it."
+        announcement: "Guide Message"
     notification:
       display: "§aToggle Visit Notifications"
       description:
@@ -196,8 +206,25 @@ gui:
     environment:
       display: "§aWorld Environment Settings"
       description:
-        - "This release only shows a message for this setting."
+        - "Change loaded-world weather and time."
+        - "These changes apply immediately to the current world."
       action: "open environment settings"
+  world_environment:
+    title: "World Environment ({world})"
+    weather:
+      display: "§aWeather"
+      description:
+        - "Switches between clear weather and rain."
+      action: "toggle weather"
+      clear: "Clear"
+      rain: "Rain"
+    time:
+      display: "§aTime"
+      description:
+        - "Switches between day and night."
+      action: "toggle time"
+      day: "Day"
+      night: "Night"
   member_management:
     title: "World Member Management"
     invite:
@@ -263,6 +290,7 @@ messages:
   target_offline: "§cThe target player is not online."
   wizard_started: "§aStarted the My World creation wizard for {player}."
   value_required: "§cPlease enter a value."
+  value_too_long: "§cPlease enter at most {max} characters."
   world_name_invalid_length: "§cThe world name must be {min}..{max} characters."
   world_name_blocked: "§cThat world name cannot be used."
   creation_in_progress: "§eCreating the world. Please wait."
@@ -292,10 +320,17 @@ messages:
   spawn_member_set: "§aSet the member spawn point."
   spawn_both_set: "§aSet the shared guest/member spawn point."
   spawn_set_blocked: "§cYou cannot set a spawn point there. Choose a location where both feet and head space are air or water."
-  world_expand_unimplemented: "§eWorld expansion is not implemented in this release."
-  world_tags_unimplemented: "§eWorld tag settings only show a message in this release."
-  world_announcement_unimplemented: "§eVisitor guide settings only show a message in this release."
-  world_environment_unimplemented: "§eWorld environment settings only show a message in this release."
+  world_expand_updated: "§aExpanded the world border to {size} blocks."
+  world_expand_failed: "§cFailed to expand the world border."
+  world_expand_max_reached: "§eThe world border is already at the maximum size."
+  world_tags_updated: "§aUpdated the world tags."
+  world_tags_too_many: "§cYou can set up to {max} tags."
+  world_tag_too_long: "§cTag \"{tag}\" must be at most {max} characters."
+  world_announcement_updated: "§aUpdated the visitor guide."
+  world_announcement_too_long: "§cThe visitor guide must be at most {max} characters."
+  world_announcement_single_line: "§cThe visitor guide must be a single line."
+  world_weather_updated: "§aChanged weather to {weather}."
+  world_time_updated: "§aChanged time to {time}."
   member_invite_target_offline: "§c{player} is currently offline."
   member_invite_target_self: "§cYou cannot invite yourself."
   member_invite_target_already_member: "§c{player} is already a member of this world."
