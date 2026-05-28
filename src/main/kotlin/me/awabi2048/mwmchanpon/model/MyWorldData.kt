@@ -18,8 +18,10 @@ data class MyWorldData(
     val borderCenterPos: SerializableLocation,
     val borderSize: Double,
     val notificationEnabled: Boolean,
-    val announcementMessage: String,
+    val announcementMessages: List<String>,
     val tags: List<String>,
+    val weatherSetting: WorldWeatherSetting?,
+    val timeSetting: WorldTimeSetting?,
     val customWorldName: String,
     val createdAt: LocalDateTime,
 )

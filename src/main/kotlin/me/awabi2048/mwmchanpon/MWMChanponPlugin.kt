@@ -14,6 +14,7 @@ import me.awabi2048.mwmchanpon.service.PlayerSettingsService
 import me.awabi2048.mwmchanpon.service.PlatformUiService
 import me.awabi2048.mwmchanpon.service.TemplateService
 import me.awabi2048.mwmchanpon.service.WorldService
+import me.awabi2048.mwmchanpon.service.WorldTagService
 import me.awabi2048.mwmchanpon.service.WizardSessionService
 import org.bukkit.command.PluginCommand
 import org.bukkit.event.HandlerList
@@ -31,6 +32,8 @@ class MWMChanponPlugin : JavaPlugin() {
     lateinit var wizardSessionService: WizardSessionService
         private set
     lateinit var worldService: WorldService
+        private set
+    lateinit var worldTagService: WorldTagService
         private set
     lateinit var memberManagementService: MemberManagementService
         private set
@@ -76,10 +79,12 @@ class MWMChanponPlugin : JavaPlugin() {
         localizationService = LocalizationService(this, playerSettingsService)
         localizationService.clearCache()
         templateService = TemplateService(this)
+        worldTagService = WorldTagService(this)
+        worldTagService.reload()
         wizardSessionService = WizardSessionService(this)
         worldService = WorldService(this, worldRepository, templateService)
         memberManagementService = MemberManagementService(this, worldRepository, memberInviteRepository)
-        platformUiService = PlatformUiService(this, localizationService, playerSettingsService, wizardSessionService, templateService, worldService, memberManagementService)
+        platformUiService = PlatformUiService(this, localizationService, playerSettingsService, wizardSessionService, templateService, worldService, memberManagementService, worldTagService)
 
         val mwmCommand = MwmCommand(this, localizationService, wizardSessionService, platformUiService)
         val commandName = config.getString("menu_command", "mwm") ?: "mwm"

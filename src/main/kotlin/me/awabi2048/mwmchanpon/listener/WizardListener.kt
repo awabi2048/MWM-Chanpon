@@ -13,6 +13,7 @@ import me.awabi2048.mwmchanpon.ui.PersonalSettingsHolder
 import me.awabi2048.mwmchanpon.ui.TemplateSelectionHolder
 import me.awabi2048.mwmchanpon.ui.WorldEnvironmentHolder
 import me.awabi2048.mwmchanpon.ui.WorldSettingsHolder
+import me.awabi2048.mwmchanpon.ui.WorldTagEditorHolder
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
@@ -59,6 +60,7 @@ class WizardListener(
 
             is WorldSettingsHolder -> uiService.handleWorldSettingsClick(player, event, holder)
             is WorldEnvironmentHolder -> uiService.handleWorldEnvironmentClick(player, event, holder)
+            is WorldTagEditorHolder -> uiService.handleWorldTagEditorClick(player, event, holder)
             is MemberManagementHolder -> uiService.handleMemberManagementClick(player, event, holder)
             is MemberRemoveConfirmHolder -> uiService.handleMemberRemoveConfirmClick(player, event, holder)
             is MemberInviteCancelConfirmHolder -> uiService.handleMemberInviteCancelConfirmClick(player, event, holder)

@@ -5,6 +5,7 @@ import me.awabi2048.mwmchanpon.model.MyWorldData
 import me.awabi2048.mwmchanpon.model.TemplateDefinition
 import me.awabi2048.mwmchanpon.model.WizardSession
 import me.awabi2048.mwmchanpon.service.LocalizationService
+import me.awabi2048.mwmchanpon.service.WorldTagService
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
@@ -59,6 +60,14 @@ class WorldSettingsHolder(title: String, val worldId: String, val backTarget: Wo
 }
 
 class WorldEnvironmentHolder(title: String, val worldId: String, val backTarget: WorldSettingsBackTarget, val myWorldPage: Int) : GuiInventoryHolder() {
+    init {
+        backingInventory = GuiComponents.createInventory(this, 45, title)
+    }
+}
+
+class WorldTagEditorHolder(title: String, val worldId: String, val backTarget: WorldSettingsBackTarget, val myWorldPage: Int) : GuiInventoryHolder() {
+    val tagSlots = linkedMapOf<Int, String>()
+
     init {
         backingInventory = GuiComponents.createInventory(this, 45, title)
     }
@@ -516,7 +525,7 @@ object GuiScreens {
                         messages.getStringList(
                             player,
                             "gui.world_settings.announcement.description",
-                            mapOf("message" to worldData.announcementMessage.ifBlank { messages.getString(player, "gui.world_settings.common.unset") }),
+                            mapOf("message" to formatAnnouncement(messages, player, worldData.announcementMessages)),
                         ),
                     )
                     .singleAction(messages.getString(player, "gui.world_settings.announcement.action"))
@@ -561,6 +570,41 @@ object GuiScreens {
             holder.inventory.setItem(45, GuiComponents.backButton(messages.getString(player, "gui.common.back")))
         }
         holder.inventory.setItem(49, GuiComponents.worldIconButton(messages, player, worldData, showActions = false))
+        return holder.inventory
+    }
+
+    fun createWorldTagEditor(
+        player: Player,
+        messages: LocalizationService,
+        worldData: MyWorldData,
+        worldTagService: WorldTagService,
+        backTarget: WorldSettingsBackTarget,
+        myWorldPage: Int,
+    ): Inventory {
+        val holder = WorldTagEditorHolder(
+            title = messages.getString(player, "gui.tag_editor.title", mapOf("world" to worldData.name)),
+            worldId = worldData.uuid.toString(),
+            backTarget = backTarget,
+            myWorldPage = myWorldPage,
+        )
+        GuiComponents.decorate(holder.inventory)
+        worldTagService.getEditableTagIds(worldData.tags).take(7).forEachIndexed { index, tagId ->
+            val slot = 10 + index
+            val selected = worldData.tags.contains(tagId)
+            holder.tagSlots[slot] = tagId
+            holder.inventory.setItem(
+                slot,
+                GuiComponents.button(
+                    if (selected) Material.ENCHANTED_BOOK else Material.BOOK,
+                    (if (selected) "§a" else "§7") + worldTagService.getDisplayName(player, tagId),
+                    GuiLoreBuilder(messages, player)
+                        .data(messages.getString(player, "gui.tag_editor.status"), messages.getString(player, if (selected) "gui.tag_editor.status_active" else "gui.tag_editor.status_inactive"))
+                        .singleAction(messages.getString(player, "gui.tag_editor.click_toggle"))
+                        .build(),
+                ),
+            )
+        }
+        holder.inventory.setItem(22, GuiComponents.backButton(messages.getString(player, "gui.common.back")))
         return holder.inventory
     }
 
@@ -879,6 +923,14 @@ object GuiScreens {
             messages.getString(player, "gui.world_settings.common.unset")
         } else {
             tags.joinToString(", ")
+        }
+    }
+
+    private fun formatAnnouncement(messages: LocalizationService, player: Player, lines: List<String>): String {
+        return if (lines.isEmpty()) {
+            messages.getString(player, "gui.world_settings.common.unset")
+        } else {
+            lines.joinToString(" / ")
         }
     }
 

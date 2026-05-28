@@ -3,6 +3,8 @@ package me.awabi2048.mwmchanpon.repository
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.model.MyWorldData
 import me.awabi2048.mwmchanpon.model.SerializableLocation
+import me.awabi2048.mwmchanpon.model.WorldTimeSetting
+import me.awabi2048.mwmchanpon.model.WorldWeatherSetting
 import me.awabi2048.mwmchanpon.model.WorldPublishLevel
 import org.bukkit.Material
 import org.bukkit.configuration.ConfigurationSection
@@ -49,8 +51,10 @@ class WorldRepository(private val plugin: MWMChanponPlugin) {
         section.createSection("border_center_pos", worldData.borderCenterPos.toMap())
         section.set("border_size", worldData.borderSize)
         section.set("notification_enabled", worldData.notificationEnabled)
-        section.set("announcement_message", worldData.announcementMessage)
+        section.set("announcement_messages", worldData.announcementMessages)
         section.set("tags", worldData.tags)
+        section.set("weather_setting", worldData.weatherSetting?.name)
+        section.set("time_setting", worldData.timeSetting?.name)
         section.set("created_at", worldData.createdAt.toString())
         section.set("custom_world_name", worldData.customWorldName)
         config.save(File(rootDirectory, "${worldData.uuid}.yml"))
@@ -93,8 +97,16 @@ class WorldRepository(private val plugin: MWMChanponPlugin) {
             borderCenterPos = fromSection(borderSection),
             borderSize = section.getDouble("border_size"),
             notificationEnabled = section.getBoolean("notification_enabled", true),
-            announcementMessage = section.getString("announcement_message").orEmpty(),
+            announcementMessages = section.getStringList("announcement_messages").ifEmpty {
+                section.getString("announcement_message")?.takeIf(String::isNotBlank)?.let(::listOf).orEmpty()
+            },
             tags = section.getStringList("tags"),
+            weatherSetting = section.getString("weather_setting")?.let { raw ->
+                runCatching { WorldWeatherSetting.valueOf(raw) }.getOrNull()
+            },
+            timeSetting = section.getString("time_setting")?.let { raw ->
+                runCatching { WorldTimeSetting.valueOf(raw) }.getOrNull()
+            },
             customWorldName = section.getString("custom_world_name") ?: return null,
             createdAt = LocalDateTime.parse(section.getString("created_at") ?: return null),
         )

@@ -11,6 +11,8 @@ import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.model.CreationMethod
 import me.awabi2048.mwmchanpon.model.MyWorldData
 import me.awabi2048.mwmchanpon.model.SerializableLocation
+import me.awabi2048.mwmchanpon.model.WorldTimeSetting
+import me.awabi2048.mwmchanpon.model.WorldWeatherSetting
 import me.awabi2048.mwmchanpon.model.WizardSession
 import me.awabi2048.mwmchanpon.ui.GuiComponents
 import me.awabi2048.mwmchanpon.ui.GuiScreens
@@ -23,6 +25,7 @@ import me.awabi2048.mwmchanpon.ui.PersonalSettingsMenuItem
 import me.awabi2048.mwmchanpon.ui.WorldEnvironmentHolder
 import me.awabi2048.mwmchanpon.ui.WorldSettingsBackTarget
 import me.awabi2048.mwmchanpon.ui.WorldSettingsHolder
+import me.awabi2048.mwmchanpon.ui.WorldTagEditorHolder
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.event.ClickCallback
 import org.bukkit.Bukkit
@@ -58,6 +61,7 @@ class PlatformUiService(
     private val templateService: TemplateService,
     private val worldService: WorldService,
     private val memberManagementService: MemberManagementService,
+    private val worldTagService: WorldTagService,
 ) {
     private val suppressedInventoryClose = ConcurrentHashMap.newKeySet<UUID>()
     private val iconSelectionWorlds = ConcurrentHashMap<UUID, UUID>()
@@ -162,6 +166,15 @@ class PlatformUiService(
             return
         }
         openMenuInventory(player, GuiScreens.createWorldEnvironmentSettings(player, messages, worldData, backTarget, myWorldPage))
+    }
+
+    private fun openWorldTagEditor(
+        player: Player,
+        worldData: MyWorldData,
+        backTarget: WorldSettingsBackTarget,
+        myWorldPage: Int,
+    ) {
+        openMenuInventory(player, GuiScreens.createWorldTagEditor(player, messages, worldData, worldTagService, backTarget, myWorldPage))
     }
 
     private fun openMemberRemoveConfirm(
@@ -790,7 +803,10 @@ class PlatformUiService(
                 playClickSound(player)
                 openMemberManagement(player, worldData, holder.backTarget, holder.myWorldPage)
             }
-            28 -> requestWorldTags(player, worldData, holder.backTarget, holder.myWorldPage)
+            28 -> {
+                playClickSound(player)
+                openWorldTagEditor(player, worldData, holder.backTarget, holder.myWorldPage)
+            }
             29 -> requestWorldAnnouncement(player, worldData, holder.backTarget, holder.myWorldPage)
 
             30 -> {
@@ -848,6 +864,42 @@ class PlatformUiService(
                 openWorldSettings(player, worldData, holder.backTarget, holder.myWorldPage)
             }
         }
+    }
+
+    fun handleWorldTagEditorClick(player: Player, event: InventoryClickEvent, holder: WorldTagEditorHolder) {
+        val worldData = worldService.getWorldByUuid(UUID.fromString(holder.worldId)) ?: run {
+            event.isCancelled = true
+            player.sendMessage(messages.getString(player, "messages.world_not_found"))
+            player.closeInventory()
+            return
+        }
+
+        event.isCancelled = true
+        if (event.clickedInventory == player.inventory) {
+            return
+        }
+
+        if (event.rawSlot == 22) {
+            playClickSound(player)
+            openWorldSettings(player, worldData, holder.backTarget, holder.myWorldPage)
+            return
+        }
+
+        val tagId = holder.tagSlots[event.rawSlot] ?: return
+        val updatedTags = if (worldData.tags.contains(tagId)) {
+            worldData.tags.filterNot { it == tagId }
+        } else {
+            worldData.tags + tagId
+        }
+        worldService.updateWorldTags(worldData, updatedTags)
+            .onSuccess {
+                playClickSound(player)
+                player.sendMessage(messages.getString(player, "messages.world_tags_updated"))
+                openWorldTagEditor(player, it, holder.backTarget, holder.myWorldPage)
+            }
+            .onFailure {
+                player.sendMessage(it.message ?: messages.getString(player, "messages.world_not_found"))
+            }
     }
 
     fun handleWorldSettingsClosed(player: Player, holder: WorldSettingsHolder) {
@@ -995,79 +1047,11 @@ class PlatformUiService(
         }
     }
 
-    private fun requestWorldTags(player: Player, worldData: MyWorldData, backTarget: WorldSettingsBackTarget, myWorldPage: Int) {
-        if (isBedrock(player)) {
-            openBedrockSingleLineForm(
-                player = player,
-                worldData = worldData,
-                titleKey = "gui.world_settings.tags.form.title",
-                messageKey = "gui.world_settings.tags.form.message",
-                labelKey = "gui.world_settings.tags.form.tags",
-                defaultValue = worldData.tags.joinToString(", "),
-                backTarget = backTarget,
-                myWorldPage = myWorldPage,
-                allowBlank = true,
-                maxLength = 240,
-                onSubmit = { target, latest, value ->
-                    val tags = parseTags(value)
-                    worldService.updateWorldTags(latest, tags)
-                },
-                successMessageKey = "messages.world_tags_updated",
-            )
-        } else {
-            openJavaSingleLineDialog(
-                player = player,
-                worldData = worldData,
-                titleKey = "gui.world_settings.tags.form.title",
-                messageKey = "gui.world_settings.tags.form.message",
-                labelKey = "gui.world_settings.tags.form.tags",
-                inputKey = "world_tags",
-                initialValue = worldData.tags.joinToString(", "),
-                backTarget = backTarget,
-                myWorldPage = myWorldPage,
-                allowBlank = true,
-                maxLength = 240,
-                onSubmit = { target, latest, value ->
-                    val tags = parseTags(value)
-                    worldService.updateWorldTags(latest, tags)
-                },
-                successMessageKey = "messages.world_tags_updated",
-            )
-        }
-    }
-
     private fun requestWorldAnnouncement(player: Player, worldData: MyWorldData, backTarget: WorldSettingsBackTarget, myWorldPage: Int) {
         if (isBedrock(player)) {
-            openBedrockSingleLineForm(
-                player = player,
-                worldData = worldData,
-                titleKey = "gui.world_settings.announcement.form.title",
-                messageKey = "gui.world_settings.announcement.form.message",
-                labelKey = "gui.world_settings.announcement.form.announcement",
-                defaultValue = worldData.announcementMessage,
-                backTarget = backTarget,
-                myWorldPage = myWorldPage,
-                allowBlank = true,
-                maxLength = plugin.config.getInt("world_announcement.max_length", 100),
-                onSubmit = { _, latest, value -> worldService.updateAnnouncement(latest, value) },
-                successMessageKey = "messages.world_announcement_updated",
-            )
+            openBedrockAnnouncementForm(player, worldData, backTarget, myWorldPage)
         } else {
-            openJavaSingleLineDialog(
-                player = player,
-                worldData = worldData,
-                titleKey = "gui.world_settings.announcement.form.title",
-                messageKey = "gui.world_settings.announcement.form.message",
-                labelKey = "gui.world_settings.announcement.form.announcement",
-                inputKey = "world_announcement",
-                initialValue = worldData.announcementMessage,
-                backTarget = backTarget,
-                myWorldPage = myWorldPage,
-                allowBlank = true,
-                maxLength = plugin.config.getInt("world_announcement.max_length", 100),
-                onSubmit = { _, latest, value -> worldService.updateAnnouncement(latest, value) },
-                successMessageKey = "messages.world_announcement_updated",
-            )
+            openJavaAnnouncementDialog(player, worldData, backTarget, myWorldPage)
         }
     }
 
@@ -1079,19 +1063,21 @@ class PlatformUiService(
         }
 
         val world = player.world
-        val clear = world.hasStorm() || world.isThundering
-        world.setStorm(!clear)
-        world.isThundering = false
-        world.weatherDuration = 20 * 60 * 10
+        val setting = if (worldData.weatherSetting == WorldWeatherSetting.RAIN) {
+            WorldWeatherSetting.CLEAR
+        } else {
+            WorldWeatherSetting.RAIN
+        }
+        val updated = worldService.updateWeatherSetting(worldData, world, setting)
         playClickSound(player)
         player.sendMessage(
             messages.getString(
                 player,
                 "messages.world_weather_updated",
-                mapOf("weather" to messages.getString(player, if (clear) "gui.world_environment.weather.clear" else "gui.world_environment.weather.rain")),
+                mapOf("weather" to messages.getString(player, if (setting == WorldWeatherSetting.CLEAR) "gui.world_environment.weather.clear" else "gui.world_environment.weather.rain")),
             ),
         )
-        openWorldEnvironmentSettings(player, worldData, holder.backTarget, holder.myWorldPage)
+        openWorldEnvironmentSettings(player, updated, holder.backTarget, holder.myWorldPage)
     }
 
     private fun toggleWorldTime(player: Player, worldData: MyWorldData, holder: WorldEnvironmentHolder) {
@@ -1102,17 +1088,21 @@ class PlatformUiService(
         }
 
         val world = player.world
-        val nextDay = world.time in 13000L..23999L
-        world.time = if (nextDay) 1000L else 13000L
+        val setting = if (worldData.timeSetting == WorldTimeSetting.NIGHT) {
+            WorldTimeSetting.DAY
+        } else {
+            WorldTimeSetting.NIGHT
+        }
+        val updated = worldService.updateTimeSetting(worldData, world, setting)
         playClickSound(player)
         player.sendMessage(
             messages.getString(
                 player,
                 "messages.world_time_updated",
-                mapOf("time" to messages.getString(player, if (nextDay) "gui.world_environment.time.day" else "gui.world_environment.time.night")),
+                mapOf("time" to messages.getString(player, if (setting == WorldTimeSetting.DAY) "gui.world_environment.time.day" else "gui.world_environment.time.night")),
             ),
         )
-        openWorldEnvironmentSettings(player, worldData, holder.backTarget, holder.myWorldPage)
+        openWorldEnvironmentSettings(player, updated, holder.backTarget, holder.myWorldPage)
     }
 
     private fun publishLevelKey(worldData: MyWorldData): String {
@@ -1121,13 +1111,6 @@ class PlatformUiService(
             me.awabi2048.mwmchanpon.model.WorldPublishLevel.WIP -> "gui.myworld.world_icon.publish.wip"
             me.awabi2048.mwmchanpon.model.WorldPublishLevel.CLOSED -> "gui.myworld.world_icon.publish.closed"
         }
-    }
-
-    private fun parseTags(value: String): List<String> {
-        return value.split(',')
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-            .distinctBy { it.lowercase(Locale.ROOT) }
     }
 
     private fun formatWorldSize(size: Double): String {
@@ -1431,20 +1414,7 @@ class PlatformUiService(
         player.showDialog(dialog)
     }
 
-    private fun openBedrockSingleLineForm(
-        player: Player,
-        worldData: MyWorldData,
-        titleKey: String,
-        messageKey: String,
-        labelKey: String,
-        defaultValue: String,
-        backTarget: WorldSettingsBackTarget,
-        myWorldPage: Int,
-        allowBlank: Boolean,
-        maxLength: Int,
-        onSubmit: (Player, MyWorldData, String) -> Result<MyWorldData>,
-        successMessageKey: String,
-    ) {
+    private fun openBedrockAnnouncementForm(player: Player, worldData: MyWorldData, backTarget: WorldSettingsBackTarget, myWorldPage: Int) {
         val floodgateApi = runCatching { FloodgateApi.getInstance() }.getOrNull()
         if (floodgateApi == null) {
             player.sendMessage(messages.getString(player, "gui.common.offline_target"))
@@ -1454,34 +1424,23 @@ class PlatformUiService(
         suppressNextInventoryClose(player)
         player.closeInventory()
 
+        val maxLines = plugin.config.getInt("announcement.max_lines", 5)
+        val maxLength = plugin.config.getInt("announcement.max_line_length", 100)
         val form = CustomForm.builder()
-            .title(messages.getString(player, titleKey))
-            .label(messages.getString(player, messageKey))
-            .input(messages.getString(player, labelKey), "", defaultValue)
+            .title(messages.getString(player, "gui.world_settings.announcement.form.title"))
+            .label(messages.getString(player, "gui.world_settings.announcement.form.message", mapOf("max_lines" to maxLines.toString(), "max_length" to maxLength.toString())))
+            .apply {
+                repeat(maxLines) { index ->
+                    input(
+                        messages.getString(player, "gui.world_settings.announcement.form.line", mapOf("number" to (index + 1).toString())),
+                        "",
+                        worldData.announcementMessages.getOrNull(index).orEmpty().removePrefix("§f").replace("§", "&"),
+                    )
+                }
+            }
             .validResultHandler { response ->
-                val value = response.asInput(0)?.trim().orEmpty()
-                if (!allowBlank && value.isBlank()) {
-                    player.sendMessage(messages.getString(player, "messages.value_required"))
-                    openBedrockSingleLineForm(player, worldData, titleKey, messageKey, labelKey, defaultValue, backTarget, myWorldPage, allowBlank, maxLength, onSubmit, successMessageKey)
-                    return@validResultHandler
-                }
-                if (value.length > maxLength) {
-                    player.sendMessage(messages.getString(player, "messages.value_too_long", mapOf("max" to maxLength.toString())))
-                    openBedrockSingleLineForm(player, worldData, titleKey, messageKey, labelKey, defaultValue, backTarget, myWorldPage, allowBlank, maxLength, onSubmit, successMessageKey)
-                    return@validResultHandler
-                }
-
-                val latest = worldService.getWorldByUuid(worldData.uuid) ?: worldData
-                onSubmit(player, latest, value)
-                    .onSuccess {
-                        playClickSound(player)
-                        player.sendMessage(messages.getString(player, successMessageKey))
-                        openWorldSettings(player, it, backTarget, myWorldPage)
-                    }
-                    .onFailure {
-                        player.sendMessage(it.message ?: messages.getString(player, "messages.world_not_found"))
-                        openWorldSettings(player, latest, backTarget, myWorldPage)
-                    }
+                val values = (0 until maxLines).map { index -> response.asInput(index)?.trim().orEmpty() }
+                saveAnnouncement(player, worldData, values, backTarget, myWorldPage)
             }
             .closedResultHandler(Runnable { openWorldSettings(player, worldData, backTarget, myWorldPage) })
             .invalidResultHandler(Consumer<InvalidFormResponseResult<org.geysermc.cumulus.response.CustomFormResponse>> { openWorldSettings(player, worldData, backTarget, myWorldPage) })
@@ -1490,75 +1449,85 @@ class PlatformUiService(
         floodgateApi.sendForm(player.uniqueId, form)
     }
 
-    private fun openJavaSingleLineDialog(
-        player: Player,
-        worldData: MyWorldData,
-        titleKey: String,
-        messageKey: String,
-        labelKey: String,
-        inputKey: String,
-        initialValue: String,
-        backTarget: WorldSettingsBackTarget,
-        myWorldPage: Int,
-        allowBlank: Boolean,
-        maxLength: Int,
-        onSubmit: (Player, MyWorldData, String) -> Result<MyWorldData>,
-        successMessageKey: String,
-    ) {
+    private fun openJavaAnnouncementDialog(player: Player, worldData: MyWorldData, backTarget: WorldSettingsBackTarget, myWorldPage: Int) {
         suppressNextInventoryClose(player)
         player.closeInventory()
 
+        val maxLines = plugin.config.getInt("announcement.max_lines", 5)
+        val maxLength = plugin.config.getInt("announcement.max_line_length", 100)
         val options = ClickCallback.Options.builder().uses(1).lifetime(Duration.ofMinutes(5)).build()
-        val submitButton = ActionButton.builder(Component.text(messages.getString(player, "gui.creation.input.submit")))
-            .width(120)
+        val saveButton = ActionButton.builder(Component.text(messages.getString(player, "gui.creation.input.submit")))
+            .width(80)
             .action(DialogAction.customClick({ response, audience ->
                 val target = audience as? Player ?: return@customClick
-                val value = response.getText(inputKey)?.trim().orEmpty()
-                if (!allowBlank && value.isBlank()) {
-                    target.sendMessage(messages.getString(target, "messages.value_required"))
-                    openJavaSingleLineDialog(target, worldData, titleKey, messageKey, labelKey, inputKey, initialValue, backTarget, myWorldPage, allowBlank, maxLength, onSubmit, successMessageKey)
-                    return@customClick
-                }
-                if (value.length > maxLength) {
-                    target.sendMessage(messages.getString(target, "messages.value_too_long", mapOf("max" to maxLength.toString())))
-                    openJavaSingleLineDialog(target, worldData, titleKey, messageKey, labelKey, inputKey, initialValue, backTarget, myWorldPage, allowBlank, maxLength, onSubmit, successMessageKey)
-                    return@customClick
-                }
-
-                val latest = worldService.getWorldByUuid(worldData.uuid) ?: worldData
-                onSubmit(target, latest, value)
-                    .onSuccess {
-                        playClickSound(target)
-                        target.sendMessage(messages.getString(target, successMessageKey))
-                        openWorldSettings(target, it, backTarget, myWorldPage)
-                    }
-                    .onFailure {
-                        target.sendMessage(it.message ?: messages.getString(target, "messages.world_not_found"))
-                        openWorldSettings(target, latest, backTarget, myWorldPage)
-                    }
+                val values = (0 until maxLines).map { index -> response.getText("announcement_line_$index")?.trim().orEmpty() }
+                saveAnnouncement(target, worldData, values, backTarget, myWorldPage)
+            }, options))
+            .build()
+        val resetButton = ActionButton.builder(Component.text(messages.getString(player, "gui.world_settings.announcement.form.reset")))
+            .width(80)
+            .action(DialogAction.customClick({ _, audience ->
+                val target = audience as? Player ?: return@customClick
+                saveAnnouncement(target, worldData, emptyList(), backTarget, myWorldPage)
             }, options))
             .build()
         val backButton = ActionButton.builder(Component.text(messages.getString(player, "gui.creation.input.back")))
-            .width(120)
+            .width(80)
             .action(DialogAction.customClick({ _, audience ->
                 val target = audience as? Player ?: return@customClick
                 openWorldSettings(target, worldData, backTarget, myWorldPage)
             }, options))
             .build()
 
+        val inputs = (0 until maxLines).map { index ->
+            DialogInput.text(
+                "announcement_line_$index",
+                240,
+                Component.text(messages.getString(player, "gui.world_settings.announcement.form.line", mapOf("number" to (index + 1).toString()))),
+                false,
+                worldData.announcementMessages.getOrNull(index).orEmpty().removePrefix("§f").replace("§", "&"),
+                maxLength,
+                null,
+            )
+        }
         val dialog = Dialog.create { factory ->
             factory.empty().base(
-                DialogBase.builder(Component.text(messages.getString(player, titleKey)))
+                DialogBase.builder(Component.text(messages.getString(player, "gui.world_settings.announcement.form.title")))
                     .canCloseWithEscape(false)
                     .pause(false)
                     .afterAction(DialogBase.DialogAfterAction.CLOSE)
-                    .body(listOf(DialogBody.plainMessage(Component.text(messages.getString(player, messageKey)), 240)))
-                    .inputs(listOf(DialogInput.text(inputKey, 240, Component.text(messages.getString(player, labelKey)), allowBlank.not(), initialValue, maxLength, null)))
+                    .body(
+                        listOf(
+                            DialogBody.plainMessage(
+                                Component.text(messages.getString(player, "gui.world_settings.announcement.form.message", mapOf("max_lines" to maxLines.toString(), "max_length" to maxLength.toString()))),
+                                240,
+                            ),
+                        ),
+                    )
+                    .inputs(inputs)
                     .build(),
-            ).type(DialogType.multiAction(listOf(submitButton, backButton), null, 2))
+            ).type(DialogType.multiAction(listOf(saveButton, resetButton, backButton), null, 3))
         }
 
         player.showDialog(dialog)
+    }
+
+    private fun saveAnnouncement(player: Player, worldData: MyWorldData, rawLines: List<String>, backTarget: WorldSettingsBackTarget, myWorldPage: Int) {
+        val lines = rawLines
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .map { "§f${it.replace("&", "§")}" }
+        val latest = worldService.getWorldByUuid(worldData.uuid) ?: worldData
+        worldService.updateAnnouncement(latest, lines)
+            .onSuccess {
+                playClickSound(player)
+                player.sendMessage(messages.getString(player, if (lines.isEmpty()) "messages.announcement_reset" else "messages.announcement_set"))
+                openWorldSettings(player, it, backTarget, myWorldPage)
+            }
+            .onFailure {
+                player.sendMessage(it.message ?: messages.getString(player, "messages.world_not_found"))
+                requestWorldAnnouncement(player, latest, backTarget, myWorldPage)
+            }
     }
 
     private fun openBedrockWorldInfoForm(player: Player, worldData: MyWorldData, backTarget: WorldSettingsBackTarget, myWorldPage: Int) {
@@ -1574,8 +1543,8 @@ class PlatformUiService(
         val form = CustomForm.builder()
             .title(messages.getString(player, "gui.world_settings.info.form.title"))
             .label(messages.getString(player, "gui.world_settings.info.form.message"))
-            .input(messages.getString(player, "gui.world_settings.info.form.name"), "", worldData.name)
-            .input(messages.getString(player, "gui.world_settings.info.form.description"), "", worldData.description)
+            .input(messages.getString(player, "gui.world_settings.info.form.name"), messages.getString(player, "gui.world_settings.info.form.name_placeholder"), worldData.name)
+            .input(messages.getString(player, "gui.world_settings.info.form.description"), messages.getString(player, "gui.world_settings.info.form.description_placeholder"), worldData.description)
             .validResultHandler { response ->
                 val name = response.asInput(0)?.trim().orEmpty()
                 val description = response.asInput(1)?.trim().orEmpty()
@@ -1646,11 +1615,15 @@ class PlatformUiService(
                     .canCloseWithEscape(false)
                     .pause(false)
                     .afterAction(DialogBase.DialogAfterAction.CLOSE)
-                    .body(listOf(DialogBody.plainMessage(Component.text(messages.getString(player, "gui.world_settings.info.form.message")), 240)))
+                    .body(
+                        listOf(
+                            DialogBody.plainMessage(Component.text(messages.getString(player, "gui.world_settings.info.form.message")), 240),
+                        ),
+                    )
                     .inputs(
                         listOf(
                             DialogInput.text("world_settings_name", 240, Component.text(messages.getString(player, "gui.world_settings.info.form.name")), true, worldData.name, 64, null),
-                            DialogInput.text("world_settings_description", 240, Component.text(messages.getString(player, "gui.world_settings.info.form.description")), false, worldData.description, plugin.config.getInt("world_description.max_length", 100), null),
+                            DialogInput.text("world_settings_description", 240, Component.text(messages.getString(player, "gui.world_settings.info.form.description")), true, worldData.description, plugin.config.getInt("world_description.max_length", 100), null),
                         ),
                     )
                     .build(),

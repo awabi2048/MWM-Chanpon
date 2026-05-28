@@ -118,10 +118,12 @@ gui:
         - "ワールド説明: {description}"
       action: "ワールド名と説明を編集"
       form:
-        title: "ワールド情報の設定"
-        message: "ワールド名と説明を入力してください。"
-        name: "ワールド名"
-        description: "ワールド説明"
+        title: "ワールド情報の編集"
+        message: "ワールド名と説明文をまとめて編集できます。ワールド名が空欄なら変更なし、説明文が空欄なら説明なしになります。"
+        name: "新しいワールド名"
+        name_placeholder: "ワールド名を入力"
+        description: "新しい説明文"
+        description_placeholder: "説明文を入力"
     icon:
       display: "§aワールドアイコンの変更"
       current_prefix: "§f§l| §7現在のアイコン "
@@ -181,12 +183,7 @@ gui:
       description:
         - "設定中のタグ数: {count}"
         - "現在のタグ: {tags}"
-        - "複数のタグはカンマ区切りで入力します。"
       action: "タグを編集する"
-      form:
-        title: "ワールドタグの設定"
-        message: "タグをカンマ区切りで入力します。空欄にすると全て削除します。"
-        tags: "タグ"
     announcement:
       display: "§aプレイヤー案内の設定"
       description:
@@ -195,8 +192,9 @@ gui:
       action: "案内を編集する"
       form:
         title: "プレイヤー案内の設定"
-        message: "短い案内文を入力します。空欄にすると削除します。"
-        announcement: "案内文"
+        message: "最大 {max_lines} 行、各行 {max_length} 文字まで入力できます。空欄行は保存されません。"
+        line: "{number} 行目"
+        reset: "リセット"
     notification:
       display: "§a訪問通知の切り替え"
       description:
@@ -225,6 +223,12 @@ gui:
       action: "時刻を切り替える"
       day: "昼"
       night: "夜"
+  tag_editor:
+    title: "ワールドタグの編集"
+    status: "状態"
+    status_active: "§a有効"
+    status_inactive: "§c無効"
+    click_toggle: "切り替える"
   member_management:
     title: "ワールドメンバーの管理"
     invite:
@@ -324,11 +328,10 @@ messages:
   world_expand_failed: "§cワールド境界の拡張に失敗しました。"
   world_expand_max_reached: "§eワールド境界はすでに最大サイズです。"
   world_tags_updated: "§aワールドタグを更新しました。"
-  world_tags_too_many: "§cタグは最大 {max} 個まで設定できます。"
-  world_tag_too_long: "§cタグ「{tag}」は最大 {max} 文字で入力してください。"
-  world_announcement_updated: "§aプレイヤー案内を更新しました。"
-  world_announcement_too_long: "§cプレイヤー案内は最大 {max} 文字で入力してください。"
-  world_announcement_single_line: "§cプレイヤー案内は1行で入力してください。"
+  announcement_set: "§a案内メッセージを設定しました！"
+  announcement_reset: "§e案内メッセージをリセットしました。"
+  announcement_invalid_length: "§cメッセージが長すぎます。（{max_lines}行まで、各行{max_length}文字まで）"
+  announcement_blocked_string: "§c禁止文字列が含まれています: {string}"
   world_weather_updated: "§a天候を {weather} に変更しました。"
   world_time_updated: "§a時刻を {time} に変更しました。"
   member_invite_target_offline: "§c{player}さんは現在オフラインです。"
@@ -362,3 +365,9 @@ messages:
   language_updated: "§a表示言語を {language} に変更しました。"
   reload_success: "§aMWM-Chanpon を再初期化しました。"
   reload_failed: "§cMWM-Chanpon の再初期化に失敗しました: {reason}"
+world_tag:
+  shop: "ショップ"
+  minigame: "ミニゲーム"
+  building: "建築"
+  facility: "施設"
+  streaming: "配信"

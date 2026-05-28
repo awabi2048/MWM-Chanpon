@@ -4,6 +4,8 @@ import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.model.CreationMethod
 import me.awabi2048.mwmchanpon.model.MyWorldData
 import me.awabi2048.mwmchanpon.model.SerializableLocation
+import me.awabi2048.mwmchanpon.model.WorldTimeSetting
+import me.awabi2048.mwmchanpon.model.WorldWeatherSetting
 import me.awabi2048.mwmchanpon.model.WizardSession
 import me.awabi2048.mwmchanpon.model.WorldPublishLevel
 import me.awabi2048.mwmchanpon.repository.WorldRepository
@@ -134,39 +136,41 @@ class WorldService(
     }
 
     fun updateWorldTags(worldData: MyWorldData, tags: List<String>): Result<MyWorldData> {
-        val maxCount = plugin.config.getInt("world_tags.max_count", 5)
-        val maxLength = plugin.config.getInt("world_tags.max_length", 16)
-        if (tags.size > maxCount) {
-            return Result.failure(
-                IllegalArgumentException(
-                    plugin.localizationService.getString(null, "messages.world_tags_too_many", mapOf("max" to maxCount.toString())),
-                ),
-            )
-        }
-        val tooLong = tags.firstOrNull { it.length > maxLength }
-        if (tooLong != null) {
-            return Result.failure(
-                IllegalArgumentException(
-                    plugin.localizationService.getString(null, "messages.world_tag_too_long", mapOf("tag" to tooLong, "max" to maxLength.toString())),
-                ),
-            )
-        }
         return Result.success(updateWorld(worldData.copy(tags = tags)))
     }
 
-    fun updateAnnouncement(worldData: MyWorldData, message: String): Result<MyWorldData> {
-        val maxLength = plugin.config.getInt("world_announcement.max_length", 100)
-        if (message.length > maxLength) {
+    fun updateAnnouncement(worldData: MyWorldData, messages: List<String>): Result<MyWorldData> {
+        val maxLines = plugin.config.getInt("announcement.max_lines", 5)
+        val maxLength = plugin.config.getInt("announcement.max_line_length", 100)
+        if (messages.size > maxLines || messages.any { it.length > maxLength }) {
             return Result.failure(
                 IllegalArgumentException(
-                    plugin.localizationService.getString(null, "messages.world_announcement_too_long", mapOf("max" to maxLength.toString())),
+                    plugin.localizationService.getString(null, "messages.announcement_invalid_length", mapOf("max_lines" to maxLines.toString(), "max_length" to maxLength.toString())),
                 ),
             )
         }
-        if (message.contains('\n') || message.contains('\r')) {
-            return Result.failure(IllegalArgumentException(plugin.localizationService.getString(null, "messages.world_announcement_single_line")))
+        val blocked = plugin.config.getStringList("announcement.blocked_strings")
+        val blockedMatch = blocked.firstOrNull { blockedString ->
+            blockedString.isNotBlank() && messages.any { it.contains(blockedString, ignoreCase = true) }
         }
-        return Result.success(updateWorld(worldData.copy(announcementMessage = message)))
+        if (blockedMatch != null) {
+            return Result.failure(
+                IllegalArgumentException(
+                    plugin.localizationService.getString(null, "messages.announcement_blocked_string", mapOf("string" to blockedMatch)),
+                ),
+            )
+        }
+        return Result.success(updateWorld(worldData.copy(announcementMessages = messages)))
+    }
+
+    fun updateWeatherSetting(worldData: MyWorldData, world: World, setting: WorldWeatherSetting): MyWorldData {
+        applyWeather(world, setting)
+        return updateWorld(worldData.copy(weatherSetting = setting))
+    }
+
+    fun updateTimeSetting(worldData: MyWorldData, world: World, setting: WorldTimeSetting): MyWorldData {
+        applyTime(world, setting)
+        return updateWorld(worldData.copy(timeSetting = setting))
     }
 
     fun toggleVisitNotification(worldData: MyWorldData): MyWorldData {
@@ -193,6 +197,7 @@ class WorldService(
                 ?: Bukkit.createWorld(WorldCreator(worldData.customWorldName))
                 ?: throw IllegalStateException("ワールドの読み込みに失敗しました。")
             val spawn = resolveSpawnForPlayer(player, worldData)
+            applyEnvironmentSettings(world, worldData)
             val location = Location(
                 world,
                 spawn.x,
@@ -343,11 +348,36 @@ class WorldService(
             borderCenterPos = borderCenter,
             borderSize = world.worldBorder.size,
             notificationEnabled = true,
-            announcementMessage = "",
+            announcementMessages = emptyList(),
             tags = emptyList(),
+            weatherSetting = null,
+            timeSetting = null,
             customWorldName = customWorldName,
             createdAt = LocalDateTime.now(),
         )
+    }
+
+    private fun applyEnvironmentSettings(world: World, worldData: MyWorldData) {
+        worldData.weatherSetting?.let { applyWeather(world, it) }
+        worldData.timeSetting?.let { applyTime(world, it) }
+    }
+
+    private fun applyWeather(world: World, setting: WorldWeatherSetting) {
+        when (setting) {
+            WorldWeatherSetting.CLEAR -> {
+                world.setStorm(false)
+                world.isThundering = false
+            }
+            WorldWeatherSetting.RAIN -> {
+                world.setStorm(true)
+                world.isThundering = false
+            }
+        }
+        world.weatherDuration = 20 * 60 * 10
+    }
+
+    private fun applyTime(world: World, setting: WorldTimeSetting) {
+        world.time = setting.time
     }
 
     private fun resolveIcon(session: WizardSession): Material {

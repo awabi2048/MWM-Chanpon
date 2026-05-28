@@ -6,11 +6,18 @@ world_description:
   max_length: 100
 
 world_tags:
-  max_count: 5
-  max_length: 16
+  - shop
+  - minigame
+  - building
+  - facility
+  - streaming
 
-world_announcement:
-  max_length: 100
+announcement:
+  max_lines: 5
+  max_line_length: 100
+  blocked_strings:
+    - "http"
+    - "www."
 
 validation:
   blocked_strings:

@@ -31,6 +31,12 @@ class LocalizationService(
         return raw.map { applyPlaceholders(it, placeholders) }
     }
 
+    fun hasKey(player: Player?, key: String): Boolean {
+        val locale = resolveLocale(player)
+        val fallback = plugin.config.getString("fallback_language", "ja_jp") ?: "ja_jp"
+        return load(locale).contains(key) || load(fallback).contains(key)
+    }
+
     private fun resolveLocale(player: Player?): String {
         if (player == null) {
             return plugin.config.getString("fallback_language", "ja_jp") ?: "ja_jp"

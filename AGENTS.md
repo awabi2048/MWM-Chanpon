@@ -1,6 +1,6 @@
 # mwm_chanpon_plugin 作業方針
 
-このプロジェクトは、Paper 1.21.8 向けの Kotlin / Maven プラグインである。
+このプロジェクトは、`crafter_crossing` ワークスペースに含まれる Paper 1.21.8 向けの Kotlin / Maven プラグインである。
 `crafter_crossing/my_world_manager_plugin` の実装は仕様参照元として扱うが、実体の変更はこのリポジトリの責務範囲に限定する。
 
 ## 参照元
@@ -34,5 +34,6 @@
 - JAR 配置が必要な場合は、事前に配置先と対象 JAR 名を確認する。
 - 既定の配置先は `D:\Minecraft\Chiyogami 1.21.8\plugins\MWM-Chanpon-0.1.0-SNAPSHOT.jar` とする。
 - 配置元の成果物は `target\MWM-Chanpon-0.1.0-SNAPSHOT.jar` とする。
+- 実装作業後は、`mvn clean package` が成功したら既定の配置先へ JAR を反映する。
 - 対象はこのプロジェクトの成果物に限る。
 - 無関係な JAR、設定ファイル、ワールドデータは削除しない。

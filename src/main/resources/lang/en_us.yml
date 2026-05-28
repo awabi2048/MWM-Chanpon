@@ -118,10 +118,12 @@ gui:
         - "World Description: {description}"
       action: "edit world name and description"
       form:
-        title: "World Info Settings"
-        message: "Enter the world name and description."
-        name: "World Name"
-        description: "World Description"
+        title: "Edit World Info"
+        message: "You can edit the world name and description together. Leave the world name blank to keep it unchanged, and leave the description blank to clear it."
+        name: "New World Name"
+        name_placeholder: "Enter world name"
+        description: "New Description"
+        description_placeholder: "Enter description"
     icon:
       display: "§aChange World Icon"
       current_prefix: "§f§l| §7Current Icon "
@@ -181,12 +183,7 @@ gui:
       description:
         - "Configured Tags: {count}"
         - "Current Tags: {tags}"
-        - "Separate multiple tags with commas."
       action: "edit tags"
-      form:
-        title: "World Tag Settings"
-        message: "Enter tags separated by commas. Leave blank to clear all tags."
-        tags: "Tags"
     announcement:
       display: "§aVisitor Guide Settings"
       description:
@@ -195,8 +192,9 @@ gui:
       action: "edit visitor guide"
       form:
         title: "Visitor Guide Settings"
-        message: "Enter a short guide message. Leave blank to clear it."
-        announcement: "Guide Message"
+        message: "Enter up to {max_lines} lines, {max_length} characters per line. Blank lines are not saved."
+        line: "Line {number}"
+        reset: "Reset"
     notification:
       display: "§aToggle Visit Notifications"
       description:
@@ -225,6 +223,12 @@ gui:
       action: "toggle time"
       day: "Day"
       night: "Night"
+  tag_editor:
+    title: "World Tag Editor"
+    status: "Status"
+    status_active: "§aEnabled"
+    status_inactive: "§cDisabled"
+    click_toggle: "toggle this tag"
   member_management:
     title: "World Member Management"
     invite:
@@ -324,11 +328,10 @@ messages:
   world_expand_failed: "§cFailed to expand the world border."
   world_expand_max_reached: "§eThe world border is already at the maximum size."
   world_tags_updated: "§aUpdated the world tags."
-  world_tags_too_many: "§cYou can set up to {max} tags."
-  world_tag_too_long: "§cTag \"{tag}\" must be at most {max} characters."
-  world_announcement_updated: "§aUpdated the visitor guide."
-  world_announcement_too_long: "§cThe visitor guide must be at most {max} characters."
-  world_announcement_single_line: "§cThe visitor guide must be a single line."
+  announcement_set: "§aAnnouncement message set!"
+  announcement_reset: "§eAnnouncement message reset."
+  announcement_invalid_length: "§cMessage is too long. (Max {max_lines} lines, {max_length} chars per line)"
+  announcement_blocked_string: "§cMessage contains blocked string: {string}"
   world_weather_updated: "§aChanged weather to {weather}."
   world_time_updated: "§aChanged time to {time}."
   member_invite_target_offline: "§c{player} is currently offline."
@@ -362,3 +365,9 @@ messages:
   language_updated: "§aChanged the display language to {language}."
   reload_success: "§aMWM-Chanpon was reinitialized."
   reload_failed: "§cFailed to reinitialize MWM-Chanpon: {reason}"
+world_tag:
+  shop: "Shop"
+  minigame: "Minigame"
+  building: "Building"
+  facility: "Facility"
+  streaming: "Streaming"
