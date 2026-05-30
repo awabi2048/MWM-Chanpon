@@ -17,10 +17,6 @@ class MWMChanponPlugin : JavaPlugin() {
 
     override fun onEnable() {
         saveDefaultConfig()
-        saveResource("lang/ja_jp.yml", false)
-        saveResource("lang/en_us.yml", false)
-
-        CCSystem.getAPI().registerI18nSource("MWMChanpon", this, setOf("ja_jp", "en_us"))
 
         val timeoutSeconds = config.getLong("wizard.timeout_seconds", 300)
         wizardSessionService = WizardSessionService(timeoutSeconds, logger)
@@ -35,7 +31,6 @@ class MWMChanponPlugin : JavaPlugin() {
 
     override fun onDisable() {
         wizardSessionService.clearAll()
-        CCSystem.getAPI().unregisterI18nSource("MWMChanpon")
         logger.info("MWM-Chanpon addon has been disabled.")
     }
 
