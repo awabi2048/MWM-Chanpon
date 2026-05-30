@@ -61,7 +61,7 @@ src/main/kotlin/me/awabi2048/mwmchanpon/
 
 ## 言語ファイル編集ルール
 
-- アドオン独自のメッセージのみ `src/main/resources/lang/*.yml` に保持する。
+- アドオン独自のメッセージは `cc-system/src/main/resources/lang/<locale>/chanpon/*.yml` に保持する。
 - MyWorldManager 側の言語キーは利用せず、重複定義しない。
 - YAML のインデント崩れや型不整合を禁止する。
 
