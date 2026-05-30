@@ -1,5 +1,6 @@
 package me.awabi2048.mwmchanpon.ui
 
+import com.awabi2048.ccsystem.CCSystem
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.bridge.CoreApiBridge
 import me.awabi2048.mwmchanpon.service.WizardSession
@@ -143,19 +144,21 @@ class AdminWizardGui(
             inv.setItem(i, pane)
         }
 
+        val infoLore = CCSystem.getAPI().buildLore(
+            listOf(
+                CCSystem.getAPI().createLoreDataLine("プレイヤー", session.targetPlayerName),
+                CCSystem.getAPI().createLoreDataLine("ワールド名", session.worldName ?: ""),
+                CCSystem.getAPI().createLoreSubDataLine("テンプレート", template.name),
+                "§7↓ 確認して作成する場合クリック",
+                "§7↓ キャンセルする場合✕をクリック"
+            ),
+            closingSeparator = false
+        )
+
         val infoItem = ItemStack(Material.PAPER)
         infoItem.editMeta { meta ->
             meta.displayName(Component.text("§e作成内容の確認"))
-            meta.lore(
-                listOf(
-                    Component.text("§fプレイヤー: §a${session.targetPlayerName}"),
-                    Component.text("§fワールド名: §a${session.worldName}"),
-                    Component.text("§fテンプレート: §a${template.name}"),
-                    Component.empty(),
-                    Component.text("§7↓ 確認して作成する場合クリック"),
-                    Component.text("§7↓ キャンセルする場合✕をクリック")
-                )
-            )
+            meta.lore(infoLore)
         }
         inv.setItem(13, infoItem)
 

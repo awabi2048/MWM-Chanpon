@@ -3,6 +3,7 @@ main: me.awabi2048.mwmchanpon.MWMChanponPlugin
 version: ${project.version}
 api-version: "1.21"
 softdepend:
+  - CC-System
   - MyWorldManager
   - floodgate
 
