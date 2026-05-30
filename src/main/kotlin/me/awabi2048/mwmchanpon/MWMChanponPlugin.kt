@@ -1,9 +1,11 @@
 package me.awabi2048.mwmchanpon
 
+import com.awabi2048.ccsystem.CCSystem
 import me.awabi2048.mwmchanpon.bridge.CoreApiBridge
 import me.awabi2048.mwmchanpon.listener.CreateCommandInterceptor
 import me.awabi2048.mwmchanpon.service.WizardSessionService
 import me.awabi2048.mwmchanpon.ui.AdminWizardGui
+import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
 
 class MWMChanponPlugin : JavaPlugin() {
@@ -18,6 +20,8 @@ class MWMChanponPlugin : JavaPlugin() {
         saveResource("lang/ja_jp.yml", false)
         saveResource("lang/en_us.yml", false)
 
+        CCSystem.getAPI().registerI18nSource("MWMChanpon", this, setOf("ja_jp", "en_us"))
+
         val timeoutSeconds = config.getLong("wizard.timeout_seconds", 300)
         wizardSessionService = WizardSessionService(timeoutSeconds, logger)
 
@@ -31,7 +35,14 @@ class MWMChanponPlugin : JavaPlugin() {
 
     override fun onDisable() {
         wizardSessionService.clearAll()
+        CCSystem.getAPI().unregisterI18nSource("MWMChanpon")
         logger.info("MWM-Chanpon addon has been disabled.")
+    }
+
+    fun getMessage(player: Player?, key: String, vararg placeholders: Pair<String, Any>): String {
+        var raw = CCSystem.getAPI().getI18nString(player, key)
+        for ((k, v) in placeholders) raw = raw.replace("{$k}", v.toString())
+        return raw
     }
 
     fun getCoreApiBridge(): CoreApiBridge = coreApiBridge

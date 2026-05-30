@@ -37,7 +37,7 @@ class AdminWizardGui(
 
     fun openTemplateSelection(player: Player, session: WizardSession) {
         val templates = bridge.getTemplateRepository()?.findAll() ?: run {
-            player.sendMessage(Component.text("§cテンプレートがありません"))
+            player.sendMessage(Component.text(plugin.getMessage(player, "wizard.no_templates")))
             plugin.wizardSessionService.removeSession(player.uniqueId)
             return
         }
@@ -64,7 +64,7 @@ class AdminWizardGui(
             meta.lore(
                 template.description.map { Component.text(it) } +
                     Component.text("") +
-                    Component.text("§7クリックで選択")
+                    Component.text(plugin.getMessage(null, "wizard.template_select_lore"))
             )
         }
         return item
@@ -106,7 +106,7 @@ class AdminWizardGui(
         player.closeInventory()
 
         pendingNameInput[player] = session
-        player.sendMessage(Component.text("§aワールド名をチャットに入力してください（§e30秒以内§a）"))
+        player.sendMessage(Component.text(plugin.getMessage(player, "wizard.name_prompt")))
     }
 
     @EventHandler
@@ -118,7 +118,7 @@ class AdminWizardGui(
         val worldName = PlainTextComponentSerializer.plainText().serialize(event.message()).trim()
 
         if (worldName.length < 1 || worldName.length > 32) {
-            player.sendMessage(Component.text("§cワールド名は1〜32文字で入力してください"))
+            player.sendMessage(Component.text(plugin.getMessage(player, "wizard.name_invalid")))
             pendingNameInput[player] = session
             return
         }
@@ -157,17 +157,17 @@ class AdminWizardGui(
 
         val infoItem = ItemStack(Material.PAPER)
         infoItem.editMeta { meta ->
-            meta.displayName(Component.text("§e作成内容の確認"))
+            meta.displayName(Component.text(plugin.getMessage(null, "wizard.confirm_title")))
             meta.lore(infoLore)
         }
         inv.setItem(13, infoItem)
 
         val confirmItem = ItemStack(Material.LIME_CONCRETE)
-        confirmItem.editMeta { it.displayName(Component.text("§a作成する")) }
+        confirmItem.editMeta { it.displayName(Component.text(plugin.getMessage(null, "wizard.confirm_btn"))) }
         inv.setItem(11, confirmItem)
 
         val cancelItem = ItemStack(Material.RED_CONCRETE)
-        cancelItem.editMeta { it.displayName(Component.text("§cキャンセル")) }
+        cancelItem.editMeta { it.displayName(Component.text(plugin.getMessage(null, "wizard.cancel_btn"))) }
         inv.setItem(15, cancelItem)
 
         player.openInventory(inv)
@@ -182,7 +182,7 @@ class AdminWizardGui(
             displayName.contains("作成する") -> {
                 val worldService = bridge.getWorldService()
                 if (worldService == null) {
-                    player.sendMessage(Component.text("§cMyWorldManager API が利用できません"))
+                    player.sendMessage(Component.text(plugin.getMessage(player, "wizard.api_unavailable")))
                     player.closeInventory()
                     plugin.wizardSessionService.removeSession(player.uniqueId)
                     return
@@ -193,7 +193,7 @@ class AdminWizardGui(
                 val targetUuid = session.targetPlayerUuid
 
                 if (templateId == null || worldName == null || targetUuid == null) {
-                    player.sendMessage(Component.text("§cセッションが不正です"))
+                    player.sendMessage(Component.text(plugin.getMessage(player, "wizard.invalid_session")))
                     player.closeInventory()
                     plugin.wizardSessionService.removeSession(player.uniqueId)
                     return
@@ -201,22 +201,22 @@ class AdminWizardGui(
 
                 val target = Bukkit.getPlayer(targetUuid)
                 if (target == null || !target.isOnline) {
-                    player.sendMessage(Component.text("§c作成先のプレイヤーがオフラインです"))
+                    player.sendMessage(Component.text(plugin.getMessage(player, "wizard.player_offline")))
                     player.closeInventory()
                     plugin.wizardSessionService.removeSession(player.uniqueId)
                     return
                 }
 
                 player.closeInventory()
-                player.sendMessage(Component.text("§aワールドを作成しています..."))
+                player.sendMessage(Component.text(plugin.getMessage(player, "wizard.creating")))
 
                 worldService.createFromTemplate(templateId, targetUuid, worldName, 0)
                     .thenAccept { success ->
                         Bukkit.getScheduler().runTask(plugin) { _ ->
                             if (success) {
-                                player.sendMessage(Component.text("§a${target.name}のワールド『${worldName}』を作成しました"))
+                                player.sendMessage(Component.text(plugin.getMessage(player, "wizard.success", "player" to target.name!!, "world" to worldName)))
                             } else {
-                                player.sendMessage(Component.text("§cワールドの作成に失敗しました"))
+                                player.sendMessage(Component.text(plugin.getMessage(player, "wizard.failed")))
                             }
                         }
                     }
@@ -224,7 +224,7 @@ class AdminWizardGui(
             }
             displayName.contains("キャンセル") -> {
                 player.closeInventory()
-                player.sendMessage(Component.text("§c作成をキャンセルしました"))
+                player.sendMessage(Component.text(plugin.getMessage(player, "wizard.cancelled")))
                 plugin.wizardSessionService.removeSession(player.uniqueId)
             }
         }
