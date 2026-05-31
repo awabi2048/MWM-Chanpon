@@ -1,8 +1,20 @@
 package me.awabi2048.mwmchanpon.storage
 
 import java.io.File
+import java.time.LocalDateTime
 import java.util.UUID
 import org.bukkit.configuration.file.YamlConfiguration
+
+enum class SubmissionState(val storageValue: String, val i18nKey: String) {
+    UNSUBMITTED("unsubmitted", "unsubmitted"),
+    SUBMITTED("submitted", "submitted"),
+    COMPLETED("completed", "completed");
+
+    companion object {
+        fun fromStorageValue(value: String?): SubmissionState? =
+            entries.firstOrNull { it.storageValue == value }
+    }
+}
 
 class ChanponWorldStorage(dataFolder: File) {
     private val worldsDir = File(dataFolder, "my_worlds")
@@ -22,11 +34,55 @@ class ChanponWorldStorage(dataFolder: File) {
         val config = loadOrCreate(worldUuid)
         if (production) {
             config.set("production", true)
-            config.set("production_set_at", java.time.LocalDateTime.now().toString())
+            config.set("production_set_at", LocalDateTime.now().toString())
+            if (!config.contains("submission.state")) {
+                config.set("submission.state", SubmissionState.UNSUBMITTED.storageValue)
+            }
         } else {
             config.set("production", null)
             config.set("production_set_at", null)
         }
+        config.save(worldFile(worldUuid))
+    }
+
+    fun initializeSubmissionState(worldUuid: UUID) {
+        val config = loadOrCreate(worldUuid)
+        config.set("submission.state", SubmissionState.UNSUBMITTED.storageValue)
+        config.save(worldFile(worldUuid))
+    }
+
+    fun getSubmissionState(worldUuid: UUID): SubmissionState {
+        val config = load(worldUuid)
+            ?: error("MWM-Chanpon world data is missing: $worldUuid")
+        val value = config.getString("submission.state")
+        return SubmissionState.fromStorageValue(value)
+            ?: error("Submission state is missing or invalid: $worldUuid")
+    }
+
+    fun setSubmissionState(
+        worldUuid: UUID,
+        state: SubmissionState,
+        actorUuid: UUID,
+        actorName: String,
+        action: String
+    ) {
+        val config = load(worldUuid)
+            ?: error("MWM-Chanpon world data is missing: $worldUuid")
+        if (!config.contains("submission.state")) {
+            error("Submission state is missing: $worldUuid")
+        }
+        config.set("submission.state", state.storageValue)
+        val history = config.getMapList("submission.history").toMutableList()
+        history.add(
+            linkedMapOf(
+                "at" to LocalDateTime.now().toString(),
+                "action" to action,
+                "state" to state.storageValue,
+                "actor_uuid" to actorUuid.toString(),
+                "actor_name" to actorName
+            )
+        )
+        config.set("submission.history", history)
         config.save(worldFile(worldUuid))
     }
 
