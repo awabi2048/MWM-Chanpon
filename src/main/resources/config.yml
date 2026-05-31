@@ -1,2 +1,27 @@
 wizard:
   timeout_seconds: 300
+
+production:
+  menu_slot: 40
+
+tool_permissions:
+  menu_slot: 5
+  tools:
+    worldedit:
+      display_name: "WorldEdit"
+      material: WOODEN_AXE
+      color: "§a"
+      permissions:
+        - "worldedit.*"
+    voxelsniper:
+      display_name: "VoxelSniper"
+      material: ARROW
+      color: "§d"
+      permissions:
+        - "voxelsniper.*"
+    axiom:
+      display_name: "Axiom"
+      material: ENDER_EYE
+      color: "§b"
+      permissions:
+        - "axiom.*"
