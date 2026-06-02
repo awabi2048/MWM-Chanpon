@@ -1,6 +1,9 @@
 wizard:
   timeout_seconds: 300
 
+archive:
+  enabled: false
+
 production:
   menu_slot: 40
 

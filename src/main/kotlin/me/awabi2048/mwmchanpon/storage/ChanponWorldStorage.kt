@@ -45,6 +45,23 @@ class ChanponWorldStorage(dataFolder: File) {
         config.save(worldFile(worldUuid))
     }
 
+    fun isDevelopmentWorld(worldUuid: UUID): Boolean {
+        val config = load(worldUuid) ?: return false
+        return config.getBoolean("development", false)
+    }
+
+    fun setDevelopmentWorld(worldUuid: UUID, development: Boolean) {
+        val config = loadOrCreate(worldUuid)
+        if (development) {
+            config.set("development", true)
+            config.set("development_set_at", LocalDateTime.now().toString())
+        } else {
+            config.set("development", null)
+            config.set("development_set_at", null)
+        }
+        config.save(worldFile(worldUuid))
+    }
+
     fun initializeSubmissionState(worldUuid: UUID) {
         val config = loadOrCreate(worldUuid)
         config.set("submission.state", SubmissionState.UNSUBMITTED.storageValue)

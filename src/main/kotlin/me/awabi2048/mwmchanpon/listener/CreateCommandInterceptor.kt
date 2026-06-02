@@ -19,18 +19,17 @@ class CreateCommandInterceptor(
         val parts = message.split(" ", limit = 3)
 
         if (parts.size < 3) return
-        if (parts[0] != "mwm") return
-        if (parts[1] != "create") return
+        if (parts[0].substringAfter(':') != "mwm") return
+        if (!parts[1].equals("create", ignoreCase = true)) return
 
         val targetPlayerName = parts[2]
         val player = event.player
+        event.isCancelled = true
 
         if (!player.hasPermission("mwmchanpon.admin")) {
             player.sendMessage("§c権限がありません")
             return
         }
-
-        event.isCancelled = true
 
         val bridge = plugin.getCoreApiBridge()
         if (!bridge.isCoreAvailable()) {
