@@ -5,7 +5,9 @@ import me.awabi2048.mwmchanpon.bridge.CoreApiBridge
 import me.awabi2048.mwmchanpon.extension.ProductionToggleExtension
 import me.awabi2048.mwmchanpon.extension.ProductionWorldGuard
 import me.awabi2048.mwmchanpon.extension.ToolPermissionMenuExtension
+import me.awabi2048.mwmchanpon.listener.CreateCommandInterceptor
 import me.awabi2048.mwmchanpon.listener.MemberPermissionSyncListener
+import me.awabi2048.mwmchanpon.listener.FeatureOverrideListener
 import me.awabi2048.mwmchanpon.listener.PlayerJoinListener
 import me.awabi2048.mwmchanpon.listener.ToolPermissionMenuListener
 import me.awabi2048.mwmchanpon.listener.WorldCleanupListener
@@ -16,10 +18,12 @@ import me.awabi2048.mwmchanpon.tool.ToolPermissionConfig
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.mwmchanpon.ui.AdminWizardGui
 import me.awabi2048.mwmchanpon.ui.ToolPermissionMenu
+import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import net.luckperms.api.LuckPermsProvider
 import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
+import org.bukkit.scheduler.BukkitTask
 
 class MWMChanponPlugin : JavaPlugin() {
     lateinit var wizardSessionService: WizardSessionService
@@ -30,6 +34,7 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var productionToggleExtension: ProductionToggleExtension
     private lateinit var productionWorldGuard: ProductionWorldGuard
     private lateinit var toolPermissionExtension: ToolPermissionMenuExtension
+    private var featureOverrideTask: BukkitTask? = null
 
     override fun onEnable() {
         saveDefaultConfig()
@@ -39,6 +44,7 @@ class MWMChanponPlugin : JavaPlugin() {
 
         adminWizardGui = AdminWizardGui(this, coreApiBridge)
         server.pluginManager.registerEvents(adminWizardGui, this)
+        server.pluginManager.registerEvents(CreateCommandInterceptor(this, adminWizardGui), this)
 
         val chanponStorage = ChanponWorldStorage(dataFolder)
         productionWorldGuard = ProductionWorldGuard(chanponStorage)
@@ -46,6 +52,18 @@ class MWMChanponPlugin : JavaPlugin() {
         MyWorldManagerApi.registerWorldDeleteGuard(productionWorldGuard)
         MyWorldManagerApi.registerMenuExtension(productionToggleExtension)
         server.pluginManager.registerEvents(productionToggleExtension, this)
+        val featureOverrideListener = FeatureOverrideListener(this, chanponStorage)
+        server.pluginManager.registerEvents(featureOverrideListener, this)
+        applyCoreRuntimeOverrides()
+        featureOverrideTask = server.scheduler.runTaskTimer(
+            this,
+            Runnable {
+                applyCoreRuntimeOverrides()
+                featureOverrideListener.sanitizeOpenInventories()
+            },
+            20L,
+            20L
+        )
 
         val luckPerms = LuckPermsProvider.get()
         val toolDefinitions = ToolPermissionConfig(this).load()
@@ -78,6 +96,8 @@ class MWMChanponPlugin : JavaPlugin() {
         if (::productionWorldGuard.isInitialized) {
             MyWorldManagerApi.unregisterWorldDeleteGuard(productionWorldGuard)
         }
+        featureOverrideTask?.cancel()
+        featureOverrideTask = null
         wizardSessionService.clearAll()
         logger.info("MWM-Chanpon addon has been disabled.")
     }
@@ -89,4 +109,26 @@ class MWMChanponPlugin : JavaPlugin() {
     }
 
     fun getCoreApiBridge(): CoreApiBridge = coreApiBridge
+
+    private fun applyCoreRuntimeOverrides() {
+        val mwm = server.pluginManager.getPlugin("MyWorldManager") as? MyWorldManager ?: return
+        val config = mwm.config
+
+        config.set("creation_cost.template", 0)
+        config.set("creation_cost.seed", 0)
+        config.set("creation_cost.random", 0)
+        config.set("creation.max_create_count_default", config.getInt("creation.max_total_world_count", 50).coerceAtLeast(50))
+        config.set("creation.max_world_slots_limit", 0)
+        config.set("deletion.reduce_owner_slot", false)
+
+        config.set("expansion.base_cost", 0)
+        config.set("expansion.cost_multiplier", 0.0)
+        config.getConfigurationSection("expansion.costs")?.getKeys(false)?.forEach { key ->
+            config.set("expansion.costs.$key", 0)
+        }
+        config.set("environment.gravity.cost", 0)
+        config.set("environment.weather.cost", 0)
+        config.set("environment.biome.cost", 0)
+        config.set("portal.world_gate.point_cost_per_block", 0)
+    }
 }
