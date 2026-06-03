@@ -1,0 +1,76 @@
+package me.awabi2048.mwmchanpon.protection
+
+import com.sk89q.worldedit.bukkit.BukkitAdapter
+import com.sk89q.worldedit.math.BlockVector3
+import com.sk89q.worldguard.WorldGuard
+import com.sk89q.worldguard.protection.flags.Flags
+import com.sk89q.worldguard.protection.flags.StateFlag
+import com.sk89q.worldguard.protection.managers.RemovalStrategy
+import com.sk89q.worldguard.protection.regions.ProtectedCuboidRegion
+import java.util.logging.Logger
+import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
+import me.awabi2048.mwmchanpon.storage.SubmissionState
+import me.awabi2048.myworldmanager.model.WorldData
+import org.bukkit.Bukkit
+
+class SubmittedWorldProtectionService(
+    private val storage: ChanponWorldStorage,
+    private val logger: Logger
+) {
+    fun syncAll(worlds: Iterable<WorldData>) {
+        worlds.forEach { sync(it) }
+    }
+
+    fun sync(worldData: WorldData) {
+        if (!storage.isProductionWorld(worldData.uuid)) {
+            setProtected(worldData, false)
+            return
+        }
+
+        val state = try {
+            storage.getSubmissionState(worldData.uuid)
+        } catch (ex: IllegalStateException) {
+            logger.warning("Cannot sync submitted protection because submission state is invalid: ${worldData.uuid}")
+            return
+        }
+
+        setProtected(worldData, state == SubmissionState.SUBMITTED || state == SubmissionState.COMPLETED)
+    }
+
+    fun setProtected(worldData: WorldData, protected: Boolean) {
+        val bukkitWorld = Bukkit.getWorld(worldData.customWorldName ?: "my_world.${worldData.uuid}") ?: return
+        val regionManager = WorldGuard.getInstance()
+            .platform
+            .regionContainer
+            .get(BukkitAdapter.adapt(bukkitWorld))
+
+        if (regionManager == null) {
+            logger.warning("WorldGuard region data is unavailable for ${bukkitWorld.name}")
+            return
+        }
+
+        if (protected) {
+            val region = regionManager.getRegion(REGION_ID) ?: createWorldRegion(bukkitWorld)
+            region.priority = PRIORITY
+            region.setFlag(Flags.BUILD, StateFlag.State.DENY)
+            regionManager.addRegion(region)
+        } else if (regionManager.hasRegion(REGION_ID)) {
+            regionManager.removeRegion(REGION_ID, RemovalStrategy.UNSET_PARENT_IN_CHILDREN)
+        }
+
+        regionManager.saveChanges()
+    }
+
+    private fun createWorldRegion(world: org.bukkit.World): ProtectedCuboidRegion {
+        val min = BlockVector3.at(WORLD_MIN, world.minHeight, WORLD_MIN)
+        val max = BlockVector3.at(WORLD_MAX, world.maxHeight - 1, WORLD_MAX)
+        return ProtectedCuboidRegion(REGION_ID, min, max)
+    }
+
+    companion object {
+        private const val REGION_ID = "chanpon_submitted_lock"
+        private const val PRIORITY = 1_000_000
+        private const val WORLD_MIN = -30_000_000
+        private const val WORLD_MAX = 30_000_000
+    }
+}

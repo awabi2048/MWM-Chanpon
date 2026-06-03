@@ -79,8 +79,8 @@ class ToolPermissionMenuExtension(
         val offlinePlayer = Bukkit.getOfflinePlayer(memberUuid)
         val allLines = mutableListOf<String>()
 
-        val dateStr = if (offlinePlayer.lastPlayed > 0) {
-            Instant.ofEpochMilli(offlinePlayer.lastPlayed)
+        val dateStr = if (offlinePlayer.lastSeen > 0) {
+            Instant.ofEpochMilli(offlinePlayer.lastSeen)
                 .atZone(ZoneId.systemDefault())
                 .format(DateTimeFormatter.ofPattern("yyyy年M月d日"))
         } else {

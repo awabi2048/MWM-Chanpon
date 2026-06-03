@@ -7,6 +7,9 @@ archive:
 production:
   menu_slot: 40
 
+submission:
+  closed: false
+
 tool_permissions:
   menu_slot: 5
   tools:

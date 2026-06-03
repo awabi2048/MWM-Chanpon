@@ -2,6 +2,7 @@ package me.awabi2048.mwmchanpon.tool
 
 import java.util.UUID
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
+import me.awabi2048.mwmchanpon.storage.SubmissionState
 import me.awabi2048.myworldmanager.model.WorldData
 
 class ToolPermissionController(
@@ -10,16 +11,14 @@ class ToolPermissionController(
     private val definitions: List<ToolPermissionDefinition>
 ) {
     fun isEnabled(worldUuid: UUID, playerUuid: UUID, toolId: String): Boolean {
+        if (isSubmissionLocked(worldUuid)) return false
         return storage.isToolEnabled(worldUuid, playerUuid, toolId)
     }
 
     fun setEnabled(worldData: WorldData, playerUuid: UUID, toolId: String, enabled: Boolean) {
-        storage.setToolEnabled(worldData.uuid, playerUuid, toolId, enabled)
+        storage.setToolEnabled(worldData.uuid, playerUuid, toolId, if (isSubmissionLocked(worldData.uuid)) false else enabled)
         val worldName = worldData.customWorldName ?: "my_world.${worldData.uuid}"
-        val enabledSet = definitions
-            .filter { storage.isToolEnabled(worldData.uuid, playerUuid, it.id) }
-            .map { it.id }
-            .toSet()
+        val enabledSet = getEffectiveEnabledTools(worldData.uuid, playerUuid)
         luckPermsService.syncPlayer(playerUuid, worldName, definitions, enabledSet)
     }
 
@@ -29,10 +28,7 @@ class ToolPermissionController(
         participants.add(worldData.owner)
         participants.addAll(worldData.members)
         participants.forEach { playerUuid ->
-            val enabled = definitions
-                .filter { storage.isToolEnabled(worldData.uuid, playerUuid, it.id) }
-                .map { it.id }
-                .toSet()
+            val enabled = getEffectiveEnabledTools(worldData.uuid, playerUuid)
             luckPermsService.syncPlayer(playerUuid, worldName, definitions, enabled)
         }
     }
@@ -49,6 +45,28 @@ class ToolPermissionController(
     }
 
     fun getMemberToolStates(worldUuid: UUID, playerUuid: UUID): Map<String, Boolean> {
+        if (isSubmissionLocked(worldUuid)) {
+            return definitions.associate { it.id to false }
+        }
         return storage.getMemberToolStates(worldUuid, playerUuid)
+    }
+
+    private fun getEffectiveEnabledTools(worldUuid: UUID, playerUuid: UUID): Set<String> {
+        if (isSubmissionLocked(worldUuid)) return emptySet()
+        return definitions
+            .filter { storage.isToolEnabled(worldUuid, playerUuid, it.id) }
+            .map { it.id }
+            .toSet()
+    }
+
+    private fun isSubmissionLocked(worldUuid: UUID): Boolean {
+        return try {
+            when (storage.getSubmissionState(worldUuid)) {
+                SubmissionState.SUBMITTED, SubmissionState.COMPLETED -> true
+                SubmissionState.UNSUBMITTED -> false
+            }
+        } catch (ex: IllegalStateException) {
+            false
+        }
     }
 }

@@ -118,6 +118,8 @@ class FeatureOverrideListener(
 
     private fun sanitizeInventory(inventory: Inventory, player: Player) {
         val holder = inventory.holder
+        val holderClass = holder?.let { it::class.java.name }
+        val isCoreInventory = holderClass == null || holderClass.startsWith("me.awabi2048.myworldmanager.")
         val discovery = holder is DiscoveryGui.DiscoveryGuiHolder
         val session = mwm().settingsSessionManager.getSession(player)
         if (!isManagedInventory(inventory, session?.action)) return
@@ -151,11 +153,11 @@ class FeatureOverrideListener(
             }
         }
 
-        if (session?.action == SettingsAction.ADMIN_MENU) {
+        if (isCoreInventory && session?.action == SettingsAction.ADMIN_MENU) {
             setItemIfPresent(inventory, 20, decoration(Material.GRAY_STAINED_GLASS_PANE))
             if (!archiveEnabled()) setItemIfPresent(inventory, 23, decoration(Material.GRAY_STAINED_GLASS_PANE))
         }
-        if (!archiveEnabled() && session?.action == SettingsAction.ADMIN_WORLD_GUI) {
+        if (isCoreInventory && !archiveEnabled() && session?.action == SettingsAction.ADMIN_WORLD_GUI) {
             setItemIfPresent(inventory, 46, decoration(Material.BLACK_STAINED_GLASS_PANE))
         }
 

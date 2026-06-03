@@ -4,8 +4,11 @@ import com.awabi2048.ccsystem.CCSystem
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
+import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.SubmissionState
+import me.awabi2048.mwmchanpon.tool.ToolPermissionController
+import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.event.MwmWorldCreatedEvent
 import me.awabi2048.myworldmanager.api.extension.MenuExtension
 import me.awabi2048.myworldmanager.api.extension.MenuExtensionContext
@@ -27,7 +30,9 @@ import org.bukkit.inventory.ItemStack
 
 class ProductionToggleExtension(
     private val plugin: MWMChanponPlugin,
-    private val storage: ChanponWorldStorage
+    private val storage: ChanponWorldStorage,
+    private val protectionService: SubmittedWorldProtectionService,
+    private val toolPermissionController: ToolPermissionController
 ) : MenuExtension, Listener {
     private val pendingProduction = ConcurrentHashMap<Pair<UUID, String>, Boolean>()
 
@@ -42,6 +47,10 @@ class ProductionToggleExtension(
             }
             "world_settings" -> {
                 val worldData = context.get<WorldData>("worldData") ?: return
+                if (plugin.isSubmissionClosed()) {
+                    inventory.setItem(WORLD_MENU_SLOT, createDecorationItem(Material.GRAY_STAINED_GLASS_PANE))
+                    return
+                }
                 val item = if (storage.isProductionWorld(worldData.uuid)) {
                     createSubmissionItem(player, worldData.uuid)
                 } else {
@@ -102,6 +111,11 @@ class ProductionToggleExtension(
                 } catch (ex: IllegalStateException) {
                     player.sendMessage(i18n(player, "message.state_error"))
                     event.inventory.setItem(event.slot, createSubmissionErrorItem(player))
+                    return true
+                }
+                if (plugin.isSubmissionClosed()) {
+                    player.sendMessage(i18n(player, "message.deadline_closed"))
+                    event.inventory.setItem(event.slot, createDecorationItem(Material.GRAY_STAINED_GLASS_PANE))
                     return true
                 }
                 when (current) {
@@ -167,9 +181,17 @@ class ProductionToggleExtension(
                     player.name,
                     "submit"
                 )
+                MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)?.let {
+                    protectionService.sync(it)
+                    toolPermissionController.syncWorld(it)
+                }
                 player.sendMessage(i18n(player, "message.submitted"))
             }
             ConfirmationAction.CANCEL_SUBMISSION -> {
+                if (plugin.isSubmissionClosed()) {
+                    player.sendMessage(i18n(player, "message.deadline_closed"))
+                    return
+                }
                 if (!ensureSubmissionState(player, worldUuid, SubmissionState.SUBMITTED)) return
                 storage.setSubmissionState(
                     worldUuid,
@@ -178,6 +200,10 @@ class ProductionToggleExtension(
                     player.name,
                     "cancel_submission"
                 )
+                MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)?.let {
+                    protectionService.sync(it)
+                    toolPermissionController.syncWorld(it)
+                }
                 player.sendMessage(i18n(player, "message.cancelled"))
             }
         }

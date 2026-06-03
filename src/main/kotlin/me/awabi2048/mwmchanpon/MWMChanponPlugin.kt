@@ -8,18 +8,24 @@ import me.awabi2048.mwmchanpon.extension.ChanponWorldPublishPolicy
 import me.awabi2048.mwmchanpon.extension.ChanponWorldRuntimePolicy
 import me.awabi2048.mwmchanpon.extension.ProductionToggleExtension
 import me.awabi2048.mwmchanpon.extension.ProductionWorldGuard
+import me.awabi2048.mwmchanpon.extension.SubmissionAdminMenuExtension
 import me.awabi2048.mwmchanpon.extension.ToolPermissionMenuExtension
 import me.awabi2048.mwmchanpon.listener.MemberPermissionSyncListener
 import me.awabi2048.mwmchanpon.listener.FeatureOverrideListener
 import me.awabi2048.mwmchanpon.listener.PlayerJoinListener
+import me.awabi2048.mwmchanpon.listener.SubmittedWorldProtectionListener
 import me.awabi2048.mwmchanpon.listener.ToolPermissionMenuListener
 import me.awabi2048.mwmchanpon.listener.WorldCleanupListener
+import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
 import me.awabi2048.mwmchanpon.service.WizardSessionService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.tool.LuckPermsToolPermissionService
 import me.awabi2048.mwmchanpon.tool.ToolPermissionConfig
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.mwmchanpon.ui.AdminWizardGui
+import me.awabi2048.mwmchanpon.ui.ChanponAdminWorldListMenu
+import me.awabi2048.mwmchanpon.ui.SubmissionAdminMenu
+import me.awabi2048.mwmchanpon.ui.SubmittedWorldMenuProvider
 import me.awabi2048.mwmchanpon.ui.ToolPermissionMenu
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import net.luckperms.api.LuckPermsProvider
@@ -35,6 +41,11 @@ class MWMChanponPlugin : JavaPlugin() {
     private val coreApiBridge = CoreApiBridge()
     private lateinit var productionToggleExtension: ProductionToggleExtension
     private lateinit var productionWorldGuard: ProductionWorldGuard
+    private lateinit var submittedProtectionService: SubmittedWorldProtectionService
+    private lateinit var submittedWorldMenuProvider: SubmittedWorldMenuProvider
+    private lateinit var chanponAdminWorldListMenu: ChanponAdminWorldListMenu
+    private lateinit var submissionAdminMenuExtension: SubmissionAdminMenuExtension
+    private lateinit var submissionAdminMenu: SubmissionAdminMenu
     private lateinit var toolPermissionExtension: ToolPermissionMenuExtension
     private lateinit var worldAccessPolicy: ChanponWorldAccessPolicy
     private lateinit var worldPublishPolicy: ChanponWorldPublishPolicy
@@ -52,20 +63,55 @@ class MWMChanponPlugin : JavaPlugin() {
         server.pluginManager.registerEvents(adminWizardGui, this)
 
         val chanponStorage = ChanponWorldStorage(dataFolder)
+        val luckPerms = LuckPermsProvider.get()
+        val toolDefinitions = ToolPermissionConfig(this).load()
+        val toolController = ToolPermissionController(
+            chanponStorage,
+            LuckPermsToolPermissionService(luckPerms, logger),
+            toolDefinitions
+        )
+
         productionWorldGuard = ProductionWorldGuard(chanponStorage)
-        productionToggleExtension = ProductionToggleExtension(this, chanponStorage)
+        submittedProtectionService = SubmittedWorldProtectionService(chanponStorage, logger)
+        productionToggleExtension = ProductionToggleExtension(
+            this,
+            chanponStorage,
+            submittedProtectionService,
+            toolController
+        )
+        submissionAdminMenu = SubmissionAdminMenu(
+            this,
+            chanponStorage,
+            submittedProtectionService,
+            toolController
+        )
+        submissionAdminMenuExtension = SubmissionAdminMenuExtension(submissionAdminMenu)
+        chanponAdminWorldListMenu = ChanponAdminWorldListMenu(this, chanponStorage)
+        submittedWorldMenuProvider = SubmittedWorldMenuProvider(
+            this,
+            chanponStorage,
+            submittedProtectionService,
+            toolController
+        )
         worldAccessPolicy = ChanponWorldAccessPolicy(chanponStorage)
         worldPublishPolicy = ChanponWorldPublishPolicy(chanponStorage)
         worldRuntimePolicy = ChanponWorldRuntimePolicy()
         commandExtension = ChanponCommandExtension(this, adminWizardGui)
         MyWorldManagerApi.registerWorldDeleteGuard(productionWorldGuard)
         MyWorldManagerApi.registerMenuExtension(productionToggleExtension)
+        MyWorldManagerApi.registerMenuExtension(submissionAdminMenuExtension)
+        MyWorldManagerApi.registerAdminWorldListProvider(chanponAdminWorldListMenu)
+        MyWorldManagerApi.registerWorldSettingsMenuProvider(submittedWorldMenuProvider)
         MyWorldManagerApi.registerWorldAccessPolicy(worldAccessPolicy)
         MyWorldManagerApi.registerWorldPublishPolicy(worldPublishPolicy)
         MyWorldManagerApi.registerWorldRuntimePolicy(worldRuntimePolicy)
         MyWorldManagerApi.registerCommandPolicy(commandExtension)
         MyWorldManagerApi.registerCreateCommandHandler(commandExtension)
         server.pluginManager.registerEvents(productionToggleExtension, this)
+        server.pluginManager.registerEvents(submissionAdminMenu, this)
+        server.pluginManager.registerEvents(chanponAdminWorldListMenu, this)
+        server.pluginManager.registerEvents(submittedWorldMenuProvider, this)
+        server.pluginManager.registerEvents(SubmittedWorldProtectionListener(submittedProtectionService), this)
         val featureOverrideListener = FeatureOverrideListener(this, chanponStorage)
         server.pluginManager.registerEvents(featureOverrideListener, this)
         featureOverrideTask = server.scheduler.runTaskTimer(
@@ -77,13 +123,6 @@ class MWMChanponPlugin : JavaPlugin() {
             20L
         )
 
-        val luckPerms = LuckPermsProvider.get()
-        val toolDefinitions = ToolPermissionConfig(this).load()
-        val toolController = ToolPermissionController(
-            chanponStorage,
-            LuckPermsToolPermissionService(luckPerms, logger),
-            toolDefinitions
-        )
         val toolMenu = ToolPermissionMenu(toolController, toolDefinitions)
         toolPermissionExtension = ToolPermissionMenuExtension(toolMenu, toolController, toolDefinitions)
         MyWorldManagerApi.registerMenuExtension(toolPermissionExtension)
@@ -95,12 +134,28 @@ class MWMChanponPlugin : JavaPlugin() {
         server.pluginManager.registerEvents(PlayerJoinListener(toolController), this)
         server.pluginManager.registerEvents(WorldCleanupListener(chanponStorage), this)
 
+        server.scheduler.runTask(this, Runnable {
+            MyWorldManagerApi.getWorldRepository()?.findAll()?.let {
+                submittedProtectionService.syncAll(it)
+                it.forEach(toolController::syncWorld)
+            }
+        })
+
         logger.info("MWM-Chanpon addon has been enabled.")
     }
 
     override fun onDisable() {
         if (::productionToggleExtension.isInitialized) {
             MyWorldManagerApi.unregisterMenuExtension(productionToggleExtension)
+        }
+        if (::submissionAdminMenuExtension.isInitialized) {
+            MyWorldManagerApi.unregisterMenuExtension(submissionAdminMenuExtension)
+        }
+        if (::chanponAdminWorldListMenu.isInitialized) {
+            MyWorldManagerApi.unregisterAdminWorldListProvider(chanponAdminWorldListMenu)
+        }
+        if (::submittedWorldMenuProvider.isInitialized) {
+            MyWorldManagerApi.unregisterWorldSettingsMenuProvider(submittedWorldMenuProvider)
         }
         if (::toolPermissionExtension.isInitialized) {
             MyWorldManagerApi.unregisterMenuExtension(toolPermissionExtension)
@@ -134,5 +189,7 @@ class MWMChanponPlugin : JavaPlugin() {
     }
 
     fun getCoreApiBridge(): CoreApiBridge = coreApiBridge
+
+    fun isSubmissionClosed(): Boolean = config.getBoolean("submission.closed", false)
 
 }
