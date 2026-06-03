@@ -2,10 +2,13 @@ package me.awabi2048.mwmchanpon
 
 import com.awabi2048.ccsystem.CCSystem
 import me.awabi2048.mwmchanpon.bridge.CoreApiBridge
+import me.awabi2048.mwmchanpon.extension.ChanponCommandExtension
+import me.awabi2048.mwmchanpon.extension.ChanponWorldAccessPolicy
+import me.awabi2048.mwmchanpon.extension.ChanponWorldPublishPolicy
+import me.awabi2048.mwmchanpon.extension.ChanponWorldRuntimePolicy
 import me.awabi2048.mwmchanpon.extension.ProductionToggleExtension
 import me.awabi2048.mwmchanpon.extension.ProductionWorldGuard
 import me.awabi2048.mwmchanpon.extension.ToolPermissionMenuExtension
-import me.awabi2048.mwmchanpon.listener.CreateCommandInterceptor
 import me.awabi2048.mwmchanpon.listener.MemberPermissionSyncListener
 import me.awabi2048.mwmchanpon.listener.FeatureOverrideListener
 import me.awabi2048.mwmchanpon.listener.PlayerJoinListener
@@ -18,7 +21,6 @@ import me.awabi2048.mwmchanpon.tool.ToolPermissionConfig
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.mwmchanpon.ui.AdminWizardGui
 import me.awabi2048.mwmchanpon.ui.ToolPermissionMenu
-import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import net.luckperms.api.LuckPermsProvider
 import org.bukkit.entity.Player
@@ -34,6 +36,10 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var productionToggleExtension: ProductionToggleExtension
     private lateinit var productionWorldGuard: ProductionWorldGuard
     private lateinit var toolPermissionExtension: ToolPermissionMenuExtension
+    private lateinit var worldAccessPolicy: ChanponWorldAccessPolicy
+    private lateinit var worldPublishPolicy: ChanponWorldPublishPolicy
+    private lateinit var worldRuntimePolicy: ChanponWorldRuntimePolicy
+    private lateinit var commandExtension: ChanponCommandExtension
     private var featureOverrideTask: BukkitTask? = null
 
     override fun onEnable() {
@@ -44,21 +50,27 @@ class MWMChanponPlugin : JavaPlugin() {
 
         adminWizardGui = AdminWizardGui(this, coreApiBridge)
         server.pluginManager.registerEvents(adminWizardGui, this)
-        server.pluginManager.registerEvents(CreateCommandInterceptor(this, adminWizardGui), this)
 
         val chanponStorage = ChanponWorldStorage(dataFolder)
         productionWorldGuard = ProductionWorldGuard(chanponStorage)
         productionToggleExtension = ProductionToggleExtension(this, chanponStorage)
+        worldAccessPolicy = ChanponWorldAccessPolicy(chanponStorage)
+        worldPublishPolicy = ChanponWorldPublishPolicy(chanponStorage)
+        worldRuntimePolicy = ChanponWorldRuntimePolicy()
+        commandExtension = ChanponCommandExtension(this, adminWizardGui)
         MyWorldManagerApi.registerWorldDeleteGuard(productionWorldGuard)
         MyWorldManagerApi.registerMenuExtension(productionToggleExtension)
+        MyWorldManagerApi.registerWorldAccessPolicy(worldAccessPolicy)
+        MyWorldManagerApi.registerWorldPublishPolicy(worldPublishPolicy)
+        MyWorldManagerApi.registerWorldRuntimePolicy(worldRuntimePolicy)
+        MyWorldManagerApi.registerCommandPolicy(commandExtension)
+        MyWorldManagerApi.registerCreateCommandHandler(commandExtension)
         server.pluginManager.registerEvents(productionToggleExtension, this)
         val featureOverrideListener = FeatureOverrideListener(this, chanponStorage)
         server.pluginManager.registerEvents(featureOverrideListener, this)
-        applyCoreRuntimeOverrides()
         featureOverrideTask = server.scheduler.runTaskTimer(
             this,
             Runnable {
-                applyCoreRuntimeOverrides()
                 featureOverrideListener.sanitizeOpenInventories()
             },
             20L,
@@ -96,6 +108,19 @@ class MWMChanponPlugin : JavaPlugin() {
         if (::productionWorldGuard.isInitialized) {
             MyWorldManagerApi.unregisterWorldDeleteGuard(productionWorldGuard)
         }
+        if (::worldAccessPolicy.isInitialized) {
+            MyWorldManagerApi.unregisterWorldAccessPolicy(worldAccessPolicy)
+        }
+        if (::worldPublishPolicy.isInitialized) {
+            MyWorldManagerApi.unregisterWorldPublishPolicy(worldPublishPolicy)
+        }
+        if (::worldRuntimePolicy.isInitialized) {
+            MyWorldManagerApi.unregisterWorldRuntimePolicy(worldRuntimePolicy)
+        }
+        if (::commandExtension.isInitialized) {
+            MyWorldManagerApi.unregisterCreateCommandHandler(commandExtension)
+            MyWorldManagerApi.unregisterCommandPolicy(commandExtension)
+        }
         featureOverrideTask?.cancel()
         featureOverrideTask = null
         wizardSessionService.clearAll()
@@ -110,25 +135,4 @@ class MWMChanponPlugin : JavaPlugin() {
 
     fun getCoreApiBridge(): CoreApiBridge = coreApiBridge
 
-    private fun applyCoreRuntimeOverrides() {
-        val mwm = server.pluginManager.getPlugin("MyWorldManager") as? MyWorldManager ?: return
-        val config = mwm.config
-
-        config.set("creation_cost.template", 0)
-        config.set("creation_cost.seed", 0)
-        config.set("creation_cost.random", 0)
-        config.set("creation.max_create_count_default", config.getInt("creation.max_total_world_count", 50).coerceAtLeast(50))
-        config.set("creation.max_world_slots_limit", 0)
-        config.set("deletion.reduce_owner_slot", false)
-
-        config.set("expansion.base_cost", 0)
-        config.set("expansion.cost_multiplier", 0.0)
-        config.getConfigurationSection("expansion.costs")?.getKeys(false)?.forEach { key ->
-            config.set("expansion.costs.$key", 0)
-        }
-        config.set("environment.gravity.cost", 0)
-        config.set("environment.weather.cost", 0)
-        config.set("environment.biome.cost", 0)
-        config.set("portal.world_gate.point_cost_per_block", 0)
-    }
 }

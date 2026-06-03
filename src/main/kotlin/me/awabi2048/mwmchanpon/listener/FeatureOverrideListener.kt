@@ -3,16 +3,14 @@ package me.awabi2048.mwmchanpon.listener
 import java.util.UUID
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
+import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.gui.DiscoveryGui
-import me.awabi2048.myworldmanager.gui.MeetGui
-import me.awabi2048.myworldmanager.model.PublishLevel
 import me.awabi2048.myworldmanager.session.DiscoverySort
 import me.awabi2048.myworldmanager.session.SettingsAction
 import me.awabi2048.myworldmanager.ui.bedrock.BedrockPlayerWorldListHolder
 import me.awabi2048.myworldmanager.ui.bedrock.BedrockWorldActionHolder
 import me.awabi2048.myworldmanager.util.ItemTag
-import org.bukkit.inventory.ItemFlag
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
@@ -23,10 +21,8 @@ import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
 import org.bukkit.event.inventory.InventoryClickEvent
 import org.bukkit.event.inventory.InventoryOpenEvent
-import org.bukkit.event.player.PlayerCommandPreprocessEvent
-import org.bukkit.event.server.ServerCommandEvent
-import org.bukkit.event.server.TabCompleteEvent
 import org.bukkit.inventory.Inventory
+import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
 
@@ -50,41 +46,6 @@ class FeatureOverrideListener(
         })
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
-    fun onPlayerCommand(event: PlayerCommandPreprocessEvent) {
-        val disabledReason = disabledMwmCommandReason(event.message) ?: return
-        event.isCancelled = true
-        event.player.sendMessage("§cMWM-Chanpon: $disabledReason is disabled.")
-    }
-
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
-    fun onServerCommand(event: ServerCommandEvent) {
-        val disabledReason = disabledMwmCommandReason(event.command) ?: return
-        event.isCancelled = true
-        event.sender.sendMessage("MWM-Chanpon: $disabledReason is disabled.")
-    }
-
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
-    fun onTabComplete(event: TabCompleteEvent) {
-        val parts = commandParts(event.buffer)
-        if (parts.isEmpty() || normalizeCommand(parts[0]) != "mwm") return
-        if (parts.size == 1) {
-            event.completions.removeIf { it.equals("stats", ignoreCase = true) }
-            if (!archiveEnabled()) {
-                event.completions.removeIf { it.equals("update-day", ignoreCase = true) }
-            }
-            return
-        }
-        if (parts[1].equals("give", ignoreCase = true) && parts.size >= 3) {
-            event.completions.removeIf { it.equals("world_seed", ignoreCase = true) }
-        }
-        if (parts[1].equals("stats", ignoreCase = true) ||
-            (!archiveEnabled() && parts[1].equals("update-day", ignoreCase = true))
-        ) {
-            event.completions.clear()
-        }
-    }
-
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
     fun onInventoryClick(event: InventoryClickEvent) {
         val player = event.whoClicked as? Player ?: return
@@ -92,17 +53,8 @@ class FeatureOverrideListener(
         val item = event.currentItem ?: return
         val type = ItemTag.getType(item)
 
-        if (event.view.topInventory.holder is DiscoveryGui.DiscoveryGuiHolder) {
-            val uuid = ItemTag.getWorldUuid(item)
-            if (uuid != null && storage.isDevelopmentWorld(uuid)) {
-                event.isCancelled = true
-                event.clickedInventory?.setItem(event.slot, decoration(Material.WHITE_STAINED_GLASS_PANE))
-                return
-            }
-        }
-
-        val bedrockAction = ItemTag.getString(item, "bedrock_action")
         if (event.view.topInventory.holder is BedrockWorldActionHolder) {
+            val bedrockAction = ItemTag.getString(item, "bedrock_action")
             val uuid = ItemTag.getWorldUuid(item)
             val worldData = uuid?.let { mwm().worldConfigRepository.findByUuid(it) }
             when (bedrockAction) {
@@ -110,7 +62,7 @@ class FeatureOverrideListener(
                     if (worldData == null) return
                     event.isCancelled = true
                     cyclePublishLevel(worldData, forward = true)
-                    event.view.topInventory.setItem(11, createBedrockPublishItem(worldData))
+                    event.view.topInventory.setItem(11, createBedrockPublishItem(worldData, player))
                     return
                 }
                 "toggle_archive" -> {
@@ -157,16 +109,6 @@ class FeatureOverrideListener(
             mwm().soundManager.playClickSound(player, item, "discovery")
             mwm().menuEntryRouter.openDiscovery(player, 0, false)
             sanitizeOpenInventory(player)
-            return
-        }
-
-        if (type == "gui_meet_target_head" && event.view.topInventory.holder is MeetGui.MeetGuiHolder) {
-            val target = (item.itemMeta as? org.bukkit.inventory.meta.SkullMeta)?.owningPlayer?.player ?: return
-            val worldData = mwm().worldConfigRepository.findByWorldName(target.world.name) ?: return
-            if (worldData.publishLevel == PublishLevel.PUBLIC && storage.isDevelopmentWorld(worldData.uuid)) {
-                event.isCancelled = true
-                sendMeetRequest(player, target)
-            }
         }
     }
 
@@ -192,11 +134,9 @@ class FeatureOverrideListener(
                 })
                 return
             }
-        }
-
-        if (discovery) {
             setItemIfPresent(inventory, 48, createDiscoverySortItem(player))
         }
+
         if (holder is BedrockPlayerWorldListHolder) {
             val footerStart = inventory.size - 9
             setItemIfPresent(inventory, footerStart + 4, decoration(Material.BLACK_STAINED_GLASS_PANE))
@@ -204,7 +144,7 @@ class FeatureOverrideListener(
         if (holder is BedrockWorldActionHolder) {
             val worldData = mwm().worldConfigRepository.findByUuid(holder.worldUuid)
             if (worldData != null) {
-                setItemIfPresent(inventory, 11, createBedrockPublishItem(worldData))
+                setItemIfPresent(inventory, 11, createBedrockPublishItem(worldData, player))
             }
             if (!archiveEnabled()) {
                 setItemIfPresent(inventory, 12, decoration(Material.BLACK_STAINED_GLASS_PANE))
@@ -221,19 +161,13 @@ class FeatureOverrideListener(
 
         for (slot in 0 until inventory.size) {
             val item = inventory.getItem(slot) ?: continue
-            val uuid = ItemTag.getWorldUuid(item)
-            if (discovery && uuid != null && storage.isDevelopmentWorld(uuid)) {
-                inventory.setItem(slot, decoration(Material.WHITE_STAINED_GLASS_PANE))
-                continue
-            }
-
             val type = ItemTag.getType(item)
             if (type in hiddenActionTypes()) {
                 inventory.setItem(slot, decoration(Material.GRAY_STAINED_GLASS_PANE))
                 continue
             }
             val sanitized = if (type == ItemTag.TYPE_GUI_SETTING_PUBLISH && session != null) {
-                sanitizePublishItem(item, session.worldUuid)
+                sanitizePublishItem(item, session.worldUuid, player)
             } else {
                 sanitizeItem(item, player)
             }
@@ -265,86 +199,47 @@ class FeatureOverrideListener(
         val item = source.clone()
         val worldUuid = ItemTag.getWorldUuid(item)
         val lore = item.itemMeta?.lore() ?: return item
-        val sanitized = mutableListOf<Component>()
-
-        for (line in lore) {
+        val sanitized = lore.mapNotNull { line ->
             val text = plain.serialize(line)
-            if (shouldDropLine(text)) continue
-            val replacement = replacementLine(text, worldUuid, player)
-            sanitized.add(replacement ?: line)
+            if (shouldDropLine(text)) {
+                null
+            } else {
+                replacementLine(text, worldUuid, player) ?: line
+            }
         }
-
         item.editMeta { meta -> meta.lore(sanitized) }
         return item
     }
 
-    private fun sanitizePublishItem(source: ItemStack, worldUuid: UUID): ItemStack {
-        val world = mwm().worldConfigRepository.findByUuid(worldUuid) ?: return source
-        val state = resolvePublishState(world)
-        val lines = listOf(
-            "§f§l| §7現在 §e${state.displayName}",
-            "§f§l| §7${activePrefix(state, PublishState.PUBLIC)}§a公開中 §fディスカバリーに表示し、通常どおり訪問できます。",
-            "§f§l| §7${activePrefix(state, PublishState.DEVELOPMENT)}§e制作中 §fディスカバリーに表示せず、/meet は申請扱いです。",
-            "§f§l| §7${activePrefix(state, PublishState.PRIVATE)}§7非公開 §fメンバー以外は訪問できません。",
-            "§e§l| §e左クリック §7前の公開レベルへ",
-            "§e§l| §e右クリック §7次の公開レベルへ"
-        )
+    private fun sanitizePublishItem(source: ItemStack, worldUuid: UUID, player: Player): ItemStack {
+        val state = resolvePublishState(worldUuid)
         val item = source.clone()
         item.editMeta { meta ->
-            meta.lore(lines.map { legacy.deserialize(it) })
+            meta.lore(
+                listOf(
+                    text(player, "chanpon.publish.item.current", "level" to publishStateName(player, state)),
+                    text(player, "chanpon.publish.item.public_desc", "prefix" to activePrefix(state, PublishState.PUBLIC)),
+                    text(player, "chanpon.publish.item.development_desc", "prefix" to activePrefix(state, PublishState.DEVELOPMENT)),
+                    text(player, "chanpon.publish.item.private_desc", "prefix" to activePrefix(state, PublishState.PRIVATE)),
+                    text(player, "chanpon.publish.item.left_click"),
+                    text(player, "chanpon.publish.item.right_click")
+                ).map { legacy.deserialize(it) }
+            )
         }
         return item
     }
 
     private fun replacementLine(text: String, worldUuid: UUID?, player: Player): Component? {
         if (worldUuid == null || !isPublishLine(text)) return null
-        val world = mwm().worldConfigRepository.findByUuid(worldUuid) ?: return null
-        val label = when {
-            world.publishLevel == PublishLevel.PUBLIC && storage.isDevelopmentWorld(worldUuid) -> "§e制作中"
-            world.publishLevel == PublishLevel.PUBLIC -> "§a公開中"
-            else -> "§7非公開"
-        }
-        return legacy.deserialize("§f§l| §7公開レベル $label")
+        val label = publishStateName(player, resolvePublishState(worldUuid))
+        return legacy.deserialize(text(player, "chanpon.publish.item.line", "level" to label))
     }
 
     private fun shouldDropLine(text: String): Boolean {
         val normalized = text.lowercase()
-        if (isFavoriteAggregateLine(text)) return true
-        if (isVisitorAggregateLine(text)) return true
-        if (isPointOrSlotLine(text)) return true
         if (!archiveEnabled() && isArchiveLine(normalized)) return true
-        return false
-    }
-
-    private fun isFavoriteAggregateLine(text: String): Boolean {
-        val normalized = text.lowercase()
-        val hasNumber = text.any { it.isDigit() }
-        return hasNumber && (
-            text.contains("お気に入り数") ||
-                text.contains("お気に入り ") ||
-                normalized.contains("favorites")
-            )
-    }
-
-    private fun isVisitorAggregateLine(text: String): Boolean {
-        val normalized = text.lowercase()
-        val hasNumber = text.any { it.isDigit() }
-        return hasNumber && (
-            text.contains("最近") ||
-                text.contains("来訪者") ||
-                text.contains("訪れたプレイヤー") ||
-                normalized.contains("recent visitors") ||
-                normalized.contains("recently visited")
-            )
-    }
-
-    private fun isPointOrSlotLine(text: String): Boolean {
-        val normalized = text.lowercase()
-        return text.contains("🛖") ||
-            text.contains("ワールドポイント") ||
-            text.contains("ポイント") ||
-            text.contains("ワールドスロット") ||
-            text.contains("コスト") ||
+        return normalized.contains("favorite") ||
+            normalized.contains("visitor") ||
             normalized.contains("world point") ||
             normalized.contains("my world slot") ||
             normalized.contains("cost") ||
@@ -353,27 +248,12 @@ class FeatureOverrideListener(
     }
 
     private fun isArchiveLine(normalized: String): Boolean {
-        return normalized.contains("アーカイブ") ||
-            normalized.contains("archive") ||
-            normalized.contains("archived")
+        return normalized.contains("archive") || normalized.contains("archived")
     }
 
     private fun isPublishLine(text: String): Boolean {
         val normalized = text.lowercase()
-        return text.contains("公開レベル") ||
-            text.contains("公開設定") ||
-            normalized.contains("publish")
-    }
-
-    private fun sendMeetRequest(player: Player, target: Player) {
-        val lang = mwm().languageManager
-        player.closeInventory()
-        player.sendMessage(lang.getMessage(player, "general.meet_request.sent", mapOf("player" to target.name)))
-        target.sendMessage(lang.getMessage(target, "general.meet_request.received", mapOf("player" to player.name)))
-        val result = mwm().pendingDecisionManager.enqueueMeetRequest(target, player.uniqueId, target.world.uid, 60)
-        if (mwm().playerPlatformResolver.isBedrock(target)) {
-            mwm().pendingDecisionManager.sendPendingHint(target, result.count)
-        }
+        return normalized.contains("publish")
     }
 
     private fun nextAllowedDiscoverySort(current: DiscoverySort, forward: Boolean): DiscoverySort {
@@ -385,53 +265,42 @@ class FeatureOverrideListener(
 
     private fun cyclePublishLevel(worldData: me.awabi2048.myworldmanager.model.WorldData, forward: Boolean) {
         val states = PublishState.entries
-        val current = resolvePublishState(worldData)
+        val current = resolvePublishState(worldData.uuid)
         val delta = if (forward) 1 else states.size - 1
         val next = states[(current.ordinal + delta) % states.size]
-        applyPublishState(worldData, next)
-        mwm().worldConfigRepository.save(worldData)
+        applyPublishState(worldData.uuid, next)
     }
 
-    private fun resolvePublishState(worldData: me.awabi2048.myworldmanager.model.WorldData): PublishState {
-        if (worldData.publishLevel == PublishLevel.PUBLIC && storage.isDevelopmentWorld(worldData.uuid)) {
-            return PublishState.DEVELOPMENT
+    private fun resolvePublishState(worldUuid: UUID): PublishState {
+        return when (storage.getVisibility(worldUuid)) {
+            ChanponWorldVisibility.PUBLIC -> PublishState.PUBLIC
+            ChanponWorldVisibility.DEVELOPMENT -> PublishState.DEVELOPMENT
+            ChanponWorldVisibility.PRIVATE -> PublishState.PRIVATE
         }
-        if (worldData.publishLevel == PublishLevel.PUBLIC) {
-            return PublishState.PUBLIC
-        }
-        return PublishState.PRIVATE
     }
 
-    private fun applyPublishState(worldData: me.awabi2048.myworldmanager.model.WorldData, state: PublishState) {
-        when (state) {
-            PublishState.PUBLIC -> {
-                worldData.publishLevel = PublishLevel.PUBLIC
-                storage.setDevelopmentWorld(worldData.uuid, false)
-            }
-            PublishState.DEVELOPMENT -> {
-                worldData.publishLevel = PublishLevel.PUBLIC
-                storage.setDevelopmentWorld(worldData.uuid, true)
-            }
-            PublishState.PRIVATE -> {
-                worldData.publishLevel = PublishLevel.LOCKED
-                storage.setDevelopmentWorld(worldData.uuid, false)
-            }
+    private fun applyPublishState(worldUuid: UUID, state: PublishState) {
+        val visibility = when (state) {
+            PublishState.PUBLIC -> ChanponWorldVisibility.PUBLIC
+            PublishState.DEVELOPMENT -> ChanponWorldVisibility.DEVELOPMENT
+            PublishState.PRIVATE -> ChanponWorldVisibility.PRIVATE
         }
+        storage.setVisibility(worldUuid, visibility)
     }
 
     private fun activePrefix(current: PublishState, target: PublishState): String {
-        return if (current == target) "§a» " else "§8- "
+        return if (current == target) "§a> " else "§8- "
     }
 
-    private fun createBedrockPublishItem(worldData: me.awabi2048.myworldmanager.model.WorldData): ItemStack {
-        val state = resolvePublishState(worldData).displayName
+    private fun createBedrockPublishItem(worldData: me.awabi2048.myworldmanager.model.WorldData, player: Player): ItemStack {
+        val state = publishStateName(player, resolvePublishState(worldData.uuid))
         val item = ItemStack(Material.ENDER_EYE)
         item.editMeta { meta ->
-            meta.displayName(legacy.deserialize("§e公開レベル: §f$state"))
+            meta.displayName(legacy.deserialize(text(player, "chanpon.publish.item.title", "level" to state)))
             meta.lore(
                 listOf(
-                    legacy.deserialize("§7公開中 / 制作中 / 非公開を切り替えます。"),
-                    legacy.deserialize("§e§l| §eクリック §7次の公開レベルへ")
+                    legacy.deserialize(text(player, "chanpon.publish.item.summary")),
+                    legacy.deserialize(text(player, "chanpon.publish.item.cycle"))
                 )
             )
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
@@ -445,20 +314,20 @@ class FeatureOverrideListener(
     private fun createDiscoverySortItem(player: Player): ItemStack {
         val session = mwm().discoverySessionManager.getSession(player.uniqueId)
         val current = when (session.sort) {
-            DiscoverySort.SPOTLIGHT -> "スポットライト"
-            DiscoverySort.RANDOM -> "ランダム"
-            else -> "新着順"
+            DiscoverySort.SPOTLIGHT -> text(player, "chanpon.discovery_sort.spotlight")
+            DiscoverySort.RANDOM -> text(player, "chanpon.discovery_sort.random")
+            else -> text(player, "chanpon.discovery_sort.new")
         }
         val item = ItemStack(Material.HOPPER)
         item.editMeta { meta ->
-            meta.displayName(legacy.deserialize("§e並び順"))
+            meta.displayName(legacy.deserialize(text(player, "chanpon.discovery_sort.title")))
             meta.lore(
                 listOf(
-                    legacy.deserialize("§f§l| §7現在 §e$current"),
-                    legacy.deserialize("§7- §a新着順"),
-                    legacy.deserialize("§7- §dスポットライト"),
-                    legacy.deserialize("§7- §bランダム"),
-                    legacy.deserialize("§e§l| §eクリック §7並び順を切り替え")
+                    legacy.deserialize(text(player, "chanpon.discovery_sort.current", "sort" to current)),
+                    legacy.deserialize(text(player, "chanpon.discovery_sort.new_line")),
+                    legacy.deserialize(text(player, "chanpon.discovery_sort.spotlight_line")),
+                    legacy.deserialize(text(player, "chanpon.discovery_sort.random_line")),
+                    legacy.deserialize(text(player, "chanpon.discovery_sort.cycle"))
                 )
             )
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
@@ -485,28 +354,6 @@ class FeatureOverrideListener(
 
     private fun archiveEnabled(): Boolean = plugin.config.getBoolean("archive.enabled", false)
 
-    private fun disabledMwmCommandReason(raw: String): String? {
-        val parts = commandParts(raw)
-        if (parts.size < 2 || normalizeCommand(parts[0]) != "mwm") return null
-        if (parts[1].equals("stats", ignoreCase = true)) return "/mwm stats"
-        if (!archiveEnabled() && parts[1].equals("update-day", ignoreCase = true)) return "/mwm update-day"
-        if (parts[1].equals("give", ignoreCase = true) &&
-            parts.size >= 4 &&
-            parts[3].equals("world_seed", ignoreCase = true)
-        ) {
-            return "/mwm give world_seed"
-        }
-        return null
-    }
-
-    private fun commandParts(raw: String): List<String> {
-        return raw.trim().removePrefix("/").split(Regex("\\s+")).filter { it.isNotBlank() }
-    }
-
-    private fun normalizeCommand(command: String): String {
-        return command.substringAfter(':').lowercase()
-    }
-
     private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)
 
     private fun decoration(material: Material): ItemStack {
@@ -519,9 +366,17 @@ class FeatureOverrideListener(
         return item
     }
 
-    private enum class PublishState(val displayName: String) {
-        PUBLIC("公開中"),
-        DEVELOPMENT("制作中"),
-        PRIVATE("非公開")
+    private fun publishStateName(player: Player?, state: PublishState): String {
+        return text(player, "chanpon.publish.${state.key}")
+    }
+
+    private fun text(player: Player?, key: String, vararg placeholders: Pair<String, Any>): String {
+        return plugin.getMessage(player, key, *placeholders)
+    }
+
+    private enum class PublishState(val key: String) {
+        PUBLIC("public"),
+        DEVELOPMENT("development"),
+        PRIVATE("private")
     }
 }

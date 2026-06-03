@@ -214,7 +214,7 @@ class AdminWizardGui(
                     .thenAccept { success ->
                         Bukkit.getScheduler().runTask(plugin) { _ ->
                             if (success) {
-                                player.sendMessage(Component.text(plugin.getMessage(player, "wizard.success", "player" to target.name!!, "world" to worldName)))
+                                player.sendMessage(Component.text(plugin.getMessage(player, "wizard.success", "player" to target.name, "world" to worldName)))
                             } else {
                                 player.sendMessage(Component.text(plugin.getMessage(player, "wizard.failed")))
                             }

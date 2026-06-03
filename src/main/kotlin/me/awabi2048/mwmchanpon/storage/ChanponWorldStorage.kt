@@ -16,6 +16,17 @@ enum class SubmissionState(val storageValue: String, val i18nKey: String) {
     }
 }
 
+enum class ChanponWorldVisibility(val storageValue: String) {
+    PUBLIC("public"),
+    DEVELOPMENT("development"),
+    PRIVATE("private");
+
+    companion object {
+        fun fromStorageValue(value: String?): ChanponWorldVisibility? =
+            entries.firstOrNull { it.storageValue == value }
+    }
+}
+
 class ChanponWorldStorage(dataFolder: File) {
     private val worldsDir = File(dataFolder, "my_worlds")
 
@@ -45,20 +56,21 @@ class ChanponWorldStorage(dataFolder: File) {
         config.save(worldFile(worldUuid))
     }
 
-    fun isDevelopmentWorld(worldUuid: UUID): Boolean {
-        val config = load(worldUuid) ?: return false
-        return config.getBoolean("development", false)
+    fun getVisibility(worldUuid: UUID): ChanponWorldVisibility {
+        val config = load(worldUuid) ?: return ChanponWorldVisibility.PRIVATE
+        return ChanponWorldVisibility.fromStorageValue(config.getString("visibility"))
+            ?: when {
+                config.getBoolean("development", false) -> ChanponWorldVisibility.DEVELOPMENT
+                else -> ChanponWorldVisibility.PRIVATE
+            }
     }
 
-    fun setDevelopmentWorld(worldUuid: UUID, development: Boolean) {
+    fun setVisibility(worldUuid: UUID, visibility: ChanponWorldVisibility) {
         val config = loadOrCreate(worldUuid)
-        if (development) {
-            config.set("development", true)
-            config.set("development_set_at", LocalDateTime.now().toString())
-        } else {
-            config.set("development", null)
-            config.set("development_set_at", null)
-        }
+        config.set("visibility", visibility.storageValue)
+        config.set("development", null)
+        config.set("development_set_at", null)
+        config.set("visibility_set_at", LocalDateTime.now().toString())
         config.save(worldFile(worldUuid))
     }
 

@@ -1,0 +1,55 @@
+package me.awabi2048.mwmchanpon.extension
+
+import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
+import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
+import me.awabi2048.myworldmanager.api.extension.MeetTargetAction
+import me.awabi2048.myworldmanager.api.extension.WorldAccessPolicy
+import me.awabi2048.myworldmanager.model.WorldData
+import org.bukkit.entity.Player
+
+class ChanponWorldAccessPolicy(
+    private val storage: ChanponWorldStorage
+) : WorldAccessPolicy {
+    override fun getId(): String = "mwmchanpon.world_access"
+
+    override fun canShowInDiscovery(viewer: Player, worldData: WorldData): Boolean =
+        !worldData.isArchived &&
+            worldData.sourceWorld != "CONVERT" &&
+            visibility(worldData) == ChanponWorldVisibility.PUBLIC
+
+    override fun canShowInVisitWorldList(viewer: Player, worldData: WorldData): Boolean =
+        !worldData.isArchived && visibility(worldData) == ChanponWorldVisibility.PUBLIC
+
+    override fun canUseVisitEntry(viewer: Player, worldData: WorldData, isMember: Boolean): Boolean =
+        isMember || visibility(worldData) == ChanponWorldVisibility.PUBLIC
+
+    override fun canUseSharedEntry(viewer: Player, worldData: WorldData, isMember: Boolean): Boolean =
+        canUseVisitEntry(viewer, worldData, isMember)
+
+    override fun canInviteToWorld(sender: Player, worldData: WorldData): Boolean =
+        true
+
+    override fun canEnterWorld(player: Player, worldData: WorldData, isMember: Boolean): Boolean {
+        if (worldData.isArchived) return false
+        if (player.hasPermission("myworldmanager.admin") || isMember) return true
+        return visibility(worldData) == ChanponWorldVisibility.PUBLIC
+    }
+
+    override fun canShowMeetTarget(viewer: Player, target: Player, worldData: WorldData, isMember: Boolean): Boolean {
+        if (target.world.uid == viewer.world.uid) return true
+        if (isMember) return true
+        return visibility(worldData) != ChanponWorldVisibility.PRIVATE
+    }
+
+    override fun getMeetTargetAction(viewer: Player, target: Player, worldData: WorldData, isMember: Boolean): MeetTargetAction {
+        if (target.world.uid == viewer.world.uid || isMember) return MeetTargetAction.DIRECT
+        return when (visibility(worldData)) {
+            ChanponWorldVisibility.PUBLIC -> MeetTargetAction.DIRECT
+            ChanponWorldVisibility.DEVELOPMENT -> MeetTargetAction.REQUEST
+            ChanponWorldVisibility.PRIVATE -> MeetTargetAction.DENY
+        }
+    }
+
+    private fun visibility(worldData: WorldData): ChanponWorldVisibility =
+        storage.getVisibility(worldData.uuid)
+}
