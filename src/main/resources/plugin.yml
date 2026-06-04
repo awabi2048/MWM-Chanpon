@@ -10,6 +10,12 @@ softdepend:
   - CC-System
   - floodgate
 
+commands:
+  mwmchanpon:
+    description: Open the MWM-Chanpon admin menu
+    usage: /mwmchanpon
+    permission: mwmchanpon.admin
+
 permissions:
   mwmchanpon.admin:
     description: 管理者ウィザードを使用する権限

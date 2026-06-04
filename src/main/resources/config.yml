@@ -31,3 +31,23 @@ tool_permissions:
       color: "§b"
       permissions:
         - "axiom.*"
+
+backup:
+  auto_backup:
+    enabled: false
+    time: "04:00"
+    last_run_date: ""
+  auto_rollback:
+    enabled: false
+    time: "05:00"
+    last_run_date: ""
+  automation:
+    check_interval_ticks: 1200
+  retention:
+    enabled: false
+    keep:
+      user_manual: 10
+      admin_manual: 20
+      scheduled: 14
+      restore_point: 5
+      pre_rollback: 10

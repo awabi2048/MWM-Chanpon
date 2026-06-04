@@ -34,7 +34,7 @@ class ChanponWorldStorage(dataFolder: File) {
         worldsDir.mkdirs()
     }
 
-    private fun worldFile(worldUuid: UUID): File = File(worldsDir, "${worldUuid}.yml")
+    fun worldFile(worldUuid: UUID): File = File(worldsDir, "${worldUuid}.yml")
 
     fun isProductionWorld(worldUuid: UUID): Boolean {
         val config = load(worldUuid) ?: return false

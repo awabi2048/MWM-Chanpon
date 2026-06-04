@@ -32,6 +32,12 @@ class SubmissionAdminMenu(
     private val protectionService: SubmittedWorldProtectionService,
     private val toolPermissionController: ToolPermissionController
 ) : Listener {
+    private var parentMenuOpener: ((Player) -> Unit)? = null
+
+    fun setParentMenuOpener(opener: (Player) -> Unit) {
+        parentMenuOpener = opener
+    }
+
     fun open(
         player: Player,
         page: Int = 0,
@@ -91,10 +97,7 @@ class SubmissionAdminMenu(
 
         val item = event.currentItem ?: return
         when (ItemTag.getType(item)) {
-            ItemTag.TYPE_GUI_RETURN -> plugin.getCoreApiBridge().getWorldService()?.let {
-                player.closeInventory()
-                JavaPluginBridge.openAdminMenu(player)
-            } ?: player.closeInventory()
+            ItemTag.TYPE_GUI_RETURN -> parentMenuOpener?.invoke(player) ?: player.closeInventory()
             ItemTag.TYPE_GUI_NAV_PREV, ItemTag.TYPE_GUI_NAV_NEXT -> {
                 val page = ItemTag.getTargetPage(item) ?: holder.page
                 open(player, page, holder.submissionFilter, holder.completionFilter)
@@ -506,11 +509,6 @@ class SubmissionAdminMenu(
     }
 
     private object JavaPluginBridge {
-        fun openAdminMenu(player: Player) {
-            val mwm = org.bukkit.plugin.java.JavaPlugin.getPlugin(me.awabi2048.myworldmanager.MyWorldManager::class.java)
-            mwm.adminCommandGui.open(player)
-        }
-
         fun endCoreMenuSession(player: Player) {
             val mwm = org.bukkit.plugin.java.JavaPlugin.getPlugin(me.awabi2048.myworldmanager.MyWorldManager::class.java)
             mwm.settingsSessionManager.endSession(player)
