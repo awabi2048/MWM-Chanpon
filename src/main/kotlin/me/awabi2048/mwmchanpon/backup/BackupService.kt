@@ -19,8 +19,10 @@ import java.time.format.DateTimeFormatter
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
 import kotlin.io.path.isDirectory
-import kotlin.io.path.name
 
 class BackupService(
     private val plugin: MWMChanponPlugin,
@@ -269,11 +271,17 @@ class BackupService(
                     val source = File(backupDir(entry.id), "worlds/$worldUuid")
                     val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
                     val targetWorldDir = worldData?.let { core.getWorldDirectory(it) } ?: File(Bukkit.getWorldContainer(), "my_world.$worldUuid")
-                    val backupWorldDir = File(source, "world")
-                    if (!backupWorldDir.isDirectory) error("backup world directory missing: $worldUuid")
+                    val backupWorldZip = File(source, "world.zip")
+                    if (!backupWorldZip.isFile) error("backup world zip missing: $worldUuid")
 
-                    if (targetWorldDir.exists()) targetWorldDir.deleteRecursively()
-                    copyDirectory(backupWorldDir.toPath(), targetWorldDir.toPath())
+                    val tempWorldDir = File(targetWorldDir.parentFile ?: Bukkit.getWorldContainer(), "${targetWorldDir.name}.restore-${UUID.randomUUID()}")
+                    try {
+                        extractWorldZip(backupWorldZip.toPath(), tempWorldDir.toPath())
+                        if (targetWorldDir.exists()) targetWorldDir.deleteRecursively()
+                        Files.move(tempWorldDir.toPath(), targetWorldDir.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                    } finally {
+                        if (tempWorldDir.exists()) tempWorldDir.deleteRecursively()
+                    }
 
                     copyFileIfExists(File(source, "mwm.yml"), core.getWorldDataFile(worldUuid))
                     copyFileIfExists(File(source, "chanpon.yml"), storage.worldFile(worldUuid))
@@ -389,7 +397,7 @@ class BackupService(
         if (!worldDir.isDirectory) error("world directory missing: ${worldDir.absolutePath}")
         val target = File(backupDir, "worlds/$worldUuid")
         target.mkdirs()
-        copyDirectory(worldDir.toPath(), File(target, "world").toPath())
+        zipWorldDirectory(worldDir.toPath(), File(target, "world.zip").toPath())
         copyFileIfExists(core.getWorldDataFile(worldUuid), File(target, "mwm.yml"))
         copyFileIfExists(storage.worldFile(worldUuid), File(target, "chanpon.yml"))
         writePortalSnapshots(File(target, "portals.yml"), core.getRelatedPortals(worldUuid))
@@ -432,6 +440,7 @@ class BackupService(
             LocalDateTime.parse(config.getString("created_at"), createdFormatter)
         }.getOrElse { LocalDateTime.MIN }
         val worlds = config.getStringList("worlds").mapNotNull { runCatching { UUID.fromString(it) }.getOrNull() }
+        if (worlds.any { !File(dir, "worlds/$it/world.zip").isFile }) return null
         val actorUuid = config.getString("actor_uuid")?.let { runCatching { UUID.fromString(it) }.getOrNull() }
         return BackupEntry(
             id = id,
@@ -480,7 +489,19 @@ class BackupService(
 
     private fun backupHash(entry: BackupEntry, worldUuid: UUID): String {
         val dir = File(backupDir(entry.id), "worlds/$worldUuid")
-        return hashPath(dir.toPath())
+        val digest = MessageDigest.getInstance("SHA-256")
+        digest.update(hashZip(File(dir, "world.zip").toPath()).toByteArray(Charsets.UTF_8))
+        fun updateFile(file: File, label: String) {
+            if (!file.exists()) return
+            digest.update(label.toByteArray(Charsets.UTF_8))
+            digest.update(Files.readAllBytes(file.toPath()))
+        }
+        updateFile(File(dir, "mwm.yml"), "mwm")
+        updateFile(File(dir, "chanpon.yml"), "chanpon")
+        readPortalSnapshots(File(dir, "portals.yml"))
+            .sortedBy { it.id.toString() }
+            .forEach { digest.update(portalToMap(it).toString().toByteArray(Charsets.UTF_8)) }
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
     private fun productionWorlds(): List<WorldData> {
@@ -563,18 +584,54 @@ class BackupService(
         Files.copy(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES)
     }
 
-    private fun copyDirectory(source: Path, target: Path) {
-        Files.walk(source).use { stream ->
-            stream.forEach { path ->
-                if (path.fileName?.toString() == "session.lock") return@forEach
-                val relative = source.relativize(path)
-                val destination = target.resolve(relative)
-                if (path.isDirectory()) {
+    private fun zipWorldDirectory(source: Path, target: Path) {
+        Files.createDirectories(target.parent)
+        val temp = target.resolveSibling("${target.fileName}.tmp")
+        Files.deleteIfExists(temp)
+        try {
+            ZipOutputStream(Files.newOutputStream(temp)).use { zip ->
+                Files.walk(source).use { stream ->
+                    stream.sorted(Comparator.comparing { source.relativize(it).toString() }).forEach { path ->
+                        if (path.fileName?.toString() == "session.lock") return@forEach
+                        val relative = source.relativize(path)
+                        if (relative.toString().isEmpty()) return@forEach
+                        val entryName = relative.toString().replace(File.separatorChar, '/')
+                        if (path.isDirectory()) {
+                            zip.putNextEntry(ZipEntry("$entryName/"))
+                            zip.closeEntry()
+                        } else {
+                            zip.putNextEntry(ZipEntry(entryName))
+                            Files.copy(path, zip)
+                            zip.closeEntry()
+                        }
+                    }
+                }
+            }
+            Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING)
+        } catch (ex: Exception) {
+            Files.deleteIfExists(temp)
+            throw ex
+        }
+    }
+
+    private fun extractWorldZip(source: Path, target: Path) {
+        if (Files.exists(target)) target.toFile().deleteRecursively()
+        Files.createDirectories(target)
+        val root = target.toAbsolutePath().normalize()
+        ZipInputStream(Files.newInputStream(source)).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                val destination = root.resolve(entry.name).normalize()
+                if (!destination.startsWith(root)) {
+                    error("unsafe zip entry: ${entry.name}")
+                }
+                if (entry.isDirectory) {
                     Files.createDirectories(destination)
                 } else {
                     Files.createDirectories(destination.parent)
-                    Files.copy(path, destination, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES)
+                    Files.copy(zip, destination, StandardCopyOption.REPLACE_EXISTING)
                 }
+                zip.closeEntry()
             }
         }
     }
@@ -593,9 +650,31 @@ class BackupService(
             stream.filter { !it.isDirectory() }
                 .sorted(Comparator.comparing { path.relativize(it).toString() })
                 .forEach {
-                    digest.update(path.relativize(it).toString().toByteArray(Charsets.UTF_8))
+                    if (it.fileName?.toString() == "session.lock") return@forEach
+                    digest.update(path.relativize(it).toString().replace(File.separatorChar, '/').toByteArray(Charsets.UTF_8))
                     digest.update(Files.readAllBytes(it))
                 }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    private fun hashZip(path: Path): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        if (!Files.exists(path)) return ""
+        ZipInputStream(Files.newInputStream(path)).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                if (!entry.isDirectory) {
+                    digest.update(entry.name.toByteArray(Charsets.UTF_8))
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    while (true) {
+                        val read = zip.read(buffer)
+                        if (read < 0) break
+                        digest.update(buffer, 0, read)
+                    }
+                }
+                zip.closeEntry()
+            }
         }
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
