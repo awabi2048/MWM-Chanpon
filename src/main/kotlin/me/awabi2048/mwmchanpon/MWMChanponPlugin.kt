@@ -13,7 +13,6 @@ import me.awabi2048.mwmchanpon.extension.ProductionWorldGuard
 import me.awabi2048.mwmchanpon.extension.ToolPermissionMenuExtension
 import me.awabi2048.mwmchanpon.extension.WorldBackupMenuExtension
 import me.awabi2048.mwmchanpon.listener.MemberPermissionSyncListener
-import me.awabi2048.mwmchanpon.listener.FeatureOverrideListener
 import me.awabi2048.mwmchanpon.listener.PlayerJoinListener
 import me.awabi2048.mwmchanpon.listener.SubmittedWorldProtectionListener
 import me.awabi2048.mwmchanpon.listener.ToolPermissionMenuListener
@@ -30,6 +29,8 @@ import me.awabi2048.mwmchanpon.ui.AutomationSettingsMenu
 import me.awabi2048.mwmchanpon.ui.BackupListMenu
 import me.awabi2048.mwmchanpon.ui.ChanponAdminMenu
 import me.awabi2048.mwmchanpon.ui.ChanponAdminWorldListMenu
+import me.awabi2048.mwmchanpon.ui.ChanponDiscoveryMenuProvider
+import me.awabi2048.mwmchanpon.ui.ChanponPlayerWorldMenuProvider
 import me.awabi2048.mwmchanpon.ui.SubmissionAdminMenu
 import me.awabi2048.mwmchanpon.ui.SubmittedWorldMenuProvider
 import me.awabi2048.mwmchanpon.ui.ToolPermissionMenu
@@ -38,7 +39,6 @@ import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import net.luckperms.api.LuckPermsProvider
 import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
-import org.bukkit.scheduler.BukkitTask
 
 class MWMChanponPlugin : JavaPlugin() {
     lateinit var wizardSessionService: WizardSessionService
@@ -50,6 +50,8 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var productionWorldGuard: ProductionWorldGuard
     private lateinit var submittedProtectionService: SubmittedWorldProtectionService
     private lateinit var submittedWorldMenuProvider: SubmittedWorldMenuProvider
+    private lateinit var playerWorldMenuProvider: ChanponPlayerWorldMenuProvider
+    private lateinit var discoveryMenuProvider: ChanponDiscoveryMenuProvider
     private lateinit var chanponAdminWorldListMenu: ChanponAdminWorldListMenu
     private lateinit var submissionAdminMenu: SubmissionAdminMenu
     private lateinit var backupService: BackupService
@@ -64,7 +66,6 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var worldPublishPolicy: ChanponWorldPublishPolicy
     private lateinit var worldRuntimePolicy: ChanponWorldRuntimePolicy
     private lateinit var commandExtension: ChanponCommandExtension
-    private var featureOverrideTask: BukkitTask? = null
 
     override fun onEnable() {
         saveDefaultConfig()
@@ -123,6 +124,8 @@ class MWMChanponPlugin : JavaPlugin() {
             submittedProtectionService,
             toolController
         )
+        playerWorldMenuProvider = ChanponPlayerWorldMenuProvider(this, chanponStorage)
+        discoveryMenuProvider = ChanponDiscoveryMenuProvider(this)
         worldAccessPolicy = ChanponWorldAccessPolicy(chanponStorage)
         worldPublishPolicy = ChanponWorldPublishPolicy(chanponStorage)
         worldRuntimePolicy = ChanponWorldRuntimePolicy()
@@ -131,6 +134,8 @@ class MWMChanponPlugin : JavaPlugin() {
         MyWorldManagerApi.registerMenuExtension(productionToggleExtension)
         MyWorldManagerApi.registerAdminWorldListProvider(chanponAdminWorldListMenu)
         MyWorldManagerApi.registerWorldSettingsMenuProvider(submittedWorldMenuProvider)
+        MyWorldManagerApi.registerPlayerWorldMenuProvider(playerWorldMenuProvider)
+        MyWorldManagerApi.registerDiscoveryMenuProvider(discoveryMenuProvider)
         MyWorldManagerApi.registerWorldAccessPolicy(worldAccessPolicy)
         MyWorldManagerApi.registerWorldPublishPolicy(worldPublishPolicy)
         MyWorldManagerApi.registerWorldRuntimePolicy(worldRuntimePolicy)
@@ -147,17 +152,9 @@ class MWMChanponPlugin : JavaPlugin() {
         server.pluginManager.registerEvents(automationSettingsMenu, this)
         server.pluginManager.registerEvents(chanponAdminWorldListMenu, this)
         server.pluginManager.registerEvents(submittedWorldMenuProvider, this)
+        server.pluginManager.registerEvents(playerWorldMenuProvider, this)
+        server.pluginManager.registerEvents(discoveryMenuProvider, this)
         server.pluginManager.registerEvents(SubmittedWorldProtectionListener(submittedProtectionService), this)
-        val featureOverrideListener = FeatureOverrideListener(this, chanponStorage)
-        server.pluginManager.registerEvents(featureOverrideListener, this)
-        featureOverrideTask = server.scheduler.runTaskTimer(
-            this,
-            Runnable {
-                featureOverrideListener.sanitizeOpenInventories()
-            },
-            20L,
-            20L
-        )
 
         val toolMenu = ToolPermissionMenu(toolController, toolDefinitions)
         toolPermissionExtension = ToolPermissionMenuExtension(toolMenu, toolController, toolDefinitions)
@@ -194,6 +191,12 @@ class MWMChanponPlugin : JavaPlugin() {
         if (::submittedWorldMenuProvider.isInitialized) {
             MyWorldManagerApi.unregisterWorldSettingsMenuProvider(submittedWorldMenuProvider)
         }
+        if (::playerWorldMenuProvider.isInitialized) {
+            MyWorldManagerApi.unregisterPlayerWorldMenuProvider(playerWorldMenuProvider)
+        }
+        if (::discoveryMenuProvider.isInitialized) {
+            MyWorldManagerApi.unregisterDiscoveryMenuProvider(discoveryMenuProvider)
+        }
         if (::toolPermissionExtension.isInitialized) {
             MyWorldManagerApi.unregisterMenuExtension(toolPermissionExtension)
         }
@@ -216,8 +219,6 @@ class MWMChanponPlugin : JavaPlugin() {
             MyWorldManagerApi.unregisterCreateCommandHandler(commandExtension)
             MyWorldManagerApi.unregisterCommandPolicy(commandExtension)
         }
-        featureOverrideTask?.cancel()
-        featureOverrideTask = null
         if (::automationService.isInitialized) {
             automationService.stop()
         }
