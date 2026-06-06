@@ -13,7 +13,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
-import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
@@ -67,6 +66,33 @@ class BackupService(
         return createBackup(listOf(worldUuid), BackupScope.WORLD, kind, actorUuid, actorName, reason, acquireLocks = true)
     }
 
+    fun createOwnerWorldBackup(
+        worldUuid: UUID,
+        actorUuid: UUID,
+        actorName: String,
+        reason: String? = null
+    ): CompletableFuture<BackupOperationResult> {
+        val remainingSeconds = ownerBackupCooldownRemainingSeconds(worldUuid)
+        if (remainingSeconds > 0) {
+            return CompletableFuture.completedFuture(
+                BackupOperationResult(BackupOperationStatus.FAILED, null, "cooldown:$remainingSeconds")
+            )
+        }
+        return createBackup(listOf(worldUuid), BackupScope.WORLD, BackupKind.USER_MANUAL, actorUuid, actorName, reason, acquireLocks = true)
+            .thenApply { result ->
+                if (result.status == BackupOperationStatus.SUCCESS) {
+                    markOwnerBackupCreated(worldUuid)
+                }
+                result
+            }
+    }
+
+    fun ownerBackupCooldownRemainingSeconds(worldUuid: UUID): Long {
+        val remaining = ownerBackupCooldownRemainingMillis(worldUuid)
+        if (remaining <= 0L) return 0L
+        return (remaining + 999L) / 1000L
+    }
+
     fun createAllBackup(
         worldUuids: List<UUID>,
         kind: BackupKind,
@@ -88,16 +114,29 @@ class BackupService(
     }
 
     fun restoreBackup(entry: BackupEntry): CompletableFuture<RestoreOperationResult> {
-        if (!activeBackupIds.add(entry.id)) {
+        return restoreBackup(entry, entry.worldUuids)
+    }
+
+    fun restoreWorldBackup(entry: BackupEntry, worldUuid: UUID): CompletableFuture<RestoreOperationResult> {
+        if (worldUuid !in entry.worldUuids) {
             return CompletableFuture.completedFuture(
-                RestoreOperationResult(BackupOperationStatus.FAILED, emptyList(), entry.worldUuids, null, "backup is locked")
+                RestoreOperationResult(BackupOperationStatus.FAILED, emptyList(), listOf(worldUuid), null, "world is not included in backup")
             )
         }
-        val targets = entry.worldUuids.filter { storage.isProductionWorld(it) }
+        return restoreBackup(entry, listOf(worldUuid))
+    }
+
+    private fun restoreBackup(entry: BackupEntry, requestedWorlds: List<UUID>): CompletableFuture<RestoreOperationResult> {
+        if (!activeBackupIds.add(entry.id)) {
+            return CompletableFuture.completedFuture(
+                RestoreOperationResult(BackupOperationStatus.FAILED, emptyList(), requestedWorlds, null, "backup is locked")
+            )
+        }
+        val targets = requestedWorlds.distinct().filter { storage.isProductionWorld(it) }
         if (targets.isEmpty()) {
             activeBackupIds.remove(entry.id)
             return CompletableFuture.completedFuture(
-                RestoreOperationResult(BackupOperationStatus.FAILED, emptyList(), entry.worldUuids, null, "no production worlds")
+                RestoreOperationResult(BackupOperationStatus.FAILED, emptyList(), requestedWorlds, null, "no production worlds")
             )
         }
         val locked = targets.filter { operationLocks.add(it) }
@@ -284,7 +323,7 @@ class BackupService(
                     }
 
                     copyFileIfExists(File(source, "mwm.yml"), core.getWorldDataFile(worldUuid))
-                    copyFileIfExists(File(source, "chanpon.yml"), storage.worldFile(worldUuid))
+                    copyChanponFileForRestore(File(source, "chanpon.yml"), storage.worldFile(worldUuid))
                     portalsByWorld[worldUuid] = readPortalSnapshots(File(source, "portals.yml"))
                     restored.add(worldUuid)
                 } catch (ex: Exception) {
@@ -306,6 +345,7 @@ class BackupService(
                     restored.forEach { worldUuid ->
                         runCatching {
                             syncCore.replaceRelatedPortals(worldUuid, portalsByWorld[worldUuid].orEmpty())
+                            storage.setLastBackupHash(worldUuid, backupHash(entry, worldUuid))
                         }.onFailure { ex ->
                             plugin.logger.warning("Restore portal sync failed for $worldUuid: ${ex.message}")
                             syncRestored.remove(worldUuid)
@@ -456,16 +496,13 @@ class BackupService(
     }
 
     private fun writeWorldHashes(entry: BackupEntry) {
-        val config = plugin.config
         entry.worldUuids.forEach { worldUuid ->
-            config.set("backup.last_hash.$worldUuid", backupHash(entry, worldUuid))
+            storage.setLastBackupHash(worldUuid, backupHash(entry, worldUuid))
         }
-        config.set("backup.last_scheduled_date", LocalDate.now().toString())
-        plugin.saveConfig()
     }
 
     private fun hasChangedSinceLastBackup(worldData: WorldData): Boolean {
-        val previous = plugin.config.getString("backup.last_hash.${worldData.uuid}") ?: return true
+        val previous = storage.getLastBackupHash(worldData.uuid) ?: return true
         return currentWorldHash(worldData) != previous
     }
 
@@ -480,7 +517,7 @@ class BackupService(
         val worldDir = core.getWorldDirectory(worldData)
         digest.update(hashPath(worldDir.toPath()).toByteArray(Charsets.UTF_8))
         updateFile(core.getWorldDataFile(worldData.uuid), "mwm")
-        updateFile(storage.worldFile(worldData.uuid), "chanpon")
+        updateChanponFile(digest, storage.worldFile(worldData.uuid))
         core.getRelatedPortals(worldData.uuid)
             .sortedBy { it.id.toString() }
             .forEach { digest.update(portalToMap(it).toString().toByteArray(Charsets.UTF_8)) }
@@ -497,7 +534,7 @@ class BackupService(
             digest.update(Files.readAllBytes(file.toPath()))
         }
         updateFile(File(dir, "mwm.yml"), "mwm")
-        updateFile(File(dir, "chanpon.yml"), "chanpon")
+        updateChanponFile(digest, File(dir, "chanpon.yml"))
         readPortalSnapshots(File(dir, "portals.yml"))
             .sortedBy { it.id.toString() }
             .forEach { digest.update(portalToMap(it).toString().toByteArray(Charsets.UTF_8)) }
@@ -506,6 +543,18 @@ class BackupService(
 
     private fun productionWorlds(): List<WorldData> {
         return MyWorldManagerApi.getWorldRepository()?.findAll().orEmpty().filter { storage.isProductionWorld(it.uuid) }
+    }
+
+    private fun ownerBackupCooldownRemainingMillis(worldUuid: UUID): Long {
+        val cooldownMillis = plugin.config.getLong("backup.owner_manual.cooldown_hours", 3L).coerceAtLeast(0L) * 60L * 60L * 1000L
+        if (cooldownMillis <= 0L) return 0L
+        val lastCreatedAt = storage.getOwnerManualBackupLastCreatedAt(worldUuid)
+        if (lastCreatedAt <= 0L) return 0L
+        return (cooldownMillis - (System.currentTimeMillis() - lastCreatedAt)).coerceAtLeast(0L)
+    }
+
+    private fun markOwnerBackupCreated(worldUuid: UUID) {
+        storage.setOwnerManualBackupLastCreatedAt(worldUuid, System.currentTimeMillis())
     }
 
     private fun saveLoadedWorlds(worldUuids: List<UUID>) {
@@ -582,6 +631,32 @@ class BackupService(
         if (!source.exists()) return
         target.parentFile?.mkdirs()
         Files.copy(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES)
+    }
+
+    private fun updateChanponFile(digest: MessageDigest, file: File) {
+        if (!file.exists()) return
+        val config = YamlConfiguration.loadConfiguration(file)
+        config.set("backup.last_hash", null)
+        config.set("backup.owner_manual.last_created_at", null)
+        digest.update("chanpon".toByteArray(Charsets.UTF_8))
+        digest.update(config.saveToString().toByteArray(Charsets.UTF_8))
+    }
+
+    private fun copyChanponFileForRestore(source: File, target: File) {
+        if (!source.exists()) return
+        val lastOwnerBackupAt = if (target.exists()) {
+            YamlConfiguration.loadConfiguration(target).getLong("backup.owner_manual.last_created_at", 0L)
+        } else {
+            0L
+        }
+        copyFileIfExists(source, target)
+        val restored = YamlConfiguration.loadConfiguration(target)
+        restored.set("backup.last_hash", null)
+        restored.set(
+            "backup.owner_manual.last_created_at",
+            if (lastOwnerBackupAt > 0L) lastOwnerBackupAt else null
+        )
+        restored.save(target)
     }
 
     private fun zipWorldDirectory(source: Path, target: Path) {

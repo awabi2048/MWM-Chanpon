@@ -33,6 +33,8 @@ tool_permissions:
         - "axiom.*"
 
 backup:
+  owner_manual:
+    cooldown_hours: 3
   auto_backup:
     enabled: false
     time: "04:00"

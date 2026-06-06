@@ -138,6 +138,26 @@ class ChanponWorldStorage(dataFolder: File) {
         config.save(worldFile(worldUuid))
     }
 
+    fun getLastBackupHash(worldUuid: UUID): String? {
+        return load(worldUuid)?.getString("backup.last_hash")
+    }
+
+    fun setLastBackupHash(worldUuid: UUID, hash: String) {
+        val config = loadOrCreate(worldUuid)
+        config.set("backup.last_hash", hash)
+        config.save(worldFile(worldUuid))
+    }
+
+    fun getOwnerManualBackupLastCreatedAt(worldUuid: UUID): Long {
+        return load(worldUuid)?.getLong("backup.owner_manual.last_created_at", 0L) ?: 0L
+    }
+
+    fun setOwnerManualBackupLastCreatedAt(worldUuid: UUID, value: Long) {
+        val config = loadOrCreate(worldUuid)
+        config.set("backup.owner_manual.last_created_at", value)
+        config.save(worldFile(worldUuid))
+    }
+
     fun deleteWorld(worldUuid: UUID) {
         worldFile(worldUuid).delete()
     }

@@ -95,7 +95,12 @@ class BackupListMenu(
             ItemTag.TYPE_GUI_CONFIRM -> {
                 player.closeInventory()
                 val backup = backupService.listBackups().firstOrNull { it.id == holder.backupId } ?: return
-                backupService.restoreBackup(backup).thenAccept { result ->
+                val future = if (holder.source.mode == BackupListMode.WORLD && holder.source.worldUuid != null) {
+                    backupService.restoreWorldBackup(backup, holder.source.worldUuid)
+                } else {
+                    backupService.restoreBackup(backup)
+                }
+                future.thenAccept { result ->
                     Bukkit.getScheduler().runTask(plugin, Runnable {
                         player.sendMessage(i18nComponent(player, "message.restore_${result.status.name.lowercase()}"))
                     })
