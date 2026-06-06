@@ -120,6 +120,12 @@ class ChanponWorldStorage(dataFolder: File) {
         return config.getBoolean("tool_permissions.${playerUuid}.${toolId}", false)
     }
 
+    fun getToolEnabledState(worldUuid: UUID, playerUuid: UUID, toolId: String): Boolean? {
+        val config = load(worldUuid) ?: return null
+        val path = "tool_permissions.${playerUuid}.${toolId}"
+        return if (config.contains(path)) config.getBoolean(path, false) else null
+    }
+
     fun setToolEnabled(worldUuid: UUID, playerUuid: UUID, toolId: String, enabled: Boolean) {
         val config = loadOrCreate(worldUuid)
         config.set("tool_permissions.${playerUuid}.${toolId}", enabled)

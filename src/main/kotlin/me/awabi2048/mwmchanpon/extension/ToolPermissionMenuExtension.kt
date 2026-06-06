@@ -39,7 +39,7 @@ class ToolPermissionMenuExtension(
 
             val memberUuid = ItemTag.getWorldUuid(item) ?: continue
             val originalLore = item.itemMeta.lore() ?: emptyList()
-            val states = controller.getMemberToolStates(worldData.uuid, memberUuid)
+            val states = controller.getMemberToolStates(worldData, memberUuid)
             val newLore = rebuildLore(player, worldData, memberUuid, originalLore, states)
             val meta = item.itemMeta
             meta.lore(newLore)

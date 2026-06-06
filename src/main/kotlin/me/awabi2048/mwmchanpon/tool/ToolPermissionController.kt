@@ -10,15 +10,16 @@ class ToolPermissionController(
     private val luckPermsService: LuckPermsToolPermissionService,
     private val definitions: List<ToolPermissionDefinition>
 ) {
-    fun isEnabled(worldUuid: UUID, playerUuid: UUID, toolId: String): Boolean {
-        if (isSubmissionLocked(worldUuid)) return false
-        return storage.isToolEnabled(worldUuid, playerUuid, toolId)
+    fun isEnabled(worldData: WorldData, playerUuid: UUID, toolId: String): Boolean {
+        if (isSubmissionLocked(worldData.uuid)) return false
+        return storage.getToolEnabledState(worldData.uuid, playerUuid, toolId)
+            ?: (playerUuid == worldData.owner)
     }
 
     fun setEnabled(worldData: WorldData, playerUuid: UUID, toolId: String, enabled: Boolean) {
         storage.setToolEnabled(worldData.uuid, playerUuid, toolId, if (isSubmissionLocked(worldData.uuid)) false else enabled)
         val worldName = worldData.customWorldName ?: "my_world.${worldData.uuid}"
-        val enabledSet = getEffectiveEnabledTools(worldData.uuid, playerUuid)
+        val enabledSet = getEffectiveEnabledTools(worldData, playerUuid)
         luckPermsService.syncPlayer(playerUuid, worldName, definitions, enabledSet)
     }
 
@@ -28,7 +29,7 @@ class ToolPermissionController(
         participants.add(worldData.owner)
         participants.addAll(worldData.members)
         participants.forEach { playerUuid ->
-            val enabled = getEffectiveEnabledTools(worldData.uuid, playerUuid)
+            val enabled = getEffectiveEnabledTools(worldData, playerUuid)
             luckPermsService.syncPlayer(playerUuid, worldName, definitions, enabled)
         }
     }
@@ -44,17 +45,20 @@ class ToolPermissionController(
         luckPermsService.removePermissions(playerUuid, worldName, definitions)
     }
 
-    fun getMemberToolStates(worldUuid: UUID, playerUuid: UUID): Map<String, Boolean> {
-        if (isSubmissionLocked(worldUuid)) {
+    fun getMemberToolStates(worldData: WorldData, playerUuid: UUID): Map<String, Boolean> {
+        if (isSubmissionLocked(worldData.uuid)) {
             return definitions.associate { it.id to false }
         }
-        return storage.getMemberToolStates(worldUuid, playerUuid)
+        val stored = storage.getMemberToolStates(worldData.uuid, playerUuid)
+        return definitions.associate { definition ->
+            definition.id to (stored[definition.id] ?: (playerUuid == worldData.owner))
+        }
     }
 
-    private fun getEffectiveEnabledTools(worldUuid: UUID, playerUuid: UUID): Set<String> {
-        if (isSubmissionLocked(worldUuid)) return emptySet()
+    private fun getEffectiveEnabledTools(worldData: WorldData, playerUuid: UUID): Set<String> {
+        if (isSubmissionLocked(worldData.uuid)) return emptySet()
         return definitions
-            .filter { storage.isToolEnabled(worldUuid, playerUuid, it.id) }
+            .filter { isEnabled(worldData, playerUuid, it.id) }
             .map { it.id }
             .toSet()
     }

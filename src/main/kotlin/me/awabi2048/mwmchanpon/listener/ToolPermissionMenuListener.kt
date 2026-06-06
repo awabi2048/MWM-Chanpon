@@ -42,7 +42,7 @@ class ToolPermissionMenuListener(
 
         val toolId = ItemTag.getString(item, "chanpon_tool") ?: return
         val definition = definitions.firstOrNull { it.id == toolId } ?: return
-        val next = !controller.isEnabled(worldData.uuid, holder.targetPlayerUuid, definition.id)
+        val next = !controller.isEnabled(worldData, holder.targetPlayerUuid, definition.id)
         controller.setEnabled(worldData, holder.targetPlayerUuid, definition.id, next)
         menu.open(player, worldData, holder.targetPlayerUuid, holder.onBack)
     }

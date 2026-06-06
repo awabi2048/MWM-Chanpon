@@ -36,7 +36,7 @@ class WorldBackupMenuExtension(
         if (context.menuType != "world_settings") return
         val worldData = context.get<WorldData>("worldData") ?: return
         if (!canManage(player, worldData)) return
-        inventory.setItem(6, entryItem(player, worldData.uuid))
+        inventory.setItem(WORLD_MENU_SLOT, entryItem(player, worldData.uuid))
     }
 
     override fun onClick(event: InventoryClickEvent, player: Player, context: MenuExtensionContext): Boolean {
@@ -360,5 +360,6 @@ class WorldBackupMenuExtension(
         private const val BACKUP_ID_KEY = "chanpon_backup_id"
         private const val ACTION_KEY = "chanpon_action"
         private const val ACTION_BACKUP = "backup"
+        private const val WORLD_MENU_SLOT = 52
     }
 }

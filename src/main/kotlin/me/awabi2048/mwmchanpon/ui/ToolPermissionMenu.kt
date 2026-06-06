@@ -78,7 +78,7 @@ class ToolPermissionMenu(
     }
 
     private fun createToolItem(worldData: WorldData, targetPlayerUuid: UUID, definition: ToolPermissionDefinition): ItemStack {
-        val enabled = controller.isEnabled(worldData.uuid, targetPlayerUuid, definition.id)
+        val enabled = controller.isEnabled(worldData, targetPlayerUuid, definition.id)
         val item = ItemStack(definition.material)
         item.editMeta { meta ->
             meta.displayName(

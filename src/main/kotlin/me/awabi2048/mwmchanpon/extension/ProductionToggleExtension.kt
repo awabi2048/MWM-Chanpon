@@ -47,6 +47,9 @@ class ProductionToggleExtension(
             }
             "world_settings" -> {
                 val worldData = context.get<WorldData>("worldData") ?: return
+                if (context.get<Boolean>("isOwner") == true && storage.isProductionWorld(worldData.uuid)) {
+                    inventory.setItem(CRITICAL_MENU_SLOT, createDecorationItem(Material.GRAY_STAINED_GLASS_PANE))
+                }
                 if (plugin.isSubmissionClosed()) {
                     inventory.setItem(WORLD_MENU_SLOT, createDecorationItem(Material.GRAY_STAINED_GLASS_PANE))
                     return
@@ -75,7 +78,17 @@ class ProductionToggleExtension(
     fun onWorldCreated(event: MwmWorldCreatedEvent) {
         storage.initializeSubmissionState(event.worldUuid)
         val enabled = pendingProduction.remove(event.ownerUuid to event.worldName) ?: return
-        if (enabled) storage.setProductionWorld(event.worldUuid, true)
+        if (enabled) {
+            storage.setProductionWorld(event.worldUuid, true)
+            applyDefaultTags(event.worldUuid)
+        }
+    }
+
+    fun syncDefaultTagsForProductionWorlds() {
+        val repository = MyWorldManagerApi.getWorldRepository() ?: return
+        repository.findAll()
+            .filter { storage.isProductionWorld(it.uuid) }
+            .forEach { applyDefaultTags(it.uuid) }
     }
 
     private fun handleCreationConfirmClick(
@@ -170,6 +183,7 @@ class ProductionToggleExtension(
         when (action) {
             ConfirmationAction.SET_PRODUCTION -> {
                 storage.setProductionWorld(worldUuid, true)
+                applyDefaultTags(worldUuid)
                 player.sendMessage(i18n(player, "message.production_set"))
             }
             ConfirmationAction.SUBMIT -> {
@@ -221,6 +235,25 @@ class ProductionToggleExtension(
             return false
         }
         return true
+    }
+
+    private fun applyDefaultTags(worldUuid: UUID) {
+        if (!plugin.config.getBoolean("production.default_tags.enabled", true)) return
+        val tags = plugin.config.getStringList("production.default_tags.tags")
+            .mapNotNull { raw ->
+                MyWorldManagerApi.getWorldTagService()?.normalizeTagId(raw)
+                    ?: raw.trim().lowercase().takeIf { it.isNotBlank() }
+            }
+            .distinct()
+        if (tags.isEmpty()) return
+
+        val repository = MyWorldManagerApi.getWorldRepository() ?: return
+        val worldData = repository.findByUuid(worldUuid) ?: return
+        val missingTags = tags.filterNot { worldData.tags.contains(it) }
+        if (missingTags.isEmpty()) return
+
+        worldData.tags.addAll(missingTags)
+        repository.save(worldData)
     }
 
     private fun createCreationItem(enabled: Boolean): ItemStack {
@@ -375,6 +408,7 @@ class ProductionToggleExtension(
         private const val EXTENSION_ID = "chanpon.production_toggle"
         private const val EXTRA_KEY = "chanpon.production"
         private const val WORLD_MENU_SLOT = 51
+        private const val CRITICAL_MENU_SLOT = 33
         private const val ACTION_TOGGLE_PRODUCTION = "toggle_production"
         private const val ACTION_SET_PRODUCTION = "set_production"
         private const val ACTION_TOGGLE_SUBMISSION = "toggle_submission"

@@ -161,6 +161,7 @@ class MWMChanponPlugin : JavaPlugin() {
         worldBackupMenuExtension = WorldBackupMenuExtension(this, chanponStorage, backupService)
         MyWorldManagerApi.registerMenuExtension(toolPermissionExtension)
         MyWorldManagerApi.registerMenuExtension(worldBackupMenuExtension)
+        productionToggleExtension.syncDefaultTagsForProductionWorlds()
         server.pluginManager.registerEvents(
             ToolPermissionMenuListener(toolMenu, toolController, toolDefinitions),
             this
