@@ -31,6 +31,7 @@ import me.awabi2048.mwmchanpon.ui.ChanponAdminMenu
 import me.awabi2048.mwmchanpon.ui.ChanponAdminWorldListMenu
 import me.awabi2048.mwmchanpon.ui.ChanponDiscoveryMenuProvider
 import me.awabi2048.mwmchanpon.ui.ChanponPlayerWorldMenuProvider
+import me.awabi2048.mwmchanpon.ui.ChanponWorldSettingsMenuProvider
 import me.awabi2048.mwmchanpon.ui.SubmissionAdminMenu
 import me.awabi2048.mwmchanpon.ui.SubmittedWorldMenuProvider
 import me.awabi2048.mwmchanpon.ui.ToolPermissionMenu
@@ -50,6 +51,7 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var productionWorldGuard: ProductionWorldGuard
     private lateinit var submittedProtectionService: SubmittedWorldProtectionService
     private lateinit var submittedWorldMenuProvider: SubmittedWorldMenuProvider
+    private lateinit var chanponWorldSettingsMenuProvider: ChanponWorldSettingsMenuProvider
     private lateinit var playerWorldMenuProvider: ChanponPlayerWorldMenuProvider
     private lateinit var discoveryMenuProvider: ChanponDiscoveryMenuProvider
     private lateinit var chanponAdminWorldListMenu: ChanponAdminWorldListMenu
@@ -124,6 +126,7 @@ class MWMChanponPlugin : JavaPlugin() {
             submittedProtectionService,
             toolController
         )
+        chanponWorldSettingsMenuProvider = ChanponWorldSettingsMenuProvider(this, chanponStorage)
         playerWorldMenuProvider = ChanponPlayerWorldMenuProvider(this, chanponStorage)
         discoveryMenuProvider = ChanponDiscoveryMenuProvider(this)
         worldAccessPolicy = ChanponWorldAccessPolicy(chanponStorage)
@@ -134,6 +137,7 @@ class MWMChanponPlugin : JavaPlugin() {
         MyWorldManagerApi.registerMenuExtension(productionToggleExtension)
         MyWorldManagerApi.registerAdminWorldListProvider(chanponAdminWorldListMenu)
         MyWorldManagerApi.registerWorldSettingsMenuProvider(submittedWorldMenuProvider)
+        MyWorldManagerApi.registerWorldSettingsMenuProvider(chanponWorldSettingsMenuProvider)
         MyWorldManagerApi.registerPlayerWorldMenuProvider(playerWorldMenuProvider)
         MyWorldManagerApi.registerDiscoveryMenuProvider(discoveryMenuProvider)
         MyWorldManagerApi.registerWorldAccessPolicy(worldAccessPolicy)
@@ -152,6 +156,7 @@ class MWMChanponPlugin : JavaPlugin() {
         server.pluginManager.registerEvents(automationSettingsMenu, this)
         server.pluginManager.registerEvents(chanponAdminWorldListMenu, this)
         server.pluginManager.registerEvents(submittedWorldMenuProvider, this)
+        server.pluginManager.registerEvents(chanponWorldSettingsMenuProvider, this)
         server.pluginManager.registerEvents(playerWorldMenuProvider, this)
         server.pluginManager.registerEvents(discoveryMenuProvider, this)
         server.pluginManager.registerEvents(SubmittedWorldProtectionListener(submittedProtectionService), this)
@@ -191,6 +196,9 @@ class MWMChanponPlugin : JavaPlugin() {
         }
         if (::submittedWorldMenuProvider.isInitialized) {
             MyWorldManagerApi.unregisterWorldSettingsMenuProvider(submittedWorldMenuProvider)
+        }
+        if (::chanponWorldSettingsMenuProvider.isInitialized) {
+            MyWorldManagerApi.unregisterWorldSettingsMenuProvider(chanponWorldSettingsMenuProvider)
         }
         if (::playerWorldMenuProvider.isInitialized) {
             MyWorldManagerApi.unregisterPlayerWorldMenuProvider(playerWorldMenuProvider)
