@@ -48,9 +48,6 @@ class ProductionToggleExtension(
             }
             "world_settings" -> {
                 val worldData = context.get<WorldData>("worldData") ?: return
-                if (context.get<Boolean>("isOwner") == true && storage.isProductionWorld(worldData.uuid)) {
-                    inventory.setItem(CRITICAL_MENU_SLOT, createDecorationItem(Material.GRAY_STAINED_GLASS_PANE))
-                }
                 if (plugin.isSubmissionClosed()) {
                     inventory.setItem(WORLD_MENU_SLOT, createDecorationItem(Material.GRAY_STAINED_GLASS_PANE))
                     return
@@ -80,6 +77,7 @@ class ProductionToggleExtension(
         storage.initializeSubmissionState(event.worldUuid)
         val enabled = pendingProduction.remove(event.ownerUuid to event.worldName) ?: return
         if (enabled) {
+            if (ownerHasProductionWorld(event.ownerUuid, event.worldUuid)) return
             storage.setProductionWorld(event.worldUuid, true)
             applyForcedTags(event.worldUuid)
         }
@@ -101,6 +99,10 @@ class ProductionToggleExtension(
         if (ItemTag.getString(item, "chanpon_action") != ACTION_TOGGLE_PRODUCTION) return false
         val session = context.get<WorldCreationSession>("session") ?: return false
         val next = !(session.extras[EXTRA_KEY] as? Boolean ?: false)
+        if (next && ownerHasProductionWorld(player.uniqueId, null)) {
+            player.sendMessage(i18n(player, "message.production_limit"))
+            return true
+        }
         session.extras[EXTRA_KEY] = next
         val worldName = session.worldName ?: return true
         pendingProduction[player.uniqueId to worldName] = next
@@ -117,9 +119,22 @@ class ProductionToggleExtension(
         val worldData = context.get<WorldData>("worldData") ?: return false
         when (ItemTag.getString(item, "chanpon_action")) {
             ACTION_SET_PRODUCTION -> {
+                if (ownerHasProductionWorld(worldData.owner, worldData.uuid)) {
+                    player.sendMessage(i18n(player, "message.production_limit"))
+                    return true
+                }
                 openConfirmation(player, worldData.uuid, ConfirmationAction.SET_PRODUCTION)
             }
             ACTION_TOGGLE_SUBMISSION -> {
+                val action = if (event.click.isRightClick) ACTION_UNSET_PRODUCTION else ACTION_SUBMIT
+                if (action == ACTION_UNSET_PRODUCTION) {
+                    openConfirmation(player, worldData.uuid, ConfirmationAction.UNSET_PRODUCTION)
+                    return true
+                }
+                if (worldData.owner != player.uniqueId) {
+                    player.sendMessage(i18n(player, "message.owner_only_submit"))
+                    return true
+                }
                 val current = try {
                     storage.getSubmissionState(worldData.uuid)
                 } catch (ex: IllegalStateException) {
@@ -134,7 +149,7 @@ class ProductionToggleExtension(
                 }
                 when (current) {
                     SubmissionState.UNSUBMITTED -> openConfirmation(player, worldData.uuid, ConfirmationAction.SUBMIT)
-                    SubmissionState.SUBMITTED -> openConfirmation(player, worldData.uuid, ConfirmationAction.CANCEL_SUBMISSION)
+                    SubmissionState.SUBMITTED -> return true
                     SubmissionState.COMPLETED -> return true
                 }
             }
@@ -143,7 +158,7 @@ class ProductionToggleExtension(
         return true
     }
 
-    @EventHandler(ignoreCancelled = true)
+    @EventHandler
     fun onConfirmationClick(event: InventoryClickEvent) {
         val player = event.whoClicked as? Player ?: return
         val holder = event.view.topInventory.holder as? SubmissionConfirmationHolder ?: return
@@ -183,11 +198,29 @@ class ProductionToggleExtension(
     private fun executeConfirmedAction(player: Player, worldUuid: UUID, action: ConfirmationAction) {
         when (action) {
             ConfirmationAction.SET_PRODUCTION -> {
+                val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
+                if (worldData != null && ownerHasProductionWorld(worldData.owner, worldUuid)) {
+                    player.sendMessage(i18n(player, "message.production_limit"))
+                    return
+                }
                 storage.setProductionWorld(worldUuid, true)
                 applyForcedTags(worldUuid)
                 player.sendMessage(i18n(player, "message.production_set"))
             }
+            ConfirmationAction.UNSET_PRODUCTION -> {
+                storage.setProductionWorld(worldUuid, false)
+                MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)?.let {
+                    protectionService.sync(it)
+                    toolPermissionController.syncWorld(it)
+                }
+                player.sendMessage(i18n(player, "message.production_unset"))
+            }
             ConfirmationAction.SUBMIT -> {
+                val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
+                if (worldData == null || worldData.owner != player.uniqueId) {
+                    player.sendMessage(i18n(player, "message.owner_only_submit"))
+                    return
+                }
                 if (!ensureSubmissionState(player, worldUuid, SubmissionState.UNSUBMITTED)) return
                 storage.setSubmissionState(
                     worldUuid,
@@ -255,6 +288,12 @@ class ProductionToggleExtension(
 
         worldData.tags.addAll(missingTags)
         repository.save(worldData)
+    }
+
+    private fun ownerHasProductionWorld(ownerUuid: UUID, excludingWorldUuid: UUID?): Boolean {
+        val repository = MyWorldManagerApi.getWorldRepository() ?: return false
+        return repository.findAll()
+            .any { it.owner == ownerUuid && it.uuid != excludingWorldUuid && storage.isProductionWorld(it.uuid) }
     }
 
     private fun createCreationItem(enabled: Boolean): ItemStack {
@@ -413,10 +452,13 @@ class ProductionToggleExtension(
         private const val ACTION_TOGGLE_PRODUCTION = "toggle_production"
         private const val ACTION_SET_PRODUCTION = "set_production"
         private const val ACTION_TOGGLE_SUBMISSION = "toggle_submission"
+        private const val ACTION_SUBMIT = "submit"
+        private const val ACTION_UNSET_PRODUCTION = "unset_production"
     }
 
     private enum class ConfirmationAction(val key: String, val material: Material) {
         SET_PRODUCTION("set_production", Material.HEART_OF_THE_SEA),
+        UNSET_PRODUCTION("unset_production", Material.REDSTONE),
         SUBMIT("submit", Material.BRICKS),
         CANCEL_SUBMISSION("cancel_submission", Material.FLOW_BANNER_PATTERN)
     }

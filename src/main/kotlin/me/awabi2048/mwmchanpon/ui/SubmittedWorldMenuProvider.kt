@@ -47,17 +47,17 @@ class SubmittedWorldMenuProvider(
         }
 
         val holder = SubmittedWorldMenuHolder(worldData.uuid, request)
-        val inventory = Bukkit.createInventory(holder, 45, i18nComponent(player, "submitted_menu.title"))
+        val inventory = Bukkit.createInventory(holder, 54, i18nComponent(player, "submitted_menu.title"))
         holder.inv = inventory
         applyFrame(inventory)
 
         if (request.showBackButton) {
-            inventory.setItem(36, createReturnItem(player))
+            inventory.setItem(45, createReturnItem(player))
         }
         inventory.setItem(22, createWorldItem(player, worldData, state, reasons))
 
         if (ProtectionReason.SUBMITTED in reasons && state == SubmissionState.SUBMITTED && !plugin.isSubmissionClosed()) {
-            inventory.setItem(40, createCancelSubmissionItem(player, worldData.uuid))
+            inventory.setItem(49, createCancelSubmissionItem(player, worldData.uuid))
         }
 
         fillBody(inventory)
@@ -168,12 +168,12 @@ class SubmittedWorldMenuProvider(
     private fun applyFrame(inventory: Inventory) {
         val blackPane = createDecorationItem(Material.BLACK_STAINED_GLASS_PANE)
         for (slot in 0..8) inventory.setItem(slot, blackPane)
-        for (slot in 36..44) inventory.setItem(slot, blackPane)
+        for (slot in inventory.size - 9 until inventory.size) inventory.setItem(slot, blackPane)
     }
 
     private fun fillBody(inventory: Inventory) {
         val grayPane = createDecorationItem(Material.GRAY_STAINED_GLASS_PANE)
-        for (slot in 9..35) {
+        for (slot in 9 until inventory.size - 9) {
             if (inventory.getItem(slot) == null) inventory.setItem(slot, grayPane)
         }
     }

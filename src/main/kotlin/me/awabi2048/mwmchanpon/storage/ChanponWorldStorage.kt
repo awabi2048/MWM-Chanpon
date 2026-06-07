@@ -43,15 +43,17 @@ class ChanponWorldStorage(dataFolder: File) {
 
     fun setProductionWorld(worldUuid: UUID, production: Boolean) {
         val config = loadOrCreate(worldUuid)
+        val wasProduction = config.getBoolean("production", false)
         if (production) {
             config.set("production", true)
             config.set("production_set_at", LocalDateTime.now().toString())
-            if (!config.contains("submission.state")) {
+            if (!wasProduction || !config.contains("submission.state")) {
                 config.set("submission.state", SubmissionState.UNSUBMITTED.storageValue)
             }
         } else {
             config.set("production", null)
             config.set("production_set_at", null)
+            config.set("submission", null)
         }
         config.save(worldFile(worldUuid))
     }
