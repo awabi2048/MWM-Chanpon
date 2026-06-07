@@ -6,9 +6,7 @@ archive:
 
 production:
   menu_slot: 40
-  default_tags:
-    enabled: true
-    tags: []
+  forced_tags: []
 
 submission:
   closed: false

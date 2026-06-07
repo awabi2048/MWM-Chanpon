@@ -81,15 +81,15 @@ class ProductionToggleExtension(
         val enabled = pendingProduction.remove(event.ownerUuid to event.worldName) ?: return
         if (enabled) {
             storage.setProductionWorld(event.worldUuid, true)
-            applyDefaultTags(event.worldUuid)
+            applyForcedTags(event.worldUuid)
         }
     }
 
-    fun syncDefaultTagsForProductionWorlds() {
+    fun syncForcedTagsForProductionWorlds() {
         val repository = MyWorldManagerApi.getWorldRepository() ?: return
         repository.findAll()
             .filter { storage.isProductionWorld(it.uuid) }
-            .forEach { applyDefaultTags(it.uuid) }
+            .forEach { applyForcedTags(it.uuid) }
     }
 
     private fun handleCreationConfirmClick(
@@ -184,7 +184,7 @@ class ProductionToggleExtension(
         when (action) {
             ConfirmationAction.SET_PRODUCTION -> {
                 storage.setProductionWorld(worldUuid, true)
-                applyDefaultTags(worldUuid)
+                applyForcedTags(worldUuid)
                 player.sendMessage(i18n(player, "message.production_set"))
             }
             ConfirmationAction.SUBMIT -> {
@@ -239,9 +239,8 @@ class ProductionToggleExtension(
         return true
     }
 
-    private fun applyDefaultTags(worldUuid: UUID) {
-        if (!plugin.config.getBoolean("production.default_tags.enabled", true)) return
-        val tags = plugin.config.getStringList("production.default_tags.tags")
+    private fun applyForcedTags(worldUuid: UUID) {
+        val tags = plugin.config.getStringList("production.forced_tags")
             .mapNotNull { raw ->
                 MyWorldManagerApi.getWorldTagService()?.normalizeTagId(raw)
                     ?: raw.trim().lowercase().takeIf { it.isNotBlank() }

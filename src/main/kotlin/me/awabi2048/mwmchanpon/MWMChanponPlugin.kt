@@ -203,7 +203,7 @@ class MWMChanponPlugin : JavaPlugin() {
         MyWorldManagerApi.registerMenuExtension(toolPermissionExtension)
         MyWorldManagerApi.registerMenuExtension(worldBackupMenuExtension)
         MyWorldManagerApi.registerMenuExtension(linkedPortalMenuExtension)
-        productionToggleExtension.syncDefaultTagsForProductionWorlds()
+        productionToggleExtension.syncForcedTagsForProductionWorlds()
         server.pluginManager.registerEvents(
             ToolPermissionMenuListener(toolMenu, toolController, toolDefinitions),
             this
