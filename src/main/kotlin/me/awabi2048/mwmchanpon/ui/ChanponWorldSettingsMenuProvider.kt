@@ -79,6 +79,7 @@ class ChanponWorldSettingsMenuProvider(
         val isOwner = worldData.owner == player.uniqueId || session?.isAdminFlow == true
         val isModerator = worldData.moderators.contains(player.uniqueId)
         val hasManagePermission = isOwner || isModerator
+        val isProduction = storage.isProductionWorld(worldData.uuid)
 
         if (hasManagePermission) {
             inventory.setItem(19, mwmItem(player, "info", Material.NAME_TAG, ItemTag.TYPE_GUI_SETTING_INFO))
@@ -93,7 +94,7 @@ class ChanponWorldSettingsMenuProvider(
             inventory.setItem(24, publishItem(player, worldData))
             inventory.setItem(25, mwmItem(player, "member", Material.PLAYER_HEAD, ItemTag.TYPE_GUI_SETTING_MEMBER))
             inventory.setItem(32, mwmItem(player, "environment", Material.GRASS_BLOCK, ItemTag.TYPE_GUI_SETTING_ENVIRONMENT))
-            inventory.setItem(33, mwmItem(player, "critical", Material.TNT, ItemTag.TYPE_GUI_SETTING_CRITICAL))
+            inventory.setItem(33, criticalItem(player, isProduction))
         }
         inventory.setItem(49, worldInfoItem(player, worldData))
 
@@ -111,23 +112,33 @@ class ChanponWorldSettingsMenuProvider(
             is ExpansionHolder -> handleExpansionClick(event, player, holder.worldUuid)
             is WarningHolder -> handleWarningClick(event, player, holder)
             is ConfirmHolder -> handleConfirmClick(event, player, holder)
+            is CriticalHolder -> handleCriticalClick(event, player, holder.worldUuid)
+            is DeleteConfirmHolder -> handleDeleteConfirmClick(event, player, holder)
         }
     }
 
     private fun handleSettingsClick(event: InventoryClickEvent, player: Player, worldUuid: UUID) {
         if (event.clickedInventory != event.view.topInventory) return
         val item = event.currentItem ?: return
-        if (ItemTag.getType(item) != ItemTag.TYPE_GUI_SETTING_EXPAND) return
-        event.isCancelled = true
-
-        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
-        if (worldData.borderExpansionLevel == WorldData.EXPANSION_LEVEL_SPECIAL) return
-        if (worldData.borderExpansionLevel >= maxExpansionLevel()) {
-            player.sendMessage(i18nComponent(player, "message.expand_max"))
-            return
+        when (ItemTag.getType(item)) {
+            ItemTag.TYPE_GUI_SETTING_EXPAND -> {
+                event.isCancelled = true
+                val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
+                if (worldData.borderExpansionLevel == WorldData.EXPANSION_LEVEL_SPECIAL) return
+                if (worldData.borderExpansionLevel >= maxExpansionLevel()) {
+                    player.sendMessage(i18nComponent(player, "message.expand_max"))
+                    return
+                }
+                mwm().soundManager.playClickSound(player, item, "world_settings")
+                openExpansionMenu(player, worldData)
+            }
+            ItemTag.TYPE_GUI_SETTING_CRITICAL -> {
+                event.isCancelled = true
+                val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
+                mwm().soundManager.playClickSound(player, item, "world_settings")
+                openCriticalMenu(player, worldData)
+            }
         }
-        mwm().soundManager.playClickSound(player, item, "world_settings")
-        openExpansionMenu(player, worldData)
     }
 
     private fun handleExpansionClick(event: InventoryClickEvent, player: Player, worldUuid: UUID) {
@@ -203,6 +214,43 @@ class ChanponWorldSettingsMenuProvider(
         }
     }
 
+    private fun handleCriticalClick(event: InventoryClickEvent, player: Player, worldUuid: UUID) {
+        event.isCancelled = true
+        if (event.clickedInventory != event.view.topInventory) return
+        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
+        when (ItemTag.getType(event.currentItem ?: return)) {
+            ItemTag.TYPE_GUI_RETURN -> open(player, worldData, currentRequest(player))
+            ItemTag.TYPE_GUI_SETTING_DELETE_WORLD -> {
+                if (storage.isProductionWorld(worldUuid)) return
+                openDeleteConfirm(player, worldData, false)
+            }
+        }
+    }
+
+    private fun handleDeleteConfirmClick(event: InventoryClickEvent, player: Player, holder: DeleteConfirmHolder) {
+        event.isCancelled = true
+        if (event.clickedInventory != event.view.topInventory) return
+        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(holder.worldUuid) ?: return
+        when (ItemTag.getType(event.currentItem ?: return)) {
+            ItemTag.TYPE_GUI_CANCEL -> openCriticalMenu(player, worldData)
+            ItemTag.TYPE_GUI_CONFIRM -> {
+                if (!holder.finalStep) {
+                    openDeleteConfirm(player, worldData, true)
+                    return
+                }
+                player.closeInventory()
+                mwm().worldService.deleteWorld(holder.worldUuid, player).thenAccept { success ->
+                    Bukkit.getScheduler().runTask(plugin, Runnable {
+                        player.sendMessage(i18nComponent(player, if (success) "critical.deleted" else "critical.delete_failed"))
+                        if (success) {
+                            mwm().settingsSessionManager.endSession(player)
+                        }
+                    })
+                }
+            }
+        }
+    }
+
     private fun openExpansionMenu(player: Player, worldData: WorldData) {
         val holder = ExpansionHolder(worldData.uuid)
         val inventory = Bukkit.createInventory(holder, 45, i18nComponent(player, "expand_menu.title"))
@@ -237,6 +285,30 @@ class ChanponWorldSettingsMenuProvider(
         holder.inv = inventory
         applyFrame(inventory)
         inventory.setItem(22, confirmCenterItem(player, worldData, action, direction))
+        inventory.setItem(20, confirmButton(player, true))
+        inventory.setItem(24, confirmButton(player, false))
+        fill(inventory)
+        player.openInventory(inventory)
+    }
+
+    private fun openCriticalMenu(player: Player, worldData: WorldData) {
+        val holder = CriticalHolder(worldData.uuid)
+        val inventory = Bukkit.createInventory(holder, 45, i18nComponent(player, "critical.menu_title"))
+        holder.inv = inventory
+        applyFrame(inventory)
+        inventory.setItem(36, returnItem(player))
+        inventory.setItem(22, if (storage.isProductionWorld(worldData.uuid)) criticalUnavailableItem(player) else deleteWorldItem(player))
+        fill(inventory)
+        player.openInventory(inventory)
+    }
+
+    private fun openDeleteConfirm(player: Player, worldData: WorldData, finalStep: Boolean) {
+        val holder = DeleteConfirmHolder(worldData.uuid, finalStep)
+        val key = if (finalStep) "critical.final" else "critical.confirm"
+        val inventory = Bukkit.createInventory(holder, 45, i18nComponent(player, "${key}_title"))
+        holder.inv = inventory
+        applyFrame(inventory)
+        inventory.setItem(22, item(Material.TNT, i18n(player, "${key}_display"), i18nList(player, "${key}_lore", mapOf("world" to worldData.name)), ItemTag.TYPE_GUI_INFO))
         inventory.setItem(20, confirmButton(player, true))
         inventory.setItem(24, confirmButton(player, false))
         fill(inventory)
@@ -303,6 +375,19 @@ class ChanponWorldSettingsMenuProvider(
             i18nList(player, "notification.lore", mapOf("status" to status)),
             ItemTag.TYPE_GUI_SETTING_NOTIFICATION
         )
+    }
+
+    private fun criticalItem(player: Player, isProduction: Boolean): ItemStack {
+        val lore = if (isProduction) i18nList(player, "critical.production_lore") else i18nList(player, "critical.lore")
+        return item(Material.TNT, i18n(player, "critical.display"), lore, ItemTag.TYPE_GUI_SETTING_CRITICAL)
+    }
+
+    private fun deleteWorldItem(player: Player): ItemStack {
+        return item(Material.TNT, i18n(player, "critical.delete_display"), i18nList(player, "critical.delete_lore"), ItemTag.TYPE_GUI_SETTING_DELETE_WORLD)
+    }
+
+    private fun criticalUnavailableItem(player: Player): ItemStack {
+        return item(Material.BARRIER, i18n(player, "critical.unavailable_display"), i18nList(player, "critical.unavailable_lore"), ItemTag.TYPE_GUI_INFO)
     }
 
     private fun worldInfoItem(player: Player, worldData: WorldData): ItemStack {
@@ -484,6 +569,19 @@ class ChanponWorldSettingsMenuProvider(
         val worldUuid: UUID,
         val action: ConfirmAction,
         val direction: BlockFace?
+    ) : WorldSettingsInventoryHolder {
+        lateinit var inv: Inventory
+        override fun getInventory(): Inventory = inv
+    }
+
+    private class CriticalHolder(val worldUuid: UUID) : WorldSettingsInventoryHolder {
+        lateinit var inv: Inventory
+        override fun getInventory(): Inventory = inv
+    }
+
+    private class DeleteConfirmHolder(
+        val worldUuid: UUID,
+        val finalStep: Boolean
     ) : WorldSettingsInventoryHolder {
         lateinit var inv: Inventory
         override fun getInventory(): Inventory = inv

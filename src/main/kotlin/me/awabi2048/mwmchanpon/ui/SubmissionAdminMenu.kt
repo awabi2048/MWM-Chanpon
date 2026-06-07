@@ -162,10 +162,19 @@ class SubmissionAdminMenu(
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
 
         if (clickType == ClickType.MIDDLE) {
+            openProductionToggleConfirmation(player, worldData, holder)
+            return
+        }
+
+        if (clickType.isRightClick) {
             if (player.gameMode != GameMode.CREATIVE) return
-            val state = runCatching { storage.getSubmissionState(worldData.uuid) }.getOrNull() ?: return
-            if (state != SubmissionState.SUBMITTED) return
-            markCompleted(player, worldData, holder)
+            val state = stateFor(worldData)
+            if (state == SubmissionState.COMPLETED) return
+            if (state == SubmissionState.UNSUBMITTED) {
+                openCompleteUnsubmittedConfirmation(player, worldData, holder)
+            } else {
+                markCompleted(player, worldData, holder)
+            }
             return
         }
 
@@ -175,18 +184,13 @@ class SubmissionAdminMenu(
     }
 
     private fun markCompleted(player: Player, worldData: WorldData, holder: SubmissionAdminMenuHolder) {
-        val current = try {
-            storage.getSubmissionState(worldData.uuid)
-        } catch (ex: IllegalStateException) {
-            player.sendMessage(i18nComponent(player, "message.state_error"))
-            return
-        }
-        if (current == SubmissionState.UNSUBMITTED) {
-            player.sendMessage(i18nComponent(player, "admin_menu.complete_unsubmitted"))
-            return
-        }
+        val current = stateFor(worldData)
         if (current == SubmissionState.COMPLETED) return
 
+        if (!storage.isProductionWorld(worldData.uuid)) {
+            player.sendMessage(i18nComponent(player, "admin_menu.not_production"))
+            return
+        }
         storage.setSubmissionState(
             worldData.uuid,
             SubmissionState.COMPLETED,
@@ -207,15 +211,12 @@ class SubmissionAdminMenu(
         return MyWorldManagerApi.getWorldRepository()
             ?.findAll()
             .orEmpty()
-            .filter { storage.isProductionWorld(it.uuid) }
             .filter { worldData ->
-                val state = runCatching { storage.getSubmissionState(worldData.uuid) }.getOrNull()
-                    ?: return@filter false
+                val state = stateFor(worldData)
                 matchesSubmissionFilter(state, submissionFilter)
             }
             .filter { worldData ->
-                val state = runCatching { storage.getSubmissionState(worldData.uuid) }.getOrNull()
-                    ?: return@filter false
+                val state = stateFor(worldData)
                 matchesCompletionFilter(state, completionFilter)
             }
             .sortedByDescending { it.createdAt }
@@ -231,9 +232,15 @@ class SubmissionAdminMenu(
 
     private fun matchesCompletionFilter(state: SubmissionState, filter: CompletionFilter): Boolean {
         return when (filter) {
+            CompletionFilter.ALL -> true
             CompletionFilter.UNMARKED -> state != SubmissionState.COMPLETED
             CompletionFilter.COMPLETED -> state == SubmissionState.COMPLETED
         }
+    }
+
+    private fun stateFor(worldData: WorldData): SubmissionState {
+        if (!storage.isProductionWorld(worldData.uuid)) return SubmissionState.UNSUBMITTED
+        return runCatching { storage.getSubmissionState(worldData.uuid) }.getOrDefault(SubmissionState.UNSUBMITTED)
     }
 
     private fun productionWorlds(): List<WorldData> {
@@ -282,8 +289,72 @@ class SubmissionAdminMenu(
         player.openInventory(inventory)
     }
 
+    private fun openProductionToggleConfirmation(player: Player, worldData: WorldData, source: SubmissionAdminMenuHolder) {
+        val enabling = !storage.isProductionWorld(worldData.uuid)
+        val holder = ProductionToggleConfirmationHolder(worldData.uuid, enabling, source.page, source.submissionFilter, source.completionFilter)
+        val key = if (enabling) "confirm.set_production" else "confirm.unset_production"
+        val inventory = Bukkit.createInventory(holder, 45, i18nComponent(player, "$key.title"))
+        holder.inv = inventory
+        applyConfirmationFrame(inventory)
+        inventory.setItem(22, productionToggleConfirmationItem(player, key))
+        inventory.setItem(20, confirmButton(player, true))
+        inventory.setItem(24, confirmButton(player, false))
+        player.openInventory(inventory)
+    }
+
+    private fun openCompleteUnsubmittedConfirmation(player: Player, worldData: WorldData, source: SubmissionAdminMenuHolder) {
+        val holder = CompleteUnsubmittedConfirmationHolder(worldData.uuid, source.page, source.submissionFilter, source.completionFilter)
+        val inventory = Bukkit.createInventory(holder, 45, i18nComponent(player, "confirm.complete_unsubmitted.title"))
+        holder.inv = inventory
+        applyConfirmationFrame(inventory)
+        inventory.setItem(22, completeUnsubmittedConfirmationItem(player))
+        inventory.setItem(20, confirmButton(player, true))
+        inventory.setItem(24, confirmButton(player, false))
+        player.openInventory(inventory)
+    }
+
+    @EventHandler
+    fun onProductionToggleConfirmationClick(event: InventoryClickEvent) {
+        val player = event.whoClicked as? Player ?: return
+        val holder = event.view.topInventory.holder as? ProductionToggleConfirmationHolder ?: return
+        event.isCancelled = true
+        if (event.clickedInventory != event.view.topInventory) return
+        when (ItemTag.getType(event.currentItem ?: return)) {
+            ItemTag.TYPE_GUI_CANCEL -> open(player, holder.page, holder.submissionFilter, holder.completionFilter)
+            ItemTag.TYPE_GUI_CONFIRM -> {
+                val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(holder.worldUuid) ?: return
+                if (holder.enabling && ownerHasProductionWorld(worldData.owner, worldData.uuid)) {
+                    player.sendMessage(i18nComponent(player, "admin_menu.production_limit"))
+                    open(player, holder.page, holder.submissionFilter, holder.completionFilter)
+                    return
+                }
+                storage.setProductionWorld(worldData.uuid, holder.enabling)
+                if (holder.enabling) applyForcedTags(worldData)
+                protectionService.sync(worldData)
+                toolPermissionController.syncWorld(worldData)
+                player.sendMessage(i18nComponent(player, if (holder.enabling) "admin_menu.production_enabled" else "admin_menu.production_disabled"))
+                open(player, holder.page, holder.submissionFilter, holder.completionFilter)
+            }
+        }
+    }
+
+    @EventHandler
+    fun onCompleteUnsubmittedConfirmationClick(event: InventoryClickEvent) {
+        val player = event.whoClicked as? Player ?: return
+        val holder = event.view.topInventory.holder as? CompleteUnsubmittedConfirmationHolder ?: return
+        event.isCancelled = true
+        if (event.clickedInventory != event.view.topInventory) return
+        when (ItemTag.getType(event.currentItem ?: return)) {
+            ItemTag.TYPE_GUI_CANCEL -> open(player, holder.page, holder.submissionFilter, holder.completionFilter)
+            ItemTag.TYPE_GUI_CONFIRM -> {
+                val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(holder.worldUuid) ?: return
+                markCompleted(player, worldData, SubmissionAdminMenuHolder(holder.page, holder.submissionFilter, holder.completionFilter))
+            }
+        }
+    }
+
     private fun worldItem(player: Player, worldData: WorldData): ItemStack {
-        val state = runCatching { storage.getSubmissionState(worldData.uuid) }.getOrDefault(SubmissionState.UNSUBMITTED)
+        val state = stateFor(worldData)
         val item = ItemStack(worldData.icon)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "admin_menu.world.display", mapOf("world" to worldData.name)))
@@ -307,13 +378,18 @@ class SubmissionAdminMenu(
             members.joinToString("§7, §f", prefix = "§f")
         }
         val created = formatCreatedAt(worldData.createdAt)
+        val production = if (storage.isProductionWorld(worldData.uuid)) {
+            i18n(player, "admin_menu.world.production_yes")
+        } else {
+            i18n(player, "admin_menu.world.production_no")
+        }
         val completed = if (state == SubmissionState.COMPLETED) {
             i18n(player, "admin_menu.world.completed_yes")
         } else {
             i18n(player, "admin_menu.world.completed_no")
         }
         val middleAction = if (player.gameMode == GameMode.CREATIVE) {
-            if (state == SubmissionState.SUBMITTED) i18n(player, "admin_menu.world.action_complete") else ""
+            i18n(player, "admin_menu.world.action_complete")
         } else {
             ""
         }
@@ -324,11 +400,55 @@ class SubmissionAdminMenu(
                 "owner" to ownerName,
                 "members" to memberLine,
                 "created" to created,
+                "production" to production,
                 "state" to i18n(player, "state.${state.i18nKey}"),
                 "completed" to completed,
+                "production_action" to i18n(player, "admin_menu.world.action_toggle_production"),
                 "middle_action" to middleAction
             )
         ).filter { it.isNotBlank() }
+    }
+
+    private fun productionToggleConfirmationItem(player: Player, key: String): ItemStack {
+        val item = ItemStack(Material.HEART_OF_THE_SEA)
+        item.editMeta { meta ->
+            meta.displayName(i18nComponent(player, "$key.display"))
+            meta.lore(lore(i18nList(player, "$key.lore")))
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
+        }
+        ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
+        return item
+    }
+
+    private fun completeUnsubmittedConfirmationItem(player: Player): ItemStack {
+        val item = ItemStack(Material.GOLDEN_APPLE)
+        item.editMeta { meta ->
+            meta.displayName(i18nComponent(player, "confirm.complete_unsubmitted.display"))
+            meta.lore(lore(i18nList(player, "confirm.complete_unsubmitted.lore")))
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
+        }
+        ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
+        return item
+    }
+
+    private fun ownerHasProductionWorld(ownerUuid: UUID, excludingWorldUuid: UUID): Boolean {
+        return MyWorldManagerApi.getWorldRepository()
+            ?.findAll()
+            .orEmpty()
+            .any { it.owner == ownerUuid && it.uuid != excludingWorldUuid && storage.isProductionWorld(it.uuid) }
+    }
+
+    private fun applyForcedTags(worldData: WorldData) {
+        val tags = plugin.config.getStringList("production.forced_tags")
+            .mapNotNull { raw ->
+                MyWorldManagerApi.getWorldTagService()?.normalizeTagId(raw)
+                    ?: raw.trim().lowercase().takeIf { it.isNotBlank() }
+            }
+            .distinct()
+        val missing = tags.filterNot { worldData.tags.contains(it) }
+        if (missing.isEmpty()) return
+        worldData.tags.addAll(missing)
+        MyWorldManagerApi.getWorldRepository()?.save(worldData)
     }
 
     private fun formatCreatedAt(value: String): String {
@@ -490,10 +610,15 @@ class SubmissionAdminMenu(
     }
 
     enum class CompletionFilter(val key: String) {
+        ALL("admin_menu.completion_filter.all"),
         UNMARKED("admin_menu.completion_filter.unmarked"),
         COMPLETED("admin_menu.completion_filter.completed");
 
-        fun next(): CompletionFilter = if (this == UNMARKED) COMPLETED else UNMARKED
+        fun next(): CompletionFilter = when (this) {
+            ALL -> UNMARKED
+            UNMARKED -> COMPLETED
+            COMPLETED -> ALL
+        }
     }
 
     private class SubmissionAdminMenuHolder(
@@ -506,6 +631,27 @@ class SubmissionAdminMenu(
     }
 
     private class CloseSubmissionConfirmationHolder(
+        val page: Int,
+        val submissionFilter: SubmissionFilter,
+        val completionFilter: CompletionFilter
+    ) : InventoryHolder {
+        lateinit var inv: Inventory
+        override fun getInventory(): Inventory = inv
+    }
+
+    private class ProductionToggleConfirmationHolder(
+        val worldUuid: UUID,
+        val enabling: Boolean,
+        val page: Int,
+        val submissionFilter: SubmissionFilter,
+        val completionFilter: CompletionFilter
+    ) : InventoryHolder {
+        lateinit var inv: Inventory
+        override fun getInventory(): Inventory = inv
+    }
+
+    private class CompleteUnsubmittedConfirmationHolder(
+        val worldUuid: UUID,
         val page: Int,
         val submissionFilter: SubmissionFilter,
         val completionFilter: CompletionFilter
