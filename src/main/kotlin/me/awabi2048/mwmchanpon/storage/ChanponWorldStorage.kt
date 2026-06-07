@@ -164,6 +164,16 @@ class ChanponWorldStorage(dataFolder: File) {
         config.save(worldFile(worldUuid))
     }
 
+    fun getManualRollbackLastExecutedAt(worldUuid: UUID): Long {
+        return load(worldUuid)?.getLong("backup.manual_rollback.last_executed_at", 0L) ?: 0L
+    }
+
+    fun setManualRollbackLastExecutedAt(worldUuid: UUID, value: Long) {
+        val config = loadOrCreate(worldUuid)
+        config.set("backup.manual_rollback.last_executed_at", value)
+        config.save(worldFile(worldUuid))
+    }
+
     fun deleteWorld(worldUuid: UUID) {
         worldFile(worldUuid).delete()
     }

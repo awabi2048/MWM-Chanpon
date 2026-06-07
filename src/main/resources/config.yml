@@ -48,6 +48,10 @@ backup:
     last_run_date: ""
   automation:
     check_interval_ticks: 1200
+    manual_lock_minutes: 10
+  manual_rollback:
+    delay_seconds: 15
+    cooldown_minutes: 10
   retention:
     enabled: false
     keep:

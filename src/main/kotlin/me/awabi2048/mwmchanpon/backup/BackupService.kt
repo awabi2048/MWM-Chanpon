@@ -95,6 +95,17 @@ class BackupService(
         return (remaining + 999L) / 1000L
     }
 
+    fun manualRollbackCooldownRemainingSeconds(worldUuids: List<UUID>): Long {
+        val remaining = worldUuids.distinct().maxOfOrNull(::manualRollbackCooldownRemainingMillis) ?: 0L
+        if (remaining <= 0L) return 0L
+        return (remaining + 999L) / 1000L
+    }
+
+    fun markManualRollbackExecuted(worldUuids: List<UUID>) {
+        val now = System.currentTimeMillis()
+        worldUuids.distinct().forEach { storage.setManualRollbackLastExecutedAt(it, now) }
+    }
+
     fun createAllBackup(
         worldUuids: List<UUID>,
         kind: BackupKind,
@@ -123,7 +134,7 @@ class BackupService(
     fun restoreWorldBackup(entry: BackupEntry, worldUuid: UUID): CompletableFuture<RestoreOperationResult> {
         if (worldUuid !in entry.worldUuids) {
             return CompletableFuture.completedFuture(
-                RestoreOperationResult(BackupOperationStatus.FAILED, emptyList(), listOf(worldUuid), null, "world is not included in backup")
+                restoreFailure(entry, listOf(worldUuid), "world is not included in backup")
             )
         }
         return restoreBackup(entry, listOf(worldUuid))
@@ -132,14 +143,14 @@ class BackupService(
     private fun restoreBackup(entry: BackupEntry, requestedWorlds: List<UUID>): CompletableFuture<RestoreOperationResult> {
         if (!activeBackupIds.add(entry.id)) {
             return CompletableFuture.completedFuture(
-                RestoreOperationResult(BackupOperationStatus.FAILED, emptyList(), requestedWorlds, null, "backup is locked")
+                restoreFailure(entry, requestedWorlds, "backup is locked")
             )
         }
         val targets = requestedWorlds.distinct().filter { storage.isProductionWorld(it) }
         if (targets.isEmpty()) {
             activeBackupIds.remove(entry.id)
             return CompletableFuture.completedFuture(
-                RestoreOperationResult(BackupOperationStatus.FAILED, emptyList(), requestedWorlds, null, "no production worlds")
+                restoreFailure(entry, requestedWorlds, "no production worlds")
             )
         }
         val locked = targets.filter { operationLocks.add(it) }
@@ -147,7 +158,7 @@ class BackupService(
             locked.forEach(operationLocks::remove)
             activeBackupIds.remove(entry.id)
             return CompletableFuture.completedFuture(
-                RestoreOperationResult(BackupOperationStatus.FAILED, emptyList(), targets, null, "world is locked")
+                restoreFailure(entry, targets, "world is locked")
             )
         }
 
@@ -156,7 +167,7 @@ class BackupService(
         if (core == null) {
             targets.forEach(operationLocks::remove)
             activeBackupIds.remove(entry.id)
-            future.complete(RestoreOperationResult(BackupOperationStatus.FAILED, emptyList(), targets, null, "core api unavailable"))
+            future.complete(restoreFailure(entry, targets, "core api unavailable"))
             return future
         }
 
@@ -164,7 +175,7 @@ class BackupService(
         if (evacuatedPlayers == null) {
             targets.forEach(operationLocks::remove)
             activeBackupIds.remove(entry.id)
-            future.complete(RestoreOperationResult(BackupOperationStatus.FAILED, emptyList(), targets, null, "spawn world is not configured or unavailable"))
+            future.complete(restoreFailure(entry, targets, "spawn world is not configured or unavailable"))
             return future
         }
         unloadSequential(targets, save = true).thenCompose { unloaded ->
@@ -213,10 +224,12 @@ class BackupService(
             targets.forEach(operationLocks::remove)
             activeBackupIds.remove(entry.id)
             if (throwable != null) {
-                future.complete(
+                val failedResult =
                     RestoreOperationResult(BackupOperationStatus.FAILED, emptyList(), targets, null, throwable.message ?: "restore failed")
-                )
+                logRestoreFailure(entry, failedResult, throwable)
+                future.complete(failedResult)
             } else {
+                logRestoreFailure(entry, result)
                 val restoredWorlds = result.restoredWorlds.distinct()
                 if (restoredWorlds.isNotEmpty()) {
                     Bukkit.getScheduler().runTask(plugin, Runnable {
@@ -228,6 +241,43 @@ class BackupService(
             }
         }
         return future
+    }
+
+    private fun restoreFailure(
+        entry: BackupEntry?,
+        failedWorlds: List<UUID>,
+        message: String,
+        restoredWorlds: List<UUID> = emptyList(),
+        preRollbackBackup: BackupEntry? = null,
+        status: BackupOperationStatus = BackupOperationStatus.FAILED
+    ): RestoreOperationResult {
+        val result = RestoreOperationResult(status, restoredWorlds, failedWorlds, preRollbackBackup, message)
+        logRestoreFailure(entry, result)
+        return result
+    }
+
+    private fun logRestoreFailure(
+        entry: BackupEntry?,
+        result: RestoreOperationResult,
+        throwable: Throwable? = null
+    ) {
+        if (result.status == BackupOperationStatus.SUCCESS) return
+        val message = buildString {
+            append("Rollback failed: status=${result.status}")
+            append(", backup=${entry?.id ?: "-"}")
+            append(", message=${result.message}")
+            append(", restored=${result.restoredWorlds.joinToString()}")
+            append(", failed=${result.failedWorlds.joinToString()}")
+            append(", preRollback=${result.preRollbackBackup?.id ?: "-"}")
+        }
+        if (result.status == BackupOperationStatus.RECOVERY_FAILED) {
+            plugin.logger.severe(message)
+        } else {
+            plugin.logger.warning(message)
+        }
+        if (throwable != null) {
+            plugin.logger.warning("Rollback exception: ${throwable.message}")
+        }
     }
 
     fun deleteBackup(entry: BackupEntry): Boolean {
@@ -568,6 +618,14 @@ class BackupService(
 
     private fun markOwnerBackupCreated(worldUuid: UUID) {
         storage.setOwnerManualBackupLastCreatedAt(worldUuid, System.currentTimeMillis())
+    }
+
+    private fun manualRollbackCooldownRemainingMillis(worldUuid: UUID): Long {
+        val cooldownMillis = plugin.config.getLong("backup.manual_rollback.cooldown_minutes", 10L).coerceAtLeast(0L) * 60L * 1000L
+        if (cooldownMillis <= 0L) return 0L
+        val lastExecutedAt = storage.getManualRollbackLastExecutedAt(worldUuid)
+        if (lastExecutedAt <= 0L) return 0L
+        return (cooldownMillis - (System.currentTimeMillis() - lastExecutedAt)).coerceAtLeast(0L)
     }
 
     private fun saveLoadedWorlds(worldUuids: List<UUID>) {

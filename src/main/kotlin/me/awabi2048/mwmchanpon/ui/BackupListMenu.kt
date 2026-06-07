@@ -8,8 +8,12 @@ import me.awabi2048.mwmchanpon.backup.BackupKind
 import me.awabi2048.mwmchanpon.backup.BackupOperationStatus
 import me.awabi2048.mwmchanpon.backup.BackupScope
 import me.awabi2048.mwmchanpon.backup.BackupService
+import me.awabi2048.mwmchanpon.backup.RestoreOperationResult
+import me.awabi2048.mwmchanpon.service.BackupAutomationService
+import me.awabi2048.mwmchanpon.service.ManualRollbackService
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
@@ -28,9 +32,19 @@ class BackupListMenu(
     private val backupService: BackupService
 ) : Listener {
     private var parentMenuOpener: ((Player) -> Unit)? = null
+    private var automationService: BackupAutomationService? = null
+    private var manualRollbackService: ManualRollbackService? = null
 
     fun setParentMenuOpener(opener: (Player) -> Unit) {
         parentMenuOpener = opener
+    }
+
+    fun setAutomationService(service: BackupAutomationService) {
+        automationService = service
+    }
+
+    fun setManualRollbackService(service: ManualRollbackService) {
+        manualRollbackService = service
     }
 
     fun openAll(player: Player, page: Int = 0) {
@@ -94,18 +108,90 @@ class BackupListMenu(
             ItemTag.TYPE_GUI_CANCEL -> open(player, holder.source.mode, holder.source.worldUuid, holder.source.page)
             ItemTag.TYPE_GUI_CONFIRM -> {
                 player.closeInventory()
+                if (automationService?.isManualOperationBlocked(player) == true) {
+                    player.sendMessage(i18nComponent(player, "message.manual_operation_blocked"))
+                    return
+                }
                 val backup = backupService.listBackups().firstOrNull { it.id == holder.backupId } ?: return
-                val future = if (holder.source.mode == BackupListMode.WORLD && holder.source.worldUuid != null) {
-                    backupService.restoreWorldBackup(backup, holder.source.worldUuid)
-                } else {
-                    backupService.restoreBackup(backup)
+                val targetWorlds = restoreTargets(backup, holder.source)
+                val rollbackCooldown = backupService.manualRollbackCooldownRemainingSeconds(targetWorlds)
+                if (rollbackCooldown > 0L) {
+                    player.sendMessage(i18nComponent(player, "message.rollback_cooldown", mapOf("remaining" to BackupDisplay.formatDuration(rollbackCooldown))))
+                    return
                 }
-                future.thenAccept { result ->
-                    Bukkit.getScheduler().runTask(plugin, Runnable {
-                        player.sendMessage(i18nComponent(player, "message.restore_${result.status.name.lowercase()}"))
-                    })
+                val rollbackService = manualRollbackService
+                if (rollbackService == null) {
+                    executeRestore(player, backup, holder.source)
+                    return
                 }
+                rollbackService.schedule(
+                    player,
+                    {
+                        if (holder.source.mode == BackupListMode.WORLD && holder.source.worldUuid != null) {
+                            backupService.restoreWorldBackup(backup, holder.source.worldUuid)
+                        } else {
+                            backupService.restoreBackup(backup)
+                        }
+                    },
+                    { result ->
+                        if (result.status == BackupOperationStatus.SUCCESS || result.status == BackupOperationStatus.RECOVERED) {
+                            backupService.markManualRollbackExecuted(result.restoredWorlds)
+                        }
+                        sendRestoreResult(player, result)
+                    }
+                )
             }
+        }
+    }
+
+    private fun executeRestore(player: Player, backup: BackupEntry, source: Holder) {
+        val targetWorlds = restoreTargets(backup, source)
+        val rollbackCooldown = backupService.manualRollbackCooldownRemainingSeconds(targetWorlds)
+        if (rollbackCooldown > 0L) {
+            player.sendMessage(i18nComponent(player, "message.rollback_cooldown", mapOf("remaining" to BackupDisplay.formatDuration(rollbackCooldown))))
+            return
+        }
+        val future = if (source.mode == BackupListMode.WORLD && source.worldUuid != null) {
+            backupService.restoreWorldBackup(backup, source.worldUuid)
+        } else {
+            backupService.restoreBackup(backup)
+        }
+        future.thenAccept { result ->
+            Bukkit.getScheduler().runTask(plugin, Runnable {
+                if (result.status == BackupOperationStatus.SUCCESS || result.status == BackupOperationStatus.RECOVERED) {
+                    backupService.markManualRollbackExecuted(result.restoredWorlds)
+                }
+                sendRestoreResult(player, result)
+            })
+        }
+    }
+
+    private fun sendRestoreResult(player: Player, result: RestoreOperationResult) {
+        player.sendMessage(i18nComponent(player, "message.restore_${result.status.name.lowercase()}"))
+        if (result.status == BackupOperationStatus.SUCCESS) return
+        player.sendMessage(Component.text("要因: ${restoreReason(result.message)}", NamedTextColor.RED))
+    }
+
+    private fun restoreReason(message: String): String = when (message) {
+        "world is not included in backup" -> "このバックアップに対象ワールドが含まれていません。"
+        "backup is locked" -> "このバックアップは別の処理で使用中です。"
+        "no production worlds" -> "対象となる本番用ワールドがありません。"
+        "world is locked" -> "対象ワールドは別のバックアップまたはロールバック処理中です。"
+        "core api unavailable" -> "MyWorldManagerのAPIを取得できません。"
+        "spawn world is not configured or unavailable" -> "退避先のスポーンワールドが未設定、または利用できません。"
+        "failed to unload worlds" -> "対象ワールドのアンロードに失敗しました。"
+        "failed to create pre rollback backup" -> "ロールバック前の退避バックアップ作成に失敗しました。"
+        "restore failed" -> "ワールドデータの復元に失敗しました。"
+        "restore failed; recovered original state" -> "復元に失敗しましたが、実行前の状態へ戻しました。"
+        "restore failed; recovery also failed" -> "復元に失敗し、実行前の状態への復旧にも失敗しました。"
+        else -> message
+    }
+
+    private fun restoreTargets(backup: BackupEntry, source: Holder): List<UUID> {
+        return if (source.mode == BackupListMode.WORLD && source.worldUuid != null) {
+            listOf(source.worldUuid)
+        } else {
+            backup.worldUuids
         }
     }
 
@@ -139,7 +225,7 @@ class BackupListMenu(
                 "created" to BackupDisplay.formatCreatedAt(backup.createdAt),
                 "worlds" to backup.worldUuids.size,
                 "size" to formatBytes(backup.sizeBytes),
-                "actor" to (backup.actorName ?: "system")
+                "actor" to BackupDisplay.actorName(backup)
             ))))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }

@@ -198,6 +198,7 @@ class ChanponPlayerWorldMenuProvider(
                 "gui.player_world.world_item.publish",
                 mapOf("level" to visibilityName(player, storage.getVisibility(world.uuid)), "status_color" to "")
             )
+            val progressLine = SubmissionProgressDisplay.line(player, storage, world.uuid)
             val tagLine = if (world.tags.isNotEmpty()) {
                 val tagNames = world.tags.joinToString(", ") { mwm.worldTagManager.getDisplayName(player, it) }
                 lang.getMessage(player, "gui.player_world.world_item.tag", mapOf("tags" to tagNames))
@@ -216,7 +217,7 @@ class ChanponPlayerWorldMenuProvider(
                     "description" to description,
                     "owner_line" to ownerLine,
                     "publish_line" to publishLine,
-                    "favorite_line" to "",
+                    "favorite_line" to progressLine,
                     "visitor_line" to "",
                     "tag_line" to tagLine,
                     "expires_at_line" to "",

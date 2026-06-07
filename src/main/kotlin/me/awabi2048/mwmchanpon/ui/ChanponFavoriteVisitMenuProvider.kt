@@ -2,6 +2,7 @@ package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
+import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.event.MwmWarpReason
@@ -30,7 +31,8 @@ import java.time.LocalDate
 import java.util.UUID
 
 class ChanponFavoriteVisitMenuProvider(
-    private val plugin: MWMChanponPlugin
+    private val plugin: MWMChanponPlugin,
+    private val storage: ChanponWorldStorage
 ) : FavoriteListMenuProvider, FavoriteMenuProvider, VisitMenuProvider, Listener {
     override fun getId(): String = PROVIDER_ID
 
@@ -183,6 +185,7 @@ class ChanponFavoriteVisitMenuProvider(
             if (world.description.isNotBlank()) lines.add(mwm().languageManager.getMessage(player, "gui.common.world_desc", mapOf("description" to world.description)))
             val ownerName = Bukkit.getOfflinePlayer(world.owner).name ?: mwm().languageManager.getMessage(player, "general.unknown")
             lines.add(i18n(player, "favorite_visit.owner", mapOf("owner" to ownerName)))
+            lines.add(SubmissionProgressDisplay.line(player, storage, world.uuid))
             if (world.tags.isNotEmpty()) {
                 lines.add(i18n(player, "favorite_visit.tags", mapOf("tags" to world.tags.joinToString(", ") { mwm().worldTagManager.getDisplayName(player, it) })))
             }

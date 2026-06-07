@@ -5,6 +5,7 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
+import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.SubmissionState
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
@@ -195,6 +196,7 @@ class ProductionToggleExtension(
                     player.name,
                     "submit"
                 )
+                storage.setVisibility(worldUuid, ChanponWorldVisibility.PUBLIC)
                 MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)?.let {
                     protectionService.sync(it)
                     toolPermissionController.syncWorld(it)
