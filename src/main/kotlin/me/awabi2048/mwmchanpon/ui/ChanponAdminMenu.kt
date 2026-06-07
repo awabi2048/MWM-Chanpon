@@ -2,6 +2,8 @@ package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
+import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
+import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
@@ -17,6 +19,7 @@ import org.bukkit.inventory.ItemStack
 
 class ChanponAdminMenu(
     private val plugin: MWMChanponPlugin,
+    private val globalStorage: ChanponGlobalStorage,
     private val submissionAdminMenu: SubmissionAdminMenu,
     private val worldDataManagementMenu: WorldDataManagementMenu,
     private val automationSettingsMenu: AutomationSettingsMenu
@@ -35,6 +38,9 @@ class ChanponAdminMenu(
         inventory.setItem(23, menuItem(player, Material.CLOCK, "admin.automation", ACTION_AUTOMATION))
         inventory.setItem(25, menuItem(player, Material.DISPENSER, "admin.export", ACTION_EXPORT))
         inventory.setItem(40, infoItem(player))
+        currentWorldUuid(player)?.let { worldUuid ->
+            inventory.setItem(42, spawnWorldItem(player, worldUuid))
+        }
         fill(inventory)
         player.openInventory(inventory)
     }
@@ -42,16 +48,49 @@ class ChanponAdminMenu(
     @EventHandler
     fun onClick(event: InventoryClickEvent) {
         val player = event.whoClicked as? Player ?: return
-        event.view.topInventory.holder as? Holder ?: return
+        val holder = event.view.topInventory.holder
+        if (holder !is Holder && holder !is SpawnConfirmHolder) return
         event.isCancelled = true
         if (event.clickedInventory != event.view.topInventory) return
         val item = event.currentItem ?: return
-        when (ItemTag.getString(item, ACTION_KEY)) {
-            ACTION_SUBMISSION -> submissionAdminMenu.open(player)
-            ACTION_WORLD_DATA -> worldDataManagementMenu.open(player)
-            ACTION_AUTOMATION -> automationSettingsMenu.open(player)
-            ACTION_EXPORT -> player.sendMessage(i18nComponent(player, "admin.export.mock_message"))
+        when (holder) {
+            is Holder -> when (ItemTag.getString(item, ACTION_KEY)) {
+                ACTION_SUBMISSION -> submissionAdminMenu.open(player)
+                ACTION_WORLD_DATA -> worldDataManagementMenu.open(player)
+                ACTION_AUTOMATION -> automationSettingsMenu.open(player)
+                ACTION_EXPORT -> player.sendMessage(i18nComponent(player, "admin.export.mock_message"))
+                ACTION_SET_SPAWN_WORLD -> {
+                    val worldUuid = ItemTag.getWorldUuid(item) ?: return
+                    openSpawnConfirm(player, worldUuid)
+                }
+            }
+            is SpawnConfirmHolder -> when (ItemTag.getType(item)) {
+                ItemTag.TYPE_GUI_CONFIRM -> {
+                    globalStorage.setSpawnWorldUuid(holder.worldUuid)
+                    player.sendMessage(i18nComponent(player, "spawn_world.set_success"))
+                    open(player)
+                }
+                ItemTag.TYPE_GUI_CANCEL -> open(player)
+            }
         }
+    }
+
+    private fun openSpawnConfirm(player: Player, worldUuid: java.util.UUID) {
+        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
+        val holder = SpawnConfirmHolder(worldUuid)
+        val inventory = Bukkit.createInventory(holder, 45, i18nComponent(player, "spawn_world.confirm.title"))
+        holder.inv = inventory
+        applyFrame(inventory)
+        inventory.setItem(22, menuItem(player, Material.COMPASS, "spawn_world.confirm.center", ACTION_NONE).also {
+            it.editMeta { meta ->
+                meta.displayName(i18nComponent(player, "spawn_world.confirm.center.display", mapOf("world" to worldData.name)))
+                meta.lore(lore(i18nList(player, "spawn_world.confirm.center.lore", mapOf("world" to worldData.name))))
+            }
+        })
+        inventory.setItem(20, confirmButton(player, true))
+        inventory.setItem(24, confirmButton(player, false))
+        fill(inventory)
+        player.openInventory(inventory)
     }
 
     private fun applyFrame(inventory: Inventory) {
@@ -75,6 +114,28 @@ class ChanponAdminMenu(
         ItemTag.tagItem(item, TYPE_CONTROL)
         ItemTag.setString(item, ACTION_KEY, action)
         return item
+    }
+
+    private fun spawnWorldItem(player: Player, worldUuid: java.util.UUID): ItemStack {
+        val configured = globalStorage.getSpawnWorldUuid()
+        val key = if (configured == null) "spawn_world.set" else "spawn_world.change"
+        return menuItem(player, Material.COMPASS, key, ACTION_SET_SPAWN_WORLD).also {
+            ItemTag.setWorldUuid(it, worldUuid)
+        }
+    }
+
+    private fun confirmButton(player: Player, confirm: Boolean): ItemStack {
+        val item = ItemStack(if (confirm) Material.LIME_CONCRETE else Material.RED_CONCRETE)
+        item.editMeta { meta ->
+            meta.displayName(i18nComponent(player, if (confirm) "confirm.button.confirm" else "confirm.button.cancel"))
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
+        }
+        ItemTag.tagItem(item, if (confirm) ItemTag.TYPE_GUI_CONFIRM else ItemTag.TYPE_GUI_CANCEL)
+        return item
+    }
+
+    private fun currentWorldUuid(player: Player): java.util.UUID? {
+        return MyWorldManagerApi.getWorldRepository()?.findByWorldName(player.world.name)?.uuid
     }
 
     private fun infoItem(player: Player): ItemStack {
@@ -111,6 +172,11 @@ class ChanponAdminMenu(
         override fun getInventory(): Inventory = inv
     }
 
+    private class SpawnConfirmHolder(val worldUuid: java.util.UUID) : InventoryHolder {
+        lateinit var inv: Inventory
+        override fun getInventory(): Inventory = inv
+    }
+
     companion object {
         private const val TYPE_CONTROL = "chanpon_admin_control"
         private const val ACTION_KEY = "chanpon_action"
@@ -118,5 +184,7 @@ class ChanponAdminMenu(
         private const val ACTION_WORLD_DATA = "world_data"
         private const val ACTION_AUTOMATION = "automation"
         private const val ACTION_EXPORT = "export"
+        private const val ACTION_SET_SPAWN_WORLD = "set_spawn_world"
+        private const val ACTION_NONE = "none"
     }
 }
