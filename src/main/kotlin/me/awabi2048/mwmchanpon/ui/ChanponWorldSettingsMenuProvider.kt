@@ -84,9 +84,8 @@ class ChanponWorldSettingsMenuProvider(
             inventory.setItem(19, mwmItem(player, "info", Material.NAME_TAG, ItemTag.TYPE_GUI_SETTING_INFO))
             inventory.setItem(20, mwmItem(player, "icon", Material.ANVIL, ItemTag.TYPE_GUI_SETTING_ICON))
             inventory.setItem(21, mwmItem(player, "spawn", Material.COMPASS, ItemTag.TYPE_GUI_SETTING_SPAWN))
-            inventory.setItem(28, mwmItem(player, "tags", Material.BOOK, ItemTag.TYPE_GUI_SETTING_TAGS))
-            inventory.setItem(29, mwmItem(player, "announcement", Material.OAK_SIGN, ItemTag.TYPE_GUI_SETTING_ANNOUNCEMENT))
-            inventory.setItem(30, notificationItem(player, worldData))
+            inventory.setItem(28, mwmItem(player, "announcement", Material.OAK_SIGN, ItemTag.TYPE_GUI_SETTING_ANNOUNCEMENT))
+            inventory.setItem(29, notificationItem(player, worldData))
             inventory.setItem(47, mwmItem(player, "tour", Material.PALE_OAK_BOAT, ItemTag.TYPE_GUI_SETTING_TOUR, "gui.tour.worldmenu"))
         }
         if (isOwner) {
