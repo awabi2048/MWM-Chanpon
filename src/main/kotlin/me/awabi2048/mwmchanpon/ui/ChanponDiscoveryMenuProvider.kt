@@ -12,6 +12,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Random
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
+import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.event.MwmFavoriteAddSource
@@ -43,7 +44,8 @@ import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
 
 class ChanponDiscoveryMenuProvider(
-    private val plugin: MWMChanponPlugin
+    private val plugin: MWMChanponPlugin,
+    private val storage: ChanponWorldStorage
 ) : DiscoveryMenuProvider, Listener {
     private val legacy = LegacyComponentSerializer.legacySection()
 
@@ -287,6 +289,7 @@ class ChanponDiscoveryMenuProvider(
             val lines = listOf(
                 description,
                 lang.getMessage(player, "gui.player_world.world_item.owner", mapOf("owner" to ownerName)),
+                SubmissionProgressDisplay.line(player, storage, world.uuid),
                 tagLine,
                 if (isCurrentWorld) "" else lang.getMessage(player, "gui.discovery.world_item.warp_hint"),
                 if (isCurrentWorld) "" else lang.getMessage(player, "gui.discovery.world_item.preview_hint"),

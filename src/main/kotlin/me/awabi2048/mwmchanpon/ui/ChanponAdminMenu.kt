@@ -22,7 +22,8 @@ class ChanponAdminMenu(
     private val globalStorage: ChanponGlobalStorage,
     private val submissionAdminMenu: SubmissionAdminMenu,
     private val worldDataManagementMenu: WorldDataManagementMenu,
-    private val automationSettingsMenu: AutomationSettingsMenu
+    private val automationSettingsMenu: AutomationSettingsMenu,
+    private val worldDataExportMenu: WorldDataExportMenu
 ) : Listener {
     fun open(player: Player) {
         if (!player.hasPermission("mwmchanpon.admin")) {
@@ -58,7 +59,7 @@ class ChanponAdminMenu(
                 ACTION_SUBMISSION -> submissionAdminMenu.open(player)
                 ACTION_WORLD_DATA -> worldDataManagementMenu.open(player)
                 ACTION_AUTOMATION -> automationSettingsMenu.open(player)
-                ACTION_EXPORT -> player.sendMessage(i18nComponent(player, "admin.export.mock_message"))
+                ACTION_EXPORT -> worldDataExportMenu.open(player)
                 ACTION_SET_SPAWN_WORLD -> {
                     val worldUuid = ItemTag.getWorldUuid(item) ?: return
                     openSpawnConfirm(player, worldUuid)

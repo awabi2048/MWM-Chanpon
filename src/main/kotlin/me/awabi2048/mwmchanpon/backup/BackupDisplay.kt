@@ -8,6 +8,7 @@ object BackupDisplay {
     const val ADMIN_MANUAL_NAME = "スタッフによる手動バックアップ"
     const val SCHEDULED_NAME = "定時バックアップ"
     const val PRE_ROLLBACK_NAME = "ロールバック時バックアップ"
+    const val SYSTEM_ACTOR_NAME = "自動的に作成"
 
     private val dateTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日 H:mm")
 
@@ -27,6 +28,11 @@ object BackupDisplay {
 
     fun normalizeManualName(input: String?): String {
         return input?.trim()?.takeIf { it.isNotEmpty() } ?: DEFAULT_OWNER_MANUAL_NAME
+    }
+
+    fun actorName(entry: BackupEntry): String {
+        val actor = entry.actorName?.takeIf { it.isNotBlank() }
+        return if (actor == null || actor == "system") SYSTEM_ACTOR_NAME else actor
     }
 
     fun formatCreatedAt(value: LocalDateTime): String {

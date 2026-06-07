@@ -223,6 +223,7 @@ class SubmissionAdminMenu(
 
     private fun matchesSubmissionFilter(state: SubmissionState, filter: SubmissionFilter): Boolean {
         return when (filter) {
+            SubmissionFilter.ALL -> true
             SubmissionFilter.UNSUBMITTED -> state == SubmissionState.UNSUBMITTED
             SubmissionFilter.SUBMITTED -> state == SubmissionState.SUBMITTED || state == SubmissionState.COMPLETED
         }
@@ -477,10 +478,15 @@ class SubmissionAdminMenu(
     }
 
     enum class SubmissionFilter(val key: String) {
+        ALL("admin_menu.submission_filter.all"),
         UNSUBMITTED("admin_menu.submission_filter.unsubmitted"),
         SUBMITTED("admin_menu.submission_filter.submitted");
 
-        fun next(): SubmissionFilter = if (this == UNSUBMITTED) SUBMITTED else UNSUBMITTED
+        fun next(): SubmissionFilter = when (this) {
+            ALL -> UNSUBMITTED
+            UNSUBMITTED -> SUBMITTED
+            SUBMITTED -> ALL
+        }
     }
 
     enum class CompletionFilter(val key: String) {
