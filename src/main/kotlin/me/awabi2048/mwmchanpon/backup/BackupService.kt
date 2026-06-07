@@ -161,6 +161,12 @@ class BackupService(
         }
 
         val evacuatedPlayers = evacuatePlayers(targets)
+        if (evacuatedPlayers == null) {
+            targets.forEach(operationLocks::remove)
+            activeBackupIds.remove(entry.id)
+            future.complete(RestoreOperationResult(BackupOperationStatus.FAILED, emptyList(), targets, null, "spawn world is not configured or unavailable"))
+            return future
+        }
         unloadSequential(targets, save = true).thenCompose { unloaded ->
             if (!unloaded) {
                 CompletableFuture.completedFuture(
@@ -396,11 +402,9 @@ class BackupService(
         return chain
     }
 
-    private fun evacuatePlayers(worldUuids: List<UUID>): List<EvacuatedPlayer> {
-        val fallback = Bukkit.getWorld("level") ?: Bukkit.getWorlds().firstOrNull()
-        val location = fallback?.spawnLocation
+    private fun evacuatePlayers(worldUuids: List<UUID>): List<EvacuatedPlayer>? {
         val names = worldUuids.map { "my_world.$it" }.toSet()
-        return Bukkit.getOnlinePlayers()
+        val targets = Bukkit.getOnlinePlayers()
             .mapNotNull { player ->
                 val worldUuid = MyWorldManagerApi.getWorldRepository()?.findByWorldName(player.world.name)?.uuid
                     ?: if (player.world.name in names) {
@@ -409,10 +413,12 @@ class BackupService(
                         null
                     }
                 if (worldUuid == null || worldUuid !in worldUuids) return@mapNotNull null
-                EvacuatedPlayer(player.uniqueId, worldUuid, player.location.clone()).also {
-                    if (location != null) player.teleport(location)
-                }
+                player to EvacuatedPlayer(player.uniqueId, worldUuid, player.location.clone())
             }
+        if (targets.isEmpty()) return emptyList()
+        val location = MyWorldManagerApi.getEvacuationLocationOverride() ?: return null
+        targets.forEach { (player, _) -> player.teleport(location) }
+        return targets.map { it.second }
     }
 
     private fun restoreEvacuatedPlayers(evacuatedPlayers: List<EvacuatedPlayer>, result: RestoreOperationResult) {
