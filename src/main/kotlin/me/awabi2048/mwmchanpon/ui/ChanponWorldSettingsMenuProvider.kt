@@ -3,9 +3,9 @@ package me.awabi2048.mwmchanpon.ui
 import com.awabi2048.ccsystem.CCSystem
 import java.util.UUID
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
+import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
-import me.awabi2048.mwmchanpon.storage.SubmissionState
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.MenuExtensionContext
@@ -36,14 +36,14 @@ import org.bukkit.plugin.java.JavaPlugin
 
 class ChanponWorldSettingsMenuProvider(
     private val plugin: MWMChanponPlugin,
-    private val storage: ChanponWorldStorage
+    private val storage: ChanponWorldStorage,
+    private val protectionService: SubmittedWorldProtectionService
 ) : WorldSettingsMenuProvider, Listener {
     override fun getId(): String = PROVIDER_ID
 
     override fun open(player: Player, worldData: WorldData, request: WorldSettingsMenuRequest): Boolean {
         if (storage.isProductionWorld(worldData.uuid)) {
-            val state = runCatching { storage.getSubmissionState(worldData.uuid) }.getOrNull()
-            if (state == SubmissionState.SUBMITTED || state == SubmissionState.COMPLETED) {
+            if (protectionService.isProtected(worldData)) {
                 return false
             }
         }

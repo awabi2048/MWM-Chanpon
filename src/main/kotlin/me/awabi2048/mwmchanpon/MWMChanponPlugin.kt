@@ -81,20 +81,27 @@ class MWMChanponPlugin : JavaPlugin() {
         val chanponStorage = ChanponWorldStorage(dataFolder)
         val luckPerms = LuckPermsProvider.get()
         val toolDefinitions = ToolPermissionConfig(this).load()
+        val isAutoRollbackEnabled = { config.getBoolean("backup.auto_rollback.enabled", false) }
         val toolController = ToolPermissionController(
             chanponStorage,
             LuckPermsToolPermissionService(luckPerms, logger),
-            toolDefinitions
+            toolDefinitions,
+            isAutoRollbackEnabled
         )
 
         backupService = BackupService(this, chanponStorage)
         backupListMenu = BackupListMenu(this, backupService)
         worldDataManagementMenu = WorldDataManagementMenu(this, chanponStorage, backupService, backupListMenu)
         automationService = BackupAutomationService(this, chanponStorage, backupService)
-        automationSettingsMenu = AutomationSettingsMenu(this, backupService, automationService)
 
         productionWorldGuard = ProductionWorldGuard(chanponStorage)
-        submittedProtectionService = SubmittedWorldProtectionService(chanponStorage, logger)
+        submittedProtectionService = SubmittedWorldProtectionService(chanponStorage, logger, isAutoRollbackEnabled)
+        automationSettingsMenu = AutomationSettingsMenu(this, backupService, automationService) {
+            MyWorldManagerApi.getWorldRepository()?.findAll()?.let { worlds ->
+                submittedProtectionService.syncAll(worlds)
+                worlds.forEach(toolController::syncWorld)
+            }
+        }
         backupService.setPostRestoreHandler { restoredWorlds ->
             val repository = MyWorldManagerApi.getWorldRepository() ?: return@setPostRestoreHandler
             restoredWorlds.mapNotNull(repository::findByUuid).forEach { worldData ->
@@ -126,7 +133,7 @@ class MWMChanponPlugin : JavaPlugin() {
             submittedProtectionService,
             toolController
         )
-        chanponWorldSettingsMenuProvider = ChanponWorldSettingsMenuProvider(this, chanponStorage)
+        chanponWorldSettingsMenuProvider = ChanponWorldSettingsMenuProvider(this, chanponStorage, submittedProtectionService)
         playerWorldMenuProvider = ChanponPlayerWorldMenuProvider(this, chanponStorage)
         discoveryMenuProvider = ChanponDiscoveryMenuProvider(this)
         worldAccessPolicy = ChanponWorldAccessPolicy(chanponStorage)

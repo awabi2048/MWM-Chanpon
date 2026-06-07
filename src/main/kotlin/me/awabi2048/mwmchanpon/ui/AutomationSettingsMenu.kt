@@ -21,7 +21,8 @@ import org.bukkit.inventory.ItemStack
 class AutomationSettingsMenu(
     private val plugin: MWMChanponPlugin,
     private val backupService: BackupService,
-    private val automationService: BackupAutomationService
+    private val automationService: BackupAutomationService,
+    private val onSettingsChanged: () -> Unit = {}
 ) : Listener {
     private var parentMenuOpener: ((Player) -> Unit)? = null
 
@@ -59,20 +60,7 @@ class AutomationSettingsMenu(
         when (ItemTag.getString(item, ACTION_KEY)) {
             ACTION_AUTO_BACKUP -> openToggleConfirm(player, "backup.auto_backup.enabled", "confirm.auto_backup_toggle")
             ACTION_AUTO_ROLLBACK -> openToggleConfirm(player, "backup.auto_rollback.enabled", "confirm.auto_rollback_toggle")
-            ACTION_RESTORE_POINT -> {
-                player.closeInventory()
-                backupService.createAllBackup(
-                    automationService.productionWorldUuids(),
-                    BackupKind.RESTORE_POINT,
-                    player.uniqueId,
-                    player.name,
-                    "restore_point"
-                ).thenAccept { result ->
-                    Bukkit.getScheduler().runTask(plugin, Runnable {
-                        player.sendMessage(i18nComponent(player, if (result.status == BackupOperationStatus.SUCCESS) "message.restore_point_success" else "message.backup_failed"))
-                    })
-                }
-            }
+            ACTION_RESTORE_POINT -> openRestorePointConfirm(player)
         }
     }
 
@@ -91,10 +79,38 @@ class AutomationSettingsMenu(
         }
     }
 
+    @EventHandler
+    fun onRestorePointConfirmClick(event: InventoryClickEvent) {
+        val player = event.whoClicked as? Player ?: return
+        event.view.topInventory.holder as? RestorePointConfirmHolder ?: return
+        event.isCancelled = true
+        if (event.clickedInventory != event.view.topInventory) return
+        when (ItemTag.getType(event.currentItem ?: return)) {
+            ItemTag.TYPE_GUI_CANCEL -> open(player)
+            ItemTag.TYPE_GUI_CONFIRM -> {
+                player.closeInventory()
+                backupService.createAllBackup(
+                    automationService.productionWorldUuids(),
+                    BackupKind.RESTORE_POINT,
+                    player.uniqueId,
+                    player.name,
+                    "restore_point",
+                    null
+                ).thenAccept { result ->
+                    Bukkit.getScheduler().runTask(plugin, Runnable {
+                        player.sendMessage(i18nComponent(player, if (result.status == BackupOperationStatus.SUCCESS) "message.restore_point_success" else "message.backup_failed"))
+                        open(player)
+                    })
+                }
+            }
+        }
+    }
+
     private fun toggle(path: String) {
         plugin.config.set(path, !plugin.config.getBoolean(path, false))
         plugin.saveConfig()
         automationService.start()
+        onSettingsChanged()
     }
 
     private fun openToggleConfirm(player: Player, configPath: String, key: String) {
@@ -112,6 +128,18 @@ class AutomationSettingsMenu(
                 mapOf("state" to i18n(player, if (!current) "common.on" else "common.off"))
             )
         )
+        inv.setItem(20, button(player, true))
+        inv.setItem(24, button(player, false))
+        fill(inv)
+        player.openInventory(inv)
+    }
+
+    private fun openRestorePointConfirm(player: Player) {
+        val holder = RestorePointConfirmHolder()
+        val inv = Bukkit.createInventory(holder, 45, i18nComponent(player, "confirm.restore_point.title"))
+        holder.inv = inv
+        applyFrame(inv)
+        inv.setItem(22, centerItem(player, Material.END_CRYSTAL, "confirm.restore_point"))
         inv.setItem(20, button(player, true))
         inv.setItem(24, button(player, false))
         fill(inv)
@@ -192,6 +220,11 @@ class AutomationSettingsMenu(
     }
 
     private class ToggleConfirmHolder(val configPath: String) : InventoryHolder {
+        lateinit var inv: Inventory
+        override fun getInventory(): Inventory = inv
+    }
+
+    private class RestorePointConfirmHolder : InventoryHolder {
         lateinit var inv: Inventory
         override fun getInventory(): Inventory = inv
     }

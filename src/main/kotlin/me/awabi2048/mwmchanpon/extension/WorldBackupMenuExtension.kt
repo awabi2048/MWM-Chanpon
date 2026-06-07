@@ -1,15 +1,28 @@
 package me.awabi2048.mwmchanpon.extension
 
 import com.awabi2048.ccsystem.CCSystem
+import io.papermc.paper.connection.PlayerGameConnection
+import io.papermc.paper.dialog.Dialog
+import io.papermc.paper.event.player.PlayerCustomClickEvent
+import io.papermc.paper.registry.data.dialog.ActionButton
+import io.papermc.paper.registry.data.dialog.DialogBase
+import io.papermc.paper.registry.data.dialog.action.DialogAction
+import io.papermc.paper.registry.data.dialog.body.DialogBody
+import io.papermc.paper.registry.data.dialog.input.DialogInput
+import io.papermc.paper.registry.data.dialog.type.DialogType
 import me.awabi2048.mwmchanpon.backup.BackupEntry
+import me.awabi2048.mwmchanpon.backup.BackupDisplay
 import me.awabi2048.mwmchanpon.backup.BackupOperationStatus
 import me.awabi2048.mwmchanpon.backup.BackupService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
+import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
+import me.awabi2048.myworldmanager.api.extension.WorldSettingsInventoryHolder
 import me.awabi2048.myworldmanager.api.extension.MenuExtension
 import me.awabi2048.myworldmanager.api.extension.MenuExtensionContext
 import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.util.ItemTag
+import net.kyori.adventure.key.Key
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
 import org.bukkit.Material
@@ -17,19 +30,21 @@ import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.inventory.InventoryClickEvent
+import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.inventory.Inventory
-import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.Plugin
-import java.time.format.DateTimeFormatter
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 class WorldBackupMenuExtension(
     private val plugin: Plugin,
     private val storage: ChanponWorldStorage,
     private val backupService: BackupService
 ) : MenuExtension, Listener {
+    private val pendingBackupNameInputs = ConcurrentHashMap<UUID, Holder>()
+
     override fun getId(): String = EXTENSION_ID
 
     override fun onRender(inventory: Inventory, player: Player, context: MenuExtensionContext) {
@@ -81,7 +96,7 @@ class WorldBackupMenuExtension(
             return
         }
         when (ItemTag.getType(item)) {
-            ItemTag.TYPE_GUI_RETURN -> player.closeInventory()
+            ItemTag.TYPE_GUI_RETURN -> returnToWorldSettings(player, holder.worldUuid)
             ItemTag.TYPE_GUI_NAV_PREV, ItemTag.TYPE_GUI_NAV_NEXT -> open(player, holder.worldUuid, ItemTag.getTargetPage(item) ?: holder.page)
             TYPE_BACKUP_ITEM -> {
                 val backup = findBackup(item) ?: return
@@ -90,13 +105,39 @@ class WorldBackupMenuExtension(
             TYPE_CONTROL -> if (ItemTag.getString(item, ACTION_KEY) == ACTION_BACKUP) {
                 val remaining = backupService.ownerBackupCooldownRemainingSeconds(holder.worldUuid)
                 if (remaining > 0) {
-                    player.sendMessage(i18nComponent(player, "message.owner_backup_cooldown", mapOf("remaining" to formatDuration(remaining))))
+                    player.sendMessage(i18nComponent(player, "message.owner_backup_cooldown", mapOf("remaining" to BackupDisplay.formatDuration(remaining))))
                     open(player, holder.worldUuid, holder.page)
                 } else {
-                    openBackupConfirm(player, holder)
+                    openBackupNameInput(player, holder)
                 }
             }
         }
+    }
+
+    @Suppress("UnstableApiUsage")
+    @EventHandler
+    fun onBackupNameInput(event: PlayerCustomClickEvent) {
+        val identifier = event.identifier
+        if (identifier != Key.key("mwmchanpon:backup/owner_name_submit") &&
+            identifier != Key.key("mwmchanpon:backup/owner_name_cancel")
+        ) {
+            return
+        }
+        val player = (event.commonConnection as? PlayerGameConnection)?.player ?: return
+        val source = pendingBackupNameInputs.remove(player.uniqueId) ?: return
+
+        if (identifier == Key.key("mwmchanpon:backup/owner_name_cancel")) {
+            open(player, source.worldUuid, source.page)
+            return
+        }
+
+        val name = BackupDisplay.normalizeManualName(event.getDialogResponseView()?.getText("backup_name").orEmpty())
+        openBackupConfirm(player, source, name)
+    }
+
+    @EventHandler
+    fun onQuit(event: PlayerQuitEvent) {
+        pendingBackupNameInputs.remove(event.player.uniqueId)
     }
 
     @EventHandler
@@ -114,12 +155,12 @@ class WorldBackupMenuExtension(
                 }
                 val remaining = backupService.ownerBackupCooldownRemainingSeconds(holder.source.worldUuid)
                 if (remaining > 0) {
-                    player.sendMessage(i18nComponent(player, "message.owner_backup_cooldown", mapOf("remaining" to formatDuration(remaining))))
+                    player.sendMessage(i18nComponent(player, "message.owner_backup_cooldown", mapOf("remaining" to BackupDisplay.formatDuration(remaining))))
                     open(player, holder.source.worldUuid, holder.source.page)
                     return
                 }
                 player.closeInventory()
-                backupService.createOwnerWorldBackup(holder.source.worldUuid, player.uniqueId, player.name, "owner_manual")
+                backupService.createOwnerWorldBackup(holder.source.worldUuid, player.uniqueId, player.name, "owner_manual", holder.backupName)
                     .thenAccept { result ->
                         Bukkit.getScheduler().runTask(plugin, Runnable {
                             if (result.status == BackupOperationStatus.SUCCESS) {
@@ -127,7 +168,7 @@ class WorldBackupMenuExtension(
                             } else {
                                 val cooldown = result.message.removePrefix("cooldown:").toLongOrNull()
                                 if (cooldown != null) {
-                                    player.sendMessage(i18nComponent(player, "message.owner_backup_cooldown", mapOf("remaining" to formatDuration(cooldown))))
+                                    player.sendMessage(i18nComponent(player, "message.owner_backup_cooldown", mapOf("remaining" to BackupDisplay.formatDuration(cooldown))))
                                 } else {
                                     player.sendMessage(i18nComponent(player, "message.backup_failed"))
                                 }
@@ -162,12 +203,50 @@ class WorldBackupMenuExtension(
         }
     }
 
-    private fun openBackupConfirm(player: Player, source: Holder) {
-        val holder = BackupConfirmHolder(source.copy())
+    @Suppress("UnstableApiUsage")
+    private fun openBackupNameInput(player: Player, source: Holder) {
+        pendingBackupNameInputs[player.uniqueId] = source.copy()
+        val dialog = Dialog.create { builder ->
+            builder.empty()
+                .base(
+                    DialogBase.builder(i18nComponent(player, "owner_backup.name_input.title"))
+                        .body(listOf(DialogBody.plainMessage(i18nComponent(player, "owner_backup.name_input.body"))))
+                        .inputs(
+                            listOf(
+                                DialogInput.text("backup_name", i18nComponent(player, "owner_backup.name_input.label"))
+                                    .maxLength(MAX_BACKUP_NAME_LENGTH)
+                                    .initial("")
+                                    .build()
+                            )
+                        )
+                        .build()
+                )
+                .type(
+                    DialogType.confirmation(
+                        ActionButton.create(
+                            i18nComponent(player, "owner_backup.name_input.submit"),
+                            null,
+                            100,
+                            DialogAction.customClick(Key.key("mwmchanpon:backup/owner_name_submit"), null)
+                        ),
+                        ActionButton.create(
+                            i18nComponent(player, "owner_backup.name_input.cancel"),
+                            null,
+                            200,
+                            DialogAction.customClick(Key.key("mwmchanpon:backup/owner_name_cancel"), null)
+                        )
+                    )
+                )
+        }
+        player.showDialog(dialog)
+    }
+
+    private fun openBackupConfirm(player: Player, source: Holder, backupName: String) {
+        val holder = BackupConfirmHolder(source.copy(), backupName)
         val inv = Bukkit.createInventory(holder, 45, i18nComponent(player, "confirm.owner_backup.title"))
         holder.inv = inv
         applyFrame(inv)
-        inv.setItem(22, centerItem(player, Material.CHEST, "confirm.owner_backup"))
+        inv.setItem(22, centerItem(player, Material.CHEST, "confirm.owner_backup", mapOf("name" to backupName)))
         inv.setItem(20, button(player, true))
         inv.setItem(24, button(player, false))
         fill(inv)
@@ -202,11 +281,9 @@ class WorldBackupMenuExtension(
     private fun backupItem(player: Player, backup: BackupEntry): ItemStack {
         val item = ItemStack(materialFor(backup))
         item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "owner_backup.item.display", mapOf("id" to backup.id.take(18))))
+            meta.displayName(i18nComponent(player, "owner_backup.item.display", mapOf("name" to BackupDisplay.displayName(backup))))
             meta.lore(lore(i18nList(player, "owner_backup.item.lore", mapOf(
-                "kind" to i18n(player, "kind.${backup.kind.i18nKey}"),
-                "created" to backup.createdAt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
-                "size" to formatBytes(backup.sizeBytes),
+                "created" to BackupDisplay.formatCreatedAt(backup.createdAt),
                 "actor" to (backup.actorName ?: "system")
             ))))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
@@ -221,8 +298,8 @@ class WorldBackupMenuExtension(
         val item = ItemStack(if (remaining > 0) Material.CLOCK else Material.CHEST)
         val key = if (remaining > 0) "owner_backup.cooldown" else "owner_backup.create"
         item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "$key.display", mapOf("remaining" to formatDuration(remaining))))
-            meta.lore(lore(i18nList(player, "$key.lore", mapOf("remaining" to formatDuration(remaining)))))
+            meta.displayName(i18nComponent(player, "$key.display", mapOf("remaining" to BackupDisplay.formatDuration(remaining))))
+            meta.lore(lore(i18nList(player, "$key.lore", mapOf("remaining" to BackupDisplay.formatDuration(remaining)))))
         }
         ItemTag.tagItem(item, TYPE_CONTROL)
         ItemTag.setString(item, ACTION_KEY, ACTION_BACKUP)
@@ -243,11 +320,11 @@ class WorldBackupMenuExtension(
         return item
     }
 
-    private fun centerItem(player: Player, material: Material, key: String): ItemStack {
+    private fun centerItem(player: Player, material: Material, key: String, placeholders: Map<String, Any> = emptyMap()): ItemStack {
         val item = ItemStack(material)
         item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "$key.display"))
-            meta.lore(lore(i18nList(player, "$key.lore")))
+            meta.displayName(i18nComponent(player, "$key.display", placeholders))
+            meta.lore(lore(i18nList(player, "$key.lore", placeholders)))
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
         return item
@@ -315,39 +392,40 @@ class WorldBackupMenuExtension(
         else -> Material.RECOVERY_COMPASS
     }
 
-    private fun formatBytes(bytes: Long): String {
-        if (bytes < 1024) return "${bytes}B"
-        val kb = bytes / 1024.0
-        if (kb < 1024) return "%.1fKB".format(kb)
-        val mb = kb / 1024.0
-        if (mb < 1024) return "%.1fMB".format(mb)
-        return "%.1fGB".format(mb / 1024.0)
+    private fun returnToWorldSettings(player: Player, worldUuid: UUID) {
+        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
+        if (worldData == null) {
+            player.closeInventory()
+            return
+        }
+        val mwm = org.bukkit.plugin.java.JavaPlugin.getPlugin(MyWorldManager::class.java)
+        val session = mwm.settingsSessionManager.getSession(player)
+        mwm.worldSettingsGui.open(
+            player,
+            worldData,
+            session?.showBackButton,
+            session?.isPlayerWorldFlow,
+            session?.parentShowBackButton
+        )
     }
 
-    private fun formatDuration(seconds: Long): String {
-        val hours = seconds / 3600L
-        val minutes = (seconds % 3600L + 59L) / 60L
-        return if (hours > 0L) "${hours}h ${minutes}m" else "${minutes.coerceAtLeast(1L)}m"
-    }
-
-    private fun i18n(player: Player?, key: String) = CCSystem.getAPI().getI18nString(player, "chanpon.backup.$key")
     private fun i18nComponent(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nComponent(player, "chanpon.backup.$key", placeholders)
     private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
     private fun lore(lines: List<String>) = CCSystem.getAPI().buildLore(lines, closingSeparator = true)
 
-    data class Holder(val worldUuid: UUID, val page: Int) : InventoryHolder {
+    data class Holder(val worldUuid: UUID, val page: Int) : WorldSettingsInventoryHolder {
         lateinit var inv: Inventory
         override fun getInventory(): Inventory = inv
     }
 
-    private class BackupConfirmHolder(val source: Holder) : InventoryHolder {
+    private class BackupConfirmHolder(val source: Holder, val backupName: String) : WorldSettingsInventoryHolder {
         lateinit var inv: Inventory
         override fun getInventory(): Inventory = inv
     }
 
-    private class RestoreConfirmHolder(val backupId: String, val source: Holder) : InventoryHolder {
+    private class RestoreConfirmHolder(val backupId: String, val source: Holder) : WorldSettingsInventoryHolder {
         lateinit var inv: Inventory
         override fun getInventory(): Inventory = inv
     }
@@ -361,5 +439,6 @@ class WorldBackupMenuExtension(
         private const val ACTION_KEY = "chanpon_action"
         private const val ACTION_BACKUP = "backup"
         private const val WORLD_MENU_SLOT = 52
+        private const val MAX_BACKUP_NAME_LENGTH = 32
     }
 }

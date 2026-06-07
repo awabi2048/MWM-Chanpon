@@ -61,16 +61,18 @@ class BackupService(
         kind: BackupKind,
         actorUuid: UUID?,
         actorName: String?,
-        reason: String? = null
+        reason: String? = null,
+        name: String? = BackupDisplay.defaultName(kind)
     ): CompletableFuture<BackupOperationResult> {
-        return createBackup(listOf(worldUuid), BackupScope.WORLD, kind, actorUuid, actorName, reason, acquireLocks = true)
+        return createBackup(listOf(worldUuid), BackupScope.WORLD, kind, actorUuid, actorName, reason, name, acquireLocks = true)
     }
 
     fun createOwnerWorldBackup(
         worldUuid: UUID,
         actorUuid: UUID,
         actorName: String,
-        reason: String? = null
+        reason: String? = null,
+        name: String? = BackupDisplay.DEFAULT_OWNER_MANUAL_NAME
     ): CompletableFuture<BackupOperationResult> {
         val remainingSeconds = ownerBackupCooldownRemainingSeconds(worldUuid)
         if (remainingSeconds > 0) {
@@ -78,7 +80,7 @@ class BackupService(
                 BackupOperationResult(BackupOperationStatus.FAILED, null, "cooldown:$remainingSeconds")
             )
         }
-        return createBackup(listOf(worldUuid), BackupScope.WORLD, BackupKind.USER_MANUAL, actorUuid, actorName, reason, acquireLocks = true)
+        return createBackup(listOf(worldUuid), BackupScope.WORLD, BackupKind.USER_MANUAL, actorUuid, actorName, reason, name, acquireLocks = true)
             .thenApply { result ->
                 if (result.status == BackupOperationStatus.SUCCESS) {
                     markOwnerBackupCreated(worldUuid)
@@ -98,9 +100,10 @@ class BackupService(
         kind: BackupKind,
         actorUuid: UUID?,
         actorName: String?,
-        reason: String? = null
+        reason: String? = null,
+        name: String? = BackupDisplay.defaultName(kind)
     ): CompletableFuture<BackupOperationResult> {
-        return createBackup(worldUuids, BackupScope.ALL, kind, actorUuid, actorName, reason, acquireLocks = true)
+        return createBackup(worldUuids, BackupScope.ALL, kind, actorUuid, actorName, reason, name, acquireLocks = true)
     }
 
     fun createChangedScheduledBackup(): CompletableFuture<BackupOperationResult> {
@@ -110,7 +113,7 @@ class BackupService(
                 BackupOperationResult(BackupOperationStatus.SUCCESS, null, "no changed production worlds")
             )
         }
-        return createAllBackup(worlds.map { it.uuid }, BackupKind.SCHEDULED, null, "system", "scheduled")
+        return createAllBackup(worlds.map { it.uuid }, BackupKind.SCHEDULED, null, "system", "scheduled", BackupDisplay.SCHEDULED_NAME)
     }
 
     fun restoreBackup(entry: BackupEntry): CompletableFuture<RestoreOperationResult> {
@@ -164,7 +167,7 @@ class BackupService(
                     RestoreOperationResult(BackupOperationStatus.FAILED, emptyList(), targets, null, "failed to unload worlds")
                 )
             } else {
-                createBackup(targets, BackupScope.ALL, BackupKind.PRE_ROLLBACK, null, "system", "pre_rollback:${entry.id}", acquireLocks = false)
+                createBackup(targets, BackupScope.ALL, BackupKind.PRE_ROLLBACK, null, "system", "pre_rollback:${entry.id}", BackupDisplay.PRE_ROLLBACK_NAME, acquireLocks = false)
                     .thenCompose { preResult ->
                         val preBackup = preResult.backup
                         if (preResult.status != BackupOperationStatus.SUCCESS || preBackup == null) {
@@ -248,6 +251,7 @@ class BackupService(
         actorUuid: UUID?,
         actorName: String?,
         reason: String?,
+        name: String?,
         acquireLocks: Boolean
     ): CompletableFuture<BackupOperationResult> {
         val targets = worldUuids.distinct().filter { storage.isProductionWorld(it) }
@@ -276,7 +280,7 @@ class BackupService(
             try {
                 dir.mkdirs()
                 targets.forEach { copyWorldSnapshot(it, dir) }
-                val entry = writeManifest(dir, id, scope, kind, targets, actorUuid, actorName, reason)
+                val entry = writeManifest(dir, id, scope, kind, targets, actorUuid, actorName, reason, name)
                 writeWorldHashes(entry)
                 if (kind != BackupKind.PRE_ROLLBACK) {
                     applyRetention()
@@ -451,7 +455,8 @@ class BackupService(
         worldUuids: List<UUID>,
         actorUuid: UUID?,
         actorName: String?,
-        reason: String?
+        reason: String?,
+        name: String?
     ): BackupEntry {
         val created = LocalDateTime.now()
         val size = folderSize(dir)
@@ -464,9 +469,10 @@ class BackupService(
         config.set("actor_uuid", actorUuid?.toString())
         config.set("actor_name", actorName)
         config.set("reason", reason)
+        config.set("name", name?.takeIf { it.isNotBlank() })
         config.set("size_bytes", size)
         config.save(File(dir, "manifest.yml"))
-        return BackupEntry(id, scope, kind, created, worldUuids, actorUuid, actorName, reason, size)
+        return BackupEntry(id, scope, kind, created, worldUuids, actorUuid, actorName, reason, name?.takeIf { it.isNotBlank() }, size)
     }
 
     private fun readManifest(dir: File): BackupEntry? {
@@ -491,6 +497,7 @@ class BackupService(
             actorUuid = actorUuid,
             actorName = config.getString("actor_name"),
             reason = config.getString("reason"),
+            name = config.getString("name"),
             sizeBytes = config.getLong("size_bytes", folderSize(dir))
         )
     }

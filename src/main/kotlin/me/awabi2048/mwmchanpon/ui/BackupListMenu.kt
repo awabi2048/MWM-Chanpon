@@ -3,6 +3,7 @@ package me.awabi2048.mwmchanpon.ui
 import com.awabi2048.ccsystem.CCSystem
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.backup.BackupEntry
+import me.awabi2048.mwmchanpon.backup.BackupDisplay
 import me.awabi2048.mwmchanpon.backup.BackupKind
 import me.awabi2048.mwmchanpon.backup.BackupOperationStatus
 import me.awabi2048.mwmchanpon.backup.BackupScope
@@ -20,7 +21,6 @@ import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
-import java.time.format.DateTimeFormatter
 import java.util.UUID
 
 class BackupListMenu(
@@ -133,10 +133,10 @@ class BackupListMenu(
     private fun backupItem(player: Player, backup: BackupEntry): ItemStack {
         val item = ItemStack(materialFor(backup.kind))
         item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "backup_list.item.display", mapOf("id" to backup.id.take(18))))
+            meta.displayName(i18nComponent(player, "backup_list.item.display", mapOf("name" to BackupDisplay.displayName(backup))))
             meta.lore(lore(i18nList(player, "backup_list.item.lore", mapOf(
                 "kind" to i18n(player, "kind.${backup.kind.i18nKey}"),
-                "created" to backup.createdAt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
+                "created" to BackupDisplay.formatCreatedAt(backup.createdAt),
                 "worlds" to backup.worldUuids.size,
                 "size" to formatBytes(backup.sizeBytes),
                 "actor" to (backup.actorName ?: "system")
