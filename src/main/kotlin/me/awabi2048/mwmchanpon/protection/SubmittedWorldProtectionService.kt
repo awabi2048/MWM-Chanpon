@@ -15,7 +15,8 @@ import org.bukkit.Bukkit
 
 class SubmittedWorldProtectionService(
     private val storage: ChanponWorldStorage,
-    private val logger: Logger
+    private val logger: Logger,
+    private val autoRollbackEnabled: () -> Boolean = { false }
 ) {
     fun syncAll(worlds: Iterable<WorldData>) {
         worlds.forEach { sync(it) }
@@ -27,14 +28,32 @@ class SubmittedWorldProtectionService(
             return
         }
 
+        val reasons = protectionReasons(worldData)
+        setProtected(worldData, reasons.isNotEmpty())
+    }
+
+    fun isProtected(worldData: WorldData): Boolean = protectionReasons(worldData).isNotEmpty()
+
+    fun protectionReasons(worldData: WorldData): Set<ProtectionReason> {
+        if (!storage.isProductionWorld(worldData.uuid)) return emptySet()
+        val reasons = linkedSetOf<ProtectionReason>()
+        if (autoRollbackEnabled()) {
+            reasons.add(ProtectionReason.AUTO_ROLLBACK)
+        }
         val state = try {
             storage.getSubmissionState(worldData.uuid)
         } catch (ex: IllegalStateException) {
-            logger.warning("Cannot sync submitted protection because submission state is invalid: ${worldData.uuid}")
-            return
+            if (reasons.isEmpty()) {
+                logger.warning("Cannot sync submitted protection because submission state is invalid: ${worldData.uuid}")
+            }
+            return reasons
         }
-
-        setProtected(worldData, state == SubmissionState.SUBMITTED || state == SubmissionState.COMPLETED)
+        when (state) {
+            SubmissionState.SUBMITTED -> reasons.add(ProtectionReason.SUBMITTED)
+            SubmissionState.COMPLETED -> reasons.add(ProtectionReason.COMPLETED)
+            SubmissionState.UNSUBMITTED -> Unit
+        }
+        return reasons
     }
 
     fun setProtected(worldData: WorldData, protected: Boolean) {
@@ -73,4 +92,10 @@ class SubmittedWorldProtectionService(
         private const val WORLD_MIN = -30_000_000
         private const val WORLD_MAX = 30_000_000
     }
+}
+
+enum class ProtectionReason {
+    SUBMITTED,
+    COMPLETED,
+    AUTO_ROLLBACK
 }

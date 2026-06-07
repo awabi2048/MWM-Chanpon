@@ -40,6 +40,7 @@ data class BackupEntry(
     val actorUuid: UUID?,
     val actorName: String?,
     val reason: String?,
+    val name: String?,
     val sizeBytes: Long
 )
 

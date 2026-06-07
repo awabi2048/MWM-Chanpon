@@ -3,12 +3,14 @@ package me.awabi2048.mwmchanpon.ui
 import com.awabi2048.ccsystem.CCSystem
 import java.util.UUID
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
+import me.awabi2048.mwmchanpon.protection.ProtectionReason
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.SubmissionState
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
+import me.awabi2048.myworldmanager.api.extension.WorldSettingsInventoryHolder
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsMenuProvider
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsMenuRequest
 import me.awabi2048.myworldmanager.model.WorldData
@@ -22,7 +24,6 @@ import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.inventory.InventoryClickEvent
 import org.bukkit.inventory.Inventory
-import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
@@ -37,14 +38,15 @@ class SubmittedWorldMenuProvider(
 
     override fun open(player: Player, worldData: WorldData, request: WorldSettingsMenuRequest): Boolean {
         if (!storage.isProductionWorld(worldData.uuid)) return false
+        val reasons = protectionService.protectionReasons(worldData)
+        if (reasons.isEmpty()) return false
         val state = try {
             storage.getSubmissionState(worldData.uuid)
         } catch (ex: IllegalStateException) {
-            return false
+            SubmissionState.UNSUBMITTED
         }
-        if (state != SubmissionState.SUBMITTED && state != SubmissionState.COMPLETED) return false
 
-        val holder = SubmittedWorldMenuHolder(worldData.uuid)
+        val holder = SubmittedWorldMenuHolder(worldData.uuid, request)
         val inventory = Bukkit.createInventory(holder, 45, i18nComponent(player, "submitted_menu.title"))
         holder.inv = inventory
         applyFrame(inventory)
@@ -52,9 +54,9 @@ class SubmittedWorldMenuProvider(
         if (request.showBackButton) {
             inventory.setItem(36, createReturnItem(player))
         }
-        inventory.setItem(22, createWorldItem(player, worldData, state))
+        inventory.setItem(22, createWorldItem(player, worldData, state, reasons))
 
-        if (state == SubmissionState.SUBMITTED && !plugin.isSubmissionClosed()) {
+        if (ProtectionReason.SUBMITTED in reasons && state == SubmissionState.SUBMITTED && !plugin.isSubmissionClosed()) {
             inventory.setItem(40, createCancelSubmissionItem(player, worldData.uuid))
         }
 
@@ -76,7 +78,7 @@ class SubmittedWorldMenuProvider(
             ItemTag.TYPE_GUI_EXTENSION -> {
                 if (ItemTag.getExtensionId(item) != PROVIDER_ID) return
                 if (ItemTag.getString(item, ACTION_KEY) != ACTION_CANCEL_SUBMISSION) return
-                openCancelConfirmation(player, holder.worldUuid)
+                openCancelConfirmation(player, holder.worldUuid, holder.request)
             }
         }
     }
@@ -113,13 +115,13 @@ class SubmittedWorldMenuProvider(
         when (ItemTag.getType(event.currentItem ?: return)) {
             ItemTag.TYPE_GUI_CONFIRM -> {
                 player.closeInventory()
-                cancelSubmission(player, holder.worldUuid)
+                cancelSubmission(player, holder.worldUuid, holder.request)
             }
-            ItemTag.TYPE_GUI_CANCEL -> player.closeInventory()
+            ItemTag.TYPE_GUI_CANCEL -> reopenProtectedMenu(player, holder.worldUuid, holder.request)
         }
     }
 
-    private fun cancelSubmission(player: Player, worldUuid: UUID) {
+    private fun cancelSubmission(player: Player, worldUuid: UUID, request: WorldSettingsMenuRequest) {
         if (plugin.isSubmissionClosed()) {
             player.sendMessage(i18nComponent(player, "message.deadline_closed"))
             return
@@ -142,15 +144,18 @@ class SubmittedWorldMenuProvider(
             player.name,
             "cancel_submission"
         )
-        MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)?.let {
-            protectionService.sync(it)
-            toolPermissionController.syncWorld(it)
+        MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)?.let { worldData ->
+            protectionService.sync(worldData)
+            toolPermissionController.syncWorld(worldData)
+            if (protectionService.isProtected(worldData)) {
+                open(player, worldData, request)
+            }
         }
         player.sendMessage(i18nComponent(player, "message.cancelled"))
     }
 
-    private fun openCancelConfirmation(player: Player, worldUuid: UUID) {
-        val holder = CancelSubmissionConfirmationHolder(worldUuid)
+    private fun openCancelConfirmation(player: Player, worldUuid: UUID, request: WorldSettingsMenuRequest) {
+        val holder = CancelSubmissionConfirmationHolder(worldUuid, request)
         val inventory = Bukkit.createInventory(holder, 45, i18nComponent(player, "confirm.cancel_submission.title"))
         holder.inv = inventory
         applyFrame(inventory)
@@ -173,7 +178,12 @@ class SubmittedWorldMenuProvider(
         }
     }
 
-    private fun createWorldItem(player: Player, worldData: WorldData, state: SubmissionState): ItemStack {
+    private fun createWorldItem(
+        player: Player,
+        worldData: WorldData,
+        state: SubmissionState,
+        reasons: Set<ProtectionReason>
+    ): ItemStack {
         val item = ItemStack(worldData.icon)
         item.editMeta { meta ->
             meta.displayName(LegacyComponentSerializer.legacySection().deserialize("§e${worldData.name}"))
@@ -184,6 +194,7 @@ class SubmittedWorldMenuProvider(
                         "submitted_menu.world_lore",
                         mapOf(
                             "state" to i18n(player, "state.${state.i18nKey}"),
+                            "reason" to protectionReasonText(player, reasons),
                             "description" to worldData.description.ifBlank { "-" }
                         )
                     )
@@ -193,6 +204,16 @@ class SubmittedWorldMenuProvider(
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
         return item
+    }
+
+    private fun protectionReasonText(player: Player, reasons: Set<ProtectionReason>): String {
+        return reasons.joinToString("§7, ") { reason ->
+            when (reason) {
+                ProtectionReason.SUBMITTED -> i18n(player, "protection_reason.submitted")
+                ProtectionReason.COMPLETED -> i18n(player, "protection_reason.completed")
+                ProtectionReason.AUTO_ROLLBACK -> i18n(player, "protection_reason.auto_rollback")
+            }
+        }
     }
 
     private fun createCancelSubmissionItem(player: Player, worldUuid: UUID): ItemStack {
@@ -272,12 +293,25 @@ class SubmittedWorldMenuProvider(
 
     private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)
 
-    private class SubmittedWorldMenuHolder(val worldUuid: UUID) : InventoryHolder {
+    private fun reopenProtectedMenu(player: Player, worldUuid: UUID, request: WorldSettingsMenuRequest) {
+        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
+        if (worldData == null || !open(player, worldData, request)) {
+            player.closeInventory()
+        }
+    }
+
+    private class SubmittedWorldMenuHolder(
+        val worldUuid: UUID,
+        val request: WorldSettingsMenuRequest
+    ) : WorldSettingsInventoryHolder {
         lateinit var inv: Inventory
         override fun getInventory(): Inventory = inv
     }
 
-    private class CancelSubmissionConfirmationHolder(val worldUuid: UUID) : InventoryHolder {
+    private class CancelSubmissionConfirmationHolder(
+        val worldUuid: UUID,
+        val request: WorldSettingsMenuRequest
+    ) : WorldSettingsInventoryHolder {
         lateinit var inv: Inventory
         override fun getInventory(): Inventory = inv
     }

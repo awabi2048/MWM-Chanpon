@@ -8,7 +8,8 @@ import me.awabi2048.myworldmanager.model.WorldData
 class ToolPermissionController(
     private val storage: ChanponWorldStorage,
     private val luckPermsService: LuckPermsToolPermissionService,
-    private val definitions: List<ToolPermissionDefinition>
+    private val definitions: List<ToolPermissionDefinition>,
+    private val autoRollbackLocked: () -> Boolean = { false }
 ) {
     fun isEnabled(worldData: WorldData, playerUuid: UUID, toolId: String): Boolean {
         if (isSubmissionLocked(worldData.uuid)) return false
@@ -64,6 +65,7 @@ class ToolPermissionController(
     }
 
     private fun isSubmissionLocked(worldUuid: UUID): Boolean {
+        if (storage.isProductionWorld(worldUuid) && autoRollbackLocked()) return true
         return try {
             when (storage.getSubmissionState(worldUuid)) {
                 SubmissionState.SUBMITTED, SubmissionState.COMPLETED -> true
