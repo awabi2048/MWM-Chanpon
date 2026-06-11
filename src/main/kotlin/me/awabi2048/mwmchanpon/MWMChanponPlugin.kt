@@ -24,6 +24,7 @@ import me.awabi2048.mwmchanpon.service.ChanponSpawnWorldService
 import me.awabi2048.mwmchanpon.service.ManualRollbackService
 import me.awabi2048.mwmchanpon.service.WorldDataExportService
 import me.awabi2048.mwmchanpon.service.WizardSessionService
+import me.awabi2048.mwmchanpon.service.ArchiveService
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.tool.LuckPermsToolPermissionService
@@ -35,6 +36,7 @@ import me.awabi2048.mwmchanpon.ui.BackupListMenu
 import me.awabi2048.mwmchanpon.ui.ChanponAdminMenu
 import me.awabi2048.mwmchanpon.ui.ChanponAdminWorldListMenu
 import me.awabi2048.mwmchanpon.ui.ChanponDiscoveryMenuProvider
+import me.awabi2048.mwmchanpon.ui.ChanponEnvironmentGui
 import me.awabi2048.mwmchanpon.ui.ChanponFavoriteVisitMenuProvider
 import me.awabi2048.mwmchanpon.ui.ChanponPlayerWorldMenuProvider
 import me.awabi2048.mwmchanpon.ui.ChanponWorldSettingsMenuProvider
@@ -75,6 +77,8 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var toolPermissionExtension: ToolPermissionMenuExtension
     private lateinit var worldBackupMenuExtension: WorldBackupMenuExtension
     private lateinit var linkedPortalMenuExtension: LinkedPortalMenuExtension
+    private lateinit var environmentGui: ChanponEnvironmentGui
+    private lateinit var archiveService: ArchiveService
     private lateinit var worldAccessPolicy: ChanponWorldAccessPolicy
     private lateinit var worldPublishPolicy: ChanponWorldPublishPolicy
     private lateinit var worldRuntimePolicy: ChanponWorldRuntimePolicy
@@ -107,7 +111,8 @@ class MWMChanponPlugin : JavaPlugin() {
         backupService = BackupService(this, chanponStorage)
         worldDataExportService = WorldDataExportService(this, chanponStorage)
         backupListMenu = BackupListMenu(this, backupService)
-        worldDataManagementMenu = WorldDataManagementMenu(this, chanponStorage, backupService, backupListMenu)
+        archiveService = ArchiveService(this, chanponStorage, backupService, globalStorage)
+        worldDataManagementMenu = WorldDataManagementMenu(this, chanponStorage, backupService, backupListMenu, archiveService)
         worldDataExportMenu = WorldDataExportMenu(this, worldDataExportService)
         automationService = BackupAutomationService(this, chanponStorage, backupService)
         manualRollbackService = ManualRollbackService(this)
@@ -154,14 +159,15 @@ class MWMChanponPlugin : JavaPlugin() {
             submittedProtectionService,
             toolController
         )
-        chanponWorldSettingsMenuProvider = ChanponWorldSettingsMenuProvider(this, chanponStorage, submittedProtectionService)
-        playerWorldMenuProvider = ChanponPlayerWorldMenuProvider(this, chanponStorage)
-        discoveryMenuProvider = ChanponDiscoveryMenuProvider(this, chanponStorage)
+        environmentGui = ChanponEnvironmentGui()
+        chanponWorldSettingsMenuProvider = ChanponWorldSettingsMenuProvider(this, chanponStorage, submittedProtectionService, environmentGui)
+        playerWorldMenuProvider = ChanponPlayerWorldMenuProvider(this, globalStorage, chanponStorage)
+        discoveryMenuProvider = ChanponDiscoveryMenuProvider(this, globalStorage, chanponStorage)
         favoriteVisitMenuProvider = ChanponFavoriteVisitMenuProvider(this, chanponStorage)
-        worldAccessPolicy = ChanponWorldAccessPolicy(chanponStorage)
+        worldAccessPolicy = ChanponWorldAccessPolicy(globalStorage, chanponStorage)
         worldPublishPolicy = ChanponWorldPublishPolicy(chanponStorage)
         worldRuntimePolicy = ChanponWorldRuntimePolicy()
-        commandExtension = ChanponCommandExtension(this, adminWizardGui)
+        commandExtension = ChanponCommandExtension(this, globalStorage, adminWizardGui)
         MyWorldManagerApi.registerWorldDeleteGuard(productionWorldGuard)
         MyWorldManagerApi.registerMenuExtension(productionToggleExtension)
         MyWorldManagerApi.registerAdminWorldListProvider(chanponAdminWorldListMenu)
@@ -178,7 +184,7 @@ class MWMChanponPlugin : JavaPlugin() {
         MyWorldManagerApi.registerWorldRuntimePolicy(worldRuntimePolicy)
         MyWorldManagerApi.registerCommandPolicy(commandExtension)
         MyWorldManagerApi.registerCreateCommandHandler(commandExtension)
-        val adminCommand = ChanponAdminCommand(chanponAdminMenu)
+        val adminCommand = ChanponAdminCommand(chanponAdminMenu, archiveService)
         getCommand("mwmchanpon")?.setExecutor(adminCommand)
         getCommand("mwmchanpon")?.tabCompleter = adminCommand
         server.pluginManager.registerEvents(productionToggleExtension, this)
@@ -191,6 +197,7 @@ class MWMChanponPlugin : JavaPlugin() {
         server.pluginManager.registerEvents(chanponAdminWorldListMenu, this)
         server.pluginManager.registerEvents(submittedWorldMenuProvider, this)
         server.pluginManager.registerEvents(chanponWorldSettingsMenuProvider, this)
+        server.pluginManager.registerEvents(environmentGui, this)
         server.pluginManager.registerEvents(playerWorldMenuProvider, this)
         server.pluginManager.registerEvents(discoveryMenuProvider, this)
         server.pluginManager.registerEvents(favoriteVisitMenuProvider, this)
@@ -209,7 +216,7 @@ class MWMChanponPlugin : JavaPlugin() {
             this
         )
         server.pluginManager.registerEvents(worldBackupMenuExtension, this)
-        server.pluginManager.registerEvents(MemberPermissionSyncListener(toolController), this)
+        server.pluginManager.registerEvents(MemberPermissionSyncListener(toolController, chanponStorage), this)
         server.pluginManager.registerEvents(PlayerJoinListener(toolController, spawnWorldService), this)
         server.pluginManager.registerEvents(WorldCleanupListener(chanponStorage), this)
 

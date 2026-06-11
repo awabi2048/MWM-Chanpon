@@ -34,6 +34,24 @@ class ChanponGlobalStorage(dataFolder: File) {
         config.save(playerFile(playerUuid))
     }
 
+    fun isArchiveLocked(): Boolean =
+        settings().getBoolean("archive_locked", false)
+
+    fun setArchiveLocked(locked: Boolean) {
+        val config = settings()
+        config.set("archive_locked", locked)
+        config.save(settingsFile)
+    }
+
+    fun isWorldCreationEnabled(): Boolean =
+        settings().getBoolean("world_creation.enabled", true)
+
+    fun setWorldCreationEnabled(enabled: Boolean) {
+        val config = settings()
+        config.set("world_creation.enabled", enabled)
+        config.save(settingsFile)
+    }
+
     private fun settings(): YamlConfiguration {
         if (!settingsFile.exists()) settingsFile.createNewFile()
         return YamlConfiguration.loadConfiguration(settingsFile)

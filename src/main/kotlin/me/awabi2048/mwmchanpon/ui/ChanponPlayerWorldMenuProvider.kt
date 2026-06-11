@@ -2,6 +2,7 @@ package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
+import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.myworldmanager.MyWorldManager
@@ -32,6 +33,7 @@ import org.bukkit.plugin.java.JavaPlugin
 
 class ChanponPlayerWorldMenuProvider(
     private val plugin: MWMChanponPlugin,
+    private val globalStorage: ChanponGlobalStorage,
     private val storage: ChanponWorldStorage
 ) : PlayerWorldMenuProvider, Listener {
     private val legacy = LegacyComponentSerializer.legacySection()
@@ -41,6 +43,10 @@ class ChanponPlayerWorldMenuProvider(
     override fun open(player: Player, request: PlayerWorldMenuRequest): Boolean {
         val mwm = mwm()
         if (mwm.playerPlatformResolver.isBedrock(player)) return false
+        if (globalStorage.isArchiveLocked() && !player.hasPermission("mwmchanpon.admin")) {
+            player.sendMessage(i18n(player, "message.archive_locked"))
+            return true
+        }
 
         val session = mwm.playerWorldSessionManager.getSession(player.uniqueId)
         session.showBackButton = request.showBackButton
@@ -78,7 +84,7 @@ class ChanponPlayerWorldMenuProvider(
         val currentCreateCount = worlds.count { it.owner == player.uniqueId }
         val configuredMaxCreateCount = mwm.config.getInt("creation.max_create_count_default", 3)
         val maxCreateCount = MyWorldManagerApi.getWorldRuntimePolicy().getMaxCreateCountDefault(configuredMaxCreateCount)
-        if (canBypassWorldLimits(player) || currentCreateCount < maxCreateCount) {
+        if (canCreateWorld(player) && (canBypassWorldLimits(player) || currentCreateCount < maxCreateCount)) {
             inventory.setItem(footerStart + 2, createCreationButton(player))
         }
         inventory.setItem(footerStart + 4, createPlayerInfoItem(player))
@@ -117,6 +123,10 @@ class ChanponPlayerWorldMenuProvider(
             }
             ItemTag.TYPE_GUI_RETURN -> handleReturn(player, item)
             ItemTag.TYPE_GUI_CREATION_BUTTON -> {
+                if (!canCreateWorld(player)) {
+                    player.sendMessage(i18n(player, "message.world_creation_no_permission"))
+                    return
+                }
                 mwm.soundManager.playClickSound(player, item, "player_world")
                 val session = mwm.creationSessionManager.startSession(player.uniqueId)
                 session.isDialogMode = true
@@ -333,6 +343,15 @@ class ChanponPlayerWorldMenuProvider(
         player.hasPermission("myworldmanager.admin.bypass_world_limits") ||
             player.hasPermission("myworldmanager.admin") ||
             player.hasPermission("craftercrossing.test")
+
+    private fun canCreateWorld(player: Player): Boolean =
+        globalStorage.isWorldCreationEnabled() &&
+            (player.hasPermission("myworldmanager.command.mwm.create") ||
+                player.hasPermission("myworldmanager.admin") ||
+                player.hasPermission("craftercrossing.test"))
+
+    private fun i18n(player: Player, key: String): String =
+        CCSystem.getAPI().getI18nString(player, "chanpon.backup.$key")
 
     private fun clearGuiTransitionLater(player: Player) {
         plugin.server.scheduler.runTaskLater(plugin, Runnable {

@@ -37,7 +37,8 @@ import org.bukkit.plugin.java.JavaPlugin
 class ChanponWorldSettingsMenuProvider(
     private val plugin: MWMChanponPlugin,
     private val storage: ChanponWorldStorage,
-    private val protectionService: SubmittedWorldProtectionService
+    private val protectionService: SubmittedWorldProtectionService,
+    private val environmentGui: ChanponEnvironmentGui
 ) : WorldSettingsMenuProvider, Listener {
     override fun getId(): String = PROVIDER_ID
 
@@ -76,9 +77,12 @@ class ChanponWorldSettingsMenuProvider(
         if (request.showBackButton) inventory.setItem(45, returnItem(player))
 
         val session = mwm.settingsSessionManager.getSession(player)
-        val isOwner = worldData.owner == player.uniqueId || session?.isAdminFlow == true
+        val isAdminFlow = session?.isAdminFlow == true
+        val isActualOwner = worldData.owner == player.uniqueId || isAdminFlow
         val isModerator = worldData.moderators.contains(player.uniqueId)
-        val hasManagePermission = isOwner || isModerator
+        val isImportedArchive = storage.isImportedArchive(worldData.uuid)
+        val isOwner = isActualOwner && !isImportedArchive
+        val hasManagePermission = (isOwner || isModerator) && !isImportedArchive
         val isProduction = storage.isProductionWorld(worldData.uuid)
 
         if (hasManagePermission) {
@@ -118,25 +122,105 @@ class ChanponWorldSettingsMenuProvider(
     }
 
     private fun handleSettingsClick(event: InventoryClickEvent, player: Player, worldUuid: UUID) {
+        event.isCancelled = true
+        val mwm = mwm()
+        mwm.settingsSessionManager.getSession(player)?.let { it.isGuiTransition = false }
         if (event.clickedInventory != event.view.topInventory) return
         val item = event.currentItem ?: return
-        when (ItemTag.getType(item)) {
+        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
+        val session = mwm.settingsSessionManager.getSession(player)
+        val isOwner = worldData.owner == player.uniqueId || session?.isAdminFlow == true
+        val isModerator = worldData.moderators.contains(player.uniqueId)
+
+        val type = ItemTag.getType(item)
+        when (type) {
             ItemTag.TYPE_GUI_SETTING_EXPAND -> {
-                event.isCancelled = true
-                val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
                 if (worldData.borderExpansionLevel == WorldData.EXPANSION_LEVEL_SPECIAL) return
                 if (worldData.borderExpansionLevel >= maxExpansionLevel()) {
                     player.sendMessage(i18nComponent(player, "message.expand_max"))
                     return
                 }
-                mwm().soundManager.playClickSound(player, item, "world_settings")
+                mwm.soundManager.playClickSound(player, item, "world_settings")
                 openExpansionMenu(player, worldData)
             }
             ItemTag.TYPE_GUI_SETTING_CRITICAL -> {
-                event.isCancelled = true
-                val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
-                mwm().soundManager.playClickSound(player, item, "world_settings")
+                mwm.soundManager.playClickSound(player, item, "world_settings")
                 openCriticalMenu(player, worldData)
+            }
+            ItemTag.TYPE_GUI_SETTING_ENVIRONMENT -> {
+                mwm.soundManager.playClickSound(player, item, "world_settings")
+                environmentGui.open(player, worldData)
+            }
+            ItemTag.TYPE_GUI_SETTING_INFO -> {
+                mwm.worldSettingsGui.editWorldInfo(player, worldData)
+            }
+            ItemTag.TYPE_GUI_SETTING_ICON -> {
+                mwm.worldSettingsGui.enterIconSelection(player, worldData)
+            }
+            ItemTag.TYPE_GUI_SETTING_SPAWN -> {
+                val isGuest = if (mwm.playerPlatformResolver.isBedrock(player)) true else event.isLeftClick
+                mwm.worldSettingsGui.enterSpawnSetting(player, worldData, isGuest)
+            }
+            ItemTag.TYPE_GUI_SETTING_PUBLISH -> {
+                mwm.soundManager.playClickSound(player, item, "world_settings")
+                val nextVisibility = when (storage.getVisibility(worldUuid)) {
+                    ChanponWorldVisibility.PUBLIC -> ChanponWorldVisibility.DEVELOPMENT
+                    ChanponWorldVisibility.DEVELOPMENT -> ChanponWorldVisibility.PRIVATE
+                    ChanponWorldVisibility.PRIVATE -> ChanponWorldVisibility.PUBLIC
+                }
+                storage.setVisibility(worldUuid, nextVisibility)
+                open(player, worldData, currentRequest(player))
+            }
+            ItemTag.TYPE_GUI_SETTING_MEMBER -> {
+                mwm.soundManager.playClickSound(player, item, "world_settings")
+                mwm.worldSettingsGui.openMemberManagement(player, worldData, 0, true)
+            }
+            ItemTag.TYPE_GUI_SETTING_NOTIFICATION -> {
+                mwm.worldSettingsGui.toggleNotification(player, worldData)
+                open(player, worldData, currentRequest(player))
+            }
+            ItemTag.TYPE_GUI_SETTING_TAGS -> {
+                mwm.soundManager.playClickSound(player, item, "world_settings")
+                mwm.worldSettingsGui.openTagEditor(player, worldData)
+            }
+            ItemTag.TYPE_GUI_SETTING_ANNOUNCEMENT -> {
+                if (event.isLeftClick) {
+                    mwm.worldSettingsGui.editAnnouncement(player, worldData)
+                } else {
+                    mwm.worldSettingsGui.clearAnnouncements(player, worldData)
+                }
+                open(player, worldData, currentRequest(player))
+            }
+            ItemTag.TYPE_GUI_SETTING_TOUR -> {
+                mwm.soundManager.playClickSound(player, item, "world_settings")
+                mwm.tourGui.openEditMenu(player, worldData, 0)
+            }
+            ItemTag.TYPE_GUI_SETTING_VISITOR -> {
+                mwm.soundManager.playClickSound(player, item, "world_settings")
+                mwm.worldSettingsGui.openVisitorManagement(player, worldData, 0)
+            }
+            ItemTag.TYPE_GUI_SETTING_PORTALS -> {
+                mwm.soundManager.playClickSound(player, item, "world_settings")
+                mwm.worldSettingsGui.openPortalManagement(player, worldData, 0)
+            }
+            ItemTag.TYPE_GUI_RETURN -> {
+                mwm.soundManager.playClickSound(player, item, "world_settings")
+                player.closeInventory()
+                player.performCommand(mwm.config.getString("menu_command", "mwm")?.removePrefix("/") ?: "mwm")
+            }
+            ItemTag.TYPE_GUI_EXTENSION -> {
+                val extensionId = ItemTag.getExtensionId(item) ?: return
+                val extension = MyWorldManagerApi.getMenuExtensions().firstOrNull { it.getId() == extensionId } ?: return
+                val extensionMenuType = "world_settings"
+                extension.onClick(event, player, MenuExtensionContext(
+                    extensionMenuType,
+                    mutableMapOf(
+                        "worldData" to worldData,
+                        "showBackButton" to currentRequest(player).showBackButton,
+                        "isOwner" to isOwner,
+                        "isModerator" to isModerator
+                    )
+                ))
             }
         }
     }

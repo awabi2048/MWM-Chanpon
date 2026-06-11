@@ -10,15 +10,24 @@ class ToolPermissionConfig(private val plugin: MWMChanponPlugin) {
             val base = "tool_permissions.tools.$id"
             val materialName = plugin.config.getString("$base.material") ?: return@mapNotNull null
             val material = Material.matchMaterial(materialName) ?: Material.STONE
-            val permissions = plugin.config.getStringList("$base.permissions").filter { it.isNotBlank() }
-            if (permissions.isEmpty()) return@mapNotNull null
+            val groupName = plugin.config.getString("$base.group")?.takeIf { it.isNotBlank() }
+                ?: defaultGroupName(id)
             ToolPermissionDefinition(
                 id = id,
                 displayName = plugin.config.getString("$base.display_name") ?: id,
                 material = material,
-                permissions = permissions,
+                groupName = groupName,
                 color = plugin.config.getString("$base.color") ?: "§7"
             )
+        }
+    }
+
+    private fun defaultGroupName(id: String): String {
+        return when (id.lowercase()) {
+            "worldedit" -> "worldeditor"
+            "voxelsniper" -> "voxelsniper"
+            "axiom" -> "axiom"
+            else -> id.lowercase()
         }
     }
 }

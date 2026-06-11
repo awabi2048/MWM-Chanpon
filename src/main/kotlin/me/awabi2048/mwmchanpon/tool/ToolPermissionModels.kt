@@ -6,6 +6,6 @@ data class ToolPermissionDefinition(
     val id: String,
     val displayName: String,
     val material: Material,
-    val permissions: List<String>,
+    val groupName: String,
     val color: String = "§7"
 )

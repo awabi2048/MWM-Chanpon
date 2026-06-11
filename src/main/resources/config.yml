@@ -3,6 +3,7 @@ wizard:
 
 archive:
   enabled: false
+  password: "たぬきスープ"
 
 production:
   menu_slot: 40
@@ -18,20 +19,17 @@ tool_permissions:
       display_name: "WorldEdit"
       material: WOODEN_AXE
       color: "§a"
-      permissions:
-        - "worldedit.*"
+      group: "worldeditor"
     voxelsniper:
       display_name: "VoxelSniper"
       material: ARROW
       color: "§d"
-      permissions:
-        - "voxelsniper.*"
+      group: "voxelsniper"
     axiom:
       display_name: "Axiom"
       material: ENDER_EYE
       color: "§b"
-      permissions:
-        - "axiom.*"
+      group: "axiom"
 
 backup:
   owner_manual:

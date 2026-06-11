@@ -4,7 +4,7 @@ import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import java.util.logging.Logger
 import net.luckperms.api.LuckPerms
-import net.luckperms.api.node.types.PermissionNode
+import net.luckperms.api.node.types.InheritanceNode
 
 class LuckPermsToolPermissionService(
     private val luckPerms: LuckPerms,
@@ -19,16 +19,14 @@ class LuckPermsToolPermissionService(
         return luckPerms.userManager.loadUser(playerUuid)
             .thenCompose { user ->
                 definitions.forEach { definition ->
-                    definition.permissions.forEach { permission ->
-                        val node = PermissionNode.builder(permission)
-                            .withContext("world", worldName)
-                            .value(true)
-                            .build()
-                        if (definition.id in enabledToolIds) {
-                            user.data().add(node)
-                        } else {
-                            user.data().remove(node)
-                        }
+                    val groupNode = InheritanceNode.builder(definition.groupName)
+                        .withContext("world", worldName)
+                        .value(true)
+                        .build()
+                    if (definition.id in enabledToolIds) {
+                        user.data().add(groupNode)
+                    } else {
+                        user.data().remove(groupNode)
                     }
                 }
                 luckPerms.userManager.saveUser(user)
@@ -50,13 +48,11 @@ class LuckPermsToolPermissionService(
         return luckPerms.userManager.loadUser(playerUuid)
             .thenCompose { user ->
                 definitions.forEach { definition ->
-                    definition.permissions.forEach { permission ->
-                        val node = PermissionNode.builder(permission)
-                            .withContext("world", worldName)
-                            .value(true)
-                            .build()
-                        user.data().remove(node)
-                    }
+                    val groupNode = InheritanceNode.builder(definition.groupName)
+                        .withContext("world", worldName)
+                        .value(true)
+                        .build()
+                    user.data().remove(groupNode)
                 }
                 luckPerms.userManager.saveUser(user)
             }

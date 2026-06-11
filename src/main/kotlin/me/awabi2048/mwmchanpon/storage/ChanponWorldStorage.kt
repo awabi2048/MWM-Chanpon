@@ -58,6 +58,11 @@ class ChanponWorldStorage(dataFolder: File) {
         config.save(worldFile(worldUuid))
     }
 
+    fun getProductionSetAt(worldUuid: UUID): LocalDateTime? {
+        val raw = load(worldUuid)?.getString("production_set_at") ?: return null
+        return runCatching { LocalDateTime.parse(raw) }.getOrNull()
+    }
+
     fun getVisibility(worldUuid: UUID): ChanponWorldVisibility {
         val config = load(worldUuid) ?: return ChanponWorldVisibility.PRIVATE
         return ChanponWorldVisibility.fromStorageValue(config.getString("visibility"))
@@ -178,6 +183,31 @@ class ChanponWorldStorage(dataFolder: File) {
 
     fun deleteWorld(worldUuid: UUID) {
         worldFile(worldUuid).delete()
+    }
+
+    fun isImportedArchive(worldUuid: UUID): Boolean {
+        val config = load(worldUuid) ?: return false
+        return config.getBoolean("imported_archive", false)
+    }
+
+    fun setImportedArchive(worldUuid: UUID, value: Boolean) {
+        val config = loadOrCreate(worldUuid)
+        config.set("imported_archive", value)
+        config.save(worldFile(worldUuid))
+    }
+
+    fun getCompletedAt(worldUuid: UUID): java.time.LocalDateTime? {
+        val config = load(worldUuid) ?: return null
+        if (getSubmissionState(worldUuid) != SubmissionState.COMPLETED) return null
+        val history = config.getMapList("submission.history")
+        val completedEntries = history.filter {
+            (it["action"] as? String) == "mark_completed"
+        }
+        val lastCompleted = completedEntries.maxByOrNull {
+            (it["at"] as? String) ?: ""
+        }
+        val raw = lastCompleted?.get("at") as? String ?: return null
+        return runCatching { java.time.LocalDateTime.parse(raw) }.getOrNull()
     }
 
     private fun load(worldUuid: UUID): YamlConfiguration? {
