@@ -5,6 +5,7 @@ import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.backup.BackupKind
 import me.awabi2048.mwmchanpon.backup.BackupOperationStatus
 import me.awabi2048.mwmchanpon.backup.BackupService
+import me.awabi2048.mwmchanpon.service.ArchiveService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.model.WorldData
@@ -26,7 +27,8 @@ class WorldDataManagementMenu(
     private val plugin: MWMChanponPlugin,
     private val storage: ChanponWorldStorage,
     private val backupService: BackupService,
-    private val backupListMenu: BackupListMenu
+    private val backupListMenu: BackupListMenu,
+    private val archiveService: ArchiveService
 ) : Listener {
     private var parentMenuOpener: ((Player) -> Unit)? = null
 
@@ -52,6 +54,7 @@ class WorldDataManagementMenu(
         inv.setItem(47, controlItem(player, Material.CHEST, "world_data.bulk_backup", ACTION_BULK_BACKUP))
         inv.setItem(49, infoItem(player, worlds.size, safePage + 1, pages))
         inv.setItem(51, controlItem(player, Material.RECOVERY_COMPASS, "world_data.bulk_rollback", ACTION_BULK_ROLLBACK))
+        inv.setItem(53, controlItem(player, Material.ENDER_CHEST, "world_data.annual_archive", ACTION_ANNUAL_ARCHIVE))
         fill(inv)
         player.openInventory(inv)
     }
@@ -74,6 +77,10 @@ class WorldDataManagementMenu(
             TYPE_CONTROL -> when (ItemTag.getString(item, ACTION_KEY)) {
                 ACTION_BULK_BACKUP -> openBulkBackupConfirm(player, holder.page)
                 ACTION_BULK_ROLLBACK -> openBulkRollbackConfirm(player, holder.page)
+                ACTION_ANNUAL_ARCHIVE -> {
+                    player.closeInventory()
+                    AnnualArchiveFlow(plugin, archiveService).start(player)
+                }
             }
         }
     }
@@ -266,5 +273,6 @@ class WorldDataManagementMenu(
         private const val ACTION_KEY = "chanpon_action"
         private const val ACTION_BULK_BACKUP = "bulk_backup"
         private const val ACTION_BULK_ROLLBACK = "bulk_rollback"
+        private const val ACTION_ANNUAL_ARCHIVE = "annual_archive"
     }
 }

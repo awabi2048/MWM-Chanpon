@@ -38,6 +38,7 @@ class ChanponAdminMenu(
         inventory.setItem(21, menuItem(player, Material.CHEST, "admin.world_data", ACTION_WORLD_DATA))
         inventory.setItem(23, menuItem(player, Material.CLOCK, "admin.automation", ACTION_AUTOMATION))
         inventory.setItem(25, menuItem(player, Material.DISPENSER, "admin.export", ACTION_EXPORT))
+        inventory.setItem(38, worldCreationItem(player))
         inventory.setItem(40, infoItem(player))
         currentWorldUuid(player)?.let { worldUuid ->
             inventory.setItem(42, spawnWorldItem(player, worldUuid))
@@ -60,6 +61,10 @@ class ChanponAdminMenu(
                 ACTION_WORLD_DATA -> worldDataManagementMenu.open(player)
                 ACTION_AUTOMATION -> automationSettingsMenu.open(player)
                 ACTION_EXPORT -> worldDataExportMenu.open(player)
+                ACTION_WORLD_CREATION -> {
+                    globalStorage.setWorldCreationEnabled(!globalStorage.isWorldCreationEnabled())
+                    open(player)
+                }
                 ACTION_SET_SPAWN_WORLD -> {
                     val worldUuid = ItemTag.getWorldUuid(item) ?: return
                     openSpawnConfirm(player, worldUuid)
@@ -125,6 +130,13 @@ class ChanponAdminMenu(
         }
     }
 
+    private fun worldCreationItem(player: Player): ItemStack {
+        val enabled = globalStorage.isWorldCreationEnabled()
+        val key = if (enabled) "admin.world_creation.enabled" else "admin.world_creation.disabled"
+        val material = if (enabled) Material.LIME_DYE else Material.GRAY_DYE
+        return menuItem(player, material, key, ACTION_WORLD_CREATION)
+    }
+
     private fun confirmButton(player: Player, confirm: Boolean): ItemStack {
         val item = ItemStack(if (confirm) Material.LIME_CONCRETE else Material.RED_CONCRETE)
         item.editMeta { meta ->
@@ -185,6 +197,7 @@ class ChanponAdminMenu(
         private const val ACTION_WORLD_DATA = "world_data"
         private const val ACTION_AUTOMATION = "automation"
         private const val ACTION_EXPORT = "export"
+        private const val ACTION_WORLD_CREATION = "world_creation"
         private const val ACTION_SET_SPAWN_WORLD = "set_spawn_world"
         private const val ACTION_NONE = "none"
     }

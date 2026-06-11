@@ -16,7 +16,7 @@ class ToolPermissionMenuListener(
     private val controller: ToolPermissionController,
     private val definitions: List<ToolPermissionDefinition>
 ) : Listener {
-    @EventHandler(ignoreCancelled = true)
+    @EventHandler(ignoreCancelled = false)
     fun onInventoryClick(event: InventoryClickEvent) {
         val holder = event.view.topInventory.holder as? ToolPermissionMenuHolder ?: return
         event.isCancelled = true
