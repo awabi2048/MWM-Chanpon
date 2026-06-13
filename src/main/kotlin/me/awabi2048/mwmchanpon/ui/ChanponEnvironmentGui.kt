@@ -66,15 +66,29 @@ class ChanponEnvironmentGui : Listener {
     private fun handleMainClick(event: InventoryClickEvent, player: Player, worldUuid: UUID, item: ItemStack) {
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
         when (ItemTag.getString(item, ACTION_KEY)) {
-            ACTION_WEATHER -> openWeatherMenu(player, worldData)
-            ACTION_TIME -> openTimeMenu(player, worldData)
-            ACTION_GRAVITY -> openGravityMenu(player, worldData)
-            ACTION_SCALE -> openScaleMenu(player, worldData)
+            ACTION_WEATHER -> {
+                pushMainRoute(player, worldData)
+                openWeatherMenu(player, worldData)
+            }
+            ACTION_TIME -> {
+                pushMainRoute(player, worldData)
+                openTimeMenu(player, worldData)
+            }
+            ACTION_GRAVITY -> {
+                pushMainRoute(player, worldData)
+                openGravityMenu(player, worldData)
+            }
+            ACTION_SCALE -> {
+                pushMainRoute(player, worldData)
+                openScaleMenu(player, worldData)
+            }
         }
         if (ItemTag.isType(item, ItemTag.TYPE_GUI_RETURN)) {
-            mwm().settingsSessionManager.getSession(player)?.let { session ->
-                val worldSettings = JavaPlugin.getPlugin(MyWorldManager::class.java).worldSettingsGui
-                worldSettings.open(player, worldData, session.showBackButton, session.isPlayerWorldFlow, session.parentShowBackButton)
+            if (!mwm().menuRouteHistory.openPrevious(player)) {
+                mwm().settingsSessionManager.getSession(player)?.let { session ->
+                    val worldSettings = JavaPlugin.getPlugin(MyWorldManager::class.java).worldSettingsGui
+                    worldSettings.open(player, worldData, session.showBackButton, session.isPlayerWorldFlow, session.parentShowBackButton)
+                }
             }
         }
     }
@@ -97,7 +111,9 @@ class ChanponEnvironmentGui : Listener {
     private fun handleWeatherClick(event: InventoryClickEvent, player: Player, worldUuid: UUID, item: ItemStack) {
         if (ItemTag.isType(item, ItemTag.TYPE_GUI_RETURN)) {
             val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
-            open(player, worldData)
+            if (!mwm().menuRouteHistory.openPrevious(player)) {
+                open(player, worldData)
+            }
             return
         }
         val weather = ItemTag.getString(item, ACTION_KEY) ?: return
@@ -152,7 +168,9 @@ class ChanponEnvironmentGui : Listener {
     private fun handleTimeClick(event: InventoryClickEvent, player: Player, worldUuid: UUID, item: ItemStack) {
         if (ItemTag.isType(item, ItemTag.TYPE_GUI_RETURN)) {
             val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
-            open(player, worldData)
+            if (!mwm().menuRouteHistory.openPrevious(player)) {
+                open(player, worldData)
+            }
             return
         }
         val timeStr = ItemTag.getString(item, ACTION_KEY) ?: return
@@ -190,7 +208,9 @@ class ChanponEnvironmentGui : Listener {
     private fun handleGravityClick(event: InventoryClickEvent, player: Player, worldUuid: UUID, item: ItemStack) {
         if (ItemTag.isType(item, ItemTag.TYPE_GUI_RETURN)) {
             val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
-            open(player, worldData)
+            if (!mwm().menuRouteHistory.openPrevious(player)) {
+                open(player, worldData)
+            }
             return
         }
         val gravityStr = ItemTag.getString(item, ACTION_KEY) ?: return
@@ -235,7 +255,9 @@ class ChanponEnvironmentGui : Listener {
     private fun handleScaleClick(event: InventoryClickEvent, player: Player, worldUuid: UUID, item: ItemStack) {
         if (ItemTag.isType(item, ItemTag.TYPE_GUI_RETURN)) {
             val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
-            open(player, worldData)
+            if (!mwm().menuRouteHistory.openPrevious(player)) {
+                open(player, worldData)
+            }
             return
         }
         val scaleStr = ItemTag.getString(item, ACTION_KEY) ?: return
@@ -423,6 +445,17 @@ class ChanponEnvironmentGui : Listener {
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_DECORATION)
         return item
+    }
+
+    private fun pushMainRoute(player: Player, worldData: WorldData) {
+        mwm().menuRouteHistory.pushCustom(
+            player,
+            "chanpon.environment:${worldData.uuid}"
+        ) { target ->
+            val latest = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldData.uuid) ?: return@pushCustom false
+            open(target, latest)
+            true
+        }
     }
 
     private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)

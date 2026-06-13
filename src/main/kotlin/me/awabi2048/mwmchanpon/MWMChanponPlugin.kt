@@ -111,7 +111,7 @@ class MWMChanponPlugin : JavaPlugin() {
         backupService = BackupService(this, chanponStorage)
         worldDataExportService = WorldDataExportService(this, chanponStorage)
         backupListMenu = BackupListMenu(this, backupService)
-        archiveService = ArchiveService(this, chanponStorage, backupService, globalStorage)
+        archiveService = ArchiveService(this, chanponStorage, globalStorage)
         worldDataManagementMenu = WorldDataManagementMenu(this, chanponStorage, backupService, backupListMenu, archiveService)
         worldDataExportMenu = WorldDataExportMenu(this, worldDataExportService)
         automationService = BackupAutomationService(this, chanponStorage, backupService)

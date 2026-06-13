@@ -141,14 +141,17 @@ class ChanponWorldSettingsMenuProvider(
                     return
                 }
                 mwm.soundManager.playClickSound(player, item, "world_settings")
+                pushSettingsRoute(player, worldData)
                 openExpansionMenu(player, worldData)
             }
             ItemTag.TYPE_GUI_SETTING_CRITICAL -> {
                 mwm.soundManager.playClickSound(player, item, "world_settings")
+                pushSettingsRoute(player, worldData)
                 openCriticalMenu(player, worldData)
             }
             ItemTag.TYPE_GUI_SETTING_ENVIRONMENT -> {
                 mwm.soundManager.playClickSound(player, item, "world_settings")
+                pushSettingsRoute(player, worldData)
                 environmentGui.open(player, worldData)
             }
             ItemTag.TYPE_GUI_SETTING_INFO -> {
@@ -173,6 +176,7 @@ class ChanponWorldSettingsMenuProvider(
             }
             ItemTag.TYPE_GUI_SETTING_MEMBER -> {
                 mwm.soundManager.playClickSound(player, item, "world_settings")
+                pushSettingsRoute(player, worldData)
                 mwm.worldSettingsGui.openMemberManagement(player, worldData, 0, true)
             }
             ItemTag.TYPE_GUI_SETTING_NOTIFICATION -> {
@@ -205,8 +209,10 @@ class ChanponWorldSettingsMenuProvider(
             }
             ItemTag.TYPE_GUI_RETURN -> {
                 mwm.soundManager.playClickSound(player, item, "world_settings")
-                player.closeInventory()
-                player.performCommand(mwm.config.getString("menu_command", "mwm")?.removePrefix("/") ?: "mwm")
+                if (!mwm.menuRouteHistory.openPrevious(player)) {
+                    player.closeInventory()
+                    player.performCommand(mwm.config.getString("menu_command", "mwm")?.removePrefix("/") ?: "mwm")
+                }
             }
             ItemTag.TYPE_GUI_EXTENSION -> {
                 val extensionId = ItemTag.getExtensionId(item) ?: return
@@ -231,10 +237,17 @@ class ChanponWorldSettingsMenuProvider(
         val item = event.currentItem ?: return
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
         when (ItemTag.getType(item)) {
-            ItemTag.TYPE_GUI_RETURN -> open(player, worldData, currentRequest(player))
+            ItemTag.TYPE_GUI_RETURN -> {
+                if (!mwm().menuRouteHistory.openPrevious(player)) {
+                    open(player, worldData, currentRequest(player))
+                }
+            }
             TYPE_EXPAND_DIRECTION -> {
                 when (ItemTag.getString(item, DIRECTION_KEY)) {
-                    ACTION_CENTER -> openConfirm(player, worldData, ConfirmAction.EXPAND, null)
+                    ACTION_CENTER -> {
+                        pushExpansionRoute(player, worldData)
+                        openConfirm(player, worldData, ConfirmAction.EXPAND, null)
+                    }
                     ACTION_SELECT_DIRECTION -> {
                         val started = MyWorldManagerApi.getWorldService()?.startWorldBorderExpansionSequence(
                             player,
@@ -254,8 +267,10 @@ class ChanponWorldSettingsMenuProvider(
             }
             ItemTag.TYPE_GUI_SETTING_STEP_BACK_EXPANSION -> {
                 if (worldData.latestBorderExpansionRecord()?.modified == true) {
+                    pushExpansionRoute(player, worldData)
                     openModifiedWarning(player, worldData, ConfirmAction.STEP_BACK)
                 } else {
+                    pushExpansionRoute(player, worldData)
                     openConfirm(player, worldData, ConfirmAction.STEP_BACK, null)
                 }
             }
@@ -267,8 +282,15 @@ class ChanponWorldSettingsMenuProvider(
         if (event.clickedInventory != event.view.topInventory) return
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(holder.worldUuid) ?: return
         when (ItemTag.getType(event.currentItem ?: return)) {
-            ItemTag.TYPE_GUI_CANCEL -> openExpansionMenu(player, worldData)
-            ItemTag.TYPE_GUI_CONFIRM -> openConfirm(player, worldData, holder.action, null)
+            ItemTag.TYPE_GUI_CANCEL -> {
+                if (!mwm().menuRouteHistory.openPrevious(player)) {
+                    openExpansionMenu(player, worldData)
+                }
+            }
+            ItemTag.TYPE_GUI_CONFIRM -> {
+                pushWarningRoute(player, worldData, holder.action)
+                openConfirm(player, worldData, holder.action, null)
+            }
         }
     }
 
@@ -277,7 +299,11 @@ class ChanponWorldSettingsMenuProvider(
         if (event.clickedInventory != event.view.topInventory) return
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(holder.worldUuid) ?: return
         when (ItemTag.getType(event.currentItem ?: return)) {
-            ItemTag.TYPE_GUI_CANCEL -> openExpansionMenu(player, worldData)
+            ItemTag.TYPE_GUI_CANCEL -> {
+                if (!mwm().menuRouteHistory.openPrevious(player)) {
+                    openExpansionMenu(player, worldData)
+                }
+            }
             ItemTag.TYPE_GUI_CONFIRM -> {
                 val service = MyWorldManagerApi.getWorldService()
                 val success = when (holder.action) {
@@ -303,9 +329,14 @@ class ChanponWorldSettingsMenuProvider(
         if (event.clickedInventory != event.view.topInventory) return
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
         when (ItemTag.getType(event.currentItem ?: return)) {
-            ItemTag.TYPE_GUI_RETURN -> open(player, worldData, currentRequest(player))
+            ItemTag.TYPE_GUI_RETURN -> {
+                if (!mwm().menuRouteHistory.openPrevious(player)) {
+                    open(player, worldData, currentRequest(player))
+                }
+            }
             ItemTag.TYPE_GUI_SETTING_DELETE_WORLD -> {
                 if (storage.isProductionWorld(worldUuid)) return
+                pushCriticalRoute(player, worldData)
                 openDeleteConfirm(player, worldData, false)
             }
         }
@@ -316,9 +347,14 @@ class ChanponWorldSettingsMenuProvider(
         if (event.clickedInventory != event.view.topInventory) return
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(holder.worldUuid) ?: return
         when (ItemTag.getType(event.currentItem ?: return)) {
-            ItemTag.TYPE_GUI_CANCEL -> openCriticalMenu(player, worldData)
+            ItemTag.TYPE_GUI_CANCEL -> {
+                if (!mwm().menuRouteHistory.openPrevious(player)) {
+                    openCriticalMenu(player, worldData)
+                }
+            }
             ItemTag.TYPE_GUI_CONFIRM -> {
                 if (!holder.finalStep) {
+                    pushDeleteConfirmRoute(player, worldData, false)
                     openDeleteConfirm(player, worldData, true)
                     return
                 }
@@ -397,6 +433,62 @@ class ChanponWorldSettingsMenuProvider(
         inventory.setItem(24, confirmButton(player, false))
         fill(inventory)
         player.openInventory(inventory)
+    }
+
+    private fun pushSettingsRoute(player: Player, worldData: WorldData) {
+        val request = currentRequest(player)
+        mwm().menuRouteHistory.pushCustom(
+            player,
+            "chanpon.world_settings:${worldData.uuid}:$request"
+        ) { target ->
+            val latest = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldData.uuid) ?: return@pushCustom false
+            open(target, latest, request)
+            true
+        }
+    }
+
+    private fun pushExpansionRoute(player: Player, worldData: WorldData) {
+        mwm().menuRouteHistory.pushCustom(
+            player,
+            "chanpon.expansion:${worldData.uuid}"
+        ) { target ->
+            val latest = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldData.uuid) ?: return@pushCustom false
+            openExpansionMenu(target, latest)
+            true
+        }
+    }
+
+    private fun pushWarningRoute(player: Player, worldData: WorldData, action: ConfirmAction) {
+        mwm().menuRouteHistory.pushCustom(
+            player,
+            "chanpon.warning:${worldData.uuid}:${action.key}"
+        ) { target ->
+            val latest = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldData.uuid) ?: return@pushCustom false
+            openModifiedWarning(target, latest, action)
+            true
+        }
+    }
+
+    private fun pushCriticalRoute(player: Player, worldData: WorldData) {
+        mwm().menuRouteHistory.pushCustom(
+            player,
+            "chanpon.critical:${worldData.uuid}"
+        ) { target ->
+            val latest = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldData.uuid) ?: return@pushCustom false
+            openCriticalMenu(target, latest)
+            true
+        }
+    }
+
+    private fun pushDeleteConfirmRoute(player: Player, worldData: WorldData, finalStep: Boolean) {
+        mwm().menuRouteHistory.pushCustom(
+            player,
+            "chanpon.delete_confirm:${worldData.uuid}:$finalStep"
+        ) { target ->
+            val latest = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldData.uuid) ?: return@pushCustom false
+            openDeleteConfirm(target, latest, finalStep)
+            true
+        }
     }
 
     private fun renderExtensions(
