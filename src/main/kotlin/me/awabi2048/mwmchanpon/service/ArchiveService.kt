@@ -13,7 +13,6 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
-import me.awabi2048.mwmchanpon.backup.BackupService
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.SubmissionState
@@ -30,7 +29,6 @@ import org.bukkit.entity.Player
 class ArchiveService(
     private val plugin: MWMChanponPlugin,
     private val storage: ChanponWorldStorage,
-    @Suppress("unused") private val backupService: BackupService,
     private val globalStorage: ChanponGlobalStorage
 ) {
     private val incomingDir = File(plugin.dataFolder, "archives/incoming")
@@ -98,7 +96,7 @@ class ArchiveService(
             return CompletableFuture.completedFuture(ArchiveResult(false, "no_tracked_worlds"))
         }
 
-        val evacuateLocation = Bukkit.getWorld("world")?.spawnLocation
+        val evacuateLocation = MyWorldManagerApi.getEvacuationLocationOverride()
             ?: return CompletableFuture.completedFuture(ArchiveResult(false, "spawn_world_not_available"))
         affectedWorlds.forEach { worldData ->
             Bukkit.getWorld(worldService.getWorldFolderName(worldData))?.let { world ->
@@ -106,7 +104,7 @@ class ArchiveService(
                 world.save()
             }
         }
-        Bukkit.getWorld("level")?.save()
+        evacuateLocation.world.save()
 
         bossBar.isVisible = true
         syncBossBar(bossBar, executor, 0, affectedWorlds.size + worldsToArchive.size + worldsToDelete.size + 2)
@@ -464,7 +462,17 @@ class ArchiveService(
                     "z" to portal.z,
                     "target_world_name" to portal.targetWorldName,
                     "show_text" to portal.showText,
-                    "type" to portal.type
+                    "particle_color_rgb" to portal.particleColorRgb,
+                    "owner_uuid" to portal.ownerUuid.toString(),
+                    "created_at" to portal.createdAt,
+                    "text_display_uuid" to portal.textDisplayUuid?.toString(),
+                    "type" to portal.type,
+                    "min_x" to portal.minX,
+                    "min_y" to portal.minY,
+                    "min_z" to portal.minZ,
+                    "max_x" to portal.maxX,
+                    "max_y" to portal.maxY,
+                    "max_z" to portal.maxZ
                 )
             }
         )
@@ -484,13 +492,25 @@ class ArchiveService(
             }
             val targetWorldName = it["target_world_name"]?.toString()
             val showText = it["show_text"] as? Boolean ?: true
+            val ownerUuid = it["owner_uuid"]?.toString()?.let { raw ->
+                runCatching { UUID.fromString(raw) }.getOrNull()
+            } ?: return@mapNotNull null
             ApiPortalSnapshot(
                 id, worldName, x, y, z,
                 worldUuid, targetWorldName, showText,
-                0, UUID.randomUUID(), "",
-                null, it["type"]?.toString() ?: "",
-                null, null, null,
-                null, null, null
+                (it["particle_color_rgb"] as? Number)?.toInt() ?: 0,
+                ownerUuid,
+                it["created_at"]?.toString() ?: "",
+                it["text_display_uuid"]?.toString()?.let { raw ->
+                    runCatching { UUID.fromString(raw) }.getOrNull()
+                },
+                it["type"]?.toString() ?: "portal",
+                (it["min_x"] as? Number)?.toInt(),
+                (it["min_y"] as? Number)?.toInt(),
+                (it["min_z"] as? Number)?.toInt(),
+                (it["max_x"] as? Number)?.toInt(),
+                (it["max_y"] as? Number)?.toInt(),
+                (it["max_z"] as? Number)?.toInt()
             )
         }
     }
