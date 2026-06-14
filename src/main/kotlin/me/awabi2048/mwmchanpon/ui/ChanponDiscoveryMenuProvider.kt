@@ -82,9 +82,11 @@ class ChanponDiscoveryMenuProvider(
         val item = event.currentItem ?: return
         when (ItemTag.getType(item)) {
             ItemTag.TYPE_GUI_RETURN -> {
-                mwm().soundManager.playClickSound(player, item, "discovery")
-                player.closeInventory()
-                player.performCommand(mwm().config.getString("menu_command", "mwm")?.removePrefix("/") ?: "mwm")
+                val mwm = mwm()
+                mwm.soundManager.playClickSound(player, item, "discovery")
+                if (!mwm.menuRouteHistory.openPrevious(player)) {
+                    player.closeInventory()
+                }
             }
             ItemTag.TYPE_GUI_WORLD_ITEM -> {
                 if (!event.isLeftClick) return

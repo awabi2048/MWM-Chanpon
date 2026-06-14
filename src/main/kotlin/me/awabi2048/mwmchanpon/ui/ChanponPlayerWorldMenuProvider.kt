@@ -137,6 +137,7 @@ class ChanponPlayerWorldMenuProvider(
             }
             ItemTag.TYPE_GUI_USER_SETTINGS_BUTTON -> {
                 mwm.soundManager.playClickSound(player, item, "player_world")
+                mwm.menuRouteHistory.pushPlayerWorld(player, holder.page, holder.showBackButton)
                 mwm.userSettingsGui.open(player, true)
             }
             ItemTag.TYPE_GUI_WORLD_ITEM -> handleWorldClick(player, holder, item, event)
@@ -165,6 +166,7 @@ class ChanponPlayerWorldMenuProvider(
             return
         }
         if (event.isRightClick && !event.isShiftClick && canOpenSettings(player, worldData)) {
+            mwm.menuRouteHistory.pushPlayerWorld(player, holder.page, holder.showBackButton)
             mwm.worldSettingsGui.open(
                 player,
                 worldData,
@@ -309,9 +311,9 @@ class ChanponPlayerWorldMenuProvider(
     private fun handleReturn(player: Player, item: ItemStack) {
         val mwm = mwm()
         mwm.soundManager.playClickSound(player, item, "player_world")
-        val command = mwm.config.getString("menu_command", "mwm")?.removePrefix("/") ?: "mwm"
-        player.closeInventory()
-        player.performCommand(command)
+        if (!mwm.menuRouteHistory.openPrevious(player)) {
+            player.closeInventory()
+        }
     }
 
     private fun decoration(material: Material): ItemStack {

@@ -212,7 +212,6 @@ class ChanponWorldSettingsMenuProvider(
                 mwm.soundManager.playClickSound(player, item, "world_settings")
                 if (!mwm.menuRouteHistory.openPrevious(player)) {
                     player.closeInventory()
-                    player.performCommand(mwm.config.getString("menu_command", "mwm")?.removePrefix("/") ?: "mwm")
                 }
             }
             ItemTag.TYPE_GUI_EXTENSION -> {

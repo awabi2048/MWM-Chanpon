@@ -58,10 +58,10 @@ class ChanponAdminMenu(
         val item = event.currentItem ?: return
         when (holder) {
             is Holder -> when (ItemTag.getString(item, ACTION_KEY)) {
-                ACTION_SUBMISSION -> submissionAdminMenu.open(player)
-                ACTION_WORLD_DATA -> worldDataManagementMenu.open(player)
-                ACTION_AUTOMATION -> automationSettingsMenu.open(player)
-                ACTION_EXPORT -> worldDataExportMenu.open(player)
+                ACTION_SUBMISSION -> openChild(player) { submissionAdminMenu.open(player) }
+                ACTION_WORLD_DATA -> openChild(player) { worldDataManagementMenu.open(player) }
+                ACTION_AUTOMATION -> openChild(player) { automationSettingsMenu.open(player) }
+                ACTION_EXPORT -> openChild(player) { worldDataExportMenu.open(player) }
                 ACTION_WORLD_CREATION -> {
                     globalStorage.setWorldCreationEnabled(!globalStorage.isWorldCreationEnabled())
                     open(player)
@@ -98,6 +98,14 @@ class ChanponAdminMenu(
         inventory.setItem(24, confirmButton(player, false))
         fill(inventory)
         player.openInventory(inventory)
+    }
+
+    private fun openChild(player: Player, opener: () -> Unit) {
+        mwm().menuRouteHistory.pushCustom(player, ROUTE_ADMIN_MENU) { target ->
+            open(target)
+            true
+        }
+        opener()
     }
 
     private fun applyFrame(inventory: Inventory) {
@@ -181,6 +189,9 @@ class ChanponAdminMenu(
 
     private fun lore(lines: List<String>) = CCSystem.getAPI().buildLore(lines, closingSeparator = true)
 
+    private fun mwm(): me.awabi2048.myworldmanager.MyWorldManager =
+        org.bukkit.plugin.java.JavaPlugin.getPlugin(me.awabi2048.myworldmanager.MyWorldManager::class.java)
+
     private class Holder : InventoryHolder {
         lateinit var inv: Inventory
         override fun getInventory(): Inventory = inv
@@ -201,5 +212,6 @@ class ChanponAdminMenu(
         private const val ACTION_WORLD_CREATION = "world_creation"
         private const val ACTION_SET_SPAWN_WORLD = "set_spawn_world"
         private const val ACTION_NONE = "none"
+        private const val ROUTE_ADMIN_MENU = "chanpon.admin_menu"
     }
 }

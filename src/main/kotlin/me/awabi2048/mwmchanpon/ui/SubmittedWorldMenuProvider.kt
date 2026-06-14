@@ -87,6 +87,10 @@ class SubmittedWorldMenuProvider(
     private fun handleReturn(player: Player, item: ItemStack, request: WorldSettingsMenuRequest) {
         val mwm = mwm()
         val session = mwm.settingsSessionManager.getSession(player)
+        if (mwm.menuRouteHistory.openPrevious(player)) {
+            mwm.soundManager.playClickSound(player, item, "world_settings")
+            return
+        }
         when {
             session?.isAdminFlow == true -> {
                 mwm.soundManager.playAdminClickSound(player)
@@ -98,10 +102,8 @@ class SubmittedWorldMenuProvider(
             }
             else -> {
                 mwm.soundManager.playClickSound(player, item, null)
-                val command = mwm.config.getString("menu_command", "mwm")?.removePrefix("/") ?: "mwm"
                 mwm.settingsSessionManager.endSession(player)
                 player.closeInventory()
-                player.performCommand(command)
             }
         }
     }
