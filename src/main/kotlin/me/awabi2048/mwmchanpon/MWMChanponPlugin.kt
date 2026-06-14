@@ -17,6 +17,7 @@ import me.awabi2048.mwmchanpon.listener.MemberPermissionSyncListener
 import me.awabi2048.mwmchanpon.listener.PlayerJoinListener
 import me.awabi2048.mwmchanpon.listener.SubmittedWorldProtectionListener
 import me.awabi2048.mwmchanpon.listener.ToolPermissionMenuListener
+import me.awabi2048.mwmchanpon.listener.ToolPermissionWorldListener
 import me.awabi2048.mwmchanpon.listener.WorldCleanupListener
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
 import me.awabi2048.mwmchanpon.service.BackupAutomationService
@@ -85,6 +86,7 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var commandExtension: ChanponCommandExtension
     private lateinit var favoriteVisitMenuProvider: ChanponFavoriteVisitMenuProvider
     private lateinit var spawnWorldService: ChanponSpawnWorldService
+    private lateinit var toolController: ToolPermissionController
 
     override fun onEnable() {
         saveDefaultConfig()
@@ -101,7 +103,7 @@ class MWMChanponPlugin : JavaPlugin() {
         val luckPerms = LuckPermsProvider.get()
         val toolDefinitions = ToolPermissionConfig(this).load()
         val isAutoRollbackEnabled = { config.getBoolean("backup.auto_rollback.enabled", false) }
-        val toolController = ToolPermissionController(
+        toolController = ToolPermissionController(
             chanponStorage,
             LuckPermsToolPermissionService(luckPerms, logger),
             toolDefinitions,
@@ -159,7 +161,7 @@ class MWMChanponPlugin : JavaPlugin() {
             submittedProtectionService,
             toolController
         )
-        environmentGui = ChanponEnvironmentGui()
+        environmentGui = ChanponEnvironmentGui(this)
         chanponWorldSettingsMenuProvider = ChanponWorldSettingsMenuProvider(this, chanponStorage, submittedProtectionService, environmentGui)
         playerWorldMenuProvider = ChanponPlayerWorldMenuProvider(this, globalStorage, chanponStorage)
         discoveryMenuProvider = ChanponDiscoveryMenuProvider(this, globalStorage, chanponStorage)
@@ -212,12 +214,13 @@ class MWMChanponPlugin : JavaPlugin() {
         MyWorldManagerApi.registerMenuExtension(linkedPortalMenuExtension)
         productionToggleExtension.syncForcedTagsForProductionWorlds()
         server.pluginManager.registerEvents(
-            ToolPermissionMenuListener(toolMenu, toolController, toolDefinitions),
+            ToolPermissionMenuListener(this, toolMenu, toolController, toolDefinitions),
             this
         )
         server.pluginManager.registerEvents(worldBackupMenuExtension, this)
         server.pluginManager.registerEvents(MemberPermissionSyncListener(toolController, chanponStorage), this)
         server.pluginManager.registerEvents(PlayerJoinListener(toolController, spawnWorldService), this)
+        server.pluginManager.registerEvents(ToolPermissionWorldListener(toolController), this)
         server.pluginManager.registerEvents(WorldCleanupListener(chanponStorage), this)
 
         server.scheduler.runTask(this, Runnable {
@@ -225,6 +228,7 @@ class MWMChanponPlugin : JavaPlugin() {
                 submittedProtectionService.syncAll(it)
                 it.forEach(toolController::syncWorld)
             }
+            toolController.syncOnlinePlayers()
         })
         automationService.start()
 
@@ -285,6 +289,9 @@ class MWMChanponPlugin : JavaPlugin() {
         }
         if (::automationService.isInitialized) {
             automationService.stop()
+        }
+        if (::toolController.isInitialized) {
+            toolController.clearOnlineActivePermissions()
         }
         wizardSessionService.clearAll()
         logger.info("MWM-Chanpon addon has been disabled.")

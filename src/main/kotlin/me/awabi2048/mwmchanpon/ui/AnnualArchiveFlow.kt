@@ -1,5 +1,6 @@
 package me.awabi2048.mwmchanpon.ui
 
+import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import com.awabi2048.ccsystem.CCSystem
 import io.papermc.paper.event.player.AsyncChatEvent
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
@@ -108,7 +109,7 @@ class AnnualArchiveFlow(
     @EventHandler
     fun onInventoryClick(event: InventoryClickEvent) {
         val holder = event.inventory.holder as? ArchiveConfirmationHolder ?: return
-        event.isCancelled = true
+        event.cancelWithDebug("AnnualArchiveFlow.onInventoryClick: confirm_click")
 
         val player = event.whoClicked as? Player ?: return
         if (player.uniqueId != holder.playerId || event.clickedInventory != event.inventory) return

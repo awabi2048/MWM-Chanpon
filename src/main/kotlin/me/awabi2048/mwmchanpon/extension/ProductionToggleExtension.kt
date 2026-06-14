@@ -1,5 +1,6 @@
 package me.awabi2048.mwmchanpon.extension
 
+import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import com.awabi2048.ccsystem.CCSystem
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -162,7 +163,7 @@ class ProductionToggleExtension(
     fun onConfirmationClick(event: InventoryClickEvent) {
         val player = event.whoClicked as? Player ?: return
         val holder = event.view.topInventory.holder as? SubmissionConfirmationHolder ?: return
-        event.isCancelled = true
+        event.cancelWithDebug("ProductionToggleExtension.onConfirmationClick: confirm_click")
         if (event.clickedInventory != event.view.topInventory) return
         val item = event.currentItem ?: return
         when (ItemTag.getType(item)) {

@@ -4,6 +4,7 @@ import com.awabi2048.ccsystem.CCSystem
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
+import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
@@ -110,7 +111,7 @@ class ChanponPlayerWorldMenuProvider(
     fun onClick(event: InventoryClickEvent) {
         val player = event.whoClicked as? Player ?: return
         val holder = event.view.topInventory.holder as? Holder ?: return
-        event.isCancelled = true
+        event.cancelWithDebug("ChanponPlayerWorldMenuProvider.onClick: menu_click")
         if (event.clickedInventory != event.view.topInventory) return
 
         val item = event.currentItem ?: return

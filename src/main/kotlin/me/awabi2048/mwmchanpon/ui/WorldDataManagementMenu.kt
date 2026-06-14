@@ -3,6 +3,7 @@ package me.awabi2048.mwmchanpon.ui
 import com.awabi2048.ccsystem.CCSystem
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.backup.BackupKind
+import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import me.awabi2048.mwmchanpon.backup.BackupOperationStatus
 import me.awabi2048.mwmchanpon.backup.BackupService
 import me.awabi2048.mwmchanpon.service.ArchiveService
@@ -63,7 +64,7 @@ class WorldDataManagementMenu(
     fun onClick(event: InventoryClickEvent) {
         val player = event.whoClicked as? Player ?: return
         val holder = event.view.topInventory.holder as? Holder ?: return
-        event.isCancelled = true
+        event.cancelWithDebug("WorldDataManagementMenu.onClick: menu_click")
         if (event.clickedInventory != event.view.topInventory) return
         val item = event.currentItem ?: return
         when (ItemTag.getType(item)) {
@@ -89,7 +90,7 @@ class WorldDataManagementMenu(
     fun onBackupConfirmClick(event: InventoryClickEvent) {
         val player = event.whoClicked as? Player ?: return
         val holder = event.view.topInventory.holder as? BackupConfirmHolder ?: return
-        event.isCancelled = true
+        event.cancelWithDebug("WorldDataManagementMenu.onBackupConfirmClick: confirm_click")
         if (event.clickedInventory != event.view.topInventory) return
         when (ItemTag.getType(event.currentItem ?: return)) {
             ItemTag.TYPE_GUI_CANCEL -> open(player, holder.page)
@@ -113,7 +114,7 @@ class WorldDataManagementMenu(
     fun onBulkRollbackConfirmClick(event: InventoryClickEvent) {
         val player = event.whoClicked as? Player ?: return
         val holder = event.view.topInventory.holder as? BulkRollbackConfirmHolder ?: return
-        event.isCancelled = true
+        event.cancelWithDebug("WorldDataManagementMenu.onBulkRollbackConfirmClick: confirm_click")
         if (event.clickedInventory != event.view.topInventory) return
         when (ItemTag.getType(event.currentItem ?: return)) {
             ItemTag.TYPE_GUI_CANCEL -> open(player, holder.page)

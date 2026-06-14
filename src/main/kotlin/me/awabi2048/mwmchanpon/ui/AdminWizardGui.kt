@@ -1,5 +1,6 @@
 package me.awabi2048.mwmchanpon.ui
 
+import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import com.awabi2048.ccsystem.CCSystem
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.bridge.CoreApiBridge
@@ -77,7 +78,8 @@ class AdminWizardGui(
         }
         if (titleStr != TEMPLATE_INV_TITLE && titleStr != CONFIRM_INV_TITLE) return
 
-        event.isCancelled = true
+        event.cancelWithDebug("AdminWizardGui.onInventoryClick: template_gui_click")
+        if (event.clickedInventory != event.view.topInventory) return
 
         val player = event.whoClicked as? Player ?: return
         val clickedItem = event.currentItem ?: return

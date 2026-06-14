@@ -1,5 +1,6 @@
 package me.awabi2048.mwmchanpon.ui
 
+import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import com.awabi2048.ccsystem.CCSystem
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
@@ -87,7 +88,7 @@ class ChanponFavoriteVisitMenuProvider(
     }
 
     private fun handleWorldListClick(event: InventoryClickEvent, player: Player, holder: WorldListHolder) {
-        event.isCancelled = true
+        event.cancelWithDebug("ChanponFavoriteVisitMenuProvider.handleWorldListClick: menu_click")
         if (event.clickedInventory != event.view.topInventory) return
         val item = event.currentItem ?: return
         when (ItemTag.getType(item)) {
@@ -107,7 +108,7 @@ class ChanponFavoriteVisitMenuProvider(
     }
 
     private fun handleFavoriteMenuClick(event: InventoryClickEvent, player: Player, holder: FavoriteMenuHolder) {
-        event.isCancelled = true
+        event.cancelWithDebug("ChanponFavoriteVisitMenuProvider.handleFavoriteMenuClick: menu_click")
         if (event.clickedInventory != event.view.topInventory) return
         val item = event.currentItem ?: return
         val worldData = holder.worldUuid?.let { mwm().worldConfigRepository.findByUuid(it) }

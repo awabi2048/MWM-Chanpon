@@ -1,5 +1,6 @@
 package me.awabi2048.mwmchanpon.ui
 
+import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import com.awabi2048.ccsystem.CCSystem
 import java.util.UUID
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
@@ -69,12 +70,12 @@ class SubmittedWorldMenuProvider(
     fun onClick(event: InventoryClickEvent) {
         val player = event.whoClicked as? Player ?: return
         val holder = event.view.topInventory.holder as? SubmittedWorldMenuHolder ?: return
-        event.isCancelled = true
+        event.cancelWithDebug("SubmittedWorldMenuProvider.onClick: menu_click")
         if (event.clickedInventory != event.view.topInventory) return
 
         val item = event.currentItem ?: return
         when (ItemTag.getType(item)) {
-            ItemTag.TYPE_GUI_RETURN -> handleReturn(player, item)
+            ItemTag.TYPE_GUI_RETURN -> handleReturn(player, item, holder.request)
             ItemTag.TYPE_GUI_EXTENSION -> {
                 if (ItemTag.getExtensionId(item) != PROVIDER_ID) return
                 if (ItemTag.getString(item, ACTION_KEY) != ACTION_CANCEL_SUBMISSION) return
@@ -83,7 +84,7 @@ class SubmittedWorldMenuProvider(
         }
     }
 
-    private fun handleReturn(player: Player, item: ItemStack) {
+    private fun handleReturn(player: Player, item: ItemStack, request: WorldSettingsMenuRequest) {
         val mwm = mwm()
         val session = mwm.settingsSessionManager.getSession(player)
         when {
@@ -91,9 +92,9 @@ class SubmittedWorldMenuProvider(
                 mwm.soundManager.playAdminClickSound(player)
                 mwm.worldGui.open(player, null, true, false)
             }
-            session?.isPlayerWorldFlow == true -> {
+            request.isPlayerWorldFlow == true -> {
                 mwm.soundManager.playClickSound(player, item, "world_settings")
-                mwm.playerWorldGui.open(player, 0, session.parentShowBackButton)
+                mwm.playerWorldGui.open(player, 0, request.parentShowBackButton ?: false)
             }
             else -> {
                 mwm.soundManager.playClickSound(player, item, null)
@@ -109,7 +110,7 @@ class SubmittedWorldMenuProvider(
     fun onConfirmationClick(event: InventoryClickEvent) {
         val player = event.whoClicked as? Player ?: return
         val holder = event.view.topInventory.holder as? CancelSubmissionConfirmationHolder ?: return
-        event.isCancelled = true
+        event.cancelWithDebug("SubmittedWorldMenuProvider.onConfirmationClick: confirm_click")
         if (event.clickedInventory != event.view.topInventory) return
 
         when (ItemTag.getType(event.currentItem ?: return)) {
