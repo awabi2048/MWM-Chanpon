@@ -3,7 +3,10 @@ package me.awabi2048.mwmchanpon.tool
 import java.util.UUID
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.SubmissionState
+import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.model.WorldData
+import org.bukkit.Bukkit
+import org.bukkit.entity.Player
 
 class ToolPermissionController(
     private val storage: ChanponWorldStorage,
@@ -19,31 +22,53 @@ class ToolPermissionController(
 
     fun setEnabled(worldData: WorldData, playerUuid: UUID, toolId: String, enabled: Boolean) {
         storage.setToolEnabled(worldData.uuid, playerUuid, toolId, if (isSubmissionLocked(worldData.uuid)) false else enabled)
-        val worldName = worldData.customWorldName ?: "my_world.${worldData.uuid}"
-        val enabledSet = getEffectiveEnabledTools(worldData, playerUuid)
-        luckPermsService.syncPlayer(playerUuid, worldName, definitions, enabledSet)
+        Bukkit.getPlayer(playerUuid)?.let(::syncPlayerLocation)
     }
 
     fun syncWorld(worldData: WorldData) {
-        val worldName = worldData.customWorldName ?: "my_world.${worldData.uuid}"
         val participants = linkedSetOf<UUID>()
         participants.add(worldData.owner)
         participants.addAll(worldData.members)
         participants.forEach { playerUuid ->
-            val enabled = getEffectiveEnabledTools(worldData, playerUuid)
-            luckPermsService.syncPlayer(playerUuid, worldName, definitions, enabled)
+            removeLegacyScopedPermissions(worldData, playerUuid)
+            Bukkit.getPlayer(playerUuid)?.let(::syncPlayerLocation)
         }
     }
 
     fun cleanupPlayer(worldData: WorldData, playerUuid: UUID) {
-        val worldName = worldData.customWorldName ?: "my_world.${worldData.uuid}"
         storage.removeMember(worldData.uuid, playerUuid)
-        luckPermsService.removePermissions(playerUuid, worldName, definitions)
+        removeLegacyScopedPermissions(worldData, playerUuid)
+        Bukkit.getPlayer(playerUuid)?.let(::syncPlayerLocation)
     }
 
     fun cleanupPlayerPermissions(worldData: WorldData, playerUuid: UUID) {
-        val worldName = worldData.customWorldName ?: "my_world.${worldData.uuid}"
-        luckPermsService.removePermissions(playerUuid, worldName, definitions)
+        removeLegacyScopedPermissions(worldData, playerUuid)
+        Bukkit.getPlayer(playerUuid)?.let(::syncPlayerLocation)
+    }
+
+    fun syncPlayerLocation(player: Player) {
+        val worldData = MyWorldManagerApi.getWorldRepository()?.findByWorldName(player.world.name)
+        if (worldData == null || !isParticipant(worldData, player.uniqueId) || storage.isImportedArchive(worldData.uuid)) {
+            clearActivePermissions(player.uniqueId)
+            return
+        }
+
+        val enabled = getEffectiveEnabledTools(worldData, player.uniqueId)
+        luckPermsService.applyActiveGroups(player.uniqueId, definitions, enabled)
+    }
+
+    fun clearActivePermissions(playerUuid: UUID) {
+        luckPermsService.clearActiveGroups(playerUuid, definitions)
+    }
+
+    fun clearOnlineActivePermissions() {
+        Bukkit.getOnlinePlayers().forEach { player ->
+            clearActivePermissions(player.uniqueId)
+        }
+    }
+
+    fun syncOnlinePlayers() {
+        Bukkit.getOnlinePlayers().forEach(::syncPlayerLocation)
     }
 
     fun getMemberToolStates(worldData: WorldData, playerUuid: UUID): Map<String, Boolean> {
@@ -74,5 +99,17 @@ class ToolPermissionController(
         } catch (ex: IllegalStateException) {
             false
         }
+    }
+
+    private fun removeLegacyScopedPermissions(worldData: WorldData, playerUuid: UUID) {
+        luckPermsService.removeScopedPermissions(playerUuid, worldName(worldData), definitions)
+    }
+
+    private fun isParticipant(worldData: WorldData, playerUuid: UUID): Boolean {
+        return playerUuid == worldData.owner || playerUuid in worldData.members
+    }
+
+    private fun worldName(worldData: WorldData): String {
+        return worldData.customWorldName ?: "my_world.${worldData.uuid}"
     }
 }

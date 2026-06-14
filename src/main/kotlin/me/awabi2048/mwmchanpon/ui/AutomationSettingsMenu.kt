@@ -1,5 +1,6 @@
 package me.awabi2048.mwmchanpon.ui
 
+import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import com.awabi2048.ccsystem.CCSystem
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.backup.BackupKind
@@ -50,7 +51,7 @@ class AutomationSettingsMenu(
     fun onClick(event: InventoryClickEvent) {
         val player = event.whoClicked as? Player ?: return
         event.view.topInventory.holder as? Holder ?: return
-        event.isCancelled = true
+        event.cancelWithDebug("AutomationSettingsMenu.onClick: menu_click")
         if (event.clickedInventory != event.view.topInventory) return
         val item = event.currentItem ?: return
         if (ItemTag.getType(item) == ItemTag.TYPE_GUI_RETURN) {
@@ -68,7 +69,7 @@ class AutomationSettingsMenu(
     fun onToggleConfirmClick(event: InventoryClickEvent) {
         val player = event.whoClicked as? Player ?: return
         val holder = event.view.topInventory.holder as? ToggleConfirmHolder ?: return
-        event.isCancelled = true
+        event.cancelWithDebug("AutomationSettingsMenu.onToggleConfirmClick: confirm_click")
         if (event.clickedInventory != event.view.topInventory) return
         when (ItemTag.getType(event.currentItem ?: return)) {
             ItemTag.TYPE_GUI_CANCEL -> open(player)
@@ -83,7 +84,7 @@ class AutomationSettingsMenu(
     fun onRestorePointConfirmClick(event: InventoryClickEvent) {
         val player = event.whoClicked as? Player ?: return
         event.view.topInventory.holder as? RestorePointConfirmHolder ?: return
-        event.isCancelled = true
+        event.cancelWithDebug("AutomationSettingsMenu.onRestorePointConfirmClick: confirm_click")
         if (event.clickedInventory != event.view.topInventory) return
         when (ItemTag.getType(event.currentItem ?: return)) {
             ItemTag.TYPE_GUI_CANCEL -> open(player)

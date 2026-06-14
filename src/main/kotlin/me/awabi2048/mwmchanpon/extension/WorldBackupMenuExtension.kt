@@ -12,6 +12,7 @@ import io.papermc.paper.registry.data.dialog.input.DialogInput
 import io.papermc.paper.registry.data.dialog.type.DialogType
 import me.awabi2048.mwmchanpon.backup.BackupEntry
 import me.awabi2048.mwmchanpon.backup.BackupDisplay
+import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import me.awabi2048.mwmchanpon.backup.BackupOperationStatus
 import me.awabi2048.mwmchanpon.backup.BackupService
 import me.awabi2048.mwmchanpon.backup.RestoreOperationResult
@@ -21,6 +22,7 @@ import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsInventoryHolder
+import me.awabi2048.myworldmanager.api.extension.WorldSettingsMenuRequest
 import me.awabi2048.myworldmanager.api.extension.MenuExtension
 import me.awabi2048.myworldmanager.api.extension.MenuExtensionContext
 import me.awabi2048.myworldmanager.model.WorldData
@@ -74,7 +76,7 @@ class WorldBackupMenuExtension(
         val backups = backupService.listBackupsForWorld(worldUuid)
         val pages = if (backups.isEmpty()) 1 else (backups.size + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE
         val safePage = page.coerceIn(0, pages - 1)
-        val holder = Holder(worldUuid, safePage)
+        val holder = Holder(worldUuid, safePage, currentRequest(player))
         val inv = Bukkit.createInventory(holder, 54, i18nComponent(player, "owner_backup.title"))
         holder.inv = inv
         applyFrame(inv)
@@ -94,7 +96,7 @@ class WorldBackupMenuExtension(
     fun onMenuClick(event: InventoryClickEvent) {
         val player = event.whoClicked as? Player ?: return
         val holder = event.view.topInventory.holder as? Holder ?: return
-        event.isCancelled = true
+        event.cancelWithDebug("WorldBackupMenuExtension.onMenuClick: menu_click")
         if (event.clickedInventory != event.view.topInventory) return
         val item = event.currentItem ?: return
         if (ownedProductionWorld(player, holder.worldUuid) == null) {
@@ -155,7 +157,7 @@ class WorldBackupMenuExtension(
     fun onBackupConfirmClick(event: InventoryClickEvent) {
         val player = event.whoClicked as? Player ?: return
         val holder = event.view.topInventory.holder as? BackupConfirmHolder ?: return
-        event.isCancelled = true
+        event.cancelWithDebug("WorldBackupMenuExtension.onBackupConfirmClick: confirm_click")
         if (event.clickedInventory != event.view.topInventory) return
         when (ItemTag.getType(event.currentItem ?: return)) {
             ItemTag.TYPE_GUI_CANCEL -> open(player, holder.source.worldUuid, holder.source.page)
@@ -199,7 +201,7 @@ class WorldBackupMenuExtension(
     fun onRestoreConfirmClick(event: InventoryClickEvent) {
         val player = event.whoClicked as? Player ?: return
         val holder = event.view.topInventory.holder as? RestoreConfirmHolder ?: return
-        event.isCancelled = true
+        event.cancelWithDebug("WorldBackupMenuExtension.onRestoreConfirmClick: confirm_click")
         if (event.clickedInventory != event.view.topInventory) return
         when (ItemTag.getType(event.currentItem ?: return)) {
             ItemTag.TYPE_GUI_CANCEL -> open(player, holder.source.worldUuid, holder.source.page)
@@ -450,11 +452,32 @@ class WorldBackupMenuExtension(
             return
         }
         val mwm = org.bukkit.plugin.java.JavaPlugin.getPlugin(MyWorldManager::class.java)
-        val session = mwm.settingsSessionManager.getSession(player)
         mwm.worldSettingsGui.open(
             player,
             worldData,
-            session?.showBackButton,
+            holderRequest(player)?.showBackButton,
+            holderRequest(player)?.isPlayerWorldFlow,
+            holderRequest(player)?.parentShowBackButton
+        )
+    }
+
+    private fun holderRequest(player: Player): WorldSettingsMenuRequest? {
+        return when (val holder = player.openInventory.topInventory.holder) {
+            is Holder -> holder.request
+            is BackupConfirmHolder -> holder.source.request
+            is RestoreConfirmHolder -> holder.source.request
+            else -> null
+        }
+    }
+
+    private fun currentRequest(player: Player): WorldSettingsMenuRequest {
+        val holderRequest = holderRequest(player)
+        if (holderRequest != null) return holderRequest
+        val session = org.bukkit.plugin.java.JavaPlugin.getPlugin(MyWorldManager::class.java)
+            .settingsSessionManager
+            .getSession(player)
+        return WorldSettingsMenuRequest(
+            session?.showBackButton ?: false,
             session?.isPlayerWorldFlow,
             session?.parentShowBackButton
         )
@@ -466,7 +489,7 @@ class WorldBackupMenuExtension(
         CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
     private fun lore(lines: List<String>) = CCSystem.getAPI().buildLore(lines, closingSeparator = true)
 
-    data class Holder(val worldUuid: UUID, val page: Int) : WorldSettingsInventoryHolder {
+    data class Holder(val worldUuid: UUID, val page: Int, val request: WorldSettingsMenuRequest) : WorldSettingsInventoryHolder {
         lateinit var inv: Inventory
         override fun getInventory(): Inventory = inv
     }

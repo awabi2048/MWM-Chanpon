@@ -6,6 +6,7 @@ import java.time.format.DateTimeFormatter
 import java.util.UUID
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
+import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.SubmissionState
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
@@ -92,7 +93,7 @@ class SubmissionAdminMenu(
     fun onClick(event: InventoryClickEvent) {
         val player = event.whoClicked as? Player ?: return
         val holder = event.view.topInventory.holder as? SubmissionAdminMenuHolder ?: return
-        event.isCancelled = true
+        event.cancelWithDebug("SubmissionAdminMenu.onClick: menu_click")
         if (event.clickedInventory != event.view.topInventory) return
 
         val item = event.currentItem ?: return
@@ -138,7 +139,7 @@ class SubmissionAdminMenu(
     fun onCloseSubmissionConfirmationClick(event: InventoryClickEvent) {
         val player = event.whoClicked as? Player ?: return
         val holder = event.view.topInventory.holder as? CloseSubmissionConfirmationHolder ?: return
-        event.isCancelled = true
+        event.cancelWithDebug("SubmissionAdminMenu.onCloseSubmissionConfirmationClick: confirm_click")
         if (event.clickedInventory != event.view.topInventory) return
 
         when (ItemTag.getType(event.currentItem ?: return)) {
@@ -317,7 +318,7 @@ class SubmissionAdminMenu(
     fun onProductionToggleConfirmationClick(event: InventoryClickEvent) {
         val player = event.whoClicked as? Player ?: return
         val holder = event.view.topInventory.holder as? ProductionToggleConfirmationHolder ?: return
-        event.isCancelled = true
+        event.cancelWithDebug("SubmissionAdminMenu.onProductionToggleConfirmationClick: confirm_click")
         if (event.clickedInventory != event.view.topInventory) return
         when (ItemTag.getType(event.currentItem ?: return)) {
             ItemTag.TYPE_GUI_CANCEL -> open(player, holder.page, holder.submissionFilter, holder.completionFilter)
@@ -342,7 +343,7 @@ class SubmissionAdminMenu(
     fun onCompleteUnsubmittedConfirmationClick(event: InventoryClickEvent) {
         val player = event.whoClicked as? Player ?: return
         val holder = event.view.topInventory.holder as? CompleteUnsubmittedConfirmationHolder ?: return
-        event.isCancelled = true
+        event.cancelWithDebug("SubmissionAdminMenu.onCompleteUnsubmittedConfirmationClick: confirm_click")
         if (event.clickedInventory != event.view.topInventory) return
         when (ItemTag.getType(event.currentItem ?: return)) {
             ItemTag.TYPE_GUI_CANCEL -> open(player, holder.page, holder.submissionFilter, holder.completionFilter)

@@ -23,8 +23,12 @@ import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
 import java.util.UUID
+import me.awabi2048.mwmchanpon.MWMChanponPlugin
+import me.awabi2048.mwmchanpon.util.cancelWithDebug
 
-class ChanponEnvironmentGui : Listener {
+class ChanponEnvironmentGui(
+    private val plugin: MWMChanponPlugin
+) : Listener {
 
     fun open(player: Player, worldData: WorldData) {
         val holder = EnvMainHolder(worldData.uuid)
@@ -50,11 +54,20 @@ class ChanponEnvironmentGui : Listener {
     @EventHandler(priority = EventPriority.LOWEST)
     fun onClick(event: InventoryClickEvent) {
         val player = event.whoClicked as? Player ?: return
-        event.isCancelled = true
+        val holder = event.view.topInventory.holder
+        if (holder !is EnvMainHolder &&
+            holder !is EnvWeatherHolder &&
+            holder !is EnvTimeHolder &&
+            holder !is EnvGravityHolder &&
+            holder !is EnvScaleHolder
+        ) {
+            return
+        }
+        event.cancelWithDebug("ChanponEnvironmentGui.onClick: menu_click")
         if (event.clickedInventory != event.view.topInventory) return
         val item = event.currentItem ?: return
 
-        when (val holder = event.view.topInventory.holder) {
+        when (holder) {
             is EnvMainHolder -> handleMainClick(event, player, holder.worldUuid, item)
             is EnvWeatherHolder -> handleWeatherClick(event, player, holder.worldUuid, item)
             is EnvTimeHolder -> handleTimeClick(event, player, holder.worldUuid, item)

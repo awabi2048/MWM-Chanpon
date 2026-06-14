@@ -3,6 +3,7 @@ package me.awabi2048.mwmchanpon.ui
 import com.awabi2048.ccsystem.CCSystem
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
+import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
@@ -52,7 +53,7 @@ class ChanponAdminMenu(
         val player = event.whoClicked as? Player ?: return
         val holder = event.view.topInventory.holder
         if (holder !is Holder && holder !is SpawnConfirmHolder) return
-        event.isCancelled = true
+        event.cancelWithDebug("ChanponAdminMenu.onClick: menu_click")
         if (event.clickedInventory != event.view.topInventory) return
         val item = event.currentItem ?: return
         when (holder) {

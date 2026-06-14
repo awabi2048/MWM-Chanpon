@@ -6,12 +6,15 @@ import me.awabi2048.mwmchanpon.ui.ToolPermissionMenu
 import me.awabi2048.mwmchanpon.ui.ToolPermissionMenuHolder
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.util.ItemTag
+import me.awabi2048.mwmchanpon.MWMChanponPlugin
+import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.inventory.InventoryClickEvent
 
 class ToolPermissionMenuListener(
+    private val plugin: MWMChanponPlugin,
     private val menu: ToolPermissionMenu,
     private val controller: ToolPermissionController,
     private val definitions: List<ToolPermissionDefinition>
@@ -19,7 +22,7 @@ class ToolPermissionMenuListener(
     @EventHandler(ignoreCancelled = false)
     fun onInventoryClick(event: InventoryClickEvent) {
         val holder = event.view.topInventory.holder as? ToolPermissionMenuHolder ?: return
-        event.isCancelled = true
+        event.cancelWithDebug("ToolPermissionMenuListener.onInventoryClick: menu_click")
         if (event.clickedInventory != event.view.topInventory) return
 
         val player = event.whoClicked as? Player ?: return
