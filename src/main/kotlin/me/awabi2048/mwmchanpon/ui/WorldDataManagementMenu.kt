@@ -68,12 +68,19 @@ class WorldDataManagementMenu(
         if (event.clickedInventory != event.view.topInventory) return
         val item = event.currentItem ?: return
         when (ItemTag.getType(item)) {
-            ItemTag.TYPE_GUI_RETURN -> parentMenuOpener?.invoke(player) ?: player.closeInventory()
+            ItemTag.TYPE_GUI_RETURN -> {
+                if (!mwm().menuRouteHistory.openPrevious(player)) {
+                    parentMenuOpener?.invoke(player) ?: player.closeInventory()
+                }
+            }
             ItemTag.TYPE_GUI_NAV_PREV, ItemTag.TYPE_GUI_NAV_NEXT -> open(player, ItemTag.getTargetPage(item) ?: holder.page)
             ItemTag.TYPE_GUI_WORLD_ITEM -> {
                 val uuid = ItemTag.getWorldUuid(item) ?: return
                 if (event.click.isLeftClick) openBackupConfirm(player, uuid, holder.page)
-                if (event.click.isRightClick) backupListMenu.openWorld(player, uuid)
+                if (event.click.isRightClick) {
+                    pushSelfRoute(player, holder.page)
+                    backupListMenu.openWorld(player, uuid)
+                }
             }
             TYPE_CONTROL -> when (ItemTag.getString(item, ACTION_KEY)) {
                 ACTION_BULK_BACKUP -> openBulkBackupConfirm(player, holder.page)
@@ -118,7 +125,17 @@ class WorldDataManagementMenu(
         if (event.clickedInventory != event.view.topInventory) return
         when (ItemTag.getType(event.currentItem ?: return)) {
             ItemTag.TYPE_GUI_CANCEL -> open(player, holder.page)
-            ItemTag.TYPE_GUI_CONFIRM -> backupListMenu.openAll(player)
+            ItemTag.TYPE_GUI_CONFIRM -> {
+                pushSelfRoute(player, holder.page)
+                backupListMenu.openAll(player)
+            }
+        }
+    }
+
+    private fun pushSelfRoute(player: Player, page: Int) {
+        mwm().menuRouteHistory.pushCustom(player, "chanpon.world_data:$page") { target ->
+            open(target, page)
+            true
         }
     }
 
@@ -252,6 +269,9 @@ class WorldDataManagementMenu(
     private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
     private fun lore(lines: List<String>) = CCSystem.getAPI().buildLore(lines, closingSeparator = true)
+
+    private fun mwm(): me.awabi2048.myworldmanager.MyWorldManager =
+        org.bukkit.plugin.java.JavaPlugin.getPlugin(me.awabi2048.myworldmanager.MyWorldManager::class.java)
 
     private class Holder(val page: Int) : InventoryHolder {
         lateinit var inv: Inventory

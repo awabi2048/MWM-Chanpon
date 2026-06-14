@@ -57,7 +57,11 @@ class WorldDataExportMenu(
         if (event.clickedInventory != event.view.topInventory) return
         val item = event.currentItem ?: return
         when (ItemTag.getType(item)) {
-            ItemTag.TYPE_GUI_RETURN -> parentMenuOpener?.invoke(player) ?: player.closeInventory()
+            ItemTag.TYPE_GUI_RETURN -> {
+                if (!mwm().menuRouteHistory.openPrevious(player)) {
+                    parentMenuOpener?.invoke(player) ?: player.closeInventory()
+                }
+            }
             ItemTag.TYPE_GUI_NAV_PREV, ItemTag.TYPE_GUI_NAV_NEXT -> open(player, ItemTag.getTargetPage(item) ?: holder.page)
             ItemTag.TYPE_GUI_WORLD_ITEM -> {
                 val uuid = ItemTag.getWorldUuid(item) ?: return
@@ -163,6 +167,9 @@ class WorldDataExportMenu(
         CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
 
     private fun lore(lines: List<String>) = CCSystem.getAPI().buildLore(lines, closingSeparator = true)
+
+    private fun mwm(): me.awabi2048.myworldmanager.MyWorldManager =
+        org.bukkit.plugin.java.JavaPlugin.getPlugin(me.awabi2048.myworldmanager.MyWorldManager::class.java)
 
     private class Holder(val page: Int) : InventoryHolder {
         lateinit var inv: Inventory

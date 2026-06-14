@@ -86,7 +86,11 @@ class BackupListMenu(
         if (event.clickedInventory != event.view.topInventory) return
         val item = event.currentItem ?: return
         when (ItemTag.getType(item)) {
-            ItemTag.TYPE_GUI_RETURN -> parentMenuOpener?.invoke(player) ?: player.closeInventory()
+            ItemTag.TYPE_GUI_RETURN -> {
+                if (!mwm().menuRouteHistory.openPrevious(player)) {
+                    parentMenuOpener?.invoke(player) ?: player.closeInventory()
+                }
+            }
             ItemTag.TYPE_GUI_NAV_PREV, ItemTag.TYPE_GUI_NAV_NEXT -> open(player, holder.mode, holder.worldUuid, ItemTag.getTargetPage(item) ?: holder.page)
             TYPE_BACKUP_ITEM -> {
                 val id = ItemTag.getString(item, BACKUP_ID_KEY) ?: return
@@ -344,6 +348,9 @@ class BackupListMenu(
     private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
     private fun lore(lines: List<String>) = CCSystem.getAPI().buildLore(lines, closingSeparator = true)
+
+    private fun mwm(): me.awabi2048.myworldmanager.MyWorldManager =
+        org.bukkit.plugin.java.JavaPlugin.getPlugin(me.awabi2048.myworldmanager.MyWorldManager::class.java)
 
     enum class BackupListMode { ALL, WORLD }
 

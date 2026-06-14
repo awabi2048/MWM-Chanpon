@@ -55,7 +55,9 @@ class AutomationSettingsMenu(
         if (event.clickedInventory != event.view.topInventory) return
         val item = event.currentItem ?: return
         if (ItemTag.getType(item) == ItemTag.TYPE_GUI_RETURN) {
-            parentMenuOpener?.invoke(player) ?: player.closeInventory()
+            if (!mwm().menuRouteHistory.openPrevious(player)) {
+                parentMenuOpener?.invoke(player) ?: player.closeInventory()
+            }
             return
         }
         when (ItemTag.getString(item, ACTION_KEY)) {
@@ -214,6 +216,9 @@ class AutomationSettingsMenu(
     private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
     private fun lore(lines: List<String>) = CCSystem.getAPI().buildLore(lines, closingSeparator = true)
+
+    private fun mwm(): me.awabi2048.myworldmanager.MyWorldManager =
+        org.bukkit.plugin.java.JavaPlugin.getPlugin(me.awabi2048.myworldmanager.MyWorldManager::class.java)
 
     private class Holder : InventoryHolder {
         lateinit var inv: Inventory

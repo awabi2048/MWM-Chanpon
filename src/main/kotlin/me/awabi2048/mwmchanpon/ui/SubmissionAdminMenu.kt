@@ -98,7 +98,11 @@ class SubmissionAdminMenu(
 
         val item = event.currentItem ?: return
         when (ItemTag.getType(item)) {
-            ItemTag.TYPE_GUI_RETURN -> parentMenuOpener?.invoke(player) ?: player.closeInventory()
+            ItemTag.TYPE_GUI_RETURN -> {
+                if (!mwm().menuRouteHistory.openPrevious(player)) {
+                    parentMenuOpener?.invoke(player) ?: player.closeInventory()
+                }
+            }
             ItemTag.TYPE_GUI_NAV_PREV, ItemTag.TYPE_GUI_NAV_NEXT -> {
                 val page = ItemTag.getTargetPage(item) ?: holder.page
                 open(player, page, holder.submissionFilter, holder.completionFilter)
@@ -597,6 +601,9 @@ class SubmissionAdminMenu(
     private fun i18nComponent(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): Component {
         return CCSystem.getAPI().getI18nComponent(player, "chanpon.submission.$key", placeholders)
     }
+
+    private fun mwm(): me.awabi2048.myworldmanager.MyWorldManager =
+        org.bukkit.plugin.java.JavaPlugin.getPlugin(me.awabi2048.myworldmanager.MyWorldManager::class.java)
 
     enum class SubmissionFilter(val key: String) {
         ALL("admin_menu.submission_filter.all"),
