@@ -26,10 +26,14 @@ import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
 
 class ChanponEnvironmentGui(
-    private val plugin: MWMChanponPlugin
+    private val plugin: MWMChanponPlugin,
+    storage: me.awabi2048.mwmchanpon.storage.ChanponWorldStorage,
+    protectionService: me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService,
 ) : Listener {
+    private val accessGuard = WorldSettingsAccessGuard(storage, protectionService)
 
     fun open(player: Player, worldData: WorldData) {
+        if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
         val holder = EnvMainHolder(worldData.uuid)
         val inventory = Bukkit.createInventory(holder, 27, i18nComponent(player, "title"))
         holder.inv = inventory
@@ -77,6 +81,7 @@ class ChanponEnvironmentGui(
 
     private fun handleMainClick(event: InventoryClickEvent, player: Player, worldUuid: UUID, item: ItemStack) {
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
+        if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
         when (ItemTag.getString(item, ACTION_KEY)) {
             ACTION_WEATHER -> {
                 pushMainRoute(player, worldData)
@@ -130,6 +135,7 @@ class ChanponEnvironmentGui(
         }
         val weather = ItemTag.getString(item, ACTION_KEY) ?: return
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
+        if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
         worldData.fixedWeather = weather
         MyWorldManagerApi.getWorldRepository()?.save(worldData)
         applyWeather(worldUuid, weather)
@@ -188,6 +194,7 @@ class ChanponEnvironmentGui(
         val timeStr = ItemTag.getString(item, ACTION_KEY) ?: return
         val time = timeStr.toLongOrNull() ?: return
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
+        if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
         worldData.fixedTime = time
         MyWorldManagerApi.getWorldRepository()?.save(worldData)
         applyTime(worldUuid, time)
@@ -228,6 +235,7 @@ class ChanponEnvironmentGui(
         val gravityStr = ItemTag.getString(item, ACTION_KEY) ?: return
         val gravity = gravityStr.toDoubleOrNull() ?: return
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
+        if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
         worldData.gravityValue = gravity
         MyWorldManagerApi.getWorldRepository()?.save(worldData)
         applyGravityToWorld(worldUuid, gravity)
@@ -275,6 +283,7 @@ class ChanponEnvironmentGui(
         val scaleStr = ItemTag.getString(item, ACTION_KEY) ?: return
         val scale = scaleStr.toDoubleOrNull() ?: return
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
+        if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
         worldData.fixedScale = scale
         MyWorldManagerApi.getWorldRepository()?.save(worldData)
         applyScaleToWorld(worldUuid, scale)

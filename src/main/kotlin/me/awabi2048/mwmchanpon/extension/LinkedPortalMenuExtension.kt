@@ -49,7 +49,7 @@ class LinkedPortalMenuExtension : MenuExtension {
         val item = ItemStack(Material.END_PORTAL_FRAME)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "linked_portal.display"))
-            meta.lore(ChanponLore.build(i18nList(player, "linked_portal.lore", mapOf("world" to worldData.name))))
+            meta.lore(null)
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
