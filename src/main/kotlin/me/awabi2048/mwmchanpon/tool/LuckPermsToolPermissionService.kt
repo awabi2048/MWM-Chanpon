@@ -83,6 +83,28 @@ class LuckPermsToolPermissionService(
             }
     }
 
+    fun removePersistentGroupAssignment(
+        playerUuid: UUID,
+        worldName: String,
+        groupName: String
+    ): CompletableFuture<Void> {
+        return luckPerms.userManager.loadUser(playerUuid)
+            .thenCompose { user ->
+                user.data().remove(
+                    InheritanceNode.builder(groupName)
+                        .withContext("world", worldName)
+                        .value(true)
+                        .build()
+                )
+                luckPerms.userManager.saveUser(user)
+            }
+            .whenComplete { _, error ->
+                if (error != null) {
+                    logger.warning("Failed to remove legacy group $groupName for $playerUuid in $worldName: ${error.message}")
+                }
+            }
+    }
+
     private fun applyActiveGroups(
         user: User,
         definitions: List<ToolPermissionDefinition>,

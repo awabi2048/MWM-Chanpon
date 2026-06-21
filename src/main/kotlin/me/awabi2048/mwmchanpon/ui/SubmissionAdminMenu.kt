@@ -58,10 +58,8 @@ class SubmissionAdminMenu(
         val inventory = Bukkit.createInventory(holder, 54, i18nComponent(player, "admin_menu.title"))
         holder.inv = inventory
 
-        val blackPane = decoration(Material.BLACK_STAINED_GLASS_PANE)
-        val grayPane = decoration(Material.GRAY_STAINED_GLASS_PANE)
-        for (slot in 0..8) inventory.setItem(slot, blackPane)
-        for (slot in 45..53) inventory.setItem(slot, blackPane)
+        ChanponGuiElements.applyStandardFrame(inventory)
+        ChanponGuiElements.fill(inventory)
 
         if (safePage > 0) {
             inventory.setItem(0, navItem(player, false, safePage - 1))
@@ -81,10 +79,6 @@ class SubmissionAdminMenu(
         inventory.setItem(49, statsItem(player))
         inventory.setItem(51, completionFilterItem(player, completionFilter))
         inventory.setItem(53, closeSubmissionItem(player))
-
-        for (slot in 0 until inventory.size) {
-            if (inventory.getItem(slot) == null) inventory.setItem(slot, grayPane)
-        }
 
         player.openInventory(inventory)
     }
@@ -482,7 +476,6 @@ class SubmissionAdminMenu(
         val item = ItemStack(Material.REDSTONE)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "admin_menu.back.display"))
-            meta.lore(lore(i18nList(player, "admin_menu.back.lore")))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_RETURN)
@@ -550,11 +543,8 @@ class SubmissionAdminMenu(
     }
 
     private fun applyConfirmationFrame(inventory: Inventory) {
-        val blackPane = decoration(Material.BLACK_STAINED_GLASS_PANE)
-        val grayPane = decoration(Material.GRAY_STAINED_GLASS_PANE)
-        for (slot in 0 until inventory.size) inventory.setItem(slot, grayPane)
-        for (slot in 0..8) inventory.setItem(slot, blackPane)
-        for (slot in inventory.size - 9 until inventory.size) inventory.setItem(slot, blackPane)
+        ChanponGuiElements.applyStandardFrame(inventory)
+        ChanponGuiElements.fill(inventory)
     }
 
     private fun extensionItem(
@@ -577,17 +567,11 @@ class SubmissionAdminMenu(
     }
 
     private fun decoration(material: Material): ItemStack {
-        val item = ItemStack(material)
-        item.editMeta { meta ->
-            meta.displayName(Component.empty())
-            meta.isHideTooltip = true
-        }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_DECORATION)
-        return item
+        return ChanponGuiElements.decoration(material)
     }
 
     private fun lore(lines: List<String>): List<Component> {
-        return CCSystem.getAPI().buildLore(lines, closingSeparator = true)
+        return ChanponLore.build(lines)
     }
 
     private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): String {

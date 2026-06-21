@@ -19,6 +19,7 @@ import me.awabi2048.mwmchanpon.backup.RestoreOperationResult
 import me.awabi2048.mwmchanpon.service.BackupAutomationService
 import me.awabi2048.mwmchanpon.service.ManualRollbackService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
+import me.awabi2048.mwmchanpon.ui.ChanponLore
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsInventoryHolder
@@ -384,43 +385,40 @@ class WorldBackupMenuExtension(
     }
 
     private fun button(player: Player, confirm: Boolean): ItemStack {
-        val item = ItemStack(if (confirm) Material.LIME_CONCRETE else Material.RED_CONCRETE)
-        item.editMeta { it.displayName(i18nComponent(player, if (confirm) "confirm.button.confirm" else "confirm.button.cancel")) }
+        val item = me.awabi2048.mwmchanpon.ui.ChanponGuiElements.confirm(
+            i18n(player, if (confirm) "confirm.button.confirm" else "confirm.button.cancel"),
+            confirm
+        )
         ItemTag.tagItem(item, if (confirm) ItemTag.TYPE_GUI_CONFIRM else ItemTag.TYPE_GUI_CANCEL)
         return item
     }
 
     private fun navItem(player: Player, next: Boolean, page: Int): ItemStack {
-        val item = ItemStack(if (next) Material.ARROW else Material.SPECTRAL_ARROW)
-        item.editMeta { it.displayName(i18nComponent(player, if (next) "common.next" else "common.prev")) }
+        val item = me.awabi2048.mwmchanpon.ui.ChanponGuiElements.navigation(
+            i18n(player, if (next) "common.next" else "common.prev"),
+            next
+        )
         ItemTag.tagItem(item, if (next) ItemTag.TYPE_GUI_NAV_NEXT else ItemTag.TYPE_GUI_NAV_PREV)
         ItemTag.setTargetPage(item, page)
         return item
     }
 
     private fun backItem(player: Player): ItemStack {
-        val item = ItemStack(Material.REDSTONE)
-        item.editMeta { it.displayName(i18nComponent(player, "common.back")) }
+        val item = me.awabi2048.mwmchanpon.ui.ChanponGuiElements.back(i18n(player, "common.back"))
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_RETURN)
         return item
     }
 
     private fun applyFrame(inv: Inventory) {
-        val black = decoration(Material.BLACK_STAINED_GLASS_PANE)
-        for (slot in 0..8) inv.setItem(slot, black)
-        for (slot in inv.size - 9 until inv.size) inv.setItem(slot, black)
+        me.awabi2048.mwmchanpon.ui.ChanponGuiElements.applyStandardFrame(inv)
     }
 
     private fun fill(inv: Inventory) {
-        val gray = decoration(Material.GRAY_STAINED_GLASS_PANE)
-        for (slot in 0 until inv.size) if (inv.getItem(slot) == null) inv.setItem(slot, gray)
+        me.awabi2048.mwmchanpon.ui.ChanponGuiElements.fill(inv)
     }
 
     private fun decoration(material: Material): ItemStack {
-        val item = ItemStack(material)
-        item.editMeta { meta -> meta.displayName(Component.empty()); meta.isHideTooltip = true }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_DECORATION)
-        return item
+        return me.awabi2048.mwmchanpon.ui.ChanponGuiElements.decoration(material)
     }
 
     private fun findBackup(item: ItemStack): BackupEntry? {
@@ -485,9 +483,11 @@ class WorldBackupMenuExtension(
 
     private fun i18nComponent(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nComponent(player, "chanpon.backup.$key", placeholders)
+    private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
+        CCSystem.getAPI().getI18nString(player, "chanpon.backup.$key", placeholders)
     private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
-    private fun lore(lines: List<String>) = CCSystem.getAPI().buildLore(lines, closingSeparator = true)
+    private fun lore(lines: List<String>) = ChanponLore.build(lines)
 
     data class Holder(val worldUuid: UUID, val page: Int, val request: WorldSettingsMenuRequest) : WorldSettingsInventoryHolder {
         lateinit var inv: Inventory

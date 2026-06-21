@@ -7,7 +7,6 @@ import me.awabi2048.myworldmanager.api.extension.WorldSettingsInventoryHolder
 import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import org.bukkit.Bukkit
 import org.bukkit.GameRule
 import org.bukkit.Material
@@ -305,7 +304,7 @@ class ChanponEnvironmentGui(
         )
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "$key.display"))
-            meta.lore(CCSystem.getAPI().buildLore(i18nList(player, "$key.lore", mapOf("current" to currentValue)), closingSeparator = true))
+            meta.lore(ChanponLore.build(i18nList(player, "$key.lore", mapOf("current" to currentValue))))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
@@ -324,8 +323,8 @@ class ChanponEnvironmentGui(
         val item = ItemStack(material)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "weather.${weather.lowercase()}.display"))
-            meta.lore(CCSystem.getAPI().buildLore(
-                i18nList(player, "weather.${weather.lowercase()}.lore", mapOf("marker" to if (active) "§a▶" else "§8-")),
+            meta.lore(ChanponLore.build(
+                i18nList(player, "weather.${weather.lowercase()}.lore", mapOf("marker" to selectionMarker(active))),
                 closingSeparator = true
             ))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
@@ -340,8 +339,8 @@ class ChanponEnvironmentGui(
         val item = ItemStack(Material.CLOCK)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "time.$key.display"))
-            meta.lore(CCSystem.getAPI().buildLore(
-                i18nList(player, "time.$key.lore", mapOf("marker" to if (active) "§a▶" else "§8-")),
+            meta.lore(ChanponLore.build(
+                i18nList(player, "time.$key.lore", mapOf("marker" to selectionMarker(active))),
                 closingSeparator = true
             ))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
@@ -356,8 +355,8 @@ class ChanponEnvironmentGui(
         val item = ItemStack(Material.FEATHER)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "gravity.$key.display"))
-            meta.lore(CCSystem.getAPI().buildLore(
-                i18nList(player, "gravity.$key.lore", mapOf("marker" to if (active) "§a▶" else "§8-")),
+            meta.lore(ChanponLore.build(
+                i18nList(player, "gravity.$key.lore", mapOf("marker" to selectionMarker(active))),
                 closingSeparator = true
             ))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
@@ -372,8 +371,8 @@ class ChanponEnvironmentGui(
         val item = ItemStack(Material.PLAYER_HEAD)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "scale.$key.display"))
-            meta.lore(CCSystem.getAPI().buildLore(
-                i18nList(player, "scale.$key.lore", mapOf("marker" to if (active) "§a▶" else "§8-")),
+            meta.lore(ChanponLore.build(
+                i18nList(player, "scale.$key.lore", mapOf("marker" to selectionMarker(active))),
                 closingSeparator = true
             ))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
@@ -386,16 +385,18 @@ class ChanponEnvironmentGui(
     private fun backToMainItem(player: Player): ItemStack {
         val item = ItemStack(Material.REDSTONE)
         item.editMeta { meta ->
-            meta.displayName(LegacyComponentSerializer.legacySection().deserialize(i18n(player, "common.back")))
+            meta.displayName(CCSystem.getAPI().getGuiElementService().name(i18n(player, "common.back")))
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_RETURN)
         return item
     }
 
+    private fun selectionMarker(active: Boolean): String = if (active) "§a»" else "§8・"
+
     private fun backItem(player: Player): ItemStack {
         val item = ItemStack(Material.REDSTONE)
         item.editMeta { meta ->
-            meta.displayName(LegacyComponentSerializer.legacySection().deserialize(i18n(player, "common.back_to_settings")))
+            meta.displayName(CCSystem.getAPI().getGuiElementService().name(i18n(player, "common.back_to_settings")))
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_RETURN)
         return item
@@ -438,26 +439,15 @@ class ChanponEnvironmentGui(
     // ---- Utility ----
 
     private fun applyFrame(inventory: Inventory) {
-        val black = decoration(Material.BLACK_STAINED_GLASS_PANE)
-        for (slot in 0..8) inventory.setItem(slot, black)
-        for (slot in inventory.size - 9 until inventory.size) inventory.setItem(slot, black)
+        ChanponGuiElements.applyStandardFrame(inventory)
     }
 
     private fun fill(inventory: Inventory) {
-        val gray = decoration(Material.GRAY_STAINED_GLASS_PANE)
-        for (slot in 0 until inventory.size) {
-            if (inventory.getItem(slot) == null) inventory.setItem(slot, gray)
-        }
+        ChanponGuiElements.fill(inventory)
     }
 
     private fun decoration(material: Material): ItemStack {
-        val item = ItemStack(material)
-        item.editMeta { meta ->
-            meta.displayName(Component.empty())
-            meta.isHideTooltip = true
-        }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_DECORATION)
-        return item
+        return ChanponGuiElements.decoration(material)
     }
 
     private fun pushMainRoute(player: Player, worldData: WorldData) {

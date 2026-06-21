@@ -272,34 +272,26 @@ class BackupListMenu(
     }
 
     private fun applyFrame(inv: Inventory) {
-        val black = decoration(Material.BLACK_STAINED_GLASS_PANE)
-        for (slot in 0..8) inv.setItem(slot, black)
-        for (slot in inv.size - 9 until inv.size) inv.setItem(slot, black)
+        ChanponGuiElements.applyStandardFrame(inv)
     }
 
     private fun fill(inv: Inventory) {
-        val gray = decoration(Material.GRAY_STAINED_GLASS_PANE)
-        for (slot in 0 until inv.size) if (inv.getItem(slot) == null) inv.setItem(slot, gray)
+        ChanponGuiElements.fill(inv)
     }
 
     private fun decoration(material: Material): ItemStack {
-        val item = ItemStack(material)
-        item.editMeta { meta -> meta.displayName(Component.empty()); meta.isHideTooltip = true }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_DECORATION)
-        return item
+        return ChanponGuiElements.decoration(material)
     }
 
     private fun navItem(player: Player, next: Boolean, page: Int): ItemStack {
-        val item = ItemStack(if (next) Material.ARROW else Material.SPECTRAL_ARROW)
-        item.editMeta { it.displayName(i18nComponent(player, if (next) "common.next" else "common.prev")) }
+        val item = ChanponGuiElements.navigation(i18n(player, if (next) "common.next" else "common.prev"), next)
         ItemTag.tagItem(item, if (next) ItemTag.TYPE_GUI_NAV_NEXT else ItemTag.TYPE_GUI_NAV_PREV)
         ItemTag.setTargetPage(item, page)
         return item
     }
 
     private fun backItem(player: Player): ItemStack {
-        val item = ItemStack(Material.REDSTONE)
-        item.editMeta { it.displayName(i18nComponent(player, "common.back")) }
+        val item = ChanponGuiElements.back(i18n(player, "common.back"))
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_RETURN)
         return item
     }
@@ -325,10 +317,7 @@ class BackupListMenu(
     }
 
     private fun button(player: Player, confirm: Boolean): ItemStack {
-        val item = ItemStack(if (confirm) Material.LIME_CONCRETE else Material.RED_CONCRETE)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, if (confirm) "confirm.button.confirm" else "confirm.button.cancel"))
-        }
+        val item = ChanponGuiElements.confirm(i18n(player, if (confirm) "confirm.button.confirm" else "confirm.button.cancel"), confirm)
         ItemTag.tagItem(item, if (confirm) ItemTag.TYPE_GUI_CONFIRM else ItemTag.TYPE_GUI_CANCEL)
         return item
     }
@@ -347,7 +336,7 @@ class BackupListMenu(
         CCSystem.getAPI().getI18nComponent(player, "chanpon.backup.$key", placeholders)
     private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
-    private fun lore(lines: List<String>) = CCSystem.getAPI().buildLore(lines, closingSeparator = true)
+    private fun lore(lines: List<String>) = ChanponLore.build(lines)
 
     private fun mwm(): me.awabi2048.myworldmanager.MyWorldManager =
         org.bukkit.plugin.java.JavaPlugin.getPlugin(me.awabi2048.myworldmanager.MyWorldManager::class.java)

@@ -193,7 +193,7 @@ class ChanponFavoriteVisitMenuProvider(
             lines.add("")
             lines.add(i18n(player, "favorite_visit.warp"))
             if (!isMember(player, world)) lines.add(i18n(player, "favorite_visit.toggle_favorite"))
-            meta.lore(CCSystem.getAPI().buildLore(lines.filter { it.isNotBlank() }, closingSeparator = true))
+            meta.lore(ChanponLore.build(lines.filter { it.isNotBlank() }))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_WORLD_ITEM)
@@ -232,7 +232,7 @@ class ChanponFavoriteVisitMenuProvider(
         val item = ItemStack(material)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "favorite_menu.$key.display"))
-            meta.lore(CCSystem.getAPI().buildLore(i18nList(player, "favorite_menu.$key.lore"), closingSeparator = true))
+            meta.lore(ChanponLore.build(i18nList(player, "favorite_menu.$key.lore")))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, TYPE_CONTROL)
@@ -250,8 +250,8 @@ class ChanponFavoriteVisitMenuProvider(
     private fun worldInfoItem(player: Player, worldData: WorldData): ItemStack {
         val item = ItemStack(worldData.icon)
         item.editMeta { meta ->
-            meta.displayName(Component.text(worldData.name).decoration(TextDecoration.ITALIC, false))
-            meta.lore(CCSystem.getAPI().buildLore(listOf(i18n(player, "favorite_visit.owner", mapOf("owner" to (Bukkit.getOfflinePlayer(worldData.owner).name ?: "-")))), closingSeparator = true))
+            meta.displayName(CCSystem.getAPI().getGuiElementService().name(worldData.name))
+            meta.lore(ChanponLore.build(listOf(i18n(player, "favorite_visit.owner", mapOf("owner" to (Bukkit.getOfflinePlayer(worldData.owner).name ?: "-"))))))
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
         return item
@@ -267,24 +267,15 @@ class ChanponFavoriteVisitMenuProvider(
     }
 
     private fun applyFrame(inventory: Inventory) {
-        val black = decoration(Material.BLACK_STAINED_GLASS_PANE)
-        for (slot in 0..8) inventory.setItem(slot, black)
-        for (slot in inventory.size - 9 until inventory.size) inventory.setItem(slot, black)
+        ChanponGuiElements.applyStandardFrame(inventory)
     }
 
     private fun fill(inventory: Inventory) {
-        val gray = decoration(Material.GRAY_STAINED_GLASS_PANE)
-        for (slot in 0 until inventory.size) if (inventory.getItem(slot) == null) inventory.setItem(slot, gray)
+        ChanponGuiElements.fill(inventory)
     }
 
     private fun decoration(material: Material): ItemStack {
-        val item = ItemStack(material)
-        item.editMeta { meta ->
-            meta.displayName(Component.empty())
-            meta.isHideTooltip = true
-        }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_DECORATION)
-        return item
+        return ChanponGuiElements.decoration(material)
     }
 
     private fun navItem(player: Player, page: Int, next: Boolean): ItemStack {
@@ -301,7 +292,7 @@ class ChanponFavoriteVisitMenuProvider(
         val item = ItemStack(Material.PAPER)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "favorite_visit.info.display"))
-            meta.lore(CCSystem.getAPI().buildLore(i18nList(player, "favorite_visit.info.lore", mapOf("count" to count, "page" to page, "pages" to pages)), closingSeparator = true))
+            meta.lore(ChanponLore.build(i18nList(player, "favorite_visit.info.lore", mapOf("count" to count, "page" to page, "pages" to pages))))
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
         return item

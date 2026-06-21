@@ -1,6 +1,7 @@
 package me.awabi2048.mwmchanpon.extension
 
 import com.awabi2048.ccsystem.CCSystem
+import me.awabi2048.mwmchanpon.ui.ChanponLore
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.MenuExtension
 import me.awabi2048.myworldmanager.api.extension.MenuExtensionContext
@@ -48,7 +49,7 @@ class LinkedPortalMenuExtension : MenuExtension {
         val item = ItemStack(Material.END_PORTAL_FRAME)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "linked_portal.display"))
-            meta.lore(CCSystem.getAPI().buildLore(i18nList(player, "linked_portal.lore", mapOf("world" to worldData.name)), closingSeparator = true))
+            meta.lore(ChanponLore.build(i18nList(player, "linked_portal.lore", mapOf("world" to worldData.name))))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)

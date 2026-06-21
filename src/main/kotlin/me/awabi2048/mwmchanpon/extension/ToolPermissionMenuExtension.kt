@@ -1,6 +1,10 @@
 package me.awabi2048.mwmchanpon.extension
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -16,6 +20,7 @@ import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.TextDecoration
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import org.bukkit.event.inventory.InventoryClickEvent
@@ -26,6 +31,7 @@ class ToolPermissionMenuExtension(
     private val controller: ToolPermissionController,
     private val definitions: List<ToolPermissionDefinition>
 ) : MenuExtension {
+    private val legacy = LegacyComponentSerializer.legacySection()
     override fun getId(): String = ToolPermissionMenu.EXTENSION_ID
 
     override fun onRender(inventory: Inventory, player: Player, context: MenuExtensionContext) {
@@ -77,7 +83,7 @@ class ToolPermissionMenuExtension(
     ): List<Component> {
         val api = CCSystem.getAPI()
         val offlinePlayer = Bukkit.getOfflinePlayer(memberUuid)
-        val allLines = mutableListOf<String>()
+        val lines = mutableListOf<GuiLoreLine>()
 
         val dateStr = if (offlinePlayer.lastSeen > 0) {
             Instant.ofEpochMilli(offlinePlayer.lastSeen)
@@ -87,31 +93,30 @@ class ToolPermissionMenuExtension(
             i18n(player, "online")
         }
 
-        allLines.add(api.createLoreDataLine(i18n(player, "last_online_label"), dateStr, "§f"))
-        allLines.add("")
+        lines.add(GuiLoreLine.Data(i18n(player, "last_online_label"), dateStr, "§f"))
+        lines.add(GuiLoreLine.Spacer)
 
         val enabledTools = definitions.filter { states[it.id] == true }
         if (enabledTools.isEmpty()) {
-            allLines.add("§f❙ §7${i18n(player, "tool_permission_title")} §f${i18n(player, "none")}")
+            lines.add(GuiLoreLine.Data(i18n(player, "tool_permission_title"), i18n(player, "none"), "§f"))
         } else {
-            allLines.add("§f❙ §7${i18n(player, "tool_permission_title")}")
+            lines.add(GuiLoreLine.Data(i18n(player, "tool_permission_title"), null, ""))
             enabledTools.forEach { def ->
-                allLines.add("§8・${def.color}${def.displayName}")
+                lines.add(GuiLoreLine.Raw("§8・${def.color}${def.displayName}"))
             }
         }
 
-        allLines.add(api.createLoreSeparator(allLines))
-        allLines.add(api.createLoreActionLine(i18n(player, "click_edit_operation"), i18n(player, "click_edit_action")))
-        allLines.add("")
-
-        val shiftLines = if (memberUuid != worldData.owner) {
-            val plain = PlainTextComponentSerializer.plainText()
-            originalLore.takeLast(2).map { plain.serialize(it) }
-        } else {
-            emptyList()
+        val actionLines = mutableListOf<GuiLoreLine>(
+            GuiLoreLine.Action(i18n(player, "click_edit_operation"), i18n(player, "click_edit_action")),
+            GuiLoreLine.Spacer
+        )
+        if (memberUuid != worldData.owner) {
+            originalLore.takeLast(2).forEach { actionLines.add(GuiLoreLine.Raw(legacy.serialize(it))) }
         }
-        allLines.addAll(shiftLines)
 
-        return api.buildLore(allLines, closingSeparator = true)
+        return api.getLoreService().render(GuiLoreSpec.Blocks(listOf(
+            GuiLoreBlock(lines),
+            GuiLoreBlock(actionLines)
+        )))
     }
 }

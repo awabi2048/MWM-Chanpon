@@ -1,6 +1,9 @@
 package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import java.util.UUID
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
@@ -21,7 +24,6 @@ import me.awabi2048.myworldmanager.session.SettingsAction
 import me.awabi2048.myworldmanager.util.GuiHelper
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.block.BlockFace
@@ -156,12 +158,15 @@ class ChanponWorldSettingsMenuProvider(
                 environmentGui.open(player, worldData)
             }
             ItemTag.TYPE_GUI_SETTING_INFO -> {
+                pushSettingsRoute(player, worldData)
                 mwm.worldSettingsGui.editWorldInfo(player, worldData)
             }
             ItemTag.TYPE_GUI_SETTING_ICON -> {
+                pushSettingsRoute(player, worldData)
                 mwm.worldSettingsGui.enterIconSelection(player, worldData)
             }
             ItemTag.TYPE_GUI_SETTING_SPAWN -> {
+                pushSettingsRoute(player, worldData)
                 val isGuest = if (mwm.playerPlatformResolver.isBedrock(player)) true else event.isLeftClick
                 mwm.worldSettingsGui.enterSpawnSetting(player, worldData, isGuest)
             }
@@ -190,6 +195,7 @@ class ChanponWorldSettingsMenuProvider(
             }
             ItemTag.TYPE_GUI_SETTING_ANNOUNCEMENT -> {
                 if (event.isLeftClick) {
+                    pushSettingsRoute(player, worldData)
                     mwm.worldSettingsGui.editAnnouncement(player, worldData)
                 } else {
                     mwm.worldSettingsGui.clearAnnouncements(player, worldData)
@@ -198,10 +204,12 @@ class ChanponWorldSettingsMenuProvider(
             }
             ItemTag.TYPE_GUI_SETTING_TOUR -> {
                 mwm.soundManager.playClickSound(player, item, "world_settings")
+                pushSettingsRoute(player, worldData)
                 mwm.tourGui.openEditMenu(player, worldData, 0)
             }
             ItemTag.TYPE_GUI_SETTING_VISITOR -> {
                 mwm.soundManager.playClickSound(player, item, "world_settings")
+                pushSettingsRoute(player, worldData)
                 mwm.worldSettingsGui.openVisitorManagement(player, worldData, 0)
             }
             ItemTag.TYPE_GUI_SETTING_PORTALS -> {
@@ -428,7 +436,27 @@ class ChanponWorldSettingsMenuProvider(
         val inventory = Bukkit.createInventory(holder, 45, i18nComponent(player, "${key}_title"))
         holder.inv = inventory
         applyFrame(inventory)
-        inventory.setItem(22, item(Material.TNT, i18n(player, "${key}_display"), i18nList(player, "${key}_lore", mapOf("world" to worldData.name)), ItemTag.TYPE_GUI_INFO))
+        val loreLines = i18nList(player, "${key}_lore", mapOf("world" to worldData.name))
+        inventory.setItem(
+            22,
+            if (finalStep) {
+                componentItem(
+                    Material.TNT,
+                    i18n(player, "${key}_display"),
+                    CCSystem.getAPI().getLoreService().render(
+                        GuiLoreSpec.Rich(loreLines.map { GuiLoreLine.Danger(it) }, GuiLoreFrame.BOTH)
+                    ),
+                    ItemTag.TYPE_GUI_INFO
+                )
+            } else {
+                item(
+                    Material.TNT,
+                    i18n(player, "${key}_display"),
+                    loreLines,
+                    ItemTag.TYPE_GUI_INFO
+                )
+            }
+        )
         inventory.setItem(20, confirmButton(player, true))
         inventory.setItem(24, confirmButton(player, false))
         fill(inventory)
@@ -515,14 +543,39 @@ class ChanponWorldSettingsMenuProvider(
     private fun publishItem(player: Player, worldData: WorldData): ItemStack {
         val visibility = storage.getVisibility(worldData.uuid)
         val display = visibilityName(player, visibility)
-        val lines = mutableListOf<String>()
-        lines.add(i18n(player, "publish.current", mapOf("level" to display)))
-        lines.add(i18n(player, "publish.public_desc", mapOf("prefix" to marker(visibility == ChanponWorldVisibility.PUBLIC))))
-        lines.add(i18n(player, "publish.development_desc", mapOf("prefix" to marker(visibility == ChanponWorldVisibility.DEVELOPMENT))))
-        lines.add(i18n(player, "publish.private_desc", mapOf("prefix" to marker(visibility == ChanponWorldVisibility.PRIVATE))))
-        lines.add("")
-        lines.add(i18n(player, "publish.cycle"))
-        return item(Material.OAK_SIGN, i18n(player, "publish.title", mapOf("level" to display)), lines, ItemTag.TYPE_GUI_SETTING_PUBLISH)
+        val options = listOf(
+            Triple(ChanponWorldVisibility.PUBLIC, visibilityName(player, ChanponWorldVisibility.PUBLIC), "\u00A7a"),
+            Triple(ChanponWorldVisibility.DEVELOPMENT, visibilityName(player, ChanponWorldVisibility.DEVELOPMENT), "\u00A7e"),
+            Triple(ChanponWorldVisibility.PRIVATE, visibilityName(player, ChanponWorldVisibility.PRIVATE), "\u00A77")
+        )
+        val description = when (visibility) {
+            ChanponWorldVisibility.PUBLIC -> i18n(player, "publish.public_description")
+            ChanponWorldVisibility.DEVELOPMENT -> i18n(player, "publish.development_description")
+            ChanponWorldVisibility.PRIVATE -> i18n(player, "publish.private_description")
+        }
+        val lore = CCSystem.getAPI().getLoreService().render(
+            GuiLoreSpec.Rich(buildList {
+                add(GuiLoreLine.Data(
+                    i18n(player, "publish.current_label"),
+                    display,
+                    options.first { it.first == visibility }.third
+                ))
+                add(GuiLoreLine.Spacer)
+                add(GuiLoreLine.Text(description))
+                add(GuiLoreLine.Spacer)
+                options.forEach { (option, displayName, selectedColor) ->
+                    val selected = option == visibility
+                    val marker = if (selected) "\u00A7a\u00BB" else "\u00A78\u30FB"
+                    val color = if (selected) selectedColor else "\u00A77"
+                    add(GuiLoreLine.Raw("\u00A7f\u2759 $marker $color$displayName"))
+                }
+                add(GuiLoreLine.Spacer)
+                add(GuiLoreLine.SingleAction(
+                    i18n(player, "publish.cycle_action")
+                ))
+            }, GuiLoreFrame.BOTH)
+        )
+        return componentItem(Material.OAK_SIGN, i18n(player, "publish.title", mapOf("level" to display)), lore, ItemTag.TYPE_GUI_SETTING_PUBLISH)
     }
 
     private fun expansionItem(player: Player, worldData: WorldData): ItemStack {
@@ -540,22 +593,41 @@ class ChanponWorldSettingsMenuProvider(
                 "z" to formatNumber(border.z)
             )
         )
-        return item(Material.FILLED_MAP, i18n(player, "expand.display"), lines, ItemTag.TYPE_GUI_SETTING_EXPAND)
+        return componentItem(
+            Material.FILLED_MAP,
+            i18n(player, "expand.display"),
+            describedLore(
+                mwm().languageManager.getMessageList(player, "gui.settings.expand.blocks.description"),
+                lines
+            ),
+            ItemTag.TYPE_GUI_SETTING_EXPAND
+        )
     }
 
     private fun notificationItem(player: Player, worldData: WorldData): ItemStack {
         val status = i18n(player, if (worldData.notificationEnabled) "common.on" else "common.off")
-        return item(
+        return componentItem(
             if (worldData.notificationEnabled) Material.BELL else Material.OAK_DOOR,
             mwm().languageManager.getMessage(player, "gui.settings.notification.display"),
-            i18nList(player, "notification.lore", mapOf("status" to status)),
+            describedLore(
+                mwm().languageManager.getMessageList(player, "gui.settings.notification.blocks.description"),
+                i18nList(player, "notification.lore", mapOf("status" to status))
+            ),
             ItemTag.TYPE_GUI_SETTING_NOTIFICATION
         )
     }
 
     private fun criticalItem(player: Player, isProduction: Boolean): ItemStack {
-        val lore = if (isProduction) i18nList(player, "critical.production_lore") else i18nList(player, "critical.lore")
-        return item(Material.TNT, i18n(player, "critical.display"), lore, ItemTag.TYPE_GUI_SETTING_CRITICAL)
+        val body = if (isProduction) i18nList(player, "critical.production_lore") else i18nList(player, "critical.action_lore")
+        return componentItem(
+            Material.TNT,
+            i18n(player, "critical.display"),
+            describedLore(
+                mwm().languageManager.getMessageList(player, "gui.settings.critical.blocks.summary"),
+                body
+            ),
+            ItemTag.TYPE_GUI_SETTING_CRITICAL
+        )
     }
 
     private fun deleteWorldItem(player: Player): ItemStack {
@@ -583,9 +655,44 @@ class ChanponWorldSettingsMenuProvider(
         langPrefix: String = "gui.settings.$iconKey"
     ): ItemStack {
         val display = mwm().languageManager.getMessage(player, "$langPrefix.display")
-        val lore = i18nList(player, "mwm_action.lore")
+        val lore = describedLore(
+            mwmDescription(player, iconKey),
+            i18nList(player, "mwm_action.lore")
+        )
         val icon = mwm().menuConfigManager.getIconMaterial("world_settings", iconKey, material)
-        return item(icon, display, lore, type)
+        return componentItem(icon, display, lore, type)
+    }
+
+    private fun mwmDescription(player: Player, iconKey: String): List<String> {
+        val bedrock = mwm().playerPlatformResolver.isBedrock(player)
+        val key = when (iconKey) {
+            "info" -> if (bedrock) "gui.settings.info.blocks.summary_be" else "gui.settings.info.blocks.summary_je"
+            "icon" -> "gui.settings.icon.blocks.description"
+            "spawn" -> if (bedrock) "gui.settings.spawn.blocks.description_be" else "gui.settings.spawn.blocks.description_je"
+            "announcement" -> if (bedrock) "gui.settings.announcement.blocks.description_be" else "gui.settings.announcement.blocks.description_je"
+            "member" -> "gui.settings.member.blocks.description"
+            "environment" -> "gui.settings.environment.blocks.summary"
+            "tour" -> "gui.tour.worldmenu.blocks.description"
+            else -> return emptyList()
+        }
+        return mwm().languageManager.getMessageList(player, key)
+    }
+
+    private fun describedLore(description: List<String>, existing: List<String>): List<Component> {
+        return CCSystem.getAPI().getLoreService().render(
+            GuiLoreSpec.Rich(
+                buildList {
+                    description.filter { it.isNotBlank() }.forEach { add(GuiLoreLine.Raw(it)) }
+                    if (description.any { it.isNotBlank() } && existing.any { it.isNotBlank() }) {
+                        add(GuiLoreLine.Spacer)
+                    }
+                    existing.forEach { line ->
+                        add(if (line.isBlank()) GuiLoreLine.Spacer else GuiLoreLine.Raw(line))
+                    }
+                },
+                GuiLoreFrame.BOTH
+            )
+        )
     }
 
     private fun expansionOptionItem(player: Player, key: String, material: Material, action: String): ItemStack {
@@ -637,14 +744,30 @@ class ChanponWorldSettingsMenuProvider(
     }
 
     private fun returnItem(player: Player): ItemStack {
-        return item(Material.REDSTONE, i18n(player, "common.back"), i18nList(player, "common.back_lore"), ItemTag.TYPE_GUI_RETURN)
+        return item(Material.REDSTONE, i18n(player, "common.back"), emptyList(), ItemTag.TYPE_GUI_RETURN)
     }
 
     private fun item(material: Material, display: String, loreLines: List<String>, type: String): ItemStack {
         val item = ItemStack(material)
         item.editMeta { meta ->
-            meta.displayName(LegacyComponentSerializer.legacySection().deserialize(display))
-            meta.lore(CCSystem.getAPI().buildLore(loreLines, closingSeparator = true))
+            meta.displayName(CCSystem.getAPI().getGuiElementService().name(display))
+            if (loreLines.isNotEmpty()) {
+                meta.lore(ChanponLore.build(loreLines))
+            }
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
+        }
+        ItemTag.tagItem(item, type)
+        return item
+    }
+
+    private fun componentItem(material: Material, display: String, loreComponents: List<Component>, type: String): ItemStack {
+        val item = ItemStack(material)
+        item.editMeta { meta ->
+            meta.displayName(CCSystem.getAPI().getGuiElementService().name(display))
+            if (loreComponents.isNotEmpty()) {
+                // loreComponents are already the final output of CC-System's LoreService.
+                meta.lore(loreComponents)
+            }
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         }
         ItemTag.tagItem(item, type)
@@ -652,26 +775,15 @@ class ChanponWorldSettingsMenuProvider(
     }
 
     private fun applyFrame(inventory: Inventory) {
-        val black = decoration(Material.BLACK_STAINED_GLASS_PANE)
-        for (slot in 0..8) inventory.setItem(slot, black)
-        for (slot in inventory.size - 9 until inventory.size) inventory.setItem(slot, black)
+        ChanponGuiElements.applyStandardFrame(inventory)
     }
 
     private fun fill(inventory: Inventory) {
-        val gray = decoration(Material.GRAY_STAINED_GLASS_PANE)
-        for (slot in 0 until inventory.size) {
-            if (inventory.getItem(slot) == null) inventory.setItem(slot, gray)
-        }
+        ChanponGuiElements.fill(inventory)
     }
 
     private fun decoration(material: Material): ItemStack {
-        val item = ItemStack(material)
-        item.editMeta { meta ->
-            meta.displayName(Component.empty())
-            meta.isHideTooltip = true
-        }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_DECORATION)
-        return item
+        return ChanponGuiElements.decoration(material)
     }
 
     private fun currentRequest(player: Player): WorldSettingsMenuRequest {
@@ -712,8 +824,6 @@ class ChanponWorldSettingsMenuProvider(
     private fun visibilityName(player: Player?, visibility: ChanponWorldVisibility): String {
         return i18n(player, "visibility.${visibility.storageValue}")
     }
-
-    private fun marker(active: Boolean): String = if (active) "§a▶ " else "§8- "
 
     private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)
 

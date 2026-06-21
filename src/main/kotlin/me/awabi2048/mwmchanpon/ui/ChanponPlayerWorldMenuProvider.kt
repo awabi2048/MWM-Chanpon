@@ -1,6 +1,13 @@
 package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiItemSpec
+import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
@@ -178,16 +185,9 @@ class ChanponPlayerWorldMenuProvider(
     }
 
     private fun applyFrame(inventory: Inventory, neededDataRows: Int, footerStart: Int) {
-        val blackPane = decoration(Material.BLACK_STAINED_GLASS_PANE)
-        val grayPane = decoration(Material.GRAY_STAINED_GLASS_PANE)
-        for (slot in 0..8) inventory.setItem(slot, blackPane)
-        for (row in 0 until neededDataRows) {
-            val rowStart = (row + 1) * 9
-            inventory.setItem(rowStart, grayPane)
-            inventory.setItem(rowStart + 8, grayPane)
-            for (col in 1..7) inventory.setItem(rowStart + col, grayPane)
-        }
-        for (slot in footerStart until footerStart + 9) inventory.setItem(slot, blackPane)
+        // The row count parameters remain part of the provider contract; the inventory size determines the same frame.
+        ChanponGuiElements.applyStandardFrame(inventory)
+        ChanponGuiElements.fill(inventory)
     }
 
     private fun createWorldItem(player: Player, world: WorldData): ItemStack {
@@ -223,23 +223,19 @@ class ChanponPlayerWorldMenuProvider(
             } else {
                 ""
             }
-            val lines = lang.getMessageList(
-                player,
-                "gui.player_world.world_item.lore",
-                mapOf(
-                    "description" to description,
-                    "owner_line" to ownerLine,
-                    "publish_line" to publishLine,
-                    "favorite_line" to progressLine,
-                    "visitor_line" to "",
-                    "tag_line" to tagLine,
-                    "expires_at_line" to "",
-                    "expired_line" to expiresAtLine,
-                    "warp_action" to lang.getMessage(player, "gui.player_world.world_item.warp"),
-                    "settings_action" to lang.getMessage(player, "gui.player_world.world_item.settings")
-                )
-            ).filterMeaningful()
-            meta.lore(CCSystem.getAPI().buildLore(lines))
+            // Chanpon changes domain values only; MWM and CC-System retain the shared block layout contract.
+            meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(buildList {
+                if (description.isNotBlank()) add(GuiLoreBlock(listOf(GuiLoreLine.Raw(description))))
+                add(GuiLoreBlock(
+                    (listOf(ownerLine, publishLine, progressLine) + listOfNotNull(tagLine.takeIf(String::isNotBlank)))
+                        .map(GuiLoreLine::Raw)
+                ))
+                if (expiresAtLine.isNotBlank()) add(GuiLoreBlock(listOf(GuiLoreLine.Raw(expiresAtLine))))
+                add(GuiLoreBlock(listOf(
+                    GuiLoreLine.Raw(lang.getMessage(player, "gui.player_world.world_item.warp")),
+                    GuiLoreLine.Raw(lang.getMessage(player, "gui.player_world.world_item.settings"))
+                )))
+            })))
             if (world.isArchived) meta.setEnchantmentGlintOverride(true)
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
@@ -253,7 +249,7 @@ class ChanponPlayerWorldMenuProvider(
         val item = ItemStack(Material.NETHER_STAR)
         item.editMeta { meta ->
             meta.displayName(mwm.languageManager.getComponent(player, "gui.player_world.creation_button.display"))
-            meta.lore(mwm.languageManager.getComponentList(player, "gui.player_world.creation_button.lore"))
+            meta.lore(ChanponLore.build(mwm.languageManager.getMessageList(player, "gui.player_world.creation_button.lore")))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_CREATION_BUTTON)
@@ -262,12 +258,17 @@ class ChanponPlayerWorldMenuProvider(
 
     private fun createUserSettingsButton(player: Player): ItemStack {
         val mwm = mwm()
-        val item = ItemStack(Material.WRITABLE_BOOK)
-        item.editMeta { meta ->
-            meta.displayName(mwm.languageManager.getComponent(player, "gui.user_settings.button.display"))
-            meta.lore(mwm.languageManager.getComponentList(player, "gui.user_settings.button.lore"))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
+        val item = CCSystem.getAPI().getGuiElementService().item(
+            GuiItemSpec(
+                material = Material.WRITABLE_BOOK,
+                name = GuiNameSpec.Text(mwm.languageManager.getMessage(player, "gui.user_settings.button.display"), GuiNameStyle.PRIMARY),
+                lore = GuiLoreSpec.Simple(
+                    listOf(mwm.languageManager.getMessage(player, "gui.user_settings.button.action"))
+                ),
+                role = GuiElementRole.ACTION,
+                amount = 1
+            )
+        )
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_USER_SETTINGS_BUTTON)
         return item
     }
@@ -277,8 +278,7 @@ class ChanponPlayerWorldMenuProvider(
         item.editMeta { rawMeta ->
             val meta = rawMeta as? SkullMeta ?: return@editMeta
             meta.owningPlayer = player
-            meta.displayName(Component.text(player.name).decoration(TextDecoration.ITALIC, false))
-            meta.lore(emptyList())
+            meta.displayName(CCSystem.getAPI().getGuiElementService().name(player.name))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
@@ -290,7 +290,7 @@ class ChanponPlayerWorldMenuProvider(
         val item = ItemStack(Material.ARROW)
         item.editMeta { meta ->
             val key = if (next) "gui.common.next_page" else "gui.common.prev_page"
-            meta.displayName(legacy.deserialize(mwm.languageManager.getMessage(player, key)).decoration(TextDecoration.ITALIC, false))
+            meta.displayName(mwm.languageManager.getComponent(player, key))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.setTargetPage(item, targetPage)
@@ -317,14 +317,7 @@ class ChanponPlayerWorldMenuProvider(
     }
 
     private fun decoration(material: Material): ItemStack {
-        val item = ItemStack(material)
-        item.editMeta { meta ->
-            meta.displayName(Component.empty())
-            meta.isHideTooltip = true
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_DECORATION)
-        return item
+        return ChanponGuiElements.decoration(material)
     }
 
     private fun inventoryTitle(title: String): Component =

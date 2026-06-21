@@ -20,7 +20,19 @@ class ChanponGlobalStorage(dataFolder: File) {
 
     fun setSpawnWorldUuid(worldUuid: UUID) {
         val config = settings()
+        if (config.getString("spawn_world.uuid") != worldUuid.toString()) {
+            config.set("spawn_world.policy_initialized_uuid", null)
+        }
         config.set("spawn_world.uuid", worldUuid.toString())
+        config.save(settingsFile)
+    }
+
+    fun isSpawnPolicyInitialized(worldUuid: UUID): Boolean =
+        settings().getString("spawn_world.policy_initialized_uuid") == worldUuid.toString()
+
+    fun setSpawnPolicyInitialized(worldUuid: UUID) {
+        val config = settings()
+        config.set("spawn_world.policy_initialized_uuid", worldUuid.toString())
         config.save(settingsFile)
     }
 

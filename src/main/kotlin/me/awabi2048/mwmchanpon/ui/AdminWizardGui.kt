@@ -2,6 +2,9 @@ package me.awabi2048.mwmchanpon.ui
 
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.bridge.CoreApiBridge
 import me.awabi2048.mwmchanpon.service.WizardSession
@@ -16,6 +19,7 @@ import org.bukkit.event.Listener
 import org.bukkit.event.inventory.InventoryClickEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.inventory.Inventory
+import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemStack
 import java.util.concurrent.ConcurrentHashMap
 import io.papermc.paper.event.player.AsyncChatEvent
@@ -31,9 +35,6 @@ class AdminWizardGui(
         private const val TEMPLATE_INV_TITLE = "テンプレート選択"
         private const val CONFIRM_INV_TITLE = "作成確認"
 
-        private val pane = ItemStack(Material.GRAY_STAINED_GLASS_PANE).apply {
-            editMeta { it.displayName(Component.text(" ")) }
-        }
     }
 
     fun openTemplateSelection(player: Player, session: WizardSession) {
@@ -44,11 +45,13 @@ class AdminWizardGui(
         }
 
         val size = if (templates.size % 9 == 0) templates.size + 9 else (templates.size / 9 + 1) * 9
+        val holder = TemplateSelectionHolder()
         val inv = Bukkit.createInventory(
-            null,
+            holder,
             size.coerceIn(9, 54),
             Component.text(TEMPLATE_INV_TITLE)
         )
+        holder.inv = inv
 
         for ((index, template) in templates.withIndex()) {
             val item = createTemplateItem(template)
@@ -61,12 +64,10 @@ class AdminWizardGui(
     private fun createTemplateItem(template: TemplateData): ItemStack {
         val item = ItemStack(template.icon)
         item.editMeta { meta ->
-            meta.displayName(Component.text("§a${template.name}"))
-            meta.lore(
-                template.description.map { Component.text(it) } +
-                    Component.text("") +
-                    Component.text(plugin.getMessage(null, "wizard.template_select_lore"))
-            )
+            meta.displayName(CCSystem.getAPI().getGuiElementService().name("§a${template.name}"))
+            meta.lore(ChanponLore.build(
+                template.description + plugin.getMessage(null, "wizard.template_select_lore")
+            ))
         }
         return item
     }
@@ -99,7 +100,8 @@ class AdminWizardGui(
 
         val displayName = PlainTextComponentSerializer.plainText()
             .serialize(item.itemMeta?.displayName() ?: Component.empty())
-            .trimStart('a')
+            .trim()
+            .removePrefix("§a")
 
         val templates = bridge.getTemplateRepository()?.findAll() ?: return
         val template = templates.find { it.name == displayName } ?: return
@@ -136,40 +138,40 @@ class AdminWizardGui(
         val templateRepo = bridge.getTemplateRepository() ?: return
         val template = templateRepo.findById(session.selectedTemplateId ?: return) ?: return
 
+        val holder = ConfirmationHolder()
         val inv = Bukkit.createInventory(
-            null,
+            holder,
             27,
             Component.text(CONFIRM_INV_TITLE)
         )
+        holder.inv = inv
 
-        for (i in 0 until 27) {
-            inv.setItem(i, pane)
-        }
+        ChanponGuiElements.fill(inv)
 
-        val infoLore = CCSystem.getAPI().buildLore(
-            listOf(
-                CCSystem.getAPI().createLoreDataLine("プレイヤー", session.targetPlayerName),
-                CCSystem.getAPI().createLoreDataLine("ワールド名", session.worldName ?: ""),
-                CCSystem.getAPI().createLoreSubDataLine("テンプレート", template.name),
-                "§7↓ 確認して作成する場合クリック",
-                "§7↓ キャンセルする場合✕をクリック"
-            ),
-            closingSeparator = false
+        val infoLore = CCSystem.getAPI().getLoreService().render(
+            GuiLoreSpec.Rich(
+                listOf(
+                    GuiLoreLine.Data(plugin.getMessage(null, "wizard.confirm_player_label"), session.targetPlayerName, "§7"),
+                    GuiLoreLine.Data(plugin.getMessage(null, "wizard.confirm_world_label"), session.worldName ?: "", "§7"),
+                    GuiLoreLine.SubData(plugin.getMessage(null, "wizard.confirm_template_label"), template.name),
+                    GuiLoreLine.Raw(plugin.getMessage(null, "wizard.confirm_hint_confirm")),
+                    GuiLoreLine.Raw(plugin.getMessage(null, "wizard.confirm_hint_cancel"))
+                ),
+                GuiLoreFrame.TOP
+            )
         )
 
         val infoItem = ItemStack(Material.PAPER)
         infoItem.editMeta { meta ->
-            meta.displayName(Component.text(plugin.getMessage(null, "wizard.confirm_title")))
+            meta.displayName(CCSystem.getAPI().getGuiElementService().name(plugin.getMessage(null, "wizard.confirm_title")))
             meta.lore(infoLore)
         }
         inv.setItem(13, infoItem)
 
-        val confirmItem = ItemStack(Material.LIME_CONCRETE)
-        confirmItem.editMeta { it.displayName(Component.text(plugin.getMessage(null, "wizard.confirm_btn"))) }
+        val confirmItem = ChanponGuiElements.confirm(plugin.getMessage(null, "wizard.confirm_btn"), true)
         inv.setItem(11, confirmItem)
 
-        val cancelItem = ItemStack(Material.RED_CONCRETE)
-        cancelItem.editMeta { it.displayName(Component.text(plugin.getMessage(null, "wizard.cancel_btn"))) }
+        val cancelItem = ChanponGuiElements.confirm(plugin.getMessage(null, "wizard.cancel_btn"), false)
         inv.setItem(15, cancelItem)
 
         player.openInventory(inv)
@@ -237,5 +239,15 @@ class AdminWizardGui(
         val player = event.player
         pendingNameInput.remove(player)
         plugin.wizardSessionService.removeSession(player.uniqueId)
+    }
+
+    private class TemplateSelectionHolder : InventoryHolder {
+        lateinit var inv: Inventory
+        override fun getInventory(): Inventory = inv
+    }
+
+    private class ConfirmationHolder : InventoryHolder {
+        lateinit var inv: Inventory
+        override fun getInventory(): Inventory = inv
     }
 }
