@@ -10,6 +10,7 @@ import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.SubmissionState
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
+import me.awabi2048.mwmchanpon.ui.ChanponLore
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.event.MwmWorldCreatedEvent
 import me.awabi2048.myworldmanager.api.extension.MenuExtension
@@ -301,17 +302,15 @@ class ProductionToggleExtension(
         val item = ItemStack(if (enabled) Material.YELLOW_WOOL else Material.GRAY_WOOL)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(null, "creation.display"))
-            meta.lore(
-                listOf(
-                    i18nComponent(null, "creation.lore.description"),
-                    i18nComponent(null, "creation.lore.delete_guard"),
-                    i18nComponent(
-                        null,
-                        "creation.lore.state",
-                        mapOf("state" to i18n(null, if (enabled) "common.on" else "common.off"))
-                    )
+            meta.lore(lore(listOf(
+                i18n(null, "creation.lore.description"),
+                i18n(null, "creation.lore.delete_guard"),
+                i18n(
+                    null,
+                    "creation.lore.state",
+                    mapOf("state" to i18n(null, if (enabled) "common.on" else "common.off"))
                 )
-            )
+            )))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         }
         if (enabled) item.addUnsafeEnchantment(Enchantment.UNBREAKING, 1)
@@ -404,33 +403,16 @@ class ProductionToggleExtension(
     }
 
     private fun applyConfirmationFrame(inventory: Inventory) {
-        val blackPane = createDecorationItem(Material.BLACK_STAINED_GLASS_PANE)
-        val grayPane = createDecorationItem(Material.GRAY_STAINED_GLASS_PANE)
-        for (slot in 0 until inventory.size) {
-            inventory.setItem(slot, grayPane)
-        }
-        for (slot in 0..8) {
-            inventory.setItem(slot, blackPane)
-        }
-        val footerStart = inventory.size - 9
-        for (slot in footerStart until inventory.size) {
-            inventory.setItem(slot, blackPane)
-        }
+        me.awabi2048.mwmchanpon.ui.ChanponGuiElements.applyStandardFrame(inventory)
+        me.awabi2048.mwmchanpon.ui.ChanponGuiElements.fill(inventory)
     }
 
     private fun createDecorationItem(material: Material): ItemStack {
-        val item = ItemStack(material)
-        item.editMeta { meta ->
-            meta.displayName(Component.empty())
-            meta.isHideTooltip = true
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_DECORATION)
-        return item
+        return me.awabi2048.mwmchanpon.ui.ChanponGuiElements.decoration(material)
     }
 
     private fun lore(lines: List<String>): List<Component> {
-        return CCSystem.getAPI().buildLore(lines, closingSeparator = true)
+        return ChanponLore.build(lines)
     }
 
     private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): String {

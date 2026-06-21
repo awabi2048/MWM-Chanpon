@@ -3,6 +3,7 @@ package me.awabi2048.mwmchanpon.ui
 import com.awabi2048.ccsystem.CCSystem
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
+import me.awabi2048.mwmchanpon.protection.SpawnWorldProtectionService
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.util.ItemTag
@@ -21,6 +22,7 @@ import org.bukkit.inventory.ItemStack
 class ChanponAdminMenu(
     private val plugin: MWMChanponPlugin,
     private val globalStorage: ChanponGlobalStorage,
+    private val spawnProtection: SpawnWorldProtectionService,
     private val submissionAdminMenu: SubmissionAdminMenu,
     private val worldDataManagementMenu: WorldDataManagementMenu,
     private val automationSettingsMenu: AutomationSettingsMenu,
@@ -74,6 +76,11 @@ class ChanponAdminMenu(
             is SpawnConfirmHolder -> when (ItemTag.getType(item)) {
                 ItemTag.TYPE_GUI_CONFIRM -> {
                     globalStorage.setSpawnWorldUuid(holder.worldUuid)
+                    MyWorldManagerApi.getWorldRepository()?.findByUuid(holder.worldUuid)?.let { worldData ->
+                        if (!globalStorage.isSpawnPolicyInitialized(holder.worldUuid) && spawnProtection.applyDefaults(worldData)) {
+                            globalStorage.setSpawnPolicyInitialized(holder.worldUuid)
+                        }
+                    }
                     player.sendMessage(i18nComponent(player, "spawn_world.set_success"))
                     open(player)
                 }
@@ -109,14 +116,11 @@ class ChanponAdminMenu(
     }
 
     private fun applyFrame(inventory: Inventory) {
-        val black = decoration(Material.BLACK_STAINED_GLASS_PANE)
-        for (slot in 0..8) inventory.setItem(slot, black)
-        for (slot in 36..44) inventory.setItem(slot, black)
+        ChanponGuiElements.applyStandardFrame(inventory)
     }
 
     private fun fill(inventory: Inventory) {
-        val gray = decoration(Material.GRAY_STAINED_GLASS_PANE)
-        for (slot in 0 until inventory.size) if (inventory.getItem(slot) == null) inventory.setItem(slot, gray)
+        ChanponGuiElements.fill(inventory)
     }
 
     private fun menuItem(player: Player, material: Material, key: String, action: String): ItemStack {
@@ -172,13 +176,7 @@ class ChanponAdminMenu(
     }
 
     private fun decoration(material: Material): ItemStack {
-        val item = ItemStack(material)
-        item.editMeta { meta ->
-            meta.displayName(Component.empty())
-            meta.isHideTooltip = true
-        }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_DECORATION)
-        return item
+        return ChanponGuiElements.decoration(material)
     }
 
     private fun i18nComponent(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
@@ -187,7 +185,7 @@ class ChanponAdminMenu(
     private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
 
-    private fun lore(lines: List<String>) = CCSystem.getAPI().buildLore(lines, closingSeparator = true)
+    private fun lore(lines: List<String>) = ChanponLore.build(lines)
 
     private fun mwm(): me.awabi2048.myworldmanager.MyWorldManager =
         org.bukkit.plugin.java.JavaPlugin.getPlugin(me.awabi2048.myworldmanager.MyWorldManager::class.java)

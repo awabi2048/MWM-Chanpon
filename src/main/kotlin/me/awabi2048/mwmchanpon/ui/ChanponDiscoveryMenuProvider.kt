@@ -140,7 +140,7 @@ class ChanponDiscoveryMenuProvider(
                 "",
                 mwm.languageManager.getMessage(player, "gui.player_world.world_item.warp")
             )
-            meta.lore(CCSystem.getAPI().buildLore(lines, closingSeparator = true))
+            meta.lore(ChanponLore.build(lines))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_WORLD_ITEM)
@@ -151,7 +151,7 @@ class ChanponDiscoveryMenuProvider(
     private fun returnItem(player: Player): ItemStack {
         val item = ItemStack(Material.REDSTONE)
         item.editMeta { meta ->
-            meta.displayName(legacy.deserialize(mwm().languageManager.getMessage(player, "gui.common.return")).decoration(TextDecoration.ITALIC, false))
+            meta.displayName(mwm().languageManager.getComponent(player, "gui.common.return"))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_RETURN)
@@ -159,27 +159,15 @@ class ChanponDiscoveryMenuProvider(
     }
 
     private fun applyFrame(inventory: Inventory) {
-        val black = decoration(Material.BLACK_STAINED_GLASS_PANE)
-        for (slot in 0..8) inventory.setItem(slot, black)
-        for (slot in 45..53) inventory.setItem(slot, black)
+        ChanponGuiElements.applyStandardFrame(inventory)
     }
 
     private fun fill(inventory: Inventory) {
-        val gray = decoration(Material.GRAY_STAINED_GLASS_PANE)
-        for (slot in 9..44) {
-            if (inventory.getItem(slot) == null) inventory.setItem(slot, gray)
-        }
+        ChanponGuiElements.fill(inventory)
     }
 
     private fun decoration(material: Material): ItemStack {
-        val item = ItemStack(material)
-        item.editMeta { meta ->
-            meta.displayName(Component.empty())
-            meta.isHideTooltip = true
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_DECORATION)
-        return item
+        return ChanponGuiElements.decoration(material)
     }
 
     private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)

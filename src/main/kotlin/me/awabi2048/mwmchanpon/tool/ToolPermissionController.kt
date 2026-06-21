@@ -29,21 +29,31 @@ class ToolPermissionController(
         val participants = linkedSetOf<UUID>()
         participants.add(worldData.owner)
         participants.addAll(worldData.members)
+        participants.addAll(worldData.moderators)
         participants.forEach { playerUuid ->
             removeLegacyScopedPermissions(worldData, playerUuid)
+            removeLegacyBuilderAssignment(playerUuid, worldName(worldData))
             Bukkit.getPlayer(playerUuid)?.let(::syncPlayerLocation)
         }
+        // MWM owns persistent work-group nodes; Chanpon only changes the policy decision.
+        MyWorldManagerApi.syncWorldWorkPermissions(worldData.uuid)
     }
 
     fun cleanupPlayer(worldData: WorldData, playerUuid: UUID) {
         storage.removeMember(worldData.uuid, playerUuid)
         removeLegacyScopedPermissions(worldData, playerUuid)
+        removeLegacyBuilderAssignment(playerUuid, worldName(worldData))
         Bukkit.getPlayer(playerUuid)?.let(::syncPlayerLocation)
     }
 
     fun cleanupPlayerPermissions(worldData: WorldData, playerUuid: UUID) {
         removeLegacyScopedPermissions(worldData, playerUuid)
+        removeLegacyBuilderAssignment(playerUuid, worldName(worldData))
         Bukkit.getPlayer(playerUuid)?.let(::syncPlayerLocation)
+    }
+
+    fun cleanupLegacyWorldAssignment(playerUuid: UUID, worldName: String) {
+        removeLegacyBuilderAssignment(playerUuid, worldName)
     }
 
     fun syncPlayerLocation(player: Player) {
@@ -105,11 +115,19 @@ class ToolPermissionController(
         luckPermsService.removeScopedPermissions(playerUuid, worldName(worldData), definitions)
     }
 
+    private fun removeLegacyBuilderAssignment(playerUuid: UUID, worldName: String) {
+        luckPermsService.removePersistentGroupAssignment(playerUuid, worldName, LEGACY_BUILDER_GROUP)
+    }
+
     private fun isParticipant(worldData: WorldData, playerUuid: UUID): Boolean {
-        return playerUuid == worldData.owner || playerUuid in worldData.members
+        return playerUuid == worldData.owner || playerUuid in worldData.members || playerUuid in worldData.moderators
     }
 
     private fun worldName(worldData: WorldData): String {
         return worldData.customWorldName ?: "my_world.${worldData.uuid}"
+    }
+
+    private companion object {
+        const val LEGACY_BUILDER_GROUP = "mwmchanpon_builder"
     }
 }

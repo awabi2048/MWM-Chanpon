@@ -17,7 +17,6 @@ import me.awabi2048.myworldmanager.api.extension.WorldSettingsMenuRequest
 import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
@@ -152,6 +151,9 @@ class SubmittedWorldMenuProvider(
             toolPermissionController.syncWorld(worldData)
             if (protectionService.isProtected(worldData)) {
                 open(player, worldData, request)
+            } else {
+                player.closeInventory()
+                player.performCommand("worldmenu")
             }
         }
         player.sendMessage(i18nComponent(player, "message.cancelled"))
@@ -169,16 +171,11 @@ class SubmittedWorldMenuProvider(
     }
 
     private fun applyFrame(inventory: Inventory) {
-        val blackPane = createDecorationItem(Material.BLACK_STAINED_GLASS_PANE)
-        for (slot in 0..8) inventory.setItem(slot, blackPane)
-        for (slot in inventory.size - 9 until inventory.size) inventory.setItem(slot, blackPane)
+        ChanponGuiElements.applyStandardFrame(inventory)
     }
 
     private fun fillBody(inventory: Inventory) {
-        val grayPane = createDecorationItem(Material.GRAY_STAINED_GLASS_PANE)
-        for (slot in 9 until inventory.size - 9) {
-            if (inventory.getItem(slot) == null) inventory.setItem(slot, grayPane)
-        }
+        ChanponGuiElements.fill(inventory)
     }
 
     private fun createWorldItem(
@@ -189,7 +186,7 @@ class SubmittedWorldMenuProvider(
     ): ItemStack {
         val item = ItemStack(worldData.icon)
         item.editMeta { meta ->
-            meta.displayName(LegacyComponentSerializer.legacySection().deserialize("§e${worldData.name}"))
+            meta.displayName(CCSystem.getAPI().getGuiElementService().name("§e${worldData.name}"))
             meta.lore(
                 lore(
                     i18nList(
@@ -237,7 +234,6 @@ class SubmittedWorldMenuProvider(
         val item = ItemStack(Material.REDSTONE)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "submitted_menu.back.display"))
-            meta.lore(lore(i18nList(player, "submitted_menu.back.lore")))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_RETURN)
@@ -268,18 +264,11 @@ class SubmittedWorldMenuProvider(
     }
 
     private fun createDecorationItem(material: Material): ItemStack {
-        val item = ItemStack(material)
-        item.editMeta { meta ->
-            meta.displayName(Component.empty())
-            meta.isHideTooltip = true
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_DECORATION)
-        return item
+        return ChanponGuiElements.decoration(material)
     }
 
     private fun lore(lines: List<String>): List<Component> {
-        return CCSystem.getAPI().buildLore(lines, closingSeparator = true)
+        return ChanponLore.build(lines)
     }
 
     private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): String {

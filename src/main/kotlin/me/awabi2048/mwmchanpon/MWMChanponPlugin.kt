@@ -8,6 +8,7 @@ import me.awabi2048.mwmchanpon.extension.ChanponCommandExtension
 import me.awabi2048.mwmchanpon.extension.ChanponWorldAccessPolicy
 import me.awabi2048.mwmchanpon.extension.ChanponWorldPublishPolicy
 import me.awabi2048.mwmchanpon.extension.ChanponWorldRuntimePolicy
+import me.awabi2048.mwmchanpon.extension.ChanponWorldWorkPermissionPolicy
 import me.awabi2048.mwmchanpon.extension.LinkedPortalMenuExtension
 import me.awabi2048.mwmchanpon.extension.ProductionToggleExtension
 import me.awabi2048.mwmchanpon.extension.ProductionWorldGuard
@@ -16,10 +17,12 @@ import me.awabi2048.mwmchanpon.extension.WorldBackupMenuExtension
 import me.awabi2048.mwmchanpon.listener.MemberPermissionSyncListener
 import me.awabi2048.mwmchanpon.listener.PlayerJoinListener
 import me.awabi2048.mwmchanpon.listener.SubmittedWorldProtectionListener
+import me.awabi2048.mwmchanpon.listener.SpawnWorldProtectionListener
 import me.awabi2048.mwmchanpon.listener.ToolPermissionMenuListener
 import me.awabi2048.mwmchanpon.listener.ToolPermissionWorldListener
 import me.awabi2048.mwmchanpon.listener.WorldCleanupListener
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
+import me.awabi2048.mwmchanpon.protection.SpawnWorldProtectionService
 import me.awabi2048.mwmchanpon.service.BackupAutomationService
 import me.awabi2048.mwmchanpon.service.ChanponSpawnWorldService
 import me.awabi2048.mwmchanpon.service.ManualRollbackService
@@ -83,13 +86,18 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var worldAccessPolicy: ChanponWorldAccessPolicy
     private lateinit var worldPublishPolicy: ChanponWorldPublishPolicy
     private lateinit var worldRuntimePolicy: ChanponWorldRuntimePolicy
+    private lateinit var worldWorkPermissionPolicy: ChanponWorldWorkPermissionPolicy
     private lateinit var commandExtension: ChanponCommandExtension
     private lateinit var favoriteVisitMenuProvider: ChanponFavoriteVisitMenuProvider
     private lateinit var spawnWorldService: ChanponSpawnWorldService
     private lateinit var toolController: ToolPermissionController
+    private lateinit var spawnProtectionService: SpawnWorldProtectionService
 
     override fun onEnable() {
         saveDefaultConfig()
+        CCSystem.getAPI().getMenuNavigationService().registerMenuMatcher(MENU_OWNER) { inventory ->
+            inventory.holder?.javaClass?.name?.startsWith("me.awabi2048.mwmchanpon") == true
+        }
 
         val timeoutSeconds = config.getLong("wizard.timeout_seconds", 300)
         wizardSessionService = WizardSessionService(timeoutSeconds, logger)
@@ -101,8 +109,10 @@ class MWMChanponPlugin : JavaPlugin() {
         val globalStorage = ChanponGlobalStorage(dataFolder)
         spawnWorldService = ChanponSpawnWorldService(this, globalStorage)
         val luckPerms = LuckPermsProvider.get()
+        spawnProtectionService = SpawnWorldProtectionService()
         val toolDefinitions = ToolPermissionConfig(this).load()
         val isAutoRollbackEnabled = { config.getBoolean("backup.auto_rollback.enabled", false) }
+        worldWorkPermissionPolicy = ChanponWorldWorkPermissionPolicy(chanponStorage, isAutoRollbackEnabled)
         toolController = ToolPermissionController(
             chanponStorage,
             LuckPermsToolPermissionService(luckPerms, logger),
@@ -148,7 +158,7 @@ class MWMChanponPlugin : JavaPlugin() {
             submittedProtectionService,
             toolController
         )
-        chanponAdminMenu = ChanponAdminMenu(this, globalStorage, submissionAdminMenu, worldDataManagementMenu, automationSettingsMenu, worldDataExportMenu)
+        chanponAdminMenu = ChanponAdminMenu(this, globalStorage, spawnProtectionService, submissionAdminMenu, worldDataManagementMenu, automationSettingsMenu, worldDataExportMenu)
         submissionAdminMenu.setParentMenuOpener(chanponAdminMenu::open)
         worldDataManagementMenu.setParentMenuOpener(chanponAdminMenu::open)
         worldDataExportMenu.setParentMenuOpener(chanponAdminMenu::open)
@@ -182,6 +192,7 @@ class MWMChanponPlugin : JavaPlugin() {
         MyWorldManagerApi.registerVisitMenuProvider(favoriteVisitMenuProvider)
         MyWorldManagerApi.registerWorldEvacuationProvider(spawnWorldService)
         MyWorldManagerApi.registerWorldAccessPolicy(worldAccessPolicy)
+        MyWorldManagerApi.registerWorldWorkPermissionPolicy(worldWorkPermissionPolicy)
         MyWorldManagerApi.registerWorldPublishPolicy(worldPublishPolicy)
         MyWorldManagerApi.registerWorldRuntimePolicy(worldRuntimePolicy)
         MyWorldManagerApi.registerCommandPolicy(commandExtension)
@@ -204,6 +215,7 @@ class MWMChanponPlugin : JavaPlugin() {
         server.pluginManager.registerEvents(discoveryMenuProvider, this)
         server.pluginManager.registerEvents(favoriteVisitMenuProvider, this)
         server.pluginManager.registerEvents(SubmittedWorldProtectionListener(submittedProtectionService), this)
+        server.pluginManager.registerEvents(SpawnWorldProtectionListener(globalStorage, spawnProtectionService), this)
 
         val toolMenu = ToolPermissionMenu(toolController, toolDefinitions)
         toolPermissionExtension = ToolPermissionMenuExtension(toolMenu, toolController, toolDefinitions)
@@ -221,13 +233,21 @@ class MWMChanponPlugin : JavaPlugin() {
         server.pluginManager.registerEvents(MemberPermissionSyncListener(toolController, chanponStorage), this)
         server.pluginManager.registerEvents(PlayerJoinListener(toolController, spawnWorldService), this)
         server.pluginManager.registerEvents(ToolPermissionWorldListener(toolController), this)
-        server.pluginManager.registerEvents(WorldCleanupListener(chanponStorage), this)
+        server.pluginManager.registerEvents(WorldCleanupListener(chanponStorage, toolController), this)
 
         server.scheduler.runTask(this, Runnable {
             MyWorldManagerApi.getWorldRepository()?.findAll()?.let {
                 submittedProtectionService.syncAll(it)
                 it.forEach(toolController::syncWorld)
             }
+            globalStorage.getSpawnWorldUuid()
+                ?.takeUnless(globalStorage::isSpawnPolicyInitialized)
+                ?.let { MyWorldManagerApi.getWorldRepository()?.findByUuid(it) }
+                ?.let { worldData ->
+                    if (spawnProtectionService.applyDefaults(worldData)) {
+                        globalStorage.setSpawnPolicyInitialized(worldData.uuid)
+                    }
+                }
             toolController.syncOnlinePlayers()
         })
         automationService.start()
@@ -236,6 +256,9 @@ class MWMChanponPlugin : JavaPlugin() {
     }
 
     override fun onDisable() {
+        runCatching {
+            CCSystem.getAPI().getMenuNavigationService().closeOwnedMenus(MENU_OWNER, server.onlinePlayers)
+        }
         if (::productionToggleExtension.isInitialized) {
             MyWorldManagerApi.unregisterMenuExtension(productionToggleExtension)
         }
@@ -277,6 +300,9 @@ class MWMChanponPlugin : JavaPlugin() {
         if (::worldAccessPolicy.isInitialized) {
             MyWorldManagerApi.unregisterWorldAccessPolicy(worldAccessPolicy)
         }
+        if (::worldWorkPermissionPolicy.isInitialized) {
+            MyWorldManagerApi.unregisterWorldWorkPermissionPolicy(worldWorkPermissionPolicy)
+        }
         if (::worldPublishPolicy.isInitialized) {
             MyWorldManagerApi.unregisterWorldPublishPolicy(worldPublishPolicy)
         }
@@ -293,7 +319,8 @@ class MWMChanponPlugin : JavaPlugin() {
         if (::toolController.isInitialized) {
             toolController.clearOnlineActivePermissions()
         }
-        wizardSessionService.clearAll()
+        if (::wizardSessionService.isInitialized) wizardSessionService.clearAll()
+        runCatching { CCSystem.getAPI().getMenuNavigationService().unregisterOwner(MENU_OWNER) }
         logger.info("MWM-Chanpon addon has been disabled.")
     }
 
@@ -306,5 +333,9 @@ class MWMChanponPlugin : JavaPlugin() {
     fun getCoreApiBridge(): CoreApiBridge = coreApiBridge
 
     fun isSubmissionClosed(): Boolean = config.getBoolean("submission.closed", false)
+
+    private companion object {
+        private const val MENU_OWNER = "mwm-chanpon"
+    }
 
 }

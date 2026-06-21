@@ -1,5 +1,6 @@
 package me.awabi2048.mwmchanpon.ui
 
+import com.awabi2048.ccsystem.CCSystem
 import java.util.UUID
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.mwmchanpon.tool.ToolPermissionDefinition
@@ -32,12 +33,8 @@ class ToolPermissionMenu(
         )
         holder.bind(inventory)
 
-        val frameTop = createFrame(Material.BLACK_STAINED_GLASS_PANE)
-        val frameBg = createFrame(Material.GRAY_STAINED_GLASS_PANE)
-
-        for (slot in 0..8) inventory.setItem(slot, frameTop)
-        for (slot in 9..35) inventory.setItem(slot, frameBg)
-        for (slot in 36..44) inventory.setItem(slot, frameTop)
+        ChanponGuiElements.applyStandardFrame(inventory)
+        ChanponGuiElements.fill(inventory)
 
         val targetPlayer = Bukkit.getOfflinePlayer(targetPlayerUuid)
         val head = ItemStack(Material.PLAYER_HEAD)
@@ -45,10 +42,7 @@ class ToolPermissionMenu(
             if (meta is org.bukkit.inventory.meta.SkullMeta) {
                 meta.owningPlayer = targetPlayer
             }
-            meta.displayName(
-                Component.text("§e${targetPlayer.name ?: "Unknown"}")
-                    .decoration(TextDecoration.ITALIC, false)
-            )
+            meta.displayName(CCSystem.getAPI().getGuiElementService().name("§e${targetPlayer.name ?: "Unknown"}"))
         }
         inventory.setItem(13, head)
 
@@ -59,7 +53,7 @@ class ToolPermissionMenu(
 
         val back = ItemStack(Material.REDSTONE)
         back.editMeta { meta ->
-            meta.displayName(Component.text("§7戻る").decoration(TextDecoration.ITALIC, false))
+            meta.displayName(CCSystem.getAPI().getGuiElementService().name("§7戻る"))
         }
         ItemTag.tagItem(back, ItemTag.TYPE_GUI_RETURN)
         inventory.setItem(31, back)
@@ -67,30 +61,15 @@ class ToolPermissionMenu(
         player.openInventory(inventory)
     }
 
-    private fun createFrame(material: Material): ItemStack {
-        val item = ItemStack(material)
-        item.editMeta { meta ->
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-            meta.displayName(Component.text(" "))
-        }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_DECORATION)
-        return item
-    }
-
     private fun createToolItem(worldData: WorldData, targetPlayerUuid: UUID, definition: ToolPermissionDefinition): ItemStack {
         val enabled = controller.isEnabled(worldData, targetPlayerUuid, definition.id)
         val item = ItemStack(definition.material)
         item.editMeta { meta ->
-            meta.displayName(
-                Component.text("${if (enabled) "§a" else "§7"}${definition.displayName}")
-                    .decoration(TextDecoration.ITALIC, false)
-            )
-            meta.lore(
-                listOf(
-                    Component.text("§7状態: ${if (enabled) "§aオン" else "§cオフ"}").decoration(TextDecoration.ITALIC, false),
-                    Component.text("§eクリックで切り替え").decoration(TextDecoration.ITALIC, false)
-                )
-            )
+            meta.displayName(CCSystem.getAPI().getGuiElementService().name("${if (enabled) "§a" else "§7"}${definition.displayName}"))
+            meta.lore(ChanponLore.build(listOf(
+                "§7状態: ${if (enabled) "§aオン" else "§cオフ"}",
+                "§eクリックで切り替え"
+            )))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         }
         if (enabled) item.addUnsafeEnchantment(Enchantment.UNBREAKING, 1)
