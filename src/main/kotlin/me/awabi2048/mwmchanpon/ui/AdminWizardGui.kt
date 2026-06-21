@@ -121,8 +121,10 @@ class AdminWizardGui(
         event.isCancelled = true
         val worldName = PlainTextComponentSerializer.plainText().serialize(event.message()).trim()
 
-        if (worldName.length < 1 || worldName.length > 32) {
-            player.sendMessage(Component.text(plugin.getMessage(player, "wizard.name_invalid")))
+        val validationError = bridge.getWorldService()?.validateWorldName(worldName)
+        if (validationError != null) {
+            // 管理者作成もMWM本体と同じ禁止文字列・ファイル名・文字数規則を使用する。
+            player.sendMessage(Component.text(validationError))
             pendingNameInput[player] = session
             return
         }
@@ -198,6 +200,13 @@ class AdminWizardGui(
 
                 if (templateId == null || worldName == null || targetUuid == null) {
                     player.sendMessage(Component.text(plugin.getMessage(player, "wizard.invalid_session")))
+                    player.closeInventory()
+                    plugin.wizardSessionService.removeSession(player.uniqueId)
+                    return
+                }
+
+                bridge.getWorldService()?.validateWorldName(worldName)?.let { validationError ->
+                    player.sendMessage(Component.text(validationError))
                     player.closeInventory()
                     plugin.wizardSessionService.removeSession(player.uniqueId)
                     return

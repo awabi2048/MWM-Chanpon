@@ -171,7 +171,7 @@ class MWMChanponPlugin : JavaPlugin() {
             submittedProtectionService,
             toolController
         )
-        environmentGui = ChanponEnvironmentGui(this)
+        environmentGui = ChanponEnvironmentGui(this, chanponStorage, submittedProtectionService)
         chanponWorldSettingsMenuProvider = ChanponWorldSettingsMenuProvider(this, chanponStorage, submittedProtectionService, environmentGui)
         playerWorldMenuProvider = ChanponPlayerWorldMenuProvider(this, globalStorage, chanponStorage)
         discoveryMenuProvider = ChanponDiscoveryMenuProvider(this, globalStorage, chanponStorage)

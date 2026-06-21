@@ -43,6 +43,8 @@ class ChanponWorldSettingsMenuProvider(
     private val protectionService: SubmittedWorldProtectionService,
     private val environmentGui: ChanponEnvironmentGui
 ) : WorldSettingsMenuProvider, Listener {
+    private val accessGuard = WorldSettingsAccessGuard(storage, protectionService)
+
     override fun getId(): String = PROVIDER_ID
 
     override fun open(player: Player, worldData: WorldData, request: WorldSettingsMenuRequest): Boolean {
@@ -136,6 +138,36 @@ class ChanponWorldSettingsMenuProvider(
         val isModerator = worldData.moderators.contains(player.uniqueId)
 
         val type = ItemTag.getType(item)
+        val ownerOnlyTypes = setOf(
+            ItemTag.TYPE_GUI_SETTING_EXPAND,
+            ItemTag.TYPE_GUI_SETTING_CRITICAL,
+            ItemTag.TYPE_GUI_SETTING_ENVIRONMENT,
+            ItemTag.TYPE_GUI_SETTING_PUBLISH,
+            ItemTag.TYPE_GUI_SETTING_MEMBER,
+        )
+        val managerTypes = setOf(
+            ItemTag.TYPE_GUI_SETTING_INFO,
+            ItemTag.TYPE_GUI_SETTING_ICON,
+            ItemTag.TYPE_GUI_SETTING_SPAWN,
+            ItemTag.TYPE_GUI_SETTING_NOTIFICATION,
+            ItemTag.TYPE_GUI_SETTING_ANNOUNCEMENT,
+            ItemTag.TYPE_GUI_SETTING_TOUR,
+        )
+        val inWorldTypes = setOf(
+            ItemTag.TYPE_GUI_SETTING_SPAWN,
+            ItemTag.TYPE_GUI_SETTING_EXPAND,
+            ItemTag.TYPE_GUI_SETTING_ENVIRONMENT,
+            ItemTag.TYPE_GUI_SETTING_CRITICAL,
+        )
+        if (type in ownerOnlyTypes || type in managerTypes) {
+            if (!accessGuard.allow(
+                    player,
+                    worldData,
+                    ownerOnly = type in ownerOnlyTypes,
+                    requireTargetWorld = type in inWorldTypes,
+                )
+            ) return
+        }
         when (type) {
             ItemTag.TYPE_GUI_SETTING_EXPAND -> {
                 if (worldData.borderExpansionLevel == WorldData.EXPANSION_LEVEL_SPECIAL) return
@@ -251,6 +283,7 @@ class ChanponWorldSettingsMenuProvider(
                 }
             }
             TYPE_EXPAND_DIRECTION -> {
+                if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
                 when (ItemTag.getString(item, DIRECTION_KEY)) {
                     ACTION_CENTER -> {
                         pushExpansionRoute(player, worldData)
@@ -274,6 +307,7 @@ class ChanponWorldSettingsMenuProvider(
                 }
             }
             ItemTag.TYPE_GUI_SETTING_STEP_BACK_EXPANSION -> {
+                if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
                 if (worldData.latestBorderExpansionRecord()?.modified == true) {
                     pushExpansionRoute(player, worldData)
                     openModifiedWarning(player, worldData, ConfirmAction.STEP_BACK)
@@ -296,6 +330,7 @@ class ChanponWorldSettingsMenuProvider(
                 }
             }
             ItemTag.TYPE_GUI_CONFIRM -> {
+                if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
                 pushWarningRoute(player, worldData, holder.action)
                 openConfirm(player, worldData, holder.action, null)
             }
@@ -313,6 +348,7 @@ class ChanponWorldSettingsMenuProvider(
                 }
             }
             ItemTag.TYPE_GUI_CONFIRM -> {
+                if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
                 val service = MyWorldManagerApi.getWorldService()
                 val success = when (holder.action) {
                     ConfirmAction.EXPAND -> service?.expandWorldBorder(holder.worldUuid, holder.direction) == true
@@ -343,6 +379,7 @@ class ChanponWorldSettingsMenuProvider(
                 }
             }
             ItemTag.TYPE_GUI_SETTING_DELETE_WORLD -> {
+                if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
                 if (storage.isProductionWorld(worldUuid)) return
                 pushCriticalRoute(player, worldData)
                 openDeleteConfirm(player, worldData, false)
@@ -361,6 +398,7 @@ class ChanponWorldSettingsMenuProvider(
                 }
             }
             ItemTag.TYPE_GUI_CONFIRM -> {
+                if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
                 if (!holder.finalStep) {
                     pushDeleteConfirmRoute(player, worldData, false)
                     openDeleteConfirm(player, worldData, true)
@@ -420,6 +458,7 @@ class ChanponWorldSettingsMenuProvider(
     }
 
     private fun openCriticalMenu(player: Player, worldData: WorldData) {
+        if (!mwm().playerStatsRepository.findByUuid(player.uniqueId).criticalSettingsEnabled) return
         val holder = CriticalHolder(worldData.uuid, currentRequest(player))
         val inventory = Bukkit.createInventory(holder, 45, i18nComponent(player, "critical.menu_title"))
         holder.inv = inventory
@@ -560,14 +599,13 @@ class ChanponWorldSettingsMenuProvider(
                     display,
                     options.first { it.first == visibility }.third
                 ))
-                add(GuiLoreLine.Spacer)
                 add(GuiLoreLine.Text(description))
                 add(GuiLoreLine.Spacer)
                 options.forEach { (option, displayName, selectedColor) ->
                     val selected = option == visibility
                     val marker = if (selected) "\u00A7a\u00BB" else "\u00A78\u30FB"
                     val color = if (selected) selectedColor else "\u00A77"
-                    add(GuiLoreLine.Raw("\u00A7f\u2759 $marker $color$displayName"))
+                    add(GuiLoreLine.Raw("$marker $color$displayName"))
                 }
                 add(GuiLoreLine.Spacer)
                 add(GuiLoreLine.SingleAction(
@@ -575,7 +613,7 @@ class ChanponWorldSettingsMenuProvider(
                 ))
             }, GuiLoreFrame.BOTH)
         )
-        return componentItem(Material.OAK_SIGN, i18n(player, "publish.title", mapOf("level" to display)), lore, ItemTag.TYPE_GUI_SETTING_PUBLISH)
+        return componentItem(Material.OAK_SIGN, i18n(player, "publish.title"), lore, ItemTag.TYPE_GUI_SETTING_PUBLISH)
     }
 
     private fun expansionItem(player: Player, worldData: WorldData): ItemStack {

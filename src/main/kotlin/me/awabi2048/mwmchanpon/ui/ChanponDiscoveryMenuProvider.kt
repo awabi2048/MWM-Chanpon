@@ -64,7 +64,9 @@ class ChanponDiscoveryMenuProvider(
                 inventory.setItem(WORLD_ITEM_SLOTS[index], createWorldItem(player, worldData))
             }
 
-        inventory.setItem(45, returnItem(player))
+        if (request.showBackButton) {
+            inventory.setItem(45, returnItem(player))
+        }
 
         fill(inventory)
         mwm.soundManager.playMenuOpenSound(player, "discovery")

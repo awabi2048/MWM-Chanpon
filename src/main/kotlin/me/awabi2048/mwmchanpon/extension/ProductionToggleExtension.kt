@@ -13,6 +13,7 @@ import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.mwmchanpon.ui.ChanponLore
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.event.MwmWorldCreatedEvent
+import me.awabi2048.myworldmanager.api.extension.CreationConfirmationLayout
 import me.awabi2048.myworldmanager.api.extension.MenuExtension
 import me.awabi2048.myworldmanager.api.extension.MenuExtensionContext
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsInventoryHolder
@@ -41,10 +42,17 @@ class ProductionToggleExtension(
 
     override fun getId(): String = EXTENSION_ID
 
+    override fun onPrepare(context: MenuExtensionContext) {
+        if (context.menuType != "creation_confirm") return
+        // Chanpon は中央のフッター枠を本番ワールド設定に使うため、MWM のスポーン設定を7枠目へ送る。
+        context.get<CreationConfirmationLayout>("layout")?.spawnLocationSlot = 42
+    }
+
     override fun onRender(inventory: Inventory, player: Player, context: MenuExtensionContext) {
         when (context.menuType) {
             "creation_confirm" -> {
                 val session = context.get<WorldCreationSession>("session") ?: return
+                if (ownerHasProductionWorld(player.uniqueId, null)) return
                 val enabled = session.extras[EXTRA_KEY] as? Boolean ?: false
                 inventory.setItem(plugin.config.getInt("production.menu_slot", 40), createCreationItem(enabled))
             }
@@ -57,6 +65,7 @@ class ProductionToggleExtension(
                 val item = if (storage.isProductionWorld(worldData.uuid)) {
                     createSubmissionItem(player, worldData.uuid)
                 } else {
+                    if (ownerHasProductionWorld(worldData.owner, worldData.uuid)) return
                     createProductionItem(player)
                 }
                 inventory.setItem(WORLD_MENU_SLOT, item)
@@ -395,7 +404,7 @@ class ProductionToggleExtension(
         val key = if (confirm) "confirm.button.confirm" else "confirm.button.cancel"
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "$key.display"))
-            meta.lore(lore(i18nList(player, "$key.lore")))
+            meta.lore(null)
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, if (confirm) ItemTag.TYPE_GUI_CONFIRM else ItemTag.TYPE_GUI_CANCEL)

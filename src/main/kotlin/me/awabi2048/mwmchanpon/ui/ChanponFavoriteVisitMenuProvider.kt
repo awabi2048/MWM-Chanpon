@@ -102,7 +102,14 @@ class ChanponFavoriteVisitMenuProvider(
                 }
                 openWorldList(player, holder.mode, worlds, page, returnWorld, owner, holder.showBackButton)
             }
-            ItemTag.TYPE_GUI_RETURN -> returnToWorld(player, holder.returnWorldUuid)
+            ItemTag.TYPE_GUI_RETURN -> {
+                if (holder.mode == ListMode.FAVORITE) {
+                    val worldData = holder.returnWorldUuid?.let { mwm().worldConfigRepository.findByUuid(it) }
+                    mwm().menuEntryRouter.openFavoriteMenu(player, worldData)
+                } else {
+                    returnToWorld(player, holder.returnWorldUuid)
+                }
+            }
             ItemTag.TYPE_GUI_WORLD_ITEM -> handleWorldItemClick(event, player, item)
         }
     }

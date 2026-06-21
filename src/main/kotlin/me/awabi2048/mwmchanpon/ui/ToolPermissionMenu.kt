@@ -44,7 +44,7 @@ class ToolPermissionMenu(
             }
             meta.displayName(CCSystem.getAPI().getGuiElementService().name("§e${targetPlayer.name ?: "Unknown"}"))
         }
-        inventory.setItem(13, head)
+        inventory.setItem(4, head)
 
         val toolSlots = listOf(20, 22, 24)
         definitions.take(toolSlots.size).forEachIndexed { index, definition ->
@@ -56,7 +56,7 @@ class ToolPermissionMenu(
             meta.displayName(CCSystem.getAPI().getGuiElementService().name("§7戻る"))
         }
         ItemTag.tagItem(back, ItemTag.TYPE_GUI_RETURN)
-        inventory.setItem(31, back)
+        inventory.setItem(40, back)
 
         player.openInventory(inventory)
     }
