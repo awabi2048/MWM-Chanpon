@@ -10,6 +10,7 @@ import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.SubmissionState
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
+import me.awabi2048.mwmchanpon.ui.ChanponGuiElements
 import me.awabi2048.mwmchanpon.ui.ChanponLore
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.event.MwmWorldCreatedEvent
@@ -192,17 +193,21 @@ class ProductionToggleExtension(
 
     private fun openConfirmation(player: Player, worldUuid: UUID, action: ConfirmationAction) {
         val holder = SubmissionConfirmationHolder(worldUuid, action)
+        val layout = ChanponGuiElements.confirmationLayout()
         val inventory = Bukkit.createInventory(
             holder,
-            45,
+            layout.size,
             i18nComponent(player, "confirm.${action.key}.title")
         )
         holder.inv = inventory
 
         applyConfirmationFrame(inventory)
-        inventory.setItem(22, createConfirmationCenterItem(player, action))
-        inventory.setItem(20, createConfirmationButton(player, true))
-        inventory.setItem(24, createConfirmationButton(player, false))
+        ChanponGuiElements.setConfirmationItems(
+            inventory,
+            createConfirmationCenterItem(player, action),
+            createConfirmationButton(player, true),
+            createConfirmationButton(player, false)
+        )
         player.openInventory(inventory)
     }
 
@@ -412,12 +417,11 @@ class ProductionToggleExtension(
     }
 
     private fun applyConfirmationFrame(inventory: Inventory) {
-        me.awabi2048.mwmchanpon.ui.ChanponGuiElements.applyStandardFrame(inventory)
-        me.awabi2048.mwmchanpon.ui.ChanponGuiElements.fill(inventory)
+        ChanponGuiElements.applyConfirmationFrame(inventory)
     }
 
     private fun createDecorationItem(material: Material): ItemStack {
-        return me.awabi2048.mwmchanpon.ui.ChanponGuiElements.decoration(material)
+        return ChanponGuiElements.decoration(material)
     }
 
     private fun lore(lines: List<String>): List<Component> {

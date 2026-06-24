@@ -435,24 +435,32 @@ class ChanponWorldSettingsMenuProvider(
 
     private fun openModifiedWarning(player: Player, worldData: WorldData, action: ConfirmAction) {
         val holder = WarningHolder(worldData.uuid, action, currentRequest(player))
-        val inventory = Bukkit.createInventory(holder, 45, i18nComponent(player, "modified_warning.title"))
+        val layout = ChanponGuiElements.confirmationLayout()
+        val inventory = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "modified_warning.title"))
         holder.inv = inventory
         applyFrame(inventory)
-        inventory.setItem(22, modifiedWarningItem(player))
-        inventory.setItem(20, warningButton(player, true))
-        inventory.setItem(24, warningButton(player, false))
+        ChanponGuiElements.setConfirmationItems(
+            inventory,
+            modifiedWarningItem(player),
+            warningButton(player, true),
+            warningButton(player, false)
+        )
         fill(inventory)
         player.openInventory(inventory)
     }
 
     private fun openConfirm(player: Player, worldData: WorldData, action: ConfirmAction, direction: BlockFace?) {
         val holder = ConfirmHolder(worldData.uuid, action, direction, currentRequest(player))
-        val inventory = Bukkit.createInventory(holder, 45, i18nComponent(player, "confirm.${action.key}.title"))
+        val layout = ChanponGuiElements.confirmationLayout()
+        val inventory = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "confirm.${action.key}.title"))
         holder.inv = inventory
         applyFrame(inventory)
-        inventory.setItem(22, confirmCenterItem(player, worldData, action, direction))
-        inventory.setItem(20, confirmButton(player, true))
-        inventory.setItem(24, confirmButton(player, false))
+        ChanponGuiElements.setConfirmationItems(
+            inventory,
+            confirmCenterItem(player, worldData, action, direction),
+            confirmButton(player, true),
+            confirmButton(player, false)
+        )
         fill(inventory)
         player.openInventory(inventory)
     }
@@ -472,12 +480,12 @@ class ChanponWorldSettingsMenuProvider(
     private fun openDeleteConfirm(player: Player, worldData: WorldData, finalStep: Boolean) {
         val holder = DeleteConfirmHolder(worldData.uuid, finalStep, currentRequest(player))
         val key = if (finalStep) "critical.final" else "critical.confirm"
-        val inventory = Bukkit.createInventory(holder, 45, i18nComponent(player, "${key}_title"))
+        val layout = ChanponGuiElements.confirmationLayout()
+        val inventory = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "${key}_title"))
         holder.inv = inventory
         applyFrame(inventory)
         val loreLines = i18nList(player, "${key}_lore", mapOf("world" to worldData.name))
-        inventory.setItem(
-            22,
+        val centerItem =
             if (finalStep) {
                 componentItem(
                     Material.TNT,
@@ -495,9 +503,12 @@ class ChanponWorldSettingsMenuProvider(
                     ItemTag.TYPE_GUI_INFO
                 )
             }
+        ChanponGuiElements.setConfirmationItems(
+            inventory,
+            centerItem,
+            confirmButton(player, true),
+            confirmButton(player, false)
         )
-        inventory.setItem(20, confirmButton(player, true))
-        inventory.setItem(24, confirmButton(player, false))
         fill(inventory)
         player.openInventory(inventory)
     }

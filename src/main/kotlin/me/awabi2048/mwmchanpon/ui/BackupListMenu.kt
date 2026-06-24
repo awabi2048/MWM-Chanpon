@@ -241,24 +241,32 @@ class BackupListMenu(
 
     private fun openRestoreConfirm(player: Player, backup: BackupEntry, source: Holder) {
         val holder = RestoreConfirmHolder(backup.id, source.copy())
-        val inv = Bukkit.createInventory(holder, 45, i18nComponent(player, "confirm.restore.title"))
+        val layout = ChanponGuiElements.confirmationLayout()
+        val inv = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "confirm.restore.title"))
         holder.inv = inv
         applyFrame(inv)
-        inv.setItem(22, centerItem(player, Material.CHEST, "confirm.restore"))
-        inv.setItem(20, button(player, true))
-        inv.setItem(24, button(player, false))
+        ChanponGuiElements.setConfirmationItems(
+            inv,
+            centerItem(player, Material.CHEST, "confirm.restore"),
+            button(player, true),
+            button(player, false)
+        )
         fill(inv)
         player.openInventory(inv)
     }
 
     private fun openDeleteConfirm(player: Player, backup: BackupEntry, stage: Int, source: Holder) {
         val holder = DeleteConfirmHolder(backup.id, stage, source.copy())
-        val inv = Bukkit.createInventory(holder, 45, i18nComponent(player, "confirm.delete$stage.title"))
+        val layout = ChanponGuiElements.confirmationLayout()
+        val inv = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "confirm.delete$stage.title"))
         holder.inv = inv
         applyFrame(inv)
-        inv.setItem(22, centerItem(player, Material.BARRIER, "confirm.delete$stage"))
-        inv.setItem(20, button(player, true))
-        inv.setItem(24, button(player, false))
+        ChanponGuiElements.setConfirmationItems(
+            inv,
+            centerItem(player, Material.BARRIER, "confirm.delete$stage"),
+            button(player, true),
+            button(player, false)
+        )
         fill(inv)
         player.openInventory(inv)
     }

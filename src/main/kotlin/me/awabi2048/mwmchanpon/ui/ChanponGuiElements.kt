@@ -2,9 +2,8 @@ package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
-import com.awabi2048.ccsystem.api.gui.GuiFrameSection
-import com.awabi2048.ccsystem.api.gui.GuiFrameSpec
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
+import com.awabi2048.ccsystem.api.gui.GuiConfirmationLayout
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
@@ -13,21 +12,33 @@ import org.bukkit.Material
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemStack
 
-/** Keeps Chanpon's layout choices local while delegating all visual construction to CC-System. */
+/** Keeps Chanpon UI calls local while delegating shared layout and visual construction to CC-System. */
 internal object ChanponGuiElements {
     private val elements
         get() = CCSystem.getAPI().getGuiElementService()
+    private val layouts
+        get() = CCSystem.getAPI().getGuiLayoutService()
 
     fun applyStandardFrame(inventory: Inventory) {
-        val frame = decorationSpec(Material.BLACK_STAINED_GLASS_PANE)
-        elements.applyFrame(
-            inventory,
-            GuiFrameSpec(
-                header = GuiFrameSection.Row(frame),
-                footer = GuiFrameSection.Row(frame),
-                emptySlot = null
-            )
-        )
+        layouts.applyStandardFrame(inventory)
+    }
+
+    fun confirmationLayout(): GuiConfirmationLayout = layouts.confirmation45()
+
+    fun applyConfirmationFrame(inventory: Inventory) {
+        applyStandardFrame(inventory)
+    }
+
+    fun setConfirmationItems(
+        inventory: Inventory,
+        centerItem: ItemStack,
+        confirmItem: ItemStack,
+        cancelItem: ItemStack
+    ) {
+        val layout = confirmationLayout()
+        inventory.setItem(layout.previewSlot, centerItem)
+        inventory.setItem(layout.confirmSlot, confirmItem)
+        inventory.setItem(layout.cancelSlot, cancelItem)
     }
 
     fun fill(inventory: Inventory, material: Material = Material.GRAY_STAINED_GLASS_PANE) {

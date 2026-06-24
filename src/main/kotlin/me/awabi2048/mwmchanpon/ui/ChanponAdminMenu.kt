@@ -92,17 +92,21 @@ class ChanponAdminMenu(
     private fun openSpawnConfirm(player: Player, worldUuid: java.util.UUID) {
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
         val holder = SpawnConfirmHolder(worldUuid)
-        val inventory = Bukkit.createInventory(holder, 45, i18nComponent(player, "spawn_world.confirm.title"))
+        val layout = ChanponGuiElements.confirmationLayout()
+        val inventory = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "spawn_world.confirm.title"))
         holder.inv = inventory
         applyFrame(inventory)
-        inventory.setItem(22, menuItem(player, Material.COMPASS, "spawn_world.confirm.center", ACTION_NONE).also {
-            it.editMeta { meta ->
-                meta.displayName(i18nComponent(player, "spawn_world.confirm.center.display", mapOf("world" to worldData.name)))
-                meta.lore(lore(i18nList(player, "spawn_world.confirm.center.lore", mapOf("world" to worldData.name))))
-            }
-        })
-        inventory.setItem(20, confirmButton(player, true))
-        inventory.setItem(24, confirmButton(player, false))
+        ChanponGuiElements.setConfirmationItems(
+            inventory,
+            menuItem(player, Material.COMPASS, "spawn_world.confirm.center", ACTION_NONE).also {
+                it.editMeta { meta ->
+                    meta.displayName(i18nComponent(player, "spawn_world.confirm.center.display", mapOf("world" to worldData.name)))
+                    meta.lore(lore(i18nList(player, "spawn_world.confirm.center.lore", mapOf("world" to worldData.name))))
+                }
+            },
+            confirmButton(player, true),
+            confirmButton(player, false)
+        )
         fill(inventory)
         player.openInventory(inventory)
     }
