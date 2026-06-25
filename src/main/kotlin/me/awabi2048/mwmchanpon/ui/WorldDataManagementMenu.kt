@@ -43,17 +43,21 @@ class WorldDataManagementMenu(
         val pages = if (worlds.isEmpty()) 1 else (worlds.size + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE
         val safePage = page.coerceIn(0, pages - 1)
         val holder = Holder(safePage)
-        val inv = Bukkit.createInventory(holder, 54, i18nComponent(player, "world_data.title"))
+        val layout = ChanponGuiElements.pagedListLayout()
+        val inv = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "world_data.title"))
         holder.inv = inv
         applyFrame(inv)
-        if (safePage > 0) inv.setItem(0, navItem(player, false, safePage - 1))
-        if (safePage < pages - 1) inv.setItem(8, navItem(player, true, safePage + 1))
+        ChanponGuiElements.setPagedListNavigation(
+            inv,
+            if (safePage > 0) navItem(player, false, safePage - 1) else null,
+            if (safePage < pages - 1) navItem(player, true, safePage + 1) else null,
+            backItem(player),
+            infoItem(player, worlds.size, safePage + 1, pages)
+        )
         worlds.drop(safePage * ITEMS_PER_PAGE).take(ITEMS_PER_PAGE).forEachIndexed { index, world ->
-            inv.setItem(9 + index, worldItem(player, world))
+            inv.setItem(layout.itemSlots[index], worldItem(player, world))
         }
-        inv.setItem(45, backItem(player))
         inv.setItem(47, controlItem(player, Material.CHEST, "world_data.bulk_backup", ACTION_BULK_BACKUP))
-        inv.setItem(49, infoItem(player, worlds.size, safePage + 1, pages))
         inv.setItem(51, controlItem(player, Material.RECOVERY_COMPASS, "world_data.bulk_rollback", ACTION_BULK_ROLLBACK))
         inv.setItem(53, controlItem(player, Material.ENDER_CHEST, "world_data.annual_archive", ACTION_ANNUAL_ARCHIVE))
         fill(inv)

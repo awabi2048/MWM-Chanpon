@@ -64,16 +64,20 @@ class BackupListMenu(
         val pages = if (backups.isEmpty()) 1 else (backups.size + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE
         val safePage = page.coerceIn(0, pages - 1)
         val holder = Holder(mode, worldUuid, safePage)
-        val inv = Bukkit.createInventory(holder, 54, i18nComponent(player, "backup_list.title"))
+        val layout = ChanponGuiElements.pagedListLayout()
+        val inv = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "backup_list.title"))
         holder.inv = inv
         applyFrame(inv)
-        if (safePage > 0) inv.setItem(0, navItem(player, false, safePage - 1))
-        if (safePage < pages - 1) inv.setItem(8, navItem(player, true, safePage + 1))
+        ChanponGuiElements.setPagedListNavigation(
+            inv,
+            if (safePage > 0) navItem(player, false, safePage - 1) else null,
+            if (safePage < pages - 1) navItem(player, true, safePage + 1) else null,
+            backItem(player),
+            infoItem(player, backups.size, safePage + 1, pages)
+        )
         backups.drop(safePage * ITEMS_PER_PAGE).take(ITEMS_PER_PAGE).forEachIndexed { index, backup ->
-            inv.setItem(9 + index, backupItem(player, backup))
+            inv.setItem(layout.itemSlots[index], backupItem(player, backup))
         }
-        inv.setItem(45, backItem(player))
-        inv.setItem(49, infoItem(player, backups.size, safePage + 1, pages))
         fill(inv)
         player.openInventory(inv)
     }

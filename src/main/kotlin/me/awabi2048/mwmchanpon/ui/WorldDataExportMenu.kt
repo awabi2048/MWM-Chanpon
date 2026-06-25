@@ -34,16 +34,20 @@ class WorldDataExportMenu(
         val pages = if (worlds.isEmpty()) 1 else (worlds.size + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE
         val safePage = page.coerceIn(0, pages - 1)
         val holder = Holder(safePage)
-        val inv = Bukkit.createInventory(holder, 54, i18nComponent(player, "export_menu.title"))
+        val layout = ChanponGuiElements.pagedListLayout()
+        val inv = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "export_menu.title"))
         holder.inv = inv
         applyFrame(inv)
-        if (safePage > 0) inv.setItem(0, navItem(player, false, safePage - 1))
-        if (safePage < pages - 1) inv.setItem(8, navItem(player, true, safePage + 1))
+        ChanponGuiElements.setPagedListNavigation(
+            inv,
+            if (safePage > 0) navItem(player, false, safePage - 1) else null,
+            if (safePage < pages - 1) navItem(player, true, safePage + 1) else null,
+            backItem(player),
+            infoItem(player, worlds.size, safePage + 1, pages)
+        )
         worlds.drop(safePage * ITEMS_PER_PAGE).take(ITEMS_PER_PAGE).forEachIndexed { index, world ->
-            inv.setItem(9 + index, worldItem(player, world))
+            inv.setItem(layout.itemSlots[index], worldItem(player, world))
         }
-        inv.setItem(45, backItem(player))
-        inv.setItem(49, infoItem(player, worlds.size, safePage + 1, pages))
         inv.setItem(51, bulkExportItem(player))
         fill(inv)
         player.openInventory(inv)

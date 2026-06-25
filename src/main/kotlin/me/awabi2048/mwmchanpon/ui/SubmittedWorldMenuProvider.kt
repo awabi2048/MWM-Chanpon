@@ -47,18 +47,22 @@ class SubmittedWorldMenuProvider(
         }
 
         val holder = SubmittedWorldMenuHolder(worldData.uuid, request)
-        val inventory = Bukkit.createInventory(holder, 54, i18nComponent(player, "submitted_menu.title"))
+        val layout = ChanponGuiElements.settingsLayout()
+        val inventory = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "submitted_menu.title"))
         holder.inv = inventory
         applyFrame(inventory)
 
-        if (request.showBackButton) {
-            inventory.setItem(45, createReturnItem(player))
-        }
         inventory.setItem(22, createWorldItem(player, worldData, state, reasons))
 
-        if (ProtectionReason.SUBMITTED in reasons && state == SubmissionState.SUBMITTED && !plugin.isSubmissionClosed()) {
-            inventory.setItem(49, createCancelSubmissionItem(player, worldData.uuid))
-        }
+        ChanponGuiElements.setSettingsFooter(
+            inventory,
+            if (request.showBackButton) createReturnItem(player) else null,
+            if (ProtectionReason.SUBMITTED in reasons && state == SubmissionState.SUBMITTED && !plugin.isSubmissionClosed()) {
+                createCancelSubmissionItem(player, worldData.uuid)
+            } else {
+                null
+            }
+        )
 
         fillBody(inventory)
         player.openInventory(inventory)

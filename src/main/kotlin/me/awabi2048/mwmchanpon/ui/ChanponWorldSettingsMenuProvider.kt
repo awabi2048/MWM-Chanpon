@@ -75,11 +75,11 @@ class ChanponWorldSettingsMenuProvider(
                 mapOf("world" to worldData.name)
             )
         )
-        val inventory = Bukkit.createInventory(holder, 54, title)
+        val layout = ChanponGuiElements.settingsLayout()
+        val inventory = Bukkit.createInventory(holder, layout.size, title)
         holder.inv = inventory
 
         applyFrame(inventory)
-        if (request.showBackButton) inventory.setItem(45, returnItem(player))
 
         val session = mwm.settingsSessionManager.getSession(player)
         val isAdminFlow = session?.isAdminFlow == true
@@ -105,7 +105,11 @@ class ChanponWorldSettingsMenuProvider(
             inventory.setItem(32, mwmItem(player, "environment", Material.GRASS_BLOCK, ItemTag.TYPE_GUI_SETTING_ENVIRONMENT))
             inventory.setItem(33, criticalItem(player, isProduction))
         }
-        inventory.setItem(49, worldInfoItem(player, worldData))
+        ChanponGuiElements.setSettingsFooter(
+            inventory,
+            if (request.showBackButton) returnItem(player) else null,
+            worldInfoItem(player, worldData)
+        )
 
         fill(inventory)
         renderExtensions(inventory, player, worldData, request.showBackButton, isOwner, isModerator)

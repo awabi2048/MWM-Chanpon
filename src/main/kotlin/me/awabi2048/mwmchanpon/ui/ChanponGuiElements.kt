@@ -7,6 +7,9 @@ import com.awabi2048.ccsystem.api.gui.GuiConfirmationLayout
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
+import com.awabi2048.ccsystem.api.gui.GuiPagedListLayout
+import com.awabi2048.ccsystem.api.gui.GuiSettingsLayout
+import com.awabi2048.ccsystem.api.gui.GuiThreeChoiceLayout
 import me.awabi2048.myworldmanager.util.ItemTag
 import org.bukkit.Material
 import org.bukkit.inventory.Inventory
@@ -25,6 +28,12 @@ internal object ChanponGuiElements {
 
     fun confirmationLayout(): GuiConfirmationLayout = layouts.confirmation45()
 
+    fun pagedListLayout(): GuiPagedListLayout = layouts.pagedList54()
+
+    fun settingsLayout(): GuiSettingsLayout = layouts.settings54()
+
+    fun threeChoiceLayout(): GuiThreeChoiceLayout = layouts.threeChoice45()
+
     fun applyConfirmationFrame(inventory: Inventory) {
         applyStandardFrame(inventory)
     }
@@ -39,6 +48,26 @@ internal object ChanponGuiElements {
         inventory.setItem(layout.previewSlot, centerItem)
         inventory.setItem(layout.confirmSlot, confirmItem)
         inventory.setItem(layout.cancelSlot, cancelItem)
+    }
+
+    fun setPagedListNavigation(
+        inventory: Inventory,
+        previousItem: ItemStack?,
+        nextItem: ItemStack?,
+        backItem: ItemStack?,
+        infoItem: ItemStack?
+    ) {
+        val layout = pagedListLayout()
+        previousItem?.let { inventory.setItem(layout.previousPageSlot, it) }
+        nextItem?.let { inventory.setItem(layout.nextPageSlot, it) }
+        backItem?.let { inventory.setItem(layout.backSlot, it) }
+        infoItem?.let { inventory.setItem(layout.infoSlot, it) }
+    }
+
+    fun setSettingsFooter(inventory: Inventory, backItem: ItemStack?, infoItem: ItemStack?) {
+        val layout = settingsLayout()
+        backItem?.let { inventory.setItem(layout.backSlot, it) }
+        infoItem?.let { inventory.setItem(layout.infoSlot, it) }
     }
 
     fun fill(inventory: Inventory, material: Material = Material.GRAY_STAINED_GLASS_PANE) {

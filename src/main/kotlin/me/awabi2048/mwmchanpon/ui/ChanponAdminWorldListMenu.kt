@@ -65,7 +65,8 @@ class ChanponAdminWorldListMenu(
         session.page = safePage
 
         val holder = ChanponAdminWorldListHolder(safePage, visibilityFilter, sortType, fromAdminMenu)
-        val inventory = Bukkit.createInventory(holder, 54, i18nComponent(player, "admin_list.title"))
+        val layout = ChanponGuiElements.pagedListLayout()
+        val inventory = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "admin_list.title"))
         holder.inv = inventory
 
         ChanponGuiElements.applyStandardFrame(inventory)
@@ -76,12 +77,15 @@ class ChanponAdminWorldListMenu(
         worlds.drop(safePage * ITEMS_PER_PAGE)
             .take(ITEMS_PER_PAGE)
             .forEachIndexed { index, worldData ->
-                inventory.setItem(9 + index, worldItem(player, worldData, current = false))
+                inventory.setItem(layout.itemSlots[index], worldItem(player, worldData, current = false))
             }
 
-        if (fromAdminMenu) inventory.setItem(45, backItem(player))
+        ChanponGuiElements.setSettingsFooter(
+            inventory,
+            if (fromAdminMenu) backItem(player) else null,
+            infoItem(player, worlds.size, safePage + 1, totalPages)
+        )
         inventory.setItem(47, visibilityFilterItem(player, visibilityFilter))
-        inventory.setItem(49, infoItem(player, worlds.size, safePage + 1, totalPages))
         inventory.setItem(51, sortItem(player, sortType))
         if (safePage > 0) inventory.setItem(52, navItem(player, false, safePage - 1))
         if (safePage < totalPages - 1) inventory.setItem(53, navItem(player, true, safePage + 1))

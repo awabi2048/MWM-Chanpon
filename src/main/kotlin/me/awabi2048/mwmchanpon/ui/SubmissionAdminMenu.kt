@@ -55,28 +55,28 @@ class SubmissionAdminMenu(
         val totalPages = if (worlds.isEmpty()) 1 else (worlds.size + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE
         val safePage = page.coerceIn(0, totalPages - 1)
         val holder = SubmissionAdminMenuHolder(safePage, submissionFilter, completionFilter)
-        val inventory = Bukkit.createInventory(holder, 54, i18nComponent(player, "admin_menu.title"))
+        val layout = ChanponGuiElements.pagedListLayout()
+        val inventory = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "admin_menu.title"))
         holder.inv = inventory
 
         ChanponGuiElements.applyStandardFrame(inventory)
         ChanponGuiElements.fill(inventory)
 
-        if (safePage > 0) {
-            inventory.setItem(0, navItem(player, false, safePage - 1))
-        }
-        if (safePage < totalPages - 1) {
-            inventory.setItem(8, navItem(player, true, safePage + 1))
-        }
+        ChanponGuiElements.setPagedListNavigation(
+            inventory,
+            if (safePage > 0) navItem(player, false, safePage - 1) else null,
+            if (safePage < totalPages - 1) navItem(player, true, safePage + 1) else null,
+            backItem(player),
+            statsItem(player)
+        )
 
         worlds.drop(safePage * ITEMS_PER_PAGE)
             .take(ITEMS_PER_PAGE)
             .forEachIndexed { index, worldData ->
-                inventory.setItem(9 + index, worldItem(player, worldData))
+                inventory.setItem(layout.itemSlots[index], worldItem(player, worldData))
             }
 
-        inventory.setItem(45, backItem(player))
         inventory.setItem(47, submissionFilterItem(player, submissionFilter))
-        inventory.setItem(49, statsItem(player))
         inventory.setItem(51, completionFilterItem(player, completionFilter))
         inventory.setItem(53, closeSubmissionItem(player))
 
