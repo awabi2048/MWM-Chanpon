@@ -297,24 +297,32 @@ class WorldBackupMenuExtension(
 
     private fun openBackupConfirm(player: Player, source: Holder, backupName: String) {
         val holder = BackupConfirmHolder(source.copy(), backupName)
-        val inv = Bukkit.createInventory(holder, 45, i18nComponent(player, "confirm.owner_backup.title"))
+        val layout = me.awabi2048.mwmchanpon.ui.ChanponGuiElements.confirmationLayout()
+        val inv = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "confirm.owner_backup.title"))
         holder.inv = inv
         applyFrame(inv)
-        inv.setItem(22, centerItem(player, Material.CHEST, "confirm.owner_backup", mapOf("name" to backupName)))
-        inv.setItem(20, button(player, true))
-        inv.setItem(24, button(player, false))
+        me.awabi2048.mwmchanpon.ui.ChanponGuiElements.setConfirmationItems(
+            inv,
+            centerItem(player, Material.CHEST, "confirm.owner_backup", mapOf("name" to backupName)),
+            button(player, true),
+            button(player, false)
+        )
         fill(inv)
         player.openInventory(inv)
     }
 
     private fun openRestoreConfirm(player: Player, backup: BackupEntry, source: Holder) {
         val holder = RestoreConfirmHolder(backup.id, source.copy())
-        val inv = Bukkit.createInventory(holder, 45, i18nComponent(player, "confirm.restore.title"))
+        val layout = me.awabi2048.mwmchanpon.ui.ChanponGuiElements.confirmationLayout()
+        val inv = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "confirm.restore.title"))
         holder.inv = inv
         applyFrame(inv)
-        inv.setItem(22, centerItem(player, Material.RECOVERY_COMPASS, "confirm.restore"))
-        inv.setItem(20, button(player, true))
-        inv.setItem(24, button(player, false))
+        me.awabi2048.mwmchanpon.ui.ChanponGuiElements.setConfirmationItems(
+            inv,
+            centerItem(player, Material.RECOVERY_COMPASS, "confirm.restore"),
+            button(player, true),
+            button(player, false)
+        )
         fill(inv)
         player.openInventory(inv)
     }

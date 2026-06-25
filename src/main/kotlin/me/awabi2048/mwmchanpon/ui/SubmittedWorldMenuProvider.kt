@@ -161,12 +161,16 @@ class SubmittedWorldMenuProvider(
 
     private fun openCancelConfirmation(player: Player, worldUuid: UUID, request: WorldSettingsMenuRequest) {
         val holder = CancelSubmissionConfirmationHolder(worldUuid, request)
-        val inventory = Bukkit.createInventory(holder, 45, i18nComponent(player, "confirm.cancel_submission.title"))
+        val layout = ChanponGuiElements.confirmationLayout()
+        val inventory = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "confirm.cancel_submission.title"))
         holder.inv = inventory
         applyFrame(inventory)
-        inventory.setItem(22, createConfirmationCenterItem(player))
-        inventory.setItem(20, createConfirmButton(player, true))
-        inventory.setItem(24, createConfirmButton(player, false))
+        ChanponGuiElements.setConfirmationItems(
+            inventory,
+            createConfirmationCenterItem(player),
+            createConfirmButton(player, true),
+            createConfirmButton(player, false)
+        )
         player.openInventory(inventory)
     }
 

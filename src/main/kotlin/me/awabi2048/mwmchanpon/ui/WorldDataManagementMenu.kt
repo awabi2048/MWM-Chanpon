@@ -149,24 +149,32 @@ class WorldDataManagementMenu(
 
     private fun openBulkRollbackConfirm(player: Player, page: Int) {
         val holder = BulkRollbackConfirmHolder(page)
-        val inv = Bukkit.createInventory(holder, 45, i18nComponent(player, "confirm.rollback_all.title"))
+        val layout = ChanponGuiElements.confirmationLayout()
+        val inv = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "confirm.rollback_all.title"))
         holder.inv = inv
         applyFrame(inv)
-        inv.setItem(22, centerItem(player, Material.RECOVERY_COMPASS, "confirm.rollback_all"))
-        inv.setItem(20, button(player, true))
-        inv.setItem(24, button(player, false))
+        ChanponGuiElements.setConfirmationItems(
+            inv,
+            centerItem(player, Material.RECOVERY_COMPASS, "confirm.rollback_all"),
+            button(player, true),
+            button(player, false)
+        )
         fill(inv)
         player.openInventory(inv)
     }
 
     private fun openConfirm(player: Player, worldUuid: UUID?, page: Int, key: String) {
         val holder = BackupConfirmHolder(worldUuid, page)
-        val inv = Bukkit.createInventory(holder, 45, i18nComponent(player, "$key.title"))
+        val layout = ChanponGuiElements.confirmationLayout()
+        val inv = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "$key.title"))
         holder.inv = inv
         applyFrame(inv)
-        inv.setItem(22, centerItem(player, Material.CHEST, key))
-        inv.setItem(20, button(player, true))
-        inv.setItem(24, button(player, false))
+        ChanponGuiElements.setConfirmationItems(
+            inv,
+            centerItem(player, Material.CHEST, key),
+            button(player, true),
+            button(player, false)
+        )
         fill(inv)
         player.openInventory(inv)
     }

@@ -278,13 +278,17 @@ class SubmissionAdminMenu(
 
     private fun openCloseSubmissionConfirmation(player: Player, source: SubmissionAdminMenuHolder) {
         val holder = CloseSubmissionConfirmationHolder(source.page, source.submissionFilter, source.completionFilter)
-        val inventory = Bukkit.createInventory(holder, 45, i18nComponent(player, "confirm.close_submissions.title"))
+        val layout = ChanponGuiElements.confirmationLayout()
+        val inventory = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "confirm.close_submissions.title"))
         holder.inv = inventory
 
         applyConfirmationFrame(inventory)
-        inventory.setItem(22, closeSubmissionConfirmationItem(player))
-        inventory.setItem(20, confirmButton(player, true))
-        inventory.setItem(24, confirmButton(player, false))
+        ChanponGuiElements.setConfirmationItems(
+            inventory,
+            closeSubmissionConfirmationItem(player),
+            confirmButton(player, true),
+            confirmButton(player, false)
+        )
         player.openInventory(inventory)
     }
 
@@ -292,23 +296,31 @@ class SubmissionAdminMenu(
         val enabling = !storage.isProductionWorld(worldData.uuid)
         val holder = ProductionToggleConfirmationHolder(worldData.uuid, enabling, source.page, source.submissionFilter, source.completionFilter)
         val key = if (enabling) "confirm.set_production" else "confirm.unset_production"
-        val inventory = Bukkit.createInventory(holder, 45, i18nComponent(player, "$key.title"))
+        val layout = ChanponGuiElements.confirmationLayout()
+        val inventory = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "$key.title"))
         holder.inv = inventory
         applyConfirmationFrame(inventory)
-        inventory.setItem(22, productionToggleConfirmationItem(player, key))
-        inventory.setItem(20, confirmButton(player, true))
-        inventory.setItem(24, confirmButton(player, false))
+        ChanponGuiElements.setConfirmationItems(
+            inventory,
+            productionToggleConfirmationItem(player, key),
+            confirmButton(player, true),
+            confirmButton(player, false)
+        )
         player.openInventory(inventory)
     }
 
     private fun openCompleteUnsubmittedConfirmation(player: Player, worldData: WorldData, source: SubmissionAdminMenuHolder) {
         val holder = CompleteUnsubmittedConfirmationHolder(worldData.uuid, source.page, source.submissionFilter, source.completionFilter)
-        val inventory = Bukkit.createInventory(holder, 45, i18nComponent(player, "confirm.complete_unsubmitted.title"))
+        val layout = ChanponGuiElements.confirmationLayout()
+        val inventory = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "confirm.complete_unsubmitted.title"))
         holder.inv = inventory
         applyConfirmationFrame(inventory)
-        inventory.setItem(22, completeUnsubmittedConfirmationItem(player))
-        inventory.setItem(20, confirmButton(player, true))
-        inventory.setItem(24, confirmButton(player, false))
+        ChanponGuiElements.setConfirmationItems(
+            inventory,
+            completeUnsubmittedConfirmationItem(player),
+            confirmButton(player, true),
+            confirmButton(player, false)
+        )
         player.openInventory(inventory)
     }
 
@@ -543,8 +555,7 @@ class SubmissionAdminMenu(
     }
 
     private fun applyConfirmationFrame(inventory: Inventory) {
-        ChanponGuiElements.applyStandardFrame(inventory)
-        ChanponGuiElements.fill(inventory)
+        ChanponGuiElements.applyConfirmationFrame(inventory)
     }
 
     private fun extensionItem(

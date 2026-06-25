@@ -5,7 +5,6 @@ import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.model.WorldData
-import net.kyori.adventure.text.Component
 import org.bukkit.Sound
 import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
@@ -29,7 +28,7 @@ internal class WorldSettingsAccessGuard(
         val authorized = if (ownerOnly) owner || admin else owner || moderator || admin
 
         if (!authorized || storage.isImportedArchive(worldData.uuid) || protectionService.isProtected(worldData)) {
-            player.sendMessage(Component.text(mwm.languageManager.getMessage(player, "general.no_permission")))
+            player.sendMessage(mwm.languageManager.getComponent(player, "general.no_permission"))
             denySound(player)
             return false
         }
@@ -39,9 +38,7 @@ internal class WorldSettingsAccessGuard(
                 ?: worldData.customWorldName
                 ?: "my_world.${worldData.uuid}"
             if (player.world.name != targetWorld) {
-                player.sendMessage(
-                    Component.text(mwm.languageManager.getMessage(player, "gui.settings.common.must_be_in_world"))
-                )
+                player.sendMessage(mwm.languageManager.getComponent(player, "gui.settings.common.must_be_in_world"))
                 denySound(player)
                 return false
             }

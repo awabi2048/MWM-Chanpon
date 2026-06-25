@@ -119,32 +119,37 @@ class AutomationSettingsMenu(
     private fun openToggleConfirm(player: Player, configPath: String, key: String) {
         val current = plugin.config.getBoolean(configPath, false)
         val holder = ToggleConfirmHolder(configPath)
-        val inv = Bukkit.createInventory(holder, 45, i18nComponent(player, "$key.title"))
+        val layout = ChanponGuiElements.confirmationLayout()
+        val inv = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "$key.title"))
         holder.inv = inv
         applyFrame(inv)
-        inv.setItem(
-            22,
+        ChanponGuiElements.setConfirmationItems(
+            inv,
             centerItem(
                 player,
                 Material.LEVER,
                 key,
                 mapOf("state" to i18n(player, if (!current) "common.on" else "common.off"))
-            )
+            ),
+            button(player, true),
+            button(player, false)
         )
-        inv.setItem(20, button(player, true))
-        inv.setItem(24, button(player, false))
         fill(inv)
         player.openInventory(inv)
     }
 
     private fun openRestorePointConfirm(player: Player) {
         val holder = RestorePointConfirmHolder()
-        val inv = Bukkit.createInventory(holder, 45, i18nComponent(player, "confirm.restore_point.title"))
+        val layout = ChanponGuiElements.confirmationLayout()
+        val inv = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "confirm.restore_point.title"))
         holder.inv = inv
         applyFrame(inv)
-        inv.setItem(22, centerItem(player, Material.END_CRYSTAL, "confirm.restore_point"))
-        inv.setItem(20, button(player, true))
-        inv.setItem(24, button(player, false))
+        ChanponGuiElements.setConfirmationItems(
+            inv,
+            centerItem(player, Material.END_CRYSTAL, "confirm.restore_point"),
+            button(player, true),
+            button(player, false)
+        )
         fill(inv)
         player.openInventory(inv)
     }
