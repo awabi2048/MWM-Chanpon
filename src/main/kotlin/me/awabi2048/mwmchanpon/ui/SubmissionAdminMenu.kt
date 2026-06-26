@@ -1,6 +1,9 @@
 package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
@@ -43,7 +46,8 @@ class SubmissionAdminMenu(
         player: Player,
         page: Int = 0,
         submissionFilter: SubmissionFilter = SubmissionFilter.UNSUBMITTED,
-        completionFilter: CompletionFilter = CompletionFilter.UNMARKED
+        completionFilter: CompletionFilter = CompletionFilter.UNMARKED,
+        sortType: SortType = SortType.CREATED_DESC
     ) {
         if (!player.hasPermission("myworldmanager.admin")) {
             player.sendMessage(i18nComponent(player, "admin_menu.no_permission"))
@@ -51,10 +55,10 @@ class SubmissionAdminMenu(
         }
         JavaPluginBridge.endCoreMenuSession(player)
 
-        val worlds = filteredWorlds(submissionFilter, completionFilter)
+        val worlds = filteredWorlds(submissionFilter, completionFilter, sortType)
         val totalPages = if (worlds.isEmpty()) 1 else (worlds.size + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE
         val safePage = page.coerceIn(0, totalPages - 1)
-        val holder = SubmissionAdminMenuHolder(safePage, submissionFilter, completionFilter)
+        val holder = SubmissionAdminMenuHolder(safePage, submissionFilter, completionFilter, sortType)
         val layout = ChanponGuiElements.pagedListLayout()
         val inventory = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "admin_menu.title"))
         holder.inv = inventory
@@ -77,6 +81,7 @@ class SubmissionAdminMenu(
             }
 
         inventory.setItem(47, submissionFilterItem(player, submissionFilter))
+        inventory.setItem(49, sortItem(player, sortType))
         inventory.setItem(51, completionFilterItem(player, completionFilter))
         inventory.setItem(53, closeSubmissionItem(player))
 
@@ -99,7 +104,7 @@ class SubmissionAdminMenu(
             }
             ItemTag.TYPE_GUI_NAV_PREV, ItemTag.TYPE_GUI_NAV_NEXT -> {
                 val page = ItemTag.getTargetPage(item) ?: holder.page
-                open(player, page, holder.submissionFilter, holder.completionFilter)
+                open(player, page, holder.submissionFilter, holder.completionFilter, holder.sortType)
             }
             TYPE_MENU_CONTROL -> handleControlItem(player, holder, item)
             ItemTag.TYPE_GUI_WORLD_ITEM -> handleWorldItem(player, holder, item, event.click)
@@ -112,20 +117,29 @@ class SubmissionAdminMenu(
                 player,
                 0,
                 holder.submissionFilter.next(),
-                holder.completionFilter
+                holder.completionFilter,
+                holder.sortType
             )
             ACTION_COMPLETION_FILTER -> open(
                 player,
                 0,
                 holder.submissionFilter,
-                holder.completionFilter.next()
+                holder.completionFilter.next(),
+                holder.sortType
+            )
+            ACTION_SORT -> open(
+                player,
+                0,
+                holder.submissionFilter,
+                holder.completionFilter,
+                holder.sortType.next()
             )
             ACTION_CLOSE_SUBMISSIONS -> {
                 if (plugin.isSubmissionClosed()) {
                     plugin.config.set("submission.closed", false)
                     plugin.saveConfig()
                     player.sendMessage(i18nComponent(player, "admin_menu.reopened_message"))
-                    open(player, holder.page, holder.submissionFilter, holder.completionFilter)
+                    open(player, holder.page, holder.submissionFilter, holder.completionFilter, holder.sortType)
                 } else {
                     openCloseSubmissionConfirmation(player, holder)
                 }
@@ -145,9 +159,9 @@ class SubmissionAdminMenu(
                 plugin.config.set("submission.closed", true)
                 plugin.saveConfig()
                 player.sendMessage(i18nComponent(player, "admin_menu.closed_message"))
-                open(player, holder.page, holder.submissionFilter, holder.completionFilter)
+                open(player, holder.page, holder.submissionFilter, holder.completionFilter, holder.sortType)
             }
-            ItemTag.TYPE_GUI_CANCEL -> open(player, holder.page, holder.submissionFilter, holder.completionFilter)
+            ItemTag.TYPE_GUI_CANCEL -> open(player, holder.page, holder.submissionFilter, holder.completionFilter, holder.sortType)
         }
     }
 
@@ -200,16 +214,19 @@ class SubmissionAdminMenu(
         protectionService.sync(worldData)
         toolPermissionController.syncWorld(worldData)
         player.sendMessage(i18nComponent(player, "admin_menu.completed_message"))
-        open(player, holder.page, holder.submissionFilter, holder.completionFilter)
+        open(player, holder.page, holder.submissionFilter, holder.completionFilter, holder.sortType)
     }
 
     private fun filteredWorlds(
         submissionFilter: SubmissionFilter,
-        completionFilter: CompletionFilter
+        completionFilter: CompletionFilter,
+        sortType: SortType
     ): List<WorldData> {
-        return MyWorldManagerApi.getWorldRepository()
+        val filtered = MyWorldManagerApi.getWorldRepository()
             ?.findAll()
             .orEmpty()
+            // 提出状況メニューは提出運用対象である本番用ワールドだけを扱う。
+            .filter { storage.isProductionWorld(it.uuid) }
             .filter { worldData ->
                 val state = stateFor(worldData)
                 matchesSubmissionFilter(state, submissionFilter)
@@ -218,7 +235,11 @@ class SubmissionAdminMenu(
                 val state = stateFor(worldData)
                 matchesCompletionFilter(state, completionFilter)
             }
-            .sortedByDescending { it.createdAt }
+        return when (sortType) {
+            SortType.CREATED_DESC -> filtered.sortedByDescending { it.createdAt }
+            SortType.CREATED_ASC -> filtered.sortedBy { it.createdAt }
+            SortType.NAME_ASC -> filtered.sortedBy { it.name.lowercase() }
+        }
     }
 
     private fun matchesSubmissionFilter(state: SubmissionState, filter: SubmissionFilter): Boolean {
@@ -277,7 +298,7 @@ class SubmissionAdminMenu(
     }
 
     private fun openCloseSubmissionConfirmation(player: Player, source: SubmissionAdminMenuHolder) {
-        val holder = CloseSubmissionConfirmationHolder(source.page, source.submissionFilter, source.completionFilter)
+        val holder = CloseSubmissionConfirmationHolder(source.page, source.submissionFilter, source.completionFilter, source.sortType)
         val layout = ChanponGuiElements.confirmationLayout()
         val inventory = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "confirm.close_submissions.title"))
         holder.inv = inventory
@@ -294,7 +315,7 @@ class SubmissionAdminMenu(
 
     private fun openProductionToggleConfirmation(player: Player, worldData: WorldData, source: SubmissionAdminMenuHolder) {
         val enabling = !storage.isProductionWorld(worldData.uuid)
-        val holder = ProductionToggleConfirmationHolder(worldData.uuid, enabling, source.page, source.submissionFilter, source.completionFilter)
+        val holder = ProductionToggleConfirmationHolder(worldData.uuid, enabling, source.page, source.submissionFilter, source.completionFilter, source.sortType)
         val key = if (enabling) "confirm.set_production" else "confirm.unset_production"
         val layout = ChanponGuiElements.confirmationLayout()
         val inventory = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "$key.title"))
@@ -310,7 +331,7 @@ class SubmissionAdminMenu(
     }
 
     private fun openCompleteUnsubmittedConfirmation(player: Player, worldData: WorldData, source: SubmissionAdminMenuHolder) {
-        val holder = CompleteUnsubmittedConfirmationHolder(worldData.uuid, source.page, source.submissionFilter, source.completionFilter)
+        val holder = CompleteUnsubmittedConfirmationHolder(worldData.uuid, source.page, source.submissionFilter, source.completionFilter, source.sortType)
         val layout = ChanponGuiElements.confirmationLayout()
         val inventory = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "confirm.complete_unsubmitted.title"))
         holder.inv = inventory
@@ -331,12 +352,12 @@ class SubmissionAdminMenu(
         event.cancelWithDebug("SubmissionAdminMenu.onProductionToggleConfirmationClick: confirm_click")
         if (event.clickedInventory != event.view.topInventory) return
         when (ItemTag.getType(event.currentItem ?: return)) {
-            ItemTag.TYPE_GUI_CANCEL -> open(player, holder.page, holder.submissionFilter, holder.completionFilter)
+            ItemTag.TYPE_GUI_CANCEL -> open(player, holder.page, holder.submissionFilter, holder.completionFilter, holder.sortType)
             ItemTag.TYPE_GUI_CONFIRM -> {
                 val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(holder.worldUuid) ?: return
                 if (holder.enabling && ownerHasProductionWorld(worldData.owner, worldData.uuid)) {
                     player.sendMessage(i18nComponent(player, "admin_menu.production_limit"))
-                    open(player, holder.page, holder.submissionFilter, holder.completionFilter)
+                    open(player, holder.page, holder.submissionFilter, holder.completionFilter, holder.sortType)
                     return
                 }
                 storage.setProductionWorld(worldData.uuid, holder.enabling)
@@ -344,7 +365,7 @@ class SubmissionAdminMenu(
                 protectionService.sync(worldData)
                 toolPermissionController.syncWorld(worldData)
                 player.sendMessage(i18nComponent(player, if (holder.enabling) "admin_menu.production_enabled" else "admin_menu.production_disabled"))
-                open(player, holder.page, holder.submissionFilter, holder.completionFilter)
+                open(player, holder.page, holder.submissionFilter, holder.completionFilter, holder.sortType)
             }
         }
     }
@@ -356,10 +377,10 @@ class SubmissionAdminMenu(
         event.cancelWithDebug("SubmissionAdminMenu.onCompleteUnsubmittedConfirmationClick: confirm_click")
         if (event.clickedInventory != event.view.topInventory) return
         when (ItemTag.getType(event.currentItem ?: return)) {
-            ItemTag.TYPE_GUI_CANCEL -> open(player, holder.page, holder.submissionFilter, holder.completionFilter)
+            ItemTag.TYPE_GUI_CANCEL -> open(player, holder.page, holder.submissionFilter, holder.completionFilter, holder.sortType)
             ItemTag.TYPE_GUI_CONFIRM -> {
                 val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(holder.worldUuid) ?: return
-                markCompleted(player, worldData, SubmissionAdminMenuHolder(holder.page, holder.submissionFilter, holder.completionFilter))
+                markCompleted(player, worldData, SubmissionAdminMenuHolder(holder.page, holder.submissionFilter, holder.completionFilter, holder.sortType))
             }
         }
     }
@@ -495,25 +516,67 @@ class SubmissionAdminMenu(
     }
 
     private fun submissionFilterItem(player: Player, filter: SubmissionFilter): ItemStack {
-        return extensionItem(
+        return filterListItem(
             player,
             Material.HOPPER,
             "admin_menu.submission_filter.display",
-            "admin_menu.submission_filter.lore",
-            ACTION_SUBMISSION_FILTER,
-            mapOf("filter" to i18n(player, filter.key))
+            SubmissionFilter.entries.map { it.key },
+            filter.key,
+            ACTION_SUBMISSION_FILTER
         )
     }
 
     private fun completionFilterItem(player: Player, filter: CompletionFilter): ItemStack {
-        return extensionItem(
+        return filterListItem(
             player,
             Material.LIME_DYE,
             "admin_menu.completion_filter.display",
-            "admin_menu.completion_filter.lore",
-            ACTION_COMPLETION_FILTER,
-            mapOf("filter" to i18n(player, filter.key))
+            CompletionFilter.entries.map { it.key },
+            filter.key,
+            ACTION_COMPLETION_FILTER
         )
+    }
+
+    private fun sortItem(player: Player, sortType: SortType): ItemStack {
+        return filterListItem(
+            player,
+            Material.COMPARATOR,
+            "admin_menu.sort.display",
+            SortType.entries.map { it.key },
+            sortType.key,
+            ACTION_SORT
+        )
+    }
+
+    private fun filterListItem(
+        player: Player,
+        material: Material,
+        displayKey: String,
+        optionKeys: List<String>,
+        selectedKey: String,
+        action: String
+    ): ItemStack {
+        val item = ItemStack(material)
+        val lore = CCSystem.getAPI().getLoreService().render(
+            GuiLoreSpec.Rich(buildList {
+                optionKeys.forEach { optionKey ->
+                    val selected = optionKey == selectedKey
+                    val marker = if (selected) "\u00A7a\u00BB" else "\u00A78\u30FB"
+                    val color = if (selected) "\u00A7f" else "\u00A77"
+                    add(GuiLoreLine.Raw("$marker $color${i18n(player, optionKey)}"))
+                }
+                add(GuiLoreLine.Spacer)
+                add(GuiLoreLine.SingleAction(i18n(player, "admin_menu.filter_cycle_action")))
+            }, GuiLoreFrame.BOTH)
+        )
+        item.editMeta { meta ->
+            meta.displayName(i18nComponent(player, displayKey))
+            meta.lore(lore)
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
+        }
+        ItemTag.tagItem(item, TYPE_MENU_CONTROL)
+        ItemTag.setString(item, ACTION_KEY, action)
+        return item
     }
 
     private fun closeSubmissionItem(player: Player): ItemStack {
@@ -624,10 +687,23 @@ class SubmissionAdminMenu(
         }
     }
 
+    enum class SortType(val key: String) {
+        CREATED_DESC("admin_menu.sort.created_desc"),
+        CREATED_ASC("admin_menu.sort.created_asc"),
+        NAME_ASC("admin_menu.sort.name_asc");
+
+        fun next(): SortType = when (this) {
+            CREATED_DESC -> CREATED_ASC
+            CREATED_ASC -> NAME_ASC
+            NAME_ASC -> CREATED_DESC
+        }
+    }
+
     private class SubmissionAdminMenuHolder(
         val page: Int,
         val submissionFilter: SubmissionFilter,
-        val completionFilter: CompletionFilter
+        val completionFilter: CompletionFilter,
+        val sortType: SortType
     ) : InventoryHolder {
         lateinit var inv: Inventory
         override fun getInventory(): Inventory = inv
@@ -636,7 +712,8 @@ class SubmissionAdminMenu(
     private class CloseSubmissionConfirmationHolder(
         val page: Int,
         val submissionFilter: SubmissionFilter,
-        val completionFilter: CompletionFilter
+        val completionFilter: CompletionFilter,
+        val sortType: SortType
     ) : InventoryHolder {
         lateinit var inv: Inventory
         override fun getInventory(): Inventory = inv
@@ -647,7 +724,8 @@ class SubmissionAdminMenu(
         val enabling: Boolean,
         val page: Int,
         val submissionFilter: SubmissionFilter,
-        val completionFilter: CompletionFilter
+        val completionFilter: CompletionFilter,
+        val sortType: SortType
     ) : InventoryHolder {
         lateinit var inv: Inventory
         override fun getInventory(): Inventory = inv
@@ -657,7 +735,8 @@ class SubmissionAdminMenu(
         val worldUuid: UUID,
         val page: Int,
         val submissionFilter: SubmissionFilter,
-        val completionFilter: CompletionFilter
+        val completionFilter: CompletionFilter,
+        val sortType: SortType
     ) : InventoryHolder {
         lateinit var inv: Inventory
         override fun getInventory(): Inventory = inv
@@ -677,6 +756,7 @@ class SubmissionAdminMenu(
         private const val ACTION_KEY = "chanpon_action"
         private const val ACTION_SUBMISSION_FILTER = "submission_filter"
         private const val ACTION_COMPLETION_FILTER = "completion_filter"
+        private const val ACTION_SORT = "sort"
         private const val ACTION_CLOSE_SUBMISSIONS = "close_submissions"
     }
 }

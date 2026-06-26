@@ -101,7 +101,7 @@ class SubmittedWorldMenuProvider(
             }
             request.isPlayerWorldFlow == true -> {
                 mwm.soundManager.playClickSound(player, item, "world_settings")
-                mwm.playerWorldGui.open(player, 0, request.parentShowBackButton ?: false)
+                mwm.playerWorldGui.open(player, 0, request.parentShowBackButton ?: false, player.uniqueId, player.name)
             }
             else -> {
                 mwm.soundManager.playClickSound(player, item, null)

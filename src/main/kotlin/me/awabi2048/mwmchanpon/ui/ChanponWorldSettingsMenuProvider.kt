@@ -65,10 +65,10 @@ class ChanponWorldSettingsMenuProvider(
             request.parentShowBackButton
         )
         mwm.settingsSessionManager.getSession(player)?.showBackButton = request.showBackButton
-        GuiHelper.INSTANCE.scheduleGuiTransitionReset(mwm, player)
+        GuiHelper.scheduleGuiTransitionReset(mwm, player)
 
         val holder = SettingsHolder(worldData.uuid, request)
-        val title = GuiHelper.INSTANCE.inventoryTitle(
+        val title = GuiHelper.inventoryTitle(
             mwm.languageManager.getComponent(
                 player,
                 "gui.settings.title",
@@ -88,8 +88,6 @@ class ChanponWorldSettingsMenuProvider(
         val isImportedArchive = storage.isImportedArchive(worldData.uuid)
         val isOwner = isActualOwner && !isImportedArchive
         val hasManagePermission = (isOwner || isModerator) && !isImportedArchive
-        val isProduction = storage.isProductionWorld(worldData.uuid)
-
         if (hasManagePermission) {
             inventory.setItem(19, mwmItem(player, "info", Material.NAME_TAG, ItemTag.TYPE_GUI_SETTING_INFO))
             inventory.setItem(20, mwmItem(player, "icon", Material.ANVIL, ItemTag.TYPE_GUI_SETTING_ICON))
@@ -103,7 +101,7 @@ class ChanponWorldSettingsMenuProvider(
             inventory.setItem(24, publishItem(player, worldData))
             inventory.setItem(25, mwmItem(player, "member", Material.PLAYER_HEAD, ItemTag.TYPE_GUI_SETTING_MEMBER))
             inventory.setItem(32, mwmItem(player, "environment", Material.GRASS_BLOCK, ItemTag.TYPE_GUI_SETTING_ENVIRONMENT))
-            inventory.setItem(33, criticalItem(player, isProduction))
+            inventory.setItem(33, criticalItem(player, worldData))
         }
         ChanponGuiElements.setSettingsFooter(
             inventory,
@@ -181,7 +179,11 @@ class ChanponWorldSettingsMenuProvider(
                 }
                 mwm.soundManager.playClickSound(player, item, "world_settings")
                 pushSettingsRoute(player, worldData)
-                openExpansionMenu(player, worldData)
+                if (mwm.playerPlatformResolver.isBedrock(player)) {
+                    openConfirmByPlatform(player, worldData, ConfirmAction.EXPAND, null)
+                } else {
+                    openExpansionMenu(player, worldData)
+                }
             }
             ItemTag.TYPE_GUI_SETTING_CRITICAL -> {
                 mwm.soundManager.playClickSound(player, item, "world_settings")
@@ -291,7 +293,7 @@ class ChanponWorldSettingsMenuProvider(
                 when (ItemTag.getString(item, DIRECTION_KEY)) {
                     ACTION_CENTER -> {
                         pushExpansionRoute(player, worldData)
-                        openConfirm(player, worldData, ConfirmAction.EXPAND, null)
+                        openConfirmByPlatform(player, worldData, ConfirmAction.EXPAND, null)
                     }
                     ACTION_SELECT_DIRECTION -> {
                         val started = MyWorldManagerApi.getWorldService()?.startWorldBorderExpansionSequence(
@@ -317,7 +319,7 @@ class ChanponWorldSettingsMenuProvider(
                     openModifiedWarning(player, worldData, ConfirmAction.STEP_BACK)
                 } else {
                     pushExpansionRoute(player, worldData)
-                    openConfirm(player, worldData, ConfirmAction.STEP_BACK, null)
+                    openConfirmByPlatform(player, worldData, ConfirmAction.STEP_BACK, null)
                 }
             }
         }
@@ -336,7 +338,7 @@ class ChanponWorldSettingsMenuProvider(
             ItemTag.TYPE_GUI_CONFIRM -> {
                 if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
                 pushWarningRoute(player, worldData, holder.action)
-                openConfirm(player, worldData, holder.action, null)
+                openConfirmByPlatform(player, worldData, holder.action, null)
             }
         }
     }
@@ -353,21 +355,7 @@ class ChanponWorldSettingsMenuProvider(
             }
             ItemTag.TYPE_GUI_CONFIRM -> {
                 if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
-                val service = MyWorldManagerApi.getWorldService()
-                val success = when (holder.action) {
-                    ConfirmAction.EXPAND -> service?.expandWorldBorder(holder.worldUuid, holder.direction) == true
-                    ConfirmAction.STEP_BACK -> service?.stepBackWorldBorder(holder.worldUuid) == true
-                }
-                val latest = MyWorldManagerApi.getWorldRepository()?.findByUuid(holder.worldUuid) ?: worldData
-                player.sendMessage(i18nComponent(player, if (success) holder.action.successKey else holder.action.failedKey))
-                when {
-                    success && holder.action == ConfirmAction.EXPAND -> {
-                        mwm().settingsSessionManager.endSession(player)
-                        player.closeInventory()
-                    }
-                    success -> openExpansionMenu(player, latest)
-                    else -> open(player, latest, currentRequest(player))
-                }
+                executeConfirmAction(player, worldData, holder.action, holder.direction)
             }
         }
     }
@@ -470,15 +458,77 @@ class ChanponWorldSettingsMenuProvider(
     }
 
     private fun openCriticalMenu(player: Player, worldData: WorldData) {
-        if (!mwm().playerStatsRepository.findByUuid(player.uniqueId).criticalSettingsEnabled) return
+        if (criticalUnavailableLoreKey(player, worldData) != null) {
+            player.sendMessage(i18nComponent(player, "critical.unavailable_message"))
+            return
+        }
         val holder = CriticalHolder(worldData.uuid, currentRequest(player))
         val inventory = Bukkit.createInventory(holder, 45, i18nComponent(player, "critical.menu_title"))
         holder.inv = inventory
         applyFrame(inventory)
         inventory.setItem(36, returnItem(player))
-        inventory.setItem(22, if (storage.isProductionWorld(worldData.uuid)) criticalUnavailableItem(player) else deleteWorldItem(player))
+        inventory.setItem(22, deleteWorldItem(player))
         fill(inventory)
         player.openInventory(inventory)
+    }
+
+    private fun openConfirmByPlatform(player: Player, worldData: WorldData, action: ConfirmAction, direction: BlockFace?) {
+        if (mwm().playerPlatformResolver.isBedrock(player) && openBedrockConfirmForm(player, worldData, action, direction)) {
+            return
+        }
+        openConfirm(player, worldData, action, direction)
+    }
+
+    private fun openBedrockConfirmForm(player: Player, worldData: WorldData, action: ConfirmAction, direction: BlockFace?): Boolean {
+        val directionName = direction?.let { directionName(player, it) } ?: i18n(player, "direction.center")
+        val key = if (action == ConfirmAction.STEP_BACK && worldData.latestBorderExpansionRecord()?.modified == true) {
+            "confirm.${action.key}.lore_modified"
+        } else {
+            "confirm.${action.key}.lore"
+        }
+        return mwm().floodgateFormBridge.sendSimpleForm(
+            player = player,
+            title = i18n(player, "confirm.${action.key}.title"),
+            content = i18nList(player, key, mapOf("direction" to directionName)).joinToString("\n"),
+            buttons = listOf(
+                i18n(player, "confirm.button.confirm"),
+                i18n(player, "confirm.button.cancel")
+            ),
+            onSelect = { index ->
+                Bukkit.getScheduler().runTask(plugin, Runnable {
+                    val latest = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldData.uuid) ?: return@Runnable
+                    if (index == 0) {
+                        executeConfirmAction(player, latest, action, direction)
+                    } else {
+                        open(player, latest, currentRequest(player))
+                    }
+                })
+            },
+            onClosed = {
+                Bukkit.getScheduler().runTask(plugin, Runnable {
+                    val latest = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldData.uuid) ?: return@Runnable
+                    open(player, latest, currentRequest(player))
+                })
+            }
+        )
+    }
+
+    private fun executeConfirmAction(player: Player, worldData: WorldData, action: ConfirmAction, direction: BlockFace?) {
+        val service = MyWorldManagerApi.getWorldService()
+        val success = when (action) {
+            ConfirmAction.EXPAND -> service?.expandWorldBorder(worldData.uuid, direction) == true
+            ConfirmAction.STEP_BACK -> service?.stepBackWorldBorder(worldData.uuid) == true
+        }
+        val latest = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldData.uuid) ?: worldData
+        player.sendMessage(i18nComponent(player, if (success) action.successKey else action.failedKey))
+        when {
+            success && action == ConfirmAction.EXPAND -> {
+                mwm().settingsSessionManager.endSession(player)
+                player.closeInventory()
+            }
+            success -> openExpansionMenu(player, latest)
+            else -> open(player, latest, currentRequest(player))
+        }
     }
 
     private fun openDeleteConfirm(player: Player, worldData: WorldData, finalStep: Boolean) {
@@ -670,25 +720,42 @@ class ChanponWorldSettingsMenuProvider(
         )
     }
 
-    private fun criticalItem(player: Player, isProduction: Boolean): ItemStack {
-        val body = if (isProduction) i18nList(player, "critical.production_lore") else i18nList(player, "critical.action_lore")
+    private fun criticalItem(player: Player, worldData: WorldData): ItemStack {
+        criticalUnavailableLoreKey(player, worldData)?.let { loreKey ->
+            return criticalUnavailableItem(player, loreKey)
+        }
         return componentItem(
             Material.TNT,
             i18n(player, "critical.display"),
             describedLore(
                 mwm().languageManager.getMessageList(player, "gui.settings.critical.blocks.summary"),
-                body
+                i18nList(player, "critical.action_lore")
             ),
             ItemTag.TYPE_GUI_SETTING_CRITICAL
         )
+    }
+
+    private fun criticalUnavailableLoreKey(player: Player, worldData: WorldData): String? {
+        // 重大な設定に入れない理由を一覧表示と遷移防御で共有し、専用メニューへの侵入を防ぐ。
+        if (storage.isProductionWorld(worldData.uuid)) return "critical.production_lore"
+        if (!mwm().playerStatsRepository.findByUuid(player.uniqueId).criticalSettingsEnabled) return "critical.disabled_lore"
+        return null
     }
 
     private fun deleteWorldItem(player: Player): ItemStack {
         return item(Material.TNT, i18n(player, "critical.delete_display"), i18nList(player, "critical.delete_lore"), ItemTag.TYPE_GUI_SETTING_DELETE_WORLD)
     }
 
-    private fun criticalUnavailableItem(player: Player): ItemStack {
-        return item(Material.BARRIER, i18n(player, "critical.unavailable_display"), i18nList(player, "critical.unavailable_lore"), ItemTag.TYPE_GUI_INFO)
+    private fun criticalUnavailableItem(player: Player, loreKey: String): ItemStack {
+        return componentItem(
+            Material.BARRIER,
+            i18n(player, "critical.unavailable_display"),
+            describedLore(
+                mwm().languageManager.getMessageList(player, "gui.settings.critical.blocks.summary"),
+                i18nList(player, loreKey)
+            ),
+            ItemTag.TYPE_GUI_INFO
+        )
     }
 
     private fun worldInfoItem(player: Player, worldData: WorldData): ItemStack {

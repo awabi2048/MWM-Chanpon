@@ -141,9 +141,8 @@ class ProductionToggleExtension(
                 openConfirmation(player, worldData.uuid, ConfirmationAction.SET_PRODUCTION, currentRequest(player, context))
             }
             ACTION_TOGGLE_SUBMISSION -> {
-                val action = if (event.click.isRightClick) ACTION_UNSET_PRODUCTION else ACTION_SUBMIT
-                if (action == ACTION_UNSET_PRODUCTION) {
-                    openConfirmation(player, worldData.uuid, ConfirmationAction.UNSET_PRODUCTION, currentRequest(player, context))
+                // 本番用設定の解除は管理者メニューに集約し、通常の /worldmenu では提出操作だけを扱う。
+                if (!event.click.isLeftClick) {
                     return true
                 }
                 if (worldData.owner != player.uniqueId) {

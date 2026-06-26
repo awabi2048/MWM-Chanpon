@@ -6,6 +6,7 @@ import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.protection.SpawnWorldProtectionService
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
+import me.awabi2048.myworldmanager.api.extension.AdminMenuProvider
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
@@ -27,8 +28,17 @@ class ChanponAdminMenu(
     private val worldDataManagementMenu: WorldDataManagementMenu,
     private val automationSettingsMenu: AutomationSettingsMenu,
     private val worldDataExportMenu: WorldDataExportMenu
-) : Listener {
-    fun open(player: Player) {
+) : AdminMenuProvider, Listener {
+    override fun getId(): String = PROVIDER_ID
+
+    override fun getDisplayName(player: Player): String =
+        i18n(player, "admin.provider_display")
+
+    override fun open(player: Player) {
+        openInternal(player)
+    }
+
+    private fun openInternal(player: Player) {
         if (!player.hasPermission("mwmchanpon.admin")) {
             player.sendMessage(i18nComponent(player, "admin.no_permission"))
             return
@@ -42,7 +52,7 @@ class ChanponAdminMenu(
         inventory.setItem(23, menuItem(player, Material.CLOCK, "admin.automation", ACTION_AUTOMATION))
         inventory.setItem(25, menuItem(player, Material.DISPENSER, "admin.export", ACTION_EXPORT))
         inventory.setItem(38, worldCreationItem(player))
-        inventory.setItem(40, infoItem(player))
+        inventory.setItem(40, switchToMwmItem(player))
         currentWorldUuid(player)?.let { worldUuid ->
             inventory.setItem(42, spawnWorldItem(player, worldUuid))
         }
@@ -64,8 +74,9 @@ class ChanponAdminMenu(
                 ACTION_WORLD_DATA -> openChild(player) { worldDataManagementMenu.open(player) }
                 ACTION_AUTOMATION -> openChild(player) { automationSettingsMenu.open(player) }
                 ACTION_EXPORT -> openChild(player) { worldDataExportMenu.open(player) }
+                ACTION_SWITCH_MWM -> mwm().adminCommandGui.open(player)
                 ACTION_WORLD_CREATION -> {
-                    globalStorage.setWorldCreationEnabled(!globalStorage.isWorldCreationEnabled())
+                    MyWorldManagerApi.setWorldCreationEnabled(!MyWorldManagerApi.isWorldCreationEnabled())
                     open(player)
                 }
                 ACTION_SET_SPAWN_WORLD -> {
@@ -148,7 +159,7 @@ class ChanponAdminMenu(
     }
 
     private fun worldCreationItem(player: Player): ItemStack {
-        val enabled = globalStorage.isWorldCreationEnabled()
+        val enabled = MyWorldManagerApi.isWorldCreationEnabled()
         val key = if (enabled) "admin.world_creation.enabled" else "admin.world_creation.disabled"
         val material = if (enabled) Material.LIME_DYE else Material.GRAY_DYE
         return menuItem(player, material, key, ACTION_WORLD_CREATION)
@@ -179,12 +190,27 @@ class ChanponAdminMenu(
         return item
     }
 
+    private fun switchToMwmItem(player: Player): ItemStack {
+        val item = ItemStack(Material.NETHER_STAR)
+        item.editMeta { meta ->
+            meta.displayName(i18nComponent(player, "admin.switch_mwm.display"))
+            meta.lore(lore(i18nList(player, "admin.switch_mwm.lore")))
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
+        }
+        ItemTag.tagItem(item, TYPE_CONTROL)
+        ItemTag.setString(item, ACTION_KEY, ACTION_SWITCH_MWM)
+        return item
+    }
+
     private fun decoration(material: Material): ItemStack {
         return ChanponGuiElements.decoration(material)
     }
 
     private fun i18nComponent(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nComponent(player, "chanpon.backup.$key", placeholders)
+
+    private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
+        CCSystem.getAPI().getI18nString(player, "chanpon.backup.$key", placeholders)
 
     private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
@@ -211,9 +237,11 @@ class ChanponAdminMenu(
         private const val ACTION_WORLD_DATA = "world_data"
         private const val ACTION_AUTOMATION = "automation"
         private const val ACTION_EXPORT = "export"
+        private const val ACTION_SWITCH_MWM = "switch_mwm"
         private const val ACTION_WORLD_CREATION = "world_creation"
         private const val ACTION_SET_SPAWN_WORLD = "set_spawn_world"
         private const val ACTION_NONE = "none"
         private const val ROUTE_ADMIN_MENU = "chanpon.admin_menu"
+        private const val PROVIDER_ID = "mwm-chanpon:admin_menu"
     }
 }

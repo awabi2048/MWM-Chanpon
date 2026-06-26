@@ -3,9 +3,9 @@ package me.awabi2048.mwmchanpon
 import com.awabi2048.ccsystem.CCSystem
 import me.awabi2048.mwmchanpon.backup.BackupService
 import me.awabi2048.mwmchanpon.bridge.CoreApiBridge
-import me.awabi2048.mwmchanpon.command.ChanponAdminCommand
 import me.awabi2048.mwmchanpon.extension.ChanponCommandExtension
 import me.awabi2048.mwmchanpon.extension.ChanponWorldAccessPolicy
+import me.awabi2048.mwmchanpon.extension.ChanponWorldPortalPolicy
 import me.awabi2048.mwmchanpon.extension.ChanponWorldPublishPolicy
 import me.awabi2048.mwmchanpon.extension.ChanponWorldRuntimePolicy
 import me.awabi2048.mwmchanpon.extension.ChanponWorldWorkPermissionPolicy
@@ -84,6 +84,7 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var environmentGui: ChanponEnvironmentGui
     private lateinit var archiveService: ArchiveService
     private lateinit var worldAccessPolicy: ChanponWorldAccessPolicy
+    private lateinit var worldPortalPolicy: ChanponWorldPortalPolicy
     private lateinit var worldPublishPolicy: ChanponWorldPublishPolicy
     private lateinit var worldRuntimePolicy: ChanponWorldRuntimePolicy
     private lateinit var worldWorkPermissionPolicy: ChanponWorldWorkPermissionPolicy
@@ -177,6 +178,7 @@ class MWMChanponPlugin : JavaPlugin() {
         discoveryMenuProvider = ChanponDiscoveryMenuProvider(this, globalStorage, chanponStorage)
         favoriteVisitMenuProvider = ChanponFavoriteVisitMenuProvider(this, chanponStorage)
         worldAccessPolicy = ChanponWorldAccessPolicy(globalStorage, chanponStorage)
+        worldPortalPolicy = ChanponWorldPortalPolicy(chanponStorage)
         worldPublishPolicy = ChanponWorldPublishPolicy(chanponStorage)
         worldRuntimePolicy = ChanponWorldRuntimePolicy()
         commandExtension = ChanponCommandExtension(this, globalStorage, adminWizardGui)
@@ -192,14 +194,13 @@ class MWMChanponPlugin : JavaPlugin() {
         MyWorldManagerApi.registerVisitMenuProvider(favoriteVisitMenuProvider)
         MyWorldManagerApi.registerWorldEvacuationProvider(spawnWorldService)
         MyWorldManagerApi.registerWorldAccessPolicy(worldAccessPolicy)
+        MyWorldManagerApi.registerWorldPortalPolicy(worldPortalPolicy)
         MyWorldManagerApi.registerWorldWorkPermissionPolicy(worldWorkPermissionPolicy)
         MyWorldManagerApi.registerWorldPublishPolicy(worldPublishPolicy)
         MyWorldManagerApi.registerWorldRuntimePolicy(worldRuntimePolicy)
+        MyWorldManagerApi.registerAdminMenuProvider(chanponAdminMenu)
         MyWorldManagerApi.registerCommandPolicy(commandExtension)
         MyWorldManagerApi.registerCreateCommandHandler(commandExtension)
-        val adminCommand = ChanponAdminCommand(chanponAdminMenu, archiveService)
-        getCommand("mwmchanpon")?.setExecutor(adminCommand)
-        getCommand("mwmchanpon")?.tabCompleter = adminCommand
         server.pluginManager.registerEvents(productionToggleExtension, this)
         server.pluginManager.registerEvents(submissionAdminMenu, this)
         server.pluginManager.registerEvents(chanponAdminMenu, this)
@@ -300,6 +301,9 @@ class MWMChanponPlugin : JavaPlugin() {
         if (::worldAccessPolicy.isInitialized) {
             MyWorldManagerApi.unregisterWorldAccessPolicy(worldAccessPolicy)
         }
+        if (::worldPortalPolicy.isInitialized) {
+            MyWorldManagerApi.unregisterWorldPortalPolicy(worldPortalPolicy)
+        }
         if (::worldWorkPermissionPolicy.isInitialized) {
             MyWorldManagerApi.unregisterWorldWorkPermissionPolicy(worldWorkPermissionPolicy)
         }
@@ -308,6 +312,9 @@ class MWMChanponPlugin : JavaPlugin() {
         }
         if (::worldRuntimePolicy.isInitialized) {
             MyWorldManagerApi.unregisterWorldRuntimePolicy(worldRuntimePolicy)
+        }
+        if (::chanponAdminMenu.isInitialized) {
+            MyWorldManagerApi.unregisterAdminMenuProvider(chanponAdminMenu)
         }
         if (::commandExtension.isInitialized) {
             MyWorldManagerApi.unregisterCreateCommandHandler(commandExtension)

@@ -51,6 +51,9 @@ class ChanponPlayerWorldMenuProvider(
     override fun open(player: Player, request: PlayerWorldMenuRequest): Boolean {
         val mwm = mwm()
         if (mwm.playerPlatformResolver.isBedrock(player)) return false
+        val targetPlayerUuid = request.targetPlayerUuid ?: player.uniqueId
+        val targetPlayerName = request.targetPlayerName ?: player.name
+        val isOwnMenu = targetPlayerUuid == player.uniqueId
         if (globalStorage.isArchiveLocked() && !player.hasPermission("mwmchanpon.admin")) {
             player.sendMessage(i18n(player, "message.archive_locked"))
             return true
@@ -60,7 +63,7 @@ class ChanponPlayerWorldMenuProvider(
         session.showBackButton = request.showBackButton
         session.currentPage = request.page
 
-        val worlds = mwm.playerWorldGui.getPlayerWorlds(player)
+        val worlds = mwm.playerWorldGui.getPlayerWorlds(targetPlayerUuid)
         val totalPages = if (worlds.isEmpty()) 1 else (worlds.size + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE
         val page = request.page.coerceIn(0, totalPages - 1)
         val pageWorlds = worlds.drop(page * ITEMS_PER_PAGE).take(ITEMS_PER_PAGE)
@@ -68,13 +71,13 @@ class ChanponPlayerWorldMenuProvider(
         val rowCount = (neededDataRows + 2).coerceIn(3, 6)
         val footerStart = (rowCount - 1) * 9
         val title = inventoryTitle(mwm.languageManager.getMessage(player, "gui.player_world.title"))
-        val holder = Holder(page, request.showBackButton)
+        val holder = Holder(page, request.showBackButton, targetPlayerUuid, targetPlayerName)
         val inventory = Bukkit.createInventory(holder, rowCount * 9, title)
         holder.inv = inventory
 
         mwm.settingsSessionManager.updateSessionAction(
             player,
-            player.uniqueId,
+            targetPlayerUuid,
             SettingsAction.PLAYER_WORLD_GUI,
             true,
             null,
@@ -89,14 +92,19 @@ class ChanponPlayerWorldMenuProvider(
             inventory.setItem((row + 1) * 9 + 1 + col, createWorldItem(player, worldData))
         }
 
-        val currentCreateCount = worlds.count { it.owner == player.uniqueId }
+        val currentCreateCount = worlds.count { it.owner == targetPlayerUuid }
         val configuredMaxCreateCount = mwm.config.getInt("creation.max_create_count_default", 3)
         val maxCreateCount = MyWorldManagerApi.getWorldRuntimePolicy().getMaxCreateCountDefault(configuredMaxCreateCount)
-        if (canCreateWorld(player) && (canBypassWorldLimits(player) || currentCreateCount < maxCreateCount)) {
+        val creationBlockReason = creationBlockReason(player, currentCreateCount, maxCreateCount)
+        if (isOwnMenu && creationBlockReason == null && hasCreatePermission(player)) {
             inventory.setItem(footerStart + 2, createCreationButton(player))
+        } else if (isOwnMenu && creationBlockReason != null && hasCreatePermission(player)) {
+            inventory.setItem(footerStart + 2, createCreationUnavailableButton(player, creationBlockReason))
         }
-        inventory.setItem(footerStart + 4, createPlayerInfoItem(player))
-        inventory.setItem(footerStart + 6, createUserSettingsButton(player))
+        inventory.setItem(footerStart + 4, createPlayerInfoItem(player, targetPlayerUuid, targetPlayerName))
+        if (isOwnMenu) {
+            inventory.setItem(footerStart + 6, createUserSettingsButton(player))
+        }
 
         if (page > 0) {
             inventory.setItem(footerStart + 1, createPageItem(player, page - 1, false))
@@ -127,11 +135,12 @@ class ChanponPlayerWorldMenuProvider(
             ItemTag.TYPE_GUI_NAV_NEXT, ItemTag.TYPE_GUI_NAV_PREV -> {
                 val target = ItemTag.getTargetPage(item) ?: return
                 mwm.soundManager.playClickSound(player, item, "player_world")
-                open(player, PlayerWorldMenuRequest(target, holder.showBackButton))
+                open(player, PlayerWorldMenuRequest(target, holder.showBackButton, holder.targetPlayerUuid, holder.targetPlayerName))
             }
             ItemTag.TYPE_GUI_RETURN -> handleReturn(player, item)
             ItemTag.TYPE_GUI_CREATION_BUTTON -> {
-                if (!canCreateWorld(player)) {
+                if (holder.targetPlayerUuid != player.uniqueId) return
+                if (!hasCreatePermission(player)) {
                     player.sendMessage(i18n(player, "message.world_creation_no_permission"))
                     return
                 }
@@ -143,6 +152,7 @@ class ChanponPlayerWorldMenuProvider(
                 mwm.creationGui.openTypeSelection(player)
             }
             ItemTag.TYPE_GUI_USER_SETTINGS_BUTTON -> {
+                if (holder.targetPlayerUuid != player.uniqueId) return
                 mwm.soundManager.playClickSound(player, item, "player_world")
                 mwm.menuRouteHistory.pushPlayerWorld(player, holder.page, holder.showBackButton)
                 mwm.userSettingsGui.open(player, true)
@@ -155,13 +165,13 @@ class ChanponPlayerWorldMenuProvider(
         val mwm = mwm()
         val uuid = ItemTag.getWorldUuid(item) ?: return
         val worldData = mwm.worldConfigRepository.findByUuid(uuid) ?: return
-        if (event.isShiftClick && event.isLeftClick) {
+        if (holder.targetPlayerUuid == player.uniqueId && event.isShiftClick && event.isLeftClick) {
             val stats = mwm.playerStatsRepository.findByUuid(player.uniqueId)
             stats.worldDisplayOrder.remove(uuid)
             stats.worldDisplayOrder.add(0, uuid)
             mwm.playerStatsRepository.save(stats)
             mwm.soundManager.playClickSound(player, item, "player_world")
-            open(player, PlayerWorldMenuRequest(holder.page, holder.showBackButton))
+            open(player, PlayerWorldMenuRequest(holder.page, holder.showBackButton, holder.targetPlayerUuid, holder.targetPlayerName))
             return
         }
         if (event.isLeftClick && !event.isShiftClick) {
@@ -256,6 +266,17 @@ class ChanponPlayerWorldMenuProvider(
         return item
     }
 
+    private fun createCreationUnavailableButton(player: Player, reason: CreationBlockReason): ItemStack {
+        val item = ItemStack(Material.BARRIER)
+        item.editMeta { meta ->
+            meta.displayName(mwm().languageManager.getComponent(player, reason.displayKey))
+            meta.lore(null)
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
+        }
+        ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
+        return item
+    }
+
     private fun createUserSettingsButton(player: Player): ItemStack {
         val mwm = mwm()
         val item = CCSystem.getAPI().getGuiElementService().item(
@@ -273,12 +294,12 @@ class ChanponPlayerWorldMenuProvider(
         return item
     }
 
-    private fun createPlayerInfoItem(player: Player): ItemStack {
+    private fun createPlayerInfoItem(player: Player, targetPlayerUuid: java.util.UUID, targetPlayerName: String?): ItemStack {
         val item = ItemStack(Material.PLAYER_HEAD)
         item.editMeta { rawMeta ->
             val meta = rawMeta as? SkullMeta ?: return@editMeta
-            meta.owningPlayer = player
-            meta.displayName(CCSystem.getAPI().getGuiElementService().name(player.name))
+            meta.owningPlayer = Bukkit.getOfflinePlayer(targetPlayerUuid)
+            meta.displayName(CCSystem.getAPI().getGuiElementService().name(targetPlayerName ?: targetPlayerUuid.toString()))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
@@ -333,18 +354,26 @@ class ChanponPlayerWorldMenuProvider(
     }
 
     private fun canOpenSettings(player: Player, world: WorldData): Boolean =
-        world.owner == player.uniqueId || world.moderators.contains(player.uniqueId) || world.members.contains(player.uniqueId)
+        player.hasPermission("myworldmanager.admin") ||
+            world.owner == player.uniqueId || world.moderators.contains(player.uniqueId) || world.members.contains(player.uniqueId)
 
     private fun canBypassWorldLimits(player: Player): Boolean =
         player.hasPermission("myworldmanager.admin.bypass_world_limits") ||
             player.hasPermission("myworldmanager.admin") ||
             player.hasPermission("craftercrossing.test")
 
-    private fun canCreateWorld(player: Player): Boolean =
-        globalStorage.isWorldCreationEnabled() &&
-            (player.hasPermission("myworldmanager.command.mwm.create") ||
-                player.hasPermission("myworldmanager.admin") ||
-                player.hasPermission("craftercrossing.test"))
+    private fun hasCreatePermission(player: Player): Boolean =
+        player.hasPermission("myworldmanager.command.mwm.create") ||
+            player.hasPermission("myworldmanager.admin") ||
+            player.hasPermission("craftercrossing.test")
+
+    private fun creationBlockReason(player: Player, currentCreateCount: Int, maxCreateCount: Int): CreationBlockReason? {
+        if (canBypassWorldLimits(player)) return null
+        // MWM本体の作成停止フラグを唯一の運用フラグとして扱う。
+        if (!MyWorldManagerApi.isWorldCreationEnabled()) return CreationBlockReason.PERIOD_DISABLED
+        if (currentCreateCount >= maxCreateCount) return CreationBlockReason.NO_SLOT
+        return null
+    }
 
     private fun i18n(player: Player, key: String): String =
         CCSystem.getAPI().getI18nString(player, "chanpon.backup.$key")
@@ -366,7 +395,17 @@ class ChanponPlayerWorldMenuProvider(
 
     private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)
 
-    private class Holder(val page: Int, val showBackButton: Boolean) : InventoryHolder {
+    private enum class CreationBlockReason(val displayKey: String) {
+        PERIOD_DISABLED("gui.player_world.creation_unavailable.period_disabled"),
+        NO_SLOT("gui.player_world.creation_unavailable.no_slot")
+    }
+
+    private class Holder(
+        val page: Int,
+        val showBackButton: Boolean,
+        val targetPlayerUuid: java.util.UUID,
+        val targetPlayerName: String?
+    ) : InventoryHolder {
         lateinit var inv: Inventory
         override fun getInventory(): Inventory = inv
     }
