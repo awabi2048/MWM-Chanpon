@@ -12,12 +12,14 @@ import me.awabi2048.mwmchanpon.storage.SubmissionState
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.mwmchanpon.ui.ChanponGuiElements
 import me.awabi2048.mwmchanpon.ui.ChanponLore
+import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.event.MwmWorldCreatedEvent
 import me.awabi2048.myworldmanager.api.extension.CreationConfirmationLayout
 import me.awabi2048.myworldmanager.api.extension.MenuExtension
 import me.awabi2048.myworldmanager.api.extension.MenuExtensionContext
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsInventoryHolder
+import me.awabi2048.myworldmanager.api.extension.WorldSettingsMenuRequest
 import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.session.WorldCreationSession
 import me.awabi2048.myworldmanager.util.ItemTag
@@ -32,6 +34,7 @@ import org.bukkit.event.inventory.InventoryClickEvent
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
+import org.bukkit.plugin.java.JavaPlugin
 
 class ProductionToggleExtension(
     private val plugin: MWMChanponPlugin,
@@ -135,12 +138,12 @@ class ProductionToggleExtension(
                     player.sendMessage(i18n(player, "message.production_limit"))
                     return true
                 }
-                openConfirmation(player, worldData.uuid, ConfirmationAction.SET_PRODUCTION)
+                openConfirmation(player, worldData.uuid, ConfirmationAction.SET_PRODUCTION, currentRequest(player, context))
             }
             ACTION_TOGGLE_SUBMISSION -> {
                 val action = if (event.click.isRightClick) ACTION_UNSET_PRODUCTION else ACTION_SUBMIT
                 if (action == ACTION_UNSET_PRODUCTION) {
-                    openConfirmation(player, worldData.uuid, ConfirmationAction.UNSET_PRODUCTION)
+                    openConfirmation(player, worldData.uuid, ConfirmationAction.UNSET_PRODUCTION, currentRequest(player, context))
                     return true
                 }
                 if (worldData.owner != player.uniqueId) {
@@ -160,7 +163,9 @@ class ProductionToggleExtension(
                     return true
                 }
                 when (current) {
-                    SubmissionState.UNSUBMITTED -> openConfirmation(player, worldData.uuid, ConfirmationAction.SUBMIT)
+                    SubmissionState.UNSUBMITTED -> {
+                        openConfirmation(player, worldData.uuid, ConfirmationAction.SUBMIT, currentRequest(player, context))
+                    }
                     SubmissionState.SUBMITTED -> return true
                     SubmissionState.COMPLETED -> return true
                 }
@@ -182,17 +187,23 @@ class ProductionToggleExtension(
                 holder.resolved = true
                 player.closeInventory()
                 executeConfirmedAction(player, holder.worldUuid, holder.action)
+                returnToWorldSettings(player, holder.worldUuid, holder.request)
             }
             ItemTag.TYPE_GUI_CANCEL -> {
                 holder.resolved = true
-                player.closeInventory()
                 player.sendMessage(i18n(player, "message.cancelled_confirmation"))
+                returnToWorldSettings(player, holder.worldUuid, holder.request)
             }
         }
     }
 
-    private fun openConfirmation(player: Player, worldUuid: UUID, action: ConfirmationAction) {
-        val holder = SubmissionConfirmationHolder(worldUuid, action)
+    private fun openConfirmation(
+        player: Player,
+        worldUuid: UUID,
+        action: ConfirmationAction,
+        request: WorldSettingsMenuRequest
+    ) {
+        val holder = SubmissionConfirmationHolder(worldUuid, action, request)
         val layout = ChanponGuiElements.confirmationLayout()
         val inventory = Bukkit.createInventory(
             holder,
@@ -209,6 +220,30 @@ class ProductionToggleExtension(
             createConfirmationButton(player, false)
         )
         player.openInventory(inventory)
+    }
+
+    private fun returnToWorldSettings(player: Player, worldUuid: UUID, request: WorldSettingsMenuRequest) {
+        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
+        if (worldData == null) {
+            player.closeInventory()
+            return
+        }
+        mwm().worldSettingsGui.open(
+            player,
+            worldData,
+            request.showBackButton,
+            request.isPlayerWorldFlow,
+            request.parentShowBackButton
+        )
+    }
+
+    private fun currentRequest(player: Player, context: MenuExtensionContext): WorldSettingsMenuRequest {
+        val session = mwm().settingsSessionManager.getSession(player)
+        return WorldSettingsMenuRequest(
+            context.get<Boolean>("showBackButton") ?: session?.showBackButton ?: false,
+            context.get<Boolean?>("isPlayerWorldFlow") ?: session?.isPlayerWorldFlow,
+            context.get<Boolean?>("parentShowBackButton") ?: session?.parentShowBackButton
+        )
     }
 
     private fun executeConfirmedAction(player: Player, worldUuid: UUID, action: ConfirmationAction) {
@@ -440,6 +475,8 @@ class ProductionToggleExtension(
         return CCSystem.getAPI().getI18nComponent(player, "chanpon.submission.$key", placeholders)
     }
 
+    private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)
+
     companion object {
         private const val EXTENSION_ID = "chanpon.production_toggle"
         private const val EXTRA_KEY = "chanpon.production"
@@ -461,7 +498,8 @@ class ProductionToggleExtension(
 
     private class SubmissionConfirmationHolder(
         val worldUuid: UUID,
-        val action: ConfirmationAction
+        val action: ConfirmationAction,
+        val request: WorldSettingsMenuRequest
     ) : WorldSettingsInventoryHolder {
         lateinit var inv: Inventory
         var resolved: Boolean = false

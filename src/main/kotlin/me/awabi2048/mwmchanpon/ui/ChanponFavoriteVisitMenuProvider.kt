@@ -171,16 +171,20 @@ class ChanponFavoriteVisitMenuProvider(
         val pages = if (worlds.isEmpty()) 1 else (worlds.size + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE
         val safePage = page.coerceIn(0, pages - 1)
         val holder = WorldListHolder(mode, safePage, returnWorld?.uuid, owner?.uniqueId, showBackButton)
-        val inventory = Bukkit.createInventory(holder, 54, i18nComponent(player, if (mode == ListMode.FAVORITE) "favorite_list.title" else "visit_list.title"))
+        val layout = ChanponGuiElements.pagedListLayout()
+        val inventory = Bukkit.createInventory(holder, layout.size, i18nComponent(player, if (mode == ListMode.FAVORITE) "favorite_list.title" else "visit_list.title"))
         holder.inv = inventory
         applyFrame(inventory)
         worlds.drop(safePage * ITEMS_PER_PAGE).take(ITEMS_PER_PAGE).forEachIndexed { index, world ->
             inventory.setItem(WORLD_SLOTS[index], worldListItem(player, world))
         }
-        if (safePage > 0) inventory.setItem(0, navItem(player, safePage - 1, false))
-        if (safePage < pages - 1) inventory.setItem(8, navItem(player, safePage + 1, true))
-        if (showBackButton || returnWorld != null) inventory.setItem(45, returnItem(player))
-        inventory.setItem(49, infoItem(player, worlds.size, safePage + 1, pages))
+        ChanponGuiElements.setPagedListNavigation(
+            inventory,
+            if (safePage > 0) navItem(player, safePage - 1, false) else null,
+            if (safePage < pages - 1) navItem(player, safePage + 1, true) else null,
+            if (showBackButton || returnWorld != null) returnItem(player) else null,
+            infoItem(player, worlds.size, safePage + 1, pages)
+        )
         fill(inventory)
         player.openInventory(inventory)
     }

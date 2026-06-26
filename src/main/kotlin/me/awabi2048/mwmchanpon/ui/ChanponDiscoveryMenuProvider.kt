@@ -47,9 +47,10 @@ class ChanponDiscoveryMenuProvider(
         }
 
         val holder = Holder()
+        val layout = ChanponGuiElements.settingsLayout()
         val inventory = Bukkit.createInventory(
             holder,
-            54,
+            layout.size,
             Component.text(
                 mwm.languageManager.getMessage(player, "gui.discovery.title"),
                 NamedTextColor.DARK_GRAY
@@ -64,9 +65,7 @@ class ChanponDiscoveryMenuProvider(
                 inventory.setItem(WORLD_ITEM_SLOTS[index], createWorldItem(player, worldData))
             }
 
-        if (request.showBackButton) {
-            inventory.setItem(45, returnItem(player))
-        }
+        ChanponGuiElements.setSettingsFooter(inventory, if (request.showBackButton) returnItem(player) else null, null)
 
         fill(inventory)
         mwm.soundManager.playMenuOpenSound(player, "discovery")
