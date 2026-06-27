@@ -14,6 +14,6 @@ permissions:
   mwmchanpon.admin:
     description: 管理者ウィザードを使用する権限
     default: op
-  myworldmanager.command.mwm.create:
-    description: MyWorldを作成する権限
+  mwmchanpon.create_world:
+    description: Chanpon MyWorld creation permission
     default: op

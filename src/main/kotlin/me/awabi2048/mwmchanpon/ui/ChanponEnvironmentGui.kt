@@ -1,15 +1,30 @@
 package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import io.papermc.paper.connection.PlayerGameConnection
+import io.papermc.paper.dialog.Dialog
+import io.papermc.paper.event.player.PlayerCustomClickEvent
+import io.papermc.paper.registry.data.dialog.ActionButton
+import io.papermc.paper.registry.data.dialog.DialogBase
+import io.papermc.paper.registry.data.dialog.action.DialogAction
+import io.papermc.paper.registry.data.dialog.body.DialogBody
+import io.papermc.paper.registry.data.dialog.input.DialogInput
+import io.papermc.paper.registry.data.dialog.type.DialogType
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsInventoryHolder
 import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.util.ItemTag
+import net.kyori.adventure.key.Key
 import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.Bukkit
 import org.bukkit.GameRule
 import org.bukkit.Material
+import org.bukkit.GameMode
 import org.bukkit.attribute.Attribute
 import org.bukkit.attribute.AttributeModifier
 import org.bukkit.entity.Player
@@ -22,6 +37,7 @@ import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
 
@@ -31,11 +47,12 @@ class ChanponEnvironmentGui(
     protectionService: me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService,
 ) : Listener {
     private val accessGuard = WorldSettingsAccessGuard(storage, protectionService)
+    private val pendingTimeInputs = ConcurrentHashMap<UUID, UUID>()
 
     fun open(player: Player, worldData: WorldData) {
         if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
         val holder = EnvMainHolder(worldData.uuid)
-        val inventory = Bukkit.createInventory(holder, 27, i18nComponent(player, "title"))
+        val inventory = Bukkit.createInventory(holder, 45, i18nComponent(player, "title"))
         holder.inv = inventory
         applyFrame(inventory)
 
@@ -43,12 +60,15 @@ class ChanponEnvironmentGui(
         val time = worldData.fixedTime
         val gravity = worldData.gravityValue
         val scale = worldData.fixedScale
+        val allowFlight = worldData.allowFlight
 
-        inventory.setItem(10, categoryItem(player, "weather", weatherDisplay(player, weather), weather != null))
-        inventory.setItem(12, categoryItem(player, "time", timeDisplay(player, time), time != null))
-        inventory.setItem(14, categoryItem(player, "gravity", gravityDisplay(player, gravity), gravity != null))
-        inventory.setItem(16, categoryItem(player, "scale", scaleDisplay(player, scale), scale != null))
-        inventory.setItem(22, backItem(player))
+        inventory.setItem(19, directSettingItem(player, ACTION_WEATHER, Material.LIGHT_BLUE_WOOL, weatherDisplay(player, weather), weatherOptions(player), weather ?: NONE_KEY))
+        inventory.setItem(20, directSettingItem(player, ACTION_TIME, Material.CLOCK, timeDisplay(player, time), timeOptions(player, time), timeOptionKey(time), customTimeAction = true))
+        inventory.setItem(21, directSettingItem(player, ACTION_GRAVITY, Material.FEATHER, gravityDisplay(player, gravity), gravityOptions(player), (gravity ?: DEFAULT_GRAVITY).toString()))
+        inventory.setItem(23, directSettingItem(player, ACTION_SCALE, Material.PLAYER_HEAD, scaleDisplay(player, scale), scaleOptions(player), scale?.toString()))
+        inventory.setItem(24, directSettingItem(player, ACTION_FLIGHT, Material.ELYTRA, flightDisplay(player, allowFlight), flightOptions(player), allowFlight.toString()))
+        inventory.setItem(25, emptySettingSlot())
+        inventory.setItem(40, backItem(player))
 
         fill(inventory)
         player.openInventory(inventory)
@@ -58,47 +78,31 @@ class ChanponEnvironmentGui(
     fun onClick(event: InventoryClickEvent) {
         val player = event.whoClicked as? Player ?: return
         val holder = event.view.topInventory.holder
-        if (holder !is EnvMainHolder &&
-            holder !is EnvWeatherHolder &&
-            holder !is EnvTimeHolder &&
-            holder !is EnvGravityHolder &&
-            holder !is EnvScaleHolder
-        ) {
+        if (holder !is EnvMainHolder) {
             return
         }
         event.cancelWithDebug("ChanponEnvironmentGui.onClick: menu_click")
         if (event.clickedInventory != event.view.topInventory) return
         val item = event.currentItem ?: return
 
-        when (holder) {
-            is EnvMainHolder -> handleMainClick(event, player, holder.worldUuid, item)
-            is EnvWeatherHolder -> handleWeatherClick(event, player, holder.worldUuid, item)
-            is EnvTimeHolder -> handleTimeClick(event, player, holder.worldUuid, item)
-            is EnvGravityHolder -> handleGravityClick(event, player, holder.worldUuid, item)
-            is EnvScaleHolder -> handleScaleClick(event, player, holder.worldUuid, item)
-        }
+        handleMainClick(event, player, holder.worldUuid, item)
     }
 
     private fun handleMainClick(event: InventoryClickEvent, player: Player, worldUuid: UUID, item: ItemStack) {
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
         if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
         when (ItemTag.getString(item, ACTION_KEY)) {
-            ACTION_WEATHER -> {
-                pushMainRoute(player, worldData)
-                openWeatherMenu(player, worldData)
-            }
+            ACTION_WEATHER -> cycleWeather(player, worldData, reverse = event.isRightClick)
             ACTION_TIME -> {
-                pushMainRoute(player, worldData)
-                openTimeMenu(player, worldData)
+                if (event.isShiftClick && event.isLeftClick) {
+                    showCustomTimeDialog(player, worldData)
+                } else {
+                    cycleTime(player, worldData, reverse = event.isRightClick)
+                }
             }
-            ACTION_GRAVITY -> {
-                pushMainRoute(player, worldData)
-                openGravityMenu(player, worldData)
-            }
-            ACTION_SCALE -> {
-                pushMainRoute(player, worldData)
-                openScaleMenu(player, worldData)
-            }
+            ACTION_GRAVITY -> cycleGravity(player, worldData, reverse = event.isRightClick)
+            ACTION_SCALE -> cycleScale(player, worldData, reverse = event.isRightClick)
+            ACTION_FLIGHT -> toggleFlight(player, worldData)
         }
         if (ItemTag.isType(item, ItemTag.TYPE_GUI_RETURN)) {
             if (!mwm().menuRouteHistory.openPrevious(player)) {
@@ -108,6 +112,168 @@ class ChanponEnvironmentGui(
                 }
             }
         }
+    }
+
+    @EventHandler
+    fun onCustomTimeInput(event: PlayerCustomClickEvent) {
+        val identifier = event.identifier
+        if (identifier != Key.key("mwmchanpon:environment/time_submit") &&
+            identifier != Key.key("mwmchanpon:environment/time_cancel")
+        ) {
+            return
+        }
+
+        val conn = event.commonConnection as? PlayerGameConnection ?: return
+        val player = conn.player
+        val worldUuid = pendingTimeInputs.remove(player.uniqueId) ?: return
+        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
+        if (identifier == Key.key("mwmchanpon:environment/time_cancel")) {
+            open(player, worldData)
+            return
+        }
+
+        val input = event.getDialogResponseView()?.getText("custom_time").orEmpty()
+        val parsed = parseCustomTime(input)
+        if (parsed == null) {
+            player.sendMessage(i18n(player, "time.custom.invalid"))
+            showCustomTimeDialog(player, worldData, input)
+            return
+        }
+
+        worldData.fixedTime = parsed
+        MyWorldManagerApi.getWorldRepository()?.save(worldData)
+        applyTime(worldUuid, parsed)
+        open(player, worldData)
+    }
+
+    private fun cycleWeather(player: Player, worldData: WorldData, reverse: Boolean) {
+        val next = nextNullableValue(worldData.fixedWeather, WEATHER_VALUES, reverse)
+        worldData.fixedWeather = next
+        MyWorldManagerApi.getWorldRepository()?.save(worldData)
+        applyWeather(worldData.uuid, next)
+        open(player, worldData)
+    }
+
+    private fun cycleTime(player: Player, worldData: WorldData, reverse: Boolean) {
+        val next = nextNullableValue(worldData.fixedTime, TIME_VALUES, reverse)
+        worldData.fixedTime = next
+        MyWorldManagerApi.getWorldRepository()?.save(worldData)
+        applyTime(worldData.uuid, next)
+        open(player, worldData)
+    }
+
+    private fun cycleGravity(player: Player, worldData: WorldData, reverse: Boolean) {
+        val next = nextValue(worldData.gravityValue, GRAVITY_VALUES, reverse)
+        worldData.gravityValue = next
+        MyWorldManagerApi.getWorldRepository()?.save(worldData)
+        applyGravityToWorld(worldData.uuid, next)
+        open(player, worldData)
+    }
+
+    private fun cycleScale(player: Player, worldData: WorldData, reverse: Boolean) {
+        val next = nextValue(worldData.fixedScale, SCALE_VALUES, reverse)
+        worldData.fixedScale = next
+        MyWorldManagerApi.getWorldRepository()?.save(worldData)
+        applyScaleToWorld(worldData.uuid, next)
+        open(player, worldData)
+    }
+
+    private fun toggleFlight(player: Player, worldData: WorldData) {
+        worldData.allowFlight = !worldData.allowFlight
+        MyWorldManagerApi.getWorldRepository()?.save(worldData)
+        applyFlightToWorld(worldData.uuid, worldData.allowFlight)
+        open(player, worldData)
+    }
+
+    private fun showCustomTimeDialog(player: Player, worldData: WorldData, initial: String = worldData.fixedTime?.toString() ?: "") {
+        pendingTimeInputs[player.uniqueId] = worldData.uuid
+        val dialog = Dialog.create { builder ->
+            builder.empty()
+                .base(
+                    DialogBase.builder(i18nComponent(player, "time.custom.title"))
+                        .body(listOf(DialogBody.plainMessage(i18nComponent(player, "time.custom.body"))))
+                        .inputs(
+                            listOf(
+                                DialogInput.text("custom_time", i18nComponent(player, "time.custom.label"))
+                                    .initial(initial)
+                                    .maxLength(8)
+                                    .build()
+                            )
+                        )
+                        .build()
+                )
+                .type(
+                    DialogType.confirmation(
+                        ActionButton.create(
+                            i18nComponent(player, "time.custom.apply"),
+                            null,
+                            100,
+                            DialogAction.customClick(Key.key("mwmchanpon:environment/time_submit"), null)
+                        ),
+                        ActionButton.create(
+                            Component.text(i18n(player, "common.back"), NamedTextColor.GRAY),
+                            null,
+                            200,
+                            DialogAction.customClick(Key.key("mwmchanpon:environment/time_cancel"), null)
+                        )
+                    )
+                )
+        }
+        player.showDialog(dialog)
+    }
+
+    private fun parseCustomTime(input: String): Long? {
+        val normalized = input.trim()
+        val tickValue = normalized.toLongOrNull()
+        if (tickValue != null) return tickValue.takeIf { it in 0L..23999L }
+
+        val parts = normalized.split(":")
+        if (parts.size != 2) return null
+        val hour = parts[0].toIntOrNull() ?: return null
+        val minute = parts[1].toIntOrNull() ?: return null
+        if (hour !in 0..23 || minute !in 0..59) return null
+        return Math.floorMod((hour * 1000L + minute * 1000L / 60L) - 6000L, 24000L)
+    }
+
+    private fun applyFlightToWorld(worldUuid: UUID, allowFlight: Boolean) {
+        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
+        val worldName = worldData.customWorldName ?: "my_world.$worldUuid"
+        val world = Bukkit.getWorld(worldName) ?: return
+        world.players.forEach { p ->
+            val gameModeAllowsFlight = p.gameMode == GameMode.CREATIVE || p.gameMode == GameMode.SPECTATOR
+            if (allowFlight || gameModeAllowsFlight) {
+                p.allowFlight = true
+            } else {
+                if (p.isFlying) p.isFlying = false
+                p.allowFlight = false
+            }
+        }
+    }
+
+    private fun <T> nextValue(current: T?, values: List<T>, reverse: Boolean): T {
+        val index = values.indexOf(current)
+        if (index < 0) {
+            return if (reverse) values.last() else values.first()
+        }
+        val nextIndex = if (reverse) {
+            (index + values.size - 1) % values.size
+        } else {
+            (index + 1) % values.size
+        }
+        return values[nextIndex]
+    }
+
+    private fun <T> nextNullableValue(current: T?, values: List<T?>, reverse: Boolean): T? {
+        val index = values.indexOf(current)
+        if (index < 0) {
+            return if (reverse) values.last() else values.first()
+        }
+        val nextIndex = if (reverse) {
+            (index + values.size - 1) % values.size
+        } else {
+            (index + 1) % values.size
+        }
+        return values[nextIndex]
     }
 
     // ---- Weather ----
@@ -142,10 +308,17 @@ class ChanponEnvironmentGui(
         openWeatherMenu(player, worldData)
     }
 
-    private fun applyWeather(worldUuid: UUID, weather: String) {
+    private fun applyWeather(worldUuid: UUID, weather: String?) {
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
         val worldName = worldData.customWorldName ?: "my_world.$worldUuid"
         val world = Bukkit.getWorld(worldName) ?: return
+        if (weather == null) {
+            world.setGameRule(GameRule.DO_WEATHER_CYCLE, true)
+            world.weatherDuration = 0
+            world.thunderDuration = 0
+            return
+        }
+        world.setGameRule(GameRule.DO_WEATHER_CYCLE, false)
         when (weather) {
             "CLEAR" -> {
                 world.setStorm(false)
@@ -201,10 +374,14 @@ class ChanponEnvironmentGui(
         openTimeMenu(player, worldData)
     }
 
-    private fun applyTime(worldUuid: UUID, time: Long) {
+    private fun applyTime(worldUuid: UUID, time: Long?) {
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
         val worldName = worldData.customWorldName ?: "my_world.$worldUuid"
         val world = Bukkit.getWorld(worldName) ?: return
+        if (time == null) {
+            world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, true)
+            return
+        }
         world.time = time
         world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false)
     }
@@ -306,6 +483,43 @@ class ChanponEnvironmentGui(
     }
 
     // ---- Item helpers ----
+
+    private fun directSettingItem(
+        player: Player,
+        key: String,
+        material: Material,
+        currentValue: String,
+        options: List<SettingOption>,
+        currentKey: String?,
+        customTimeAction: Boolean = false
+    ): ItemStack {
+        val item = ItemStack(material)
+        item.editMeta { meta ->
+            meta.displayName(i18nComponent(player, "$key.display"))
+            meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(buildList {
+                add(GuiLoreLine.Data(i18n(player, "common.current_label"), currentValue, "\u00A7e"))
+                add(GuiLoreLine.Warning(i18n(player, "common.must_be_in_world_warning")))
+                add(GuiLoreLine.Text(i18n(player, "$key.description")))
+                add(GuiLoreLine.Spacer)
+                options.forEach { option ->
+                    val selected = option.key == currentKey
+                    val marker = if (selected) "\u00A7a\u00BB" else "\u00A78\u30FB"
+                    val color = if (selected) option.selectedColor else "\u00A77"
+                    add(GuiLoreLine.Raw("$marker $color${option.display}"))
+                }
+                add(GuiLoreLine.Spacer)
+                add(GuiLoreLine.SingleAction(i18n(player, "common.action_next")))
+            }, GuiLoreFrame.BOTH)))
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
+        }
+        ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
+        ItemTag.setString(item, ACTION_KEY, key)
+        return item
+    }
+
+    private fun emptySettingSlot(): ItemStack {
+        return decoration(Material.WHITE_STAINED_GLASS_PANE)
+    }
 
     private fun categoryItem(player: Player, key: String, currentValue: String, active: Boolean): ItemStack {
         val item = ItemStack(
@@ -417,22 +631,79 @@ class ChanponEnvironmentGui(
         return if (weather != null) i18n(player, "weather.${weather.lowercase()}.display") else i18n(player, "common.not_set")
     }
 
+    private fun weatherOptions(player: Player): List<SettingOption> {
+        return listOf(SettingOption(NONE_KEY, i18n(player, "common.not_set"), "\u00A77")) +
+                WEATHER_VALUES.filterNotNull().map { weather ->
+            SettingOption(weather, i18n(player, "weather.${weather.lowercase()}.display"), weatherColor(weather))
+        }
+    }
+
     private fun timeDisplay(player: Player, time: Long?): String {
         return when (time) {
             0L -> i18n(player, "time.morning.display")
             6000L -> i18n(player, "time.noon.display")
             12500L -> i18n(player, "time.dusk.display")
             18000L -> i18n(player, "time.night.display")
-            else -> i18n(player, "common.not_set")
+            null -> i18n(player, "common.not_set")
+            else -> i18n(player, "time.custom.display", mapOf("time" to time))
         }
+    }
+
+    private fun timeOptions(player: Player, current: Long?): List<SettingOption> {
+        val base = listOf(
+            SettingOption(NONE_KEY, i18n(player, "common.not_set"), "\u00A77"),
+            SettingOption("0", i18n(player, "time.morning.display"), "\u00A7e"),
+            SettingOption("6000", i18n(player, "time.noon.display"), "\u00A7e"),
+            SettingOption("12500", i18n(player, "time.dusk.display"), "\u00A76"),
+            SettingOption("18000", i18n(player, "time.night.display"), "\u00A79")
+        )
+        if (current != null && current !in TIME_VALUES.filterNotNull()) {
+            return base + SettingOption("CUSTOM", timeDisplay(player, current), "\u00A7d")
+        }
+        return base
+    }
+
+    private fun timeOptionKey(time: Long?): String? {
+        return when (time) {
+            null -> NONE_KEY
+            in TIME_VALUES.filterNotNull() -> time.toString()
+            else -> "CUSTOM"
+        }
+    }
+
+    private fun flightDisplay(player: Player, allowFlight: Boolean): String {
+        return i18n(player, if (allowFlight) "flight.enabled" else "flight.disabled")
+    }
+
+    private fun flightDisplay(player: Player, allowFlight: Boolean?): String {
+        return flightDisplay(player, allowFlight == true)
+    }
+
+    private fun flightOptions(player: Player): List<SettingOption> {
+        return listOf(
+            SettingOption("true", i18n(player, "flight.enabled"), "\u00A7a"),
+            SettingOption("false", i18n(player, "flight.disabled"), "\u00A7c")
+        )
     }
 
     private fun gravityDisplay(player: Player, gravity: Double?): String {
         return when (gravity) {
+            null -> i18n(player, "gravity.earth.display")
             0.08 -> i18n(player, "gravity.earth.display")
             0.02 -> i18n(player, "gravity.mars.display")
             0.01 -> i18n(player, "gravity.moon.display")
             else -> i18n(player, "common.not_set")
+        }
+    }
+
+    private fun gravityOptions(player: Player): List<SettingOption> {
+        return GRAVITY_VALUES.map { gravity ->
+            val key = when (gravity) {
+                0.02 -> "mars"
+                0.01 -> "moon"
+                else -> "earth"
+            }
+            SettingOption(gravity.toString(), i18n(player, "gravity.$key.display"), "\u00A7e")
         }
     }
 
@@ -442,6 +713,26 @@ class ChanponEnvironmentGui(
             0.5 -> i18n(player, "scale.small.display")
             2.0 -> i18n(player, "scale.giant.display")
             else -> i18n(player, "common.not_set")
+        }
+    }
+
+    private fun scaleOptions(player: Player): List<SettingOption> {
+        return SCALE_VALUES.map { scale ->
+            val key = when (scale) {
+                0.5 -> "small"
+                2.0 -> "giant"
+                else -> "normal"
+            }
+            SettingOption(scale.toString(), i18n(player, "scale.$key.display"), "\u00A7e")
+        }
+    }
+
+    private fun weatherColor(weather: String): String {
+        return when (weather) {
+            "CLEAR" -> "\u00A7e"
+            "RAIN" -> "\u00A7b"
+            "THUNDER" -> "\u00A73"
+            else -> "\u00A7f"
         }
     }
 
@@ -511,13 +802,25 @@ class ChanponEnvironmentGui(
         override fun getInventory(): Inventory = inv
     }
 
+    private data class SettingOption(
+        val key: String,
+        val display: String,
+        val selectedColor: String
+    )
+
     companion object {
         private const val ACTION_KEY = "chanpon_env_action"
         private const val ACTION_WEATHER = "weather"
         private const val ACTION_TIME = "time"
         private const val ACTION_GRAVITY = "gravity"
         private const val ACTION_SCALE = "scale"
+        private const val ACTION_FLIGHT = "flight"
+        private const val NONE_KEY = "NONE"
         private const val DEFAULT_GRAVITY = 0.08
         private const val DEFAULT_SCALE = 1.0
+        private val WEATHER_VALUES = listOf<String?>(null, "CLEAR", "RAIN", "THUNDER")
+        private val TIME_VALUES = listOf<Long?>(null, 0L, 6000L, 12500L, 18000L)
+        private val GRAVITY_VALUES = listOf(0.08, 0.02, 0.01)
+        private val SCALE_VALUES = listOf(1.0, 0.5, 2.0)
     }
 }

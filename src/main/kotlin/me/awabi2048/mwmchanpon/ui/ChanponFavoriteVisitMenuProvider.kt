@@ -6,7 +6,6 @@ import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
-import me.awabi2048.myworldmanager.api.event.MwmWarpReason
 import me.awabi2048.myworldmanager.api.extension.FavoriteListMenuProvider
 import me.awabi2048.myworldmanager.api.extension.FavoriteListMenuRequest
 import me.awabi2048.myworldmanager.api.extension.FavoriteMenuProvider
@@ -137,7 +136,8 @@ class ChanponFavoriteVisitMenuProvider(
         val worldData = mwm().worldConfigRepository.findByUuid(uuid) ?: return
         if (event.isLeftClick && !event.isShiftClick) {
             player.closeInventory()
-            mwm().worldService.teleportToWorld(player, uuid, null, true, MwmWarpReason.DIRECT, null)
+            // ロードを伴うワープの通知・失敗処理はMWM本体の公開APIへ集約する。
+            MyWorldManagerApi.getWorldService()?.teleportToWorld(player, uuid)
             return
         }
         if (event.isRightClick && !event.isShiftClick && !isMember(player, worldData)) {

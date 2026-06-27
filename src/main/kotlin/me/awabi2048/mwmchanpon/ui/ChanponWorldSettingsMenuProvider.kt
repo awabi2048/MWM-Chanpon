@@ -16,6 +16,7 @@ import me.awabi2048.myworldmanager.api.extension.MenuExtensionContext
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsInventoryHolder
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsMenuProvider
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsMenuRequest
+import me.awabi2048.myworldmanager.api.event.MwmWarpReason
 import me.awabi2048.myworldmanager.api.service.ExpansionExecutionMode
 import me.awabi2048.myworldmanager.api.service.ExpansionSequenceOptions
 import me.awabi2048.myworldmanager.api.service.ExpansionSequencePhase
@@ -91,7 +92,7 @@ class ChanponWorldSettingsMenuProvider(
         if (hasManagePermission) {
             inventory.setItem(19, mwmItem(player, "info", Material.NAME_TAG, ItemTag.TYPE_GUI_SETTING_INFO))
             inventory.setItem(20, mwmItem(player, "icon", Material.ANVIL, ItemTag.TYPE_GUI_SETTING_ICON))
-            inventory.setItem(21, mwmItem(player, "spawn", Material.COMPASS, ItemTag.TYPE_GUI_SETTING_SPAWN))
+            inventory.setItem(21, mwmItem(player, "spawn", Material.COMPASS, ItemTag.TYPE_GUI_SETTING_SPAWN, requireTargetWorld = true))
             inventory.setItem(28, mwmItem(player, "announcement", Material.OAK_SIGN, ItemTag.TYPE_GUI_SETTING_ANNOUNCEMENT))
             inventory.setItem(29, notificationItem(player, worldData))
             inventory.setItem(47, mwmItem(player, "tour", Material.PALE_OAK_BOAT, ItemTag.TYPE_GUI_SETTING_TOUR, "gui.tour.worldmenu"))
@@ -100,7 +101,7 @@ class ChanponWorldSettingsMenuProvider(
             inventory.setItem(23, expansionItem(player, worldData))
             inventory.setItem(24, publishItem(player, worldData))
             inventory.setItem(25, mwmItem(player, "member", Material.PLAYER_HEAD, ItemTag.TYPE_GUI_SETTING_MEMBER))
-            inventory.setItem(32, mwmItem(player, "environment", Material.GRASS_BLOCK, ItemTag.TYPE_GUI_SETTING_ENVIRONMENT))
+            inventory.setItem(32, mwmItem(player, "environment", Material.GRASS_BLOCK, ItemTag.TYPE_GUI_SETTING_ENVIRONMENT, requireTargetWorld = true))
             inventory.setItem(33, criticalItem(player, worldData))
         }
         ChanponGuiElements.setSettingsFooter(
@@ -140,6 +141,25 @@ class ChanponWorldSettingsMenuProvider(
         val isModerator = worldData.moderators.contains(player.uniqueId)
 
         val type = ItemTag.getType(item)
+        if (type == ItemTag.TYPE_GUI_INFO && ItemTag.getWorldUuid(item) == worldData.uuid) {
+            mwm.soundManager.playClickSound(player, item, "world_settings")
+            mwm.worldService.teleportToWorldKeepingInventory(
+                player,
+                worldData.uuid,
+                MwmWarpReason.DIRECT,
+                Runnable {
+                player.sendMessage(
+                    mwm.languageManager.getMessage(
+                        player,
+                        "messages.warp_success",
+                        mapOf("world" to worldData.name)
+                    )
+                )
+                open(player, worldData, currentRequest(player))
+                }
+            )
+            return
+        }
         val ownerOnlyTypes = setOf(
             ItemTag.TYPE_GUI_SETTING_EXPAND,
             ItemTag.TYPE_GUI_SETTING_CRITICAL,
@@ -210,11 +230,7 @@ class ChanponWorldSettingsMenuProvider(
             }
             ItemTag.TYPE_GUI_SETTING_PUBLISH -> {
                 mwm.soundManager.playClickSound(player, item, "world_settings")
-                val nextVisibility = when (storage.getVisibility(worldUuid)) {
-                    ChanponWorldVisibility.PUBLIC -> ChanponWorldVisibility.DEVELOPMENT
-                    ChanponWorldVisibility.DEVELOPMENT -> ChanponWorldVisibility.PRIVATE
-                    ChanponWorldVisibility.PRIVATE -> ChanponWorldVisibility.PUBLIC
-                }
+                val nextVisibility = nextVisibility(storage.getVisibility(worldUuid), event.isRightClick)
                 storage.setVisibility(worldUuid, nextVisibility)
                 open(player, worldData, currentRequest(player))
             }
@@ -700,8 +716,10 @@ class ChanponWorldSettingsMenuProvider(
             Material.FILLED_MAP,
             i18n(player, "expand.display"),
             describedLore(
+                player,
                 mwm().languageManager.getMessageList(player, "gui.settings.expand.blocks.description"),
-                lines
+                lines,
+                requireTargetWorld = true
             ),
             ItemTag.TYPE_GUI_SETTING_EXPAND
         )
@@ -713,6 +731,7 @@ class ChanponWorldSettingsMenuProvider(
             if (worldData.notificationEnabled) Material.BELL else Material.OAK_DOOR,
             mwm().languageManager.getMessage(player, "gui.settings.notification.display"),
             describedLore(
+                player,
                 mwm().languageManager.getMessageList(player, "gui.settings.notification.blocks.description"),
                 i18nList(player, "notification.lore", mapOf("status" to status))
             ),
@@ -728,8 +747,10 @@ class ChanponWorldSettingsMenuProvider(
             Material.TNT,
             i18n(player, "critical.display"),
             describedLore(
+                player,
                 mwm().languageManager.getMessageList(player, "gui.settings.critical.blocks.summary"),
-                i18nList(player, "critical.action_lore")
+                i18nList(player, "critical.action_lore"),
+                requireTargetWorld = true
             ),
             ItemTag.TYPE_GUI_SETTING_CRITICAL
         )
@@ -751,6 +772,7 @@ class ChanponWorldSettingsMenuProvider(
             Material.BARRIER,
             i18n(player, "critical.unavailable_display"),
             describedLore(
+                player,
                 mwm().languageManager.getMessageList(player, "gui.settings.critical.blocks.summary"),
                 i18nList(player, loreKey)
             ),
@@ -759,12 +781,14 @@ class ChanponWorldSettingsMenuProvider(
     }
 
     private fun worldInfoItem(player: Player, worldData: WorldData): ItemStack {
-        return item(
+        val item = item(
             worldData.icon,
             "§e${worldData.name}",
             i18nList(player, "info.lore", mapOf("description" to worldData.description.ifBlank { "-" })),
             ItemTag.TYPE_GUI_INFO
         )
+        ItemTag.setWorldUuid(item, worldData.uuid)
+        return item
     }
 
     private fun mwmItem(
@@ -772,12 +796,15 @@ class ChanponWorldSettingsMenuProvider(
         iconKey: String,
         material: Material,
         type: String,
-        langPrefix: String = "gui.settings.$iconKey"
+        langPrefix: String = "gui.settings.$iconKey",
+        requireTargetWorld: Boolean = false
     ): ItemStack {
         val display = mwm().languageManager.getMessage(player, "$langPrefix.display")
         val lore = describedLore(
+            player,
             mwmDescription(player, iconKey),
-            i18nList(player, "mwm_action.lore")
+            i18nList(player, "mwm_action.lore"),
+            requireTargetWorld = requireTargetWorld
         )
         val icon = mwm().menuConfigManager.getIconMaterial("world_settings", iconKey, material)
         return componentItem(icon, display, lore, type)
@@ -798,10 +825,13 @@ class ChanponWorldSettingsMenuProvider(
         return mwm().languageManager.getMessageList(player, key)
     }
 
-    private fun describedLore(description: List<String>, existing: List<String>): List<Component> {
+    private fun describedLore(player: Player, description: List<String>, existing: List<String>, requireTargetWorld: Boolean = false): List<Component> {
         return CCSystem.getAPI().getLoreService().render(
             GuiLoreSpec.Rich(
                 buildList {
+                    if (requireTargetWorld) {
+                        add(GuiLoreLine.Warning(i18n(player, "common.must_be_in_world_warning")))
+                    }
                     description.filter { it.isNotBlank() }.forEach { add(GuiLoreLine.Raw(it)) }
                     if (description.any { it.isNotBlank() } && existing.any { it.isNotBlank() }) {
                         add(GuiLoreLine.Spacer)
@@ -943,6 +973,21 @@ class ChanponWorldSettingsMenuProvider(
 
     private fun visibilityName(player: Player?, visibility: ChanponWorldVisibility): String {
         return i18n(player, "visibility.${visibility.storageValue}")
+    }
+
+    private fun nextVisibility(current: ChanponWorldVisibility, reverse: Boolean): ChanponWorldVisibility {
+        val values = listOf(
+            ChanponWorldVisibility.PUBLIC,
+            ChanponWorldVisibility.DEVELOPMENT,
+            ChanponWorldVisibility.PRIVATE
+        )
+        val index = values.indexOf(current).let { if (it < 0) 0 else it }
+        val nextIndex = if (reverse) {
+            (index + values.size - 1) % values.size
+        } else {
+            (index + 1) % values.size
+        }
+        return values[nextIndex]
     }
 
     private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)

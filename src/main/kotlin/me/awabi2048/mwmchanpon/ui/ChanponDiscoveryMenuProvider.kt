@@ -7,7 +7,6 @@ import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
-import me.awabi2048.myworldmanager.api.event.MwmWarpReason
 import me.awabi2048.myworldmanager.api.extension.DiscoveryMenuProvider
 import me.awabi2048.myworldmanager.api.extension.DiscoveryMenuRequest
 import me.awabi2048.myworldmanager.model.WorldData
@@ -99,7 +98,8 @@ class ChanponDiscoveryMenuProvider(
                 }
                 mwm().soundManager.playClickSound(player, item, "discovery")
                 player.closeInventory()
-                mwm().worldService.teleportToWorld(player, worldUuid, null, true, MwmWarpReason.DIRECT, null)
+                // Chanponからは公開APIだけを通し、MWM本体側のロード通知とワープ処理に揃える。
+                MyWorldManagerApi.getWorldService()?.teleportToWorld(player, worldUuid)
                 player.sendMessage(mwm().languageManager.getMessage(player, "messages.warp_success", mapOf("world" to worldData.name)))
             }
         }

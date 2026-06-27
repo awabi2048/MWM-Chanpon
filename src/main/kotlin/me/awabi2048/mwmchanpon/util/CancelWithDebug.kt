@@ -1,19 +1,10 @@
 package me.awabi2048.mwmchanpon.util
 
-import me.awabi2048.mwmchanpon.MWMChanponPlugin
-import org.bukkit.entity.Player
 import org.bukkit.event.inventory.InventoryAction
 import org.bukkit.event.inventory.InventoryClickEvent
-import org.bukkit.plugin.java.JavaPlugin
 
 fun InventoryClickEvent.cancelWithDebug(source: String, force: Boolean = false) {
-    val player = this.whoClicked as? Player ?: return
-    val plugin = JavaPlugin.getPlugin(MWMChanponPlugin::class.java)
     if (!force && !shouldCancelProtectedMenuClick()) return
-    val parts = source.split(": ", limit = 2)
-    val path = parts[0]
-    val reason = parts.getOrElse(1) { "unspecified" }
-    plugin.logger.info("[ClickCancel] player=${player.name} | source=${path} | reason=${reason} | title=${this.view.title()} | slot=${this.slot} | click=${this.click} | action=${this.action}")
     this.isCancelled = true
 }
 

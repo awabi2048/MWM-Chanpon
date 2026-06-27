@@ -15,7 +15,6 @@ import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
-import me.awabi2048.myworldmanager.api.event.MwmWarpReason
 import me.awabi2048.myworldmanager.api.extension.PlayerWorldMenuProvider
 import me.awabi2048.myworldmanager.api.extension.PlayerWorldMenuRequest
 import me.awabi2048.myworldmanager.model.WorldData
@@ -177,7 +176,8 @@ class ChanponPlayerWorldMenuProvider(
         if (event.isLeftClick && !event.isShiftClick) {
             if (worldData.isArchived) return
             player.closeInventory()
-            mwm.worldService.teleportToWorld(player, uuid, null, true, MwmWarpReason.DIRECT, null)
+            // MWM本体の具象サービスを直接呼ぶとKotlinランタイムのクラスローダー差で壊れるため、公開API境界だけを通す。
+            MyWorldManagerApi.getWorldService()?.teleportToWorld(player, uuid)
             player.sendMessage(mwm.languageManager.getMessage(player, "messages.warp_success", mapOf("world" to worldData.name)))
             mwm.soundManager.playClickSound(player, item, "player_world")
             return
@@ -363,8 +363,10 @@ class ChanponPlayerWorldMenuProvider(
             player.hasPermission("craftercrossing.test")
 
     private fun hasCreatePermission(player: Player): Boolean =
-        player.hasPermission("myworldmanager.command.mwm.create") ||
+        player.hasPermission("mwmchanpon.create_world") ||
+            player.hasPermission("myworldmanager.command.mwm.create") ||
             player.hasPermission("myworldmanager.admin") ||
+            player.hasPermission("mwmchanpon.admin") ||
             player.hasPermission("craftercrossing.test")
 
     private fun creationBlockReason(player: Player, currentCreateCount: Int, maxCreateCount: Int): CreationBlockReason? {

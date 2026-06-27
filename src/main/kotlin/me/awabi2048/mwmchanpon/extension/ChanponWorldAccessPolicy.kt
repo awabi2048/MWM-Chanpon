@@ -6,6 +6,7 @@ import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.myworldmanager.api.extension.MeetTargetAction
 import me.awabi2048.myworldmanager.api.extension.WorldAccessPolicy
 import me.awabi2048.myworldmanager.model.WorldData
+import org.bukkit.OfflinePlayer
 import org.bukkit.entity.Player
 
 class ChanponWorldAccessPolicy(
@@ -34,6 +35,11 @@ class ChanponWorldAccessPolicy(
 
     override fun canInviteToWorld(sender: Player, worldData: WorldData): Boolean =
         canUseMyWorldSystem(sender)
+
+    override fun canInviteTarget(sender: Player, worldData: WorldData, target: OfflinePlayer): Boolean {
+        val targetPlayer = target as? Player ?: return false
+        return canUseMyWorldSystem(targetPlayer) && canCreateWorld(targetPlayer)
+    }
 
     override fun canEnterWorld(player: Player, worldData: WorldData, isMember: Boolean): Boolean {
         if (!canUseMyWorldSystem(player)) return false
@@ -64,4 +70,11 @@ class ChanponWorldAccessPolicy(
 
     private fun canUseMyWorldSystem(player: Player): Boolean =
         !globalStorage.isArchiveLocked() || player.hasPermission("mwmchanpon.admin")
+
+    private fun canCreateWorld(player: Player): Boolean =
+        player.hasPermission("mwmchanpon.create_world") ||
+            player.hasPermission("myworldmanager.command.mwm.create") ||
+            player.hasPermission("myworldmanager.admin") ||
+            player.hasPermission("mwmchanpon.admin") ||
+            player.hasPermission("craftercrossing.test")
 }

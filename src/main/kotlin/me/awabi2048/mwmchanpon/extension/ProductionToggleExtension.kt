@@ -49,7 +49,8 @@ class ProductionToggleExtension(
     override fun onPrepare(context: MenuExtensionContext) {
         if (context.menuType != "creation_confirm") return
         // Chanpon は中央のフッター枠を本番ワールド設定に使うため、MWM のスポーン設定を7枠目へ送る。
-        context.get<CreationConfirmationLayout>("layout")?.spawnLocationSlot = 42
+        // 作成確認の中央行は「ディメンション / 本番用設定 / スポーン位置」の3点を横並びにする。
+        context.get<CreationConfirmationLayout>("layout")?.spawnLocationSlot = 41
     }
 
     override fun onRender(inventory: Inventory, player: Player, context: MenuExtensionContext) {
