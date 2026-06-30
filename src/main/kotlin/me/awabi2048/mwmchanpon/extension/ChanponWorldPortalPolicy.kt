@@ -5,6 +5,7 @@ import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.myworldmanager.api.extension.WorldPortalPolicy
 import me.awabi2048.myworldmanager.model.WorldData
+import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 
 class ChanponWorldPortalPolicy(
@@ -21,13 +22,20 @@ class ChanponWorldPortalPolicy(
     }
 
     override fun blockedMessages(player: Player, destination: WorldData): List<String> {
-        return listOf(
-            text(player, "chanpon.portal.public_only"),
-            text(player, "chanpon.portal.meet_hint")
+        val visibility = storage.getVisibility(destination.uuid)
+        val key = when (visibility) {
+            ChanponWorldVisibility.DEVELOPMENT -> "chanpon.portal.development"
+            ChanponWorldVisibility.PRIVATE -> "chanpon.portal.locked"
+            ChanponWorldVisibility.PUBLIC -> return emptyList()
+        }
+        val ownerName = Bukkit.getOfflinePlayer(destination.owner).name ?: destination.owner.toString()
+        return CCSystem.getAPI().getI18nStringList(
+            player,
+            key,
+            mapOf(
+                "owner" to ownerName,
+                "world" to destination.name
+            )
         )
-    }
-
-    private fun text(player: Player, key: String): String {
-        return CCSystem.getAPI().getI18nString(player, key)
     }
 }

@@ -32,6 +32,7 @@ import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
 import org.bukkit.event.inventory.InventoryClickEvent
+import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
@@ -61,12 +62,14 @@ class ChanponEnvironmentGui(
         val gravity = worldData.gravityValue
         val scale = worldData.fixedScale
         val allowFlight = worldData.allowFlight
+        val targetWorldName = worldData.customWorldName ?: "my_world.${worldData.uuid}"
+        val outsideTargetWorld = player.world.name != targetWorldName
 
-        inventory.setItem(19, directSettingItem(player, ACTION_WEATHER, Material.LIGHT_BLUE_WOOL, weatherDisplay(player, weather), weatherOptions(player), weather ?: NONE_KEY))
-        inventory.setItem(20, directSettingItem(player, ACTION_TIME, Material.CLOCK, timeDisplay(player, time), timeOptions(player, time), timeOptionKey(time), customTimeAction = true))
-        inventory.setItem(21, directSettingItem(player, ACTION_GRAVITY, Material.FEATHER, gravityDisplay(player, gravity), gravityOptions(player), (gravity ?: DEFAULT_GRAVITY).toString()))
-        inventory.setItem(23, directSettingItem(player, ACTION_SCALE, Material.PLAYER_HEAD, scaleDisplay(player, scale), scaleOptions(player), scale?.toString()))
-        inventory.setItem(24, directSettingItem(player, ACTION_FLIGHT, Material.ELYTRA, flightDisplay(player, allowFlight), flightOptions(player), allowFlight.toString()))
+        inventory.setItem(19, directSettingItem(player, ACTION_WEATHER, Material.LIGHT_BLUE_WOOL, weatherDisplay(player, weather), weatherOptions(player), weather ?: NONE_KEY, outsideTargetWorld))
+        inventory.setItem(20, directSettingItem(player, ACTION_TIME, Material.CLOCK, timeDisplay(player, time), timeOptions(player, time), timeOptionKey(time), outsideTargetWorld, customTimeAction = true))
+        inventory.setItem(21, directSettingItem(player, ACTION_GRAVITY, Material.FEATHER, gravityDisplay(player, gravity), gravityOptions(player), (gravity ?: DEFAULT_GRAVITY).toString(), outsideTargetWorld))
+        inventory.setItem(23, directSettingItem(player, ACTION_SCALE, Material.PLAYER_HEAD, scaleDisplay(player, scale), scaleOptions(player), scale?.toString(), outsideTargetWorld))
+        inventory.setItem(24, directSettingItem(player, ACTION_FLIGHT, Material.ELYTRA, flightDisplay(player, allowFlight), flightOptions(player), allowFlight.toString(), outsideTargetWorld))
         inventory.setItem(25, emptySettingSlot())
         inventory.setItem(40, backItem(player))
 
@@ -248,6 +251,17 @@ class ChanponEnvironmentGui(
                 p.allowFlight = false
             }
         }
+    }
+
+    @EventHandler
+    fun onPlayerQuit(event: PlayerQuitEvent) {
+        val player = event.player
+        if (player.gameMode == GameMode.CREATIVE || player.gameMode == GameMode.SPECTATOR) {
+            return
+        }
+        // ワールド設定で一時的に付与した Fly を、次回ログイン時の通常権限状態へ持ち越さない。
+        if (player.isFlying) player.isFlying = false
+        player.allowFlight = false
     }
 
     private fun <T> nextValue(current: T?, values: List<T>, reverse: Boolean): T {
@@ -491,6 +505,7 @@ class ChanponEnvironmentGui(
         currentValue: String,
         options: List<SettingOption>,
         currentKey: String?,
+        showWorldRequiredWarning: Boolean,
         customTimeAction: Boolean = false
     ): ItemStack {
         val item = ItemStack(material)
@@ -498,7 +513,9 @@ class ChanponEnvironmentGui(
             meta.displayName(i18nComponent(player, "$key.display"))
             meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(buildList {
                 add(GuiLoreLine.Data(i18n(player, "common.current_label"), currentValue, "\u00A7e"))
-                add(GuiLoreLine.Warning(i18n(player, "common.must_be_in_world_warning")))
+                if (showWorldRequiredWarning) {
+                    add(GuiLoreLine.Warning(i18n(player, "common.must_be_in_world_warning")))
+                }
                 add(GuiLoreLine.Text(i18n(player, "$key.description")))
                 add(GuiLoreLine.Spacer)
                 options.forEach { option ->

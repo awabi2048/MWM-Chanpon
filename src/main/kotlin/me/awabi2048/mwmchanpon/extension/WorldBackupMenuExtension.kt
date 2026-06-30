@@ -42,6 +42,7 @@ import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.Plugin
+import org.bukkit.plugin.java.JavaPlugin
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -109,13 +110,23 @@ class WorldBackupMenuExtension(
             return
         }
         when (ItemTag.getType(item)) {
-            ItemTag.TYPE_GUI_RETURN -> returnToWorldSettings(player, holder.worldUuid)
-            ItemTag.TYPE_GUI_NAV_PREV, ItemTag.TYPE_GUI_NAV_NEXT -> open(player, holder.worldUuid, ItemTag.getTargetPage(item) ?: holder.page)
+            ItemTag.TYPE_GUI_RETURN -> {
+                mwm().soundManager.playClickSound(player, item, "world_settings")
+                returnToWorldSettings(player, holder.worldUuid)
+            }
+            ItemTag.TYPE_GUI_NAV_PREV, ItemTag.TYPE_GUI_NAV_NEXT -> {
+                mwm().soundManager.playClickSound(player, item, "world_settings")
+                open(player, holder.worldUuid, ItemTag.getTargetPage(item) ?: holder.page)
+            }
             TYPE_BACKUP_ITEM -> {
                 val backup = findBackup(item) ?: return
-                if (event.click.isLeftClick) openRestoreConfirm(player, backup, holder)
+                if (event.click.isLeftClick) {
+                    mwm().soundManager.playClickSound(player, item, "world_settings")
+                    openRestoreConfirm(player, backup, holder)
+                }
             }
             TYPE_CONTROL -> if (ItemTag.getString(item, ACTION_KEY) == ACTION_BACKUP) {
+                mwm().soundManager.playClickSound(player, item, "world_settings")
                 if (automationService.isManualOperationBlocked(player)) {
                     player.sendMessage(i18nComponent(player, "message.manual_operation_blocked"))
                     open(player, holder.worldUuid, holder.page)
@@ -500,6 +511,7 @@ class WorldBackupMenuExtension(
     private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
     private fun lore(lines: List<String>) = ChanponLore.build(lines)
+    private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)
 
     data class Holder(val worldUuid: UUID, val page: Int, val request: WorldSettingsMenuRequest) : WorldSettingsInventoryHolder {
         lateinit var inv: Inventory
