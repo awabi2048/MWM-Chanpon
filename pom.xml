@@ -14,7 +14,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <kotlin.version>2.3.20</kotlin.version>
-        <maven.compiler.release>21</maven.compiler.release>
+        <maven.compiler.release>25</maven.compiler.release>
     </properties>
 
     <repositories>
@@ -36,7 +36,7 @@
         <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
-            <version>1.21.8-R0.1-SNAPSHOT</version>
+            <version>26.1.2.build.72-stable</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -49,6 +49,7 @@
             <groupId>org.jetbrains.kotlin</groupId>
             <artifactId>kotlin-stdlib</artifactId>
             <version>${kotlin.version}</version>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>awabi2048</groupId>
@@ -137,6 +138,13 @@
                         </goals>
                         <configuration>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <artifactSet>
+                                <excludes>
+                                    <!-- MWM本体が公開APIのKotlin型を持つため、Chanpon側へKotlin stdlibを同梱しない。 -->
+                                    <exclude>org.jetbrains.kotlin:kotlin-stdlib</exclude>
+                                    <exclude>org.jetbrains:annotations</exclude>
+                                </excludes>
+                            </artifactSet>
                         </configuration>
                     </execution>
                 </executions>

@@ -27,7 +27,9 @@ internal class WorldSettingsAccessGuard(
         val moderator = worldData.moderators.contains(player.uniqueId)
         val authorized = if (ownerOnly) owner || admin else owner || moderator || admin
 
-        if (!authorized || storage.isImportedArchive(worldData.uuid) || protectionService.isProtected(worldData)) {
+        // 完成済み/提出済みの保護はブロック破壊などのワールド操作を止める責務であり、
+        // 設定メニューそのものは管理者・所有者が状態修正できるよう開けておく。
+        if (!authorized || storage.isImportedArchive(worldData.uuid)) {
             player.sendMessage(mwm.languageManager.getComponent(player, "general.no_permission"))
             denySound(player)
             return false

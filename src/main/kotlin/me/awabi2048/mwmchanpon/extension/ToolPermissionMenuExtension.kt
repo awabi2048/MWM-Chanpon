@@ -111,12 +111,27 @@ class ToolPermissionMenuExtension(
             GuiLoreLine.Spacer
         )
         if (memberUuid != worldData.owner) {
-            originalLore.takeLast(2).forEach { actionLines.add(GuiLoreLine.Raw(legacy.serialize(it))) }
+            // MWM 側の lore は既にフレーム用セパレータを含むため、Chanpon 側の GuiLoreBlock へ
+            // そのまま取り込むと CC-System の不変条件に抵触する。末尾アクションブロックのみ抽出する。
+            extractTrailingActionLines(originalLore).forEach { actionLines.add(GuiLoreLine.Raw(it)) }
         }
 
         return api.getLoreService().render(GuiLoreSpec.Blocks(listOf(
             GuiLoreBlock(lines),
             GuiLoreBlock(actionLines)
         )))
+    }
+
+    private fun extractTrailingActionLines(originalLore: List<Component>): List<String> {
+        val serialized = originalLore.map { legacy.serialize(it) }
+        val lastSeparator = serialized.indexOfLast(::isSeparatorLine)
+        return serialized
+            .drop(lastSeparator + 1)
+            .filter { it.isNotBlank() && !isSeparatorLine(it) }
+    }
+
+    private fun isSeparatorLine(line: String): Boolean {
+        val stripped = line.replace(Regex("[§&][0-9A-FK-ORa-fk-or]"), "").trim()
+        return stripped.isNotBlank() && stripped.all { it == '─' || it == '━' || it == '-' }
     }
 }

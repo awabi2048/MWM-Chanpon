@@ -1,7 +1,7 @@
 # mwm_chanpon_plugin 作業方針
 
 このリポジトリは `crafter_crossing` ワークスペース内の MyWorldManager アドオンです。
-Paper 1.21.8 向けに Kotlin / Maven で実装し、MyWorldManager の公開 API と CC-System の共通 API を前提にします。
+Paper 1.21.11 向けに Kotlin / Maven で実装し、MyWorldManager の公開 API と CC-System の共通 API を前提にします。
 
 ## 責務
 
@@ -46,7 +46,7 @@ Paper 1.21.8 向けに Kotlin / Maven で実装し、MyWorldManager の公開 AP
 ## ビルドとデプロイ
 
 - ソースコードを編集した場合は、最後に `mvn clean package` を実行する。
-- ビルド成功後、作業対象の成果物 `target/MWM-Chanpon-0.2.0-SNAPSHOT.jar` を `Chiyogami 1.21.8/plugins/` に配置する。
+- ビルド成功後、作業対象の成果物 `target/MWM-Chanpon-0.2.0-SNAPSHOT.jar` を `Chiyogami-1.21.11/plugins/` に配置する。
 - 配置前に既存の同系 JAR 名を確認し、無関係な JAR、設定ファイル、ワールドデータは削除しない。
 
 ## Git

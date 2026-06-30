@@ -175,6 +175,7 @@ class ChanponPlayerWorldMenuProvider(
         }
         if (event.isLeftClick && !event.isShiftClick) {
             if (worldData.isArchived) return
+            if (isCurrentWorld(player, worldData)) return
             player.closeInventory()
             // MWM本体の具象サービスを直接呼ぶとKotlinランタイムのクラスローダー差で壊れるため、公開API境界だけを通す。
             MyWorldManagerApi.getWorldService()?.teleportToWorld(player, uuid)
@@ -183,6 +184,7 @@ class ChanponPlayerWorldMenuProvider(
             return
         }
         if (event.isRightClick && !event.isShiftClick && canOpenSettings(player, worldData)) {
+            mwm.soundManager.playClickSound(player, item, "player_world")
             mwm.menuRouteHistory.pushPlayerWorld(player, holder.page, holder.showBackButton)
             mwm.worldSettingsGui.open(
                 player,
@@ -233,6 +235,11 @@ class ChanponPlayerWorldMenuProvider(
             } else {
                 ""
             }
+            val warpAction = if (isCurrentWorld(player, world)) {
+                ""
+            } else {
+                lang.getMessage(player, "gui.player_world.world_item.warp")
+            }
             // Chanpon changes domain values only; MWM and CC-System retain the shared block layout contract.
             meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(buildList {
                 if (description.isNotBlank()) add(GuiLoreBlock(listOf(GuiLoreLine.Raw(description))))
@@ -241,10 +248,10 @@ class ChanponPlayerWorldMenuProvider(
                         .map(GuiLoreLine::Raw)
                 ))
                 if (expiresAtLine.isNotBlank()) add(GuiLoreBlock(listOf(GuiLoreLine.Raw(expiresAtLine))))
-                add(GuiLoreBlock(listOf(
-                    GuiLoreLine.Raw(lang.getMessage(player, "gui.player_world.world_item.warp")),
-                    GuiLoreLine.Raw(lang.getMessage(player, "gui.player_world.world_item.settings"))
-                )))
+                add(GuiLoreBlock(buildList {
+                    if (warpAction.isNotBlank()) add(GuiLoreLine.Raw(warpAction))
+                    add(GuiLoreLine.Raw(lang.getMessage(player, "gui.player_world.world_item.settings")))
+                }))
             })))
             if (world.isArchived) meta.setEnchantmentGlintOverride(true)
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
@@ -270,7 +277,7 @@ class ChanponPlayerWorldMenuProvider(
         val item = ItemStack(Material.BARRIER)
         item.editMeta { meta ->
             meta.displayName(mwm().languageManager.getComponent(player, reason.displayKey))
-            meta.lore(null)
+            meta.lore(ChanponLore.build(mwm().languageManager.getMessageList(player, reason.loreKey)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
@@ -357,6 +364,9 @@ class ChanponPlayerWorldMenuProvider(
         player.hasPermission("myworldmanager.admin") ||
             world.owner == player.uniqueId || world.moderators.contains(player.uniqueId) || world.members.contains(player.uniqueId)
 
+    private fun isCurrentWorld(player: Player, world: WorldData): Boolean =
+        mwm().worldConfigRepository.findByWorldName(player.world.name)?.uuid == world.uuid
+
     private fun canBypassWorldLimits(player: Player): Boolean =
         player.hasPermission("myworldmanager.admin.bypass_world_limits") ||
             player.hasPermission("myworldmanager.admin") ||
@@ -364,12 +374,15 @@ class ChanponPlayerWorldMenuProvider(
 
     private fun hasCreatePermission(player: Player): Boolean =
         player.hasPermission("mwmchanpon.create_world") ||
+            player.hasPermission("myworldmanager.create") ||
             player.hasPermission("myworldmanager.command.mwm.create") ||
             player.hasPermission("myworldmanager.admin") ||
             player.hasPermission("mwmchanpon.admin") ||
             player.hasPermission("craftercrossing.test")
 
     private fun creationBlockReason(player: Player, currentCreateCount: Int, maxCreateCount: Int): CreationBlockReason? {
+        // 作成権限不足は Chanpon 側の作成導線でも MWM 本体と同じ理由表示に揃える。
+        if (!hasCreatePermission(player)) return CreationBlockReason.NO_PERMISSION
         if (canBypassWorldLimits(player)) return null
         // MWM本体の作成停止フラグを唯一の運用フラグとして扱う。
         if (!MyWorldManagerApi.isWorldCreationEnabled()) return CreationBlockReason.PERIOD_DISABLED
@@ -397,9 +410,19 @@ class ChanponPlayerWorldMenuProvider(
 
     private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)
 
-    private enum class CreationBlockReason(val displayKey: String) {
-        PERIOD_DISABLED("gui.player_world.creation_unavailable.period_disabled"),
-        NO_SLOT("gui.player_world.creation_unavailable.no_slot")
+    private enum class CreationBlockReason(val displayKey: String, val loreKey: String) {
+        PERIOD_DISABLED(
+            "gui.player_world.creation_unavailable.period_disabled.display",
+            "gui.player_world.creation_unavailable.period_disabled.lore"
+        ),
+        NO_SLOT(
+            "gui.player_world.creation_unavailable.no_slot.display",
+            "gui.player_world.creation_unavailable.no_slot.lore"
+        ),
+        NO_PERMISSION(
+            "gui.player_world.creation_unavailable.no_permission.display",
+            "gui.player_world.creation_unavailable.no_permission.lore"
+        )
     }
 
     private class Holder(

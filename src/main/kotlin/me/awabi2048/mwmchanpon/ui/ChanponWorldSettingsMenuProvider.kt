@@ -49,12 +49,6 @@ class ChanponWorldSettingsMenuProvider(
     override fun getId(): String = PROVIDER_ID
 
     override fun open(player: Player, worldData: WorldData, request: WorldSettingsMenuRequest): Boolean {
-        if (storage.isProductionWorld(worldData.uuid)) {
-            if (protectionService.isProtected(worldData)) {
-                return false
-            }
-        }
-
         val mwm = mwm()
         mwm.settingsSessionManager.updateSessionAction(
             player,
@@ -104,11 +98,10 @@ class ChanponWorldSettingsMenuProvider(
             inventory.setItem(32, mwmItem(player, "environment", Material.GRASS_BLOCK, ItemTag.TYPE_GUI_SETTING_ENVIRONMENT, requireTargetWorld = true))
             inventory.setItem(33, criticalItem(player, worldData))
         }
-        ChanponGuiElements.setSettingsFooter(
-            inventory,
-            if (request.showBackButton) returnItem(player) else null,
-            worldInfoItem(player, worldData)
-        )
+        inventory.setItem(4, worldInfoItem(player, worldData))
+        if (request.showBackButton) {
+            inventory.setItem(49, returnItem(player))
+        }
 
         fill(inventory)
         renderExtensions(inventory, player, worldData, request.showBackButton, isOwner, isModerator)
@@ -142,6 +135,7 @@ class ChanponWorldSettingsMenuProvider(
 
         val type = ItemTag.getType(item)
         if (type == ItemTag.TYPE_GUI_INFO && ItemTag.getWorldUuid(item) == worldData.uuid) {
+            if (isCurrentWorld(player, worldData)) return
             mwm.soundManager.playClickSound(player, item, "world_settings")
             mwm.worldService.teleportToWorldKeepingInventory(
                 player,
@@ -279,6 +273,7 @@ class ChanponWorldSettingsMenuProvider(
             ItemTag.TYPE_GUI_EXTENSION -> {
                 val extensionId = ItemTag.getExtensionId(item) ?: return
                 val extension = MyWorldManagerApi.getMenuExtensions().firstOrNull { it.getId() == extensionId } ?: return
+                mwm.soundManager.playClickSound(player, item, "world_settings")
                 val extensionMenuType = "world_settings"
                 extension.onClick(event, player, MenuExtensionContext(
                     extensionMenuType,
@@ -300,12 +295,14 @@ class ChanponWorldSettingsMenuProvider(
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
         when (ItemTag.getType(item)) {
             ItemTag.TYPE_GUI_RETURN -> {
+                mwm().soundManager.playClickSound(player, item, "world_settings")
                 if (!mwm().menuRouteHistory.openPrevious(player)) {
                     open(player, worldData, currentRequest(player))
                 }
             }
             TYPE_EXPAND_DIRECTION -> {
                 if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
+                mwm().soundManager.playClickSound(player, item, "world_settings")
                 when (ItemTag.getString(item, DIRECTION_KEY)) {
                     ACTION_CENTER -> {
                         pushExpansionRoute(player, worldData)
@@ -433,9 +430,9 @@ class ChanponWorldSettingsMenuProvider(
 
         inventory.setItem(20, expansionOptionItem(player, "center", Material.MAP, ACTION_CENTER))
         inventory.setItem(24, expansionOptionItem(player, "direction_select", Material.COMPASS, ACTION_SELECT_DIRECTION))
-        inventory.setItem(36, returnItem(player))
+        inventory.setItem(40, returnItem(player))
         if (worldData.latestBorderExpansionRecord() != null) {
-            inventory.setItem(40, stepBackItem(player, worldData))
+            inventory.setItem(42, stepBackItem(player, worldData))
         }
         fill(inventory)
         player.openInventory(inventory)
@@ -781,10 +778,16 @@ class ChanponWorldSettingsMenuProvider(
     }
 
     private fun worldInfoItem(player: Player, worldData: WorldData): ItemStack {
+        val lore = buildList {
+            addAll(i18nList(player, "info.lore", mapOf("description" to worldData.description.ifBlank { "-" })))
+            if (!isCurrentWorld(player, worldData)) {
+                add(mwm().languageManager.getMessage(player, "gui.player_world.world_item.warp"))
+            }
+        }
         val item = item(
             worldData.icon,
             "§e${worldData.name}",
-            i18nList(player, "info.lore", mapOf("description" to worldData.description.ifBlank { "-" })),
+            lore,
             ItemTag.TYPE_GUI_INFO
         )
         ItemTag.setWorldUuid(item, worldData.uuid)
@@ -952,6 +955,9 @@ class ChanponWorldSettingsMenuProvider(
             session?.parentShowBackButton
         )
     }
+
+    private fun isCurrentWorld(player: Player, worldData: WorldData): Boolean =
+        mwm().worldConfigRepository.findByWorldName(player.world.name)?.uuid == worldData.uuid
 
     private fun maxExpansionLevel(): Int {
         return mwm().config.getConfigurationSection("expansion.costs")?.getKeys(false)?.size ?: 3

@@ -1,13 +1,13 @@
 name: MWMChanpon
 main: me.awabi2048.mwmchanpon.MWMChanponPlugin
 version: ${project.version}
-api-version: "1.21"
+api-version: "26.1.2"
 depend:
+  - CC-System
   - MyWorldManager
   - LuckPerms
   - WorldGuard
 softdepend:
-  - CC-System
   - floodgate
 
 permissions:

@@ -135,6 +135,7 @@ class ProductionToggleExtension(
         val worldData = context.get<WorldData>("worldData") ?: return false
         when (ItemTag.getString(item, "chanpon_action")) {
             ACTION_SET_PRODUCTION -> {
+                mwm().soundManager.playClickSound(player, item, "world_settings")
                 if (ownerHasProductionWorld(worldData.owner, worldData.uuid)) {
                     player.sendMessage(i18n(player, "message.production_limit"))
                     return true
@@ -146,6 +147,7 @@ class ProductionToggleExtension(
                 if (!event.click.isLeftClick) {
                     return true
                 }
+                mwm().soundManager.playClickSound(player, item, "world_settings")
                 if (worldData.owner != player.uniqueId) {
                     player.sendMessage(i18n(player, "message.owner_only_submit"))
                     return true
