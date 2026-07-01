@@ -171,11 +171,10 @@ class SubmissionAdminMenu(
         if (clickType.isRightClick) {
             if (player.gameMode != GameMode.CREATIVE) return
             val state = stateFor(worldData)
-            if (state == SubmissionState.COMPLETED) return
-            if (state == SubmissionState.UNSUBMITTED) {
-                openCompleteUnsubmittedConfirmation(player, worldData, holder)
-            } else {
-                markCompleted(player, worldData, holder)
+            when (state) {
+                SubmissionState.COMPLETED -> unmarkCompleted(player, worldData, holder)
+                SubmissionState.UNSUBMITTED -> openCompleteUnsubmittedConfirmation(player, worldData, holder)
+                SubmissionState.SUBMITTED -> markCompleted(player, worldData, holder)
             }
             return
         }
@@ -203,6 +202,23 @@ class SubmissionAdminMenu(
         protectionService.sync(worldData)
         toolPermissionController.syncWorld(worldData)
         player.sendMessage(i18nComponent(player, "admin_menu.completed_message"))
+        open(player, holder.page, holder.progressFilter, holder.sortType)
+    }
+
+    private fun unmarkCompleted(player: Player, worldData: WorldData, holder: SubmissionAdminMenuHolder) {
+        val current = stateFor(worldData)
+        if (current != SubmissionState.COMPLETED) return
+
+        storage.setSubmissionState(
+            worldData.uuid,
+            SubmissionState.SUBMITTED,
+            player.uniqueId,
+            player.name,
+            "unmark_completed"
+        )
+        protectionService.sync(worldData)
+        toolPermissionController.syncWorld(worldData)
+        player.sendMessage(i18nComponent(player, "admin_menu.unmarked_message"))
         open(player, holder.page, holder.progressFilter, holder.sortType)
     }
 

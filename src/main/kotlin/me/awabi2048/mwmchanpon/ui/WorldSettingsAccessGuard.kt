@@ -19,6 +19,7 @@ internal class WorldSettingsAccessGuard(
         worldData: WorldData,
         ownerOnly: Boolean,
         requireTargetWorld: Boolean,
+        protectedSettings: ProtectedSettingsKind = ProtectedSettingsKind.NONE,
     ): Boolean {
         val mwm = JavaPlugin.getPlugin(MyWorldManager::class.java)
         val sessionAdmin = mwm.settingsSessionManager.getSession(player)?.isAdminFlow == true
@@ -27,10 +28,16 @@ internal class WorldSettingsAccessGuard(
         val moderator = worldData.moderators.contains(player.uniqueId)
         val authorized = if (ownerOnly) owner || admin else owner || moderator || admin
 
-        // 完成済み/提出済みの保護はブロック破壊などのワールド操作を止める責務であり、
-        // 設定メニューそのものは管理者・所有者が状態修正できるよう開けておく。
         if (!authorized || storage.isImportedArchive(worldData.uuid)) {
             player.sendMessage(mwm.languageManager.getComponent(player, "general.no_permission"))
+            denySound(player)
+            return false
+        }
+
+        // 完成済み/提出済みの保護。提出後は原則として設定変更を認めないが、
+        // 公開レベル・訪問通知・ポータル取得の3項目は管理者/所有者が事後調整できるよう例外として許可する。
+        if (protectionService.isProtected(worldData) && protectedSettings == ProtectedSettingsKind.NONE) {
+            player.sendMessage(mwm.languageManager.getComponent(player, "chanpon.message.protected_world"))
             denySound(player)
             return false
         }
@@ -46,6 +53,17 @@ internal class WorldSettingsAccessGuard(
             }
         }
         return true
+    }
+
+    /**
+     * 完成済み/提出済みでも操作を許可する設定の種別。
+     * 許可対象は「公開レベル」「訪問通知」「ポータル取得」の3つ。
+     */
+    enum class ProtectedSettingsKind {
+        NONE,
+        PUBLISH,
+        NOTIFICATION,
+        PORTAL,
     }
 
     private fun denySound(player: Player) {

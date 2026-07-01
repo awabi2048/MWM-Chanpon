@@ -25,6 +25,13 @@ class LinkedPortalMenuExtension : MenuExtension {
         val isMember = context.get<Boolean>("isMember") == true
         if (!isOwner && !isMember) return
 
+        val isProtected = context.get<Boolean>("isProtected") == true
+        if (isProtected) {
+            // 完成済み/提出済みのワールドでは、ポータル取得を中央寄せレイアウトの3点目（slot 23）に配置する。
+            inventory.setItem(23, portalItem(player, worldData))
+            return
+        }
+
         val footerStart = inventory.size - 9
         val slot = if (isOwner) footerStart + 1 else footerStart + 2
         inventory.setItem(slot, portalItem(player, worldData))

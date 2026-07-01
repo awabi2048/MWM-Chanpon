@@ -438,8 +438,11 @@ class ChanponEnvironmentGui(
         val worldName = worldData.customWorldName ?: "my_world.$worldUuid"
         val world = Bukkit.getWorld(worldName) ?: return
         val key = org.bukkit.NamespacedKey("myworldmanager", "env_gravity")
-        world.players.forEach { p ->
-            val attr = p.getAttribute(Attribute.GRAVITY) ?: return@forEach
+        // 設定変更時にワールド内の既存モブにも反映するため、プレイヤーだけでなく LivingEntity 全体を対象にする。
+        // 新規スポーン分は EnvironmentLogicListener.onEntitySpawn で補足される。
+        world.entities.forEach { entity ->
+            if (entity !is org.bukkit.entity.LivingEntity) return@forEach
+            val attr = entity.getAttribute(Attribute.GRAVITY) ?: return@forEach
             attr.modifiers.filter { it.key == key }.forEach { attr.removeModifier(it.key) }
             attr.baseValue = DEFAULT_GRAVITY
             if (gravity != DEFAULT_GRAVITY) {
@@ -486,8 +489,10 @@ class ChanponEnvironmentGui(
         val worldName = worldData.customWorldName ?: "my_world.$worldUuid"
         val world = Bukkit.getWorld(worldName) ?: return
         val key = org.bukkit.NamespacedKey("myworldmanager", "env_scale")
-        world.players.forEach { p ->
-            val attr = p.getAttribute(Attribute.SCALE) ?: return@forEach
+        // 設定変更時にワールド内の既存モブにも反映するため、プレイヤーだけでなく LivingEntity 全体を対象にする。
+        world.entities.forEach { entity ->
+            if (entity !is org.bukkit.entity.LivingEntity) return@forEach
+            val attr = entity.getAttribute(Attribute.SCALE) ?: return@forEach
             attr.modifiers.filter { it.key == key }.forEach { attr.removeModifier(it.key) }
             attr.baseValue = DEFAULT_SCALE
             if (scale != DEFAULT_SCALE) {

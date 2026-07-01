@@ -83,7 +83,14 @@ class ChanponWorldSettingsMenuProvider(
         val isImportedArchive = storage.isImportedArchive(worldData.uuid)
         val isOwner = isActualOwner && !isImportedArchive
         val hasManagePermission = (isOwner || isModerator) && !isImportedArchive
-        if (hasManagePermission) {
+        val isProtected = protectionService.isProtected(worldData)
+
+        if (isProtected && isOwner) {
+            // 完成済み/提出済みのワールドでは、公開レベル・訪問通知・ポータル取得のみ中央行に中央寄せで配置する。
+            // それ以外の設定は事後調整の対象外のため表示しない。
+            inventory.setItem(21, publishItem(player, worldData))
+            inventory.setItem(22, notificationItem(player, worldData))
+        } else if (hasManagePermission) {
             inventory.setItem(19, mwmItem(player, "info", Material.NAME_TAG, ItemTag.TYPE_GUI_SETTING_INFO))
             inventory.setItem(20, mwmItem(player, "icon", Material.ANVIL, ItemTag.TYPE_GUI_SETTING_ICON))
             inventory.setItem(21, mwmItem(player, "spawn", Material.COMPASS, ItemTag.TYPE_GUI_SETTING_SPAWN, requireTargetWorld = true))
@@ -91,7 +98,7 @@ class ChanponWorldSettingsMenuProvider(
             inventory.setItem(29, notificationItem(player, worldData))
             inventory.setItem(47, mwmItem(player, "tour", Material.PALE_OAK_BOAT, ItemTag.TYPE_GUI_SETTING_TOUR, "gui.tour.worldmenu"))
         }
-        if (isOwner) {
+        if (isOwner && !isProtected) {
             inventory.setItem(23, expansionItem(player, worldData))
             inventory.setItem(24, publishItem(player, worldData))
             inventory.setItem(25, mwmItem(player, "member", Material.PLAYER_HEAD, ItemTag.TYPE_GUI_SETTING_MEMBER))
@@ -104,7 +111,7 @@ class ChanponWorldSettingsMenuProvider(
         }
 
         fill(inventory)
-        renderExtensions(inventory, player, worldData, request.showBackButton, isOwner, isModerator)
+        renderExtensions(inventory, player, worldData, request.showBackButton, isOwner, isModerator, isProtected)
         player.openInventory(inventory)
         return true
     }
@@ -176,11 +183,19 @@ class ChanponWorldSettingsMenuProvider(
             ItemTag.TYPE_GUI_SETTING_CRITICAL,
         )
         if (type in ownerOnlyTypes || type in managerTypes) {
+            // 完成済み/提出済みでも許可する設定（公開レベル・訪問通知・ポータル取得）。
+            val protectedKind = when (type) {
+                ItemTag.TYPE_GUI_SETTING_PUBLISH -> WorldSettingsAccessGuard.ProtectedSettingsKind.PUBLISH
+                ItemTag.TYPE_GUI_SETTING_NOTIFICATION -> WorldSettingsAccessGuard.ProtectedSettingsKind.NOTIFICATION
+                ItemTag.TYPE_GUI_SETTING_PORTALS -> WorldSettingsAccessGuard.ProtectedSettingsKind.PORTAL
+                else -> WorldSettingsAccessGuard.ProtectedSettingsKind.NONE
+            }
             if (!accessGuard.allow(
                     player,
                     worldData,
                     ownerOnly = type in ownerOnlyTypes,
                     requireTargetWorld = type in inWorldTypes,
+                    protectedSettings = protectedKind,
                 )
             ) return
         }
@@ -642,7 +657,8 @@ class ChanponWorldSettingsMenuProvider(
         worldData: WorldData,
         showBackButton: Boolean,
         isOwner: Boolean,
-        isModerator: Boolean
+        isModerator: Boolean,
+        isProtected: Boolean = false
     ) {
         val context = MenuExtensionContext(
             "world_settings",
@@ -651,7 +667,8 @@ class ChanponWorldSettingsMenuProvider(
                 "showBackButton" to showBackButton,
                 "isOwner" to isOwner,
                 "isMember" to worldData.members.contains(player.uniqueId),
-                "isModerator" to isModerator
+                "isModerator" to isModerator,
+                "isProtected" to isProtected
             )
         )
         MyWorldManagerApi.getMenuExtensions().forEach { it.onRender(inventory, player, context) }
