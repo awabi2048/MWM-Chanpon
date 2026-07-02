@@ -22,17 +22,12 @@ import net.kyori.adventure.key.Key
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.Bukkit
-import org.bukkit.GameRule
 import org.bukkit.Material
-import org.bukkit.GameMode
-import org.bukkit.attribute.Attribute
-import org.bukkit.attribute.AttributeModifier
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
 import org.bukkit.event.inventory.InventoryClickEvent
-import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
@@ -239,30 +234,9 @@ class ChanponEnvironmentGui(
     }
 
     private fun applyFlightToWorld(worldUuid: UUID, allowFlight: Boolean) {
-        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
-        val worldName = worldData.customWorldName ?: "my_world.$worldUuid"
-        val world = Bukkit.getWorld(worldName) ?: return
-        world.players.forEach { p ->
-            val gameModeAllowsFlight = p.gameMode == GameMode.CREATIVE || p.gameMode == GameMode.SPECTATOR
-            if (allowFlight || gameModeAllowsFlight) {
-                p.allowFlight = true
-            } else {
-                if (p.isFlying) p.isFlying = false
-                p.allowFlight = false
-            }
-        }
+        MyWorldManagerApi.getWorldEnvironmentService()?.applyFlight(worldUuid)
     }
 
-    @EventHandler
-    fun onPlayerQuit(event: PlayerQuitEvent) {
-        val player = event.player
-        if (player.gameMode == GameMode.CREATIVE || player.gameMode == GameMode.SPECTATOR) {
-            return
-        }
-        // ワールド設定で一時的に付与した Fly を、次回ログイン時の通常権限状態へ持ち越さない。
-        if (player.isFlying) player.isFlying = false
-        player.allowFlight = false
-    }
 
     private fun <T> nextValue(current: T?, values: List<T>, reverse: Boolean): T {
         val index = values.indexOf(current)
@@ -323,35 +297,7 @@ class ChanponEnvironmentGui(
     }
 
     private fun applyWeather(worldUuid: UUID, weather: String?) {
-        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
-        val worldName = worldData.customWorldName ?: "my_world.$worldUuid"
-        val world = Bukkit.getWorld(worldName) ?: return
-        if (weather == null) {
-            world.setGameRule(GameRule.DO_WEATHER_CYCLE, true)
-            world.weatherDuration = 0
-            world.thunderDuration = 0
-            return
-        }
-        world.setGameRule(GameRule.DO_WEATHER_CYCLE, false)
-        when (weather) {
-            "CLEAR" -> {
-                world.setStorm(false)
-                world.setThundering(false)
-                world.weatherDuration = Int.MAX_VALUE
-            }
-            "RAIN" -> {
-                world.setStorm(true)
-                world.setThundering(false)
-                world.weatherDuration = Int.MAX_VALUE
-                world.thunderDuration = 0
-            }
-            "THUNDER" -> {
-                world.setStorm(true)
-                world.setThundering(true)
-                world.weatherDuration = Int.MAX_VALUE
-                world.thunderDuration = Int.MAX_VALUE
-            }
-        }
+        MyWorldManagerApi.getWorldEnvironmentService()?.applyWeather(worldUuid)
     }
 
     // ---- Time ----
@@ -389,15 +335,7 @@ class ChanponEnvironmentGui(
     }
 
     private fun applyTime(worldUuid: UUID, time: Long?) {
-        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
-        val worldName = worldData.customWorldName ?: "my_world.$worldUuid"
-        val world = Bukkit.getWorld(worldName) ?: return
-        if (time == null) {
-            world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, true)
-            return
-        }
-        world.time = time
-        world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false)
+        MyWorldManagerApi.getWorldEnvironmentService()?.applyTime(worldUuid)
     }
 
     // ---- Gravity ----
@@ -434,21 +372,7 @@ class ChanponEnvironmentGui(
     }
 
     private fun applyGravityToWorld(worldUuid: UUID, gravity: Double) {
-        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
-        val worldName = worldData.customWorldName ?: "my_world.$worldUuid"
-        val world = Bukkit.getWorld(worldName) ?: return
-        val key = org.bukkit.NamespacedKey("myworldmanager", "env_gravity")
-        // 設定変更時にワールド内の既存モブにも反映するため、プレイヤーだけでなく LivingEntity 全体を対象にする。
-        // 新規スポーン分は EnvironmentLogicListener.onEntitySpawn で補足される。
-        world.entities.forEach { entity ->
-            if (entity !is org.bukkit.entity.LivingEntity) return@forEach
-            val attr = entity.getAttribute(Attribute.GRAVITY) ?: return@forEach
-            attr.modifiers.filter { it.key == key }.forEach { attr.removeModifier(it.key) }
-            attr.baseValue = DEFAULT_GRAVITY
-            if (gravity != DEFAULT_GRAVITY) {
-                attr.addModifier(AttributeModifier(key, gravity - DEFAULT_GRAVITY, AttributeModifier.Operation.ADD_NUMBER))
-            }
-        }
+        MyWorldManagerApi.getWorldEnvironmentService()?.applyAttributes(worldUuid)
     }
 
     // ---- Scale ----
@@ -485,20 +409,7 @@ class ChanponEnvironmentGui(
     }
 
     private fun applyScaleToWorld(worldUuid: UUID, scale: Double) {
-        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
-        val worldName = worldData.customWorldName ?: "my_world.$worldUuid"
-        val world = Bukkit.getWorld(worldName) ?: return
-        val key = org.bukkit.NamespacedKey("myworldmanager", "env_scale")
-        // 設定変更時にワールド内の既存モブにも反映するため、プレイヤーだけでなく LivingEntity 全体を対象にする。
-        world.entities.forEach { entity ->
-            if (entity !is org.bukkit.entity.LivingEntity) return@forEach
-            val attr = entity.getAttribute(Attribute.SCALE) ?: return@forEach
-            attr.modifiers.filter { it.key == key }.forEach { attr.removeModifier(it.key) }
-            attr.baseValue = DEFAULT_SCALE
-            if (scale != DEFAULT_SCALE) {
-                attr.addModifier(AttributeModifier(key, scale - DEFAULT_SCALE, AttributeModifier.Operation.ADD_NUMBER))
-            }
-        }
+        MyWorldManagerApi.getWorldEnvironmentService()?.applyAttributes(worldUuid)
     }
 
     // ---- Item helpers ----
