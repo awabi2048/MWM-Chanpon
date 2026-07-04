@@ -1,6 +1,7 @@
 package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiCycle
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
@@ -109,16 +110,16 @@ class ChanponAdminWorldListMenu(
             ItemTag.TYPE_GUI_NAV_PREV, ItemTag.TYPE_GUI_NAV_NEXT -> {
                 open(player, ItemTag.getTargetPage(item) ?: holder.page, holder.visibilityFilter, holder.sortType, holder.fromAdminMenu)
             }
-            ItemTag.TYPE_GUI_EXTENSION -> handleControl(player, holder, item)
+            ItemTag.TYPE_GUI_EXTENSION -> handleControl(player, holder, item, event.click.isRightClick)
             ItemTag.TYPE_GUI_WORLD_ITEM, ItemTag.TYPE_GUI_ADMIN_CURRENT_WORLD_INFO -> handleWorldClick(player, item, event.click)
         }
     }
 
-    private fun handleControl(player: Player, holder: ChanponAdminWorldListHolder, item: ItemStack) {
+    private fun handleControl(player: Player, holder: ChanponAdminWorldListHolder, item: ItemStack, reverse: Boolean) {
         if (ItemTag.getExtensionId(item) != PROVIDER_ID) return
         when (ItemTag.getString(item, ACTION_KEY)) {
-            ACTION_VISIBILITY_FILTER -> open(player, 0, holder.visibilityFilter.next(), holder.sortType, holder.fromAdminMenu)
-            ACTION_SORT -> open(player, 0, holder.visibilityFilter, holder.sortType.next(), holder.fromAdminMenu)
+            ACTION_VISIBILITY_FILTER -> open(player, 0, GuiCycle.select(holder.visibilityFilter, VisibilityFilter.entries, reverse), holder.sortType, holder.fromAdminMenu)
+            ACTION_SORT -> open(player, 0, holder.visibilityFilter, GuiCycle.select(holder.sortType, SortType.entries, reverse), holder.fromAdminMenu)
         }
     }
 
@@ -231,7 +232,8 @@ class ChanponAdminWorldListMenu(
             meta.displayName(i18nComponent(player, "$key.display"))
             meta.lore(structuredLore(listOf(
                 GuiLoreLine.Data(i18n(player, "$key.label"), current, "§e"),
-                GuiLoreLine.SingleAction(i18n(player, "$key.action"))
+                GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.left"), i18n(player, "admin_list.cycle.next")),
+                GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.right"), i18n(player, "admin_list.cycle.previous"))
             )))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
@@ -406,23 +408,13 @@ class ChanponAdminWorldListMenu(
         ALL("admin_list.visibility_filter.all"),
         PUBLIC("admin_list.visibility_filter.public"),
         DEVELOPMENT("admin_list.visibility_filter.development"),
-        PRIVATE("admin_list.visibility_filter.private");
-
-        fun next(): VisibilityFilter {
-            val values = entries
-            return values[(ordinal + 1) % values.size]
-        }
+        PRIVATE("admin_list.visibility_filter.private")
     }
 
     enum class SortType(val key: String) {
         CREATED_DESC("admin_list.sort.created_desc"),
         CREATED_ASC("admin_list.sort.created_asc"),
-        WORLD_SIZE_DESC("admin_list.sort.world_size_desc");
-
-        fun next(): SortType {
-            val values = entries
-            return values[(ordinal + 1) % values.size]
-        }
+        WORLD_SIZE_DESC("admin_list.sort.world_size_desc")
     }
 
     companion object {

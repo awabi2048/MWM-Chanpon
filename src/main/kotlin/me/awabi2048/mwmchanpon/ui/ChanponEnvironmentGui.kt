@@ -1,6 +1,7 @@
 package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiCycle
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
@@ -188,7 +189,7 @@ class ChanponEnvironmentGui(
     }
 
     private fun cycleWeather(player: Player, worldData: WorldData, reverse: Boolean) {
-        val next = nextNullableValue(worldData.fixedWeather, WEATHER_VALUES, reverse)
+        val next = GuiCycle.selectNullable(worldData.fixedWeather, WEATHER_VALUES, reverse)
         worldData.fixedWeather = next
         MyWorldManagerApi.getWorldRepository()?.save(worldData)
         applyWeather(worldData.uuid, next)
@@ -196,7 +197,9 @@ class ChanponEnvironmentGui(
     }
 
     private fun cycleTime(player: Player, worldData: WorldData, reverse: Boolean) {
-        val next = nextNullableValue(worldData.fixedTime, TIME_VALUES, reverse)
+        // カスタム時刻は固定候補リスト外の有効値なので、循環時は未設定位置から再開する。
+        val current = worldData.fixedTime.takeIf { it in TIME_VALUES }
+        val next = GuiCycle.selectNullable(current, TIME_VALUES, reverse)
         worldData.fixedTime = next
         MyWorldManagerApi.getWorldRepository()?.save(worldData)
         applyTime(worldData.uuid, next)
@@ -204,7 +207,7 @@ class ChanponEnvironmentGui(
     }
 
     private fun cycleGravity(player: Player, worldData: WorldData, reverse: Boolean) {
-        val next = nextValue(worldData.gravityValue, GRAVITY_VALUES, reverse)
+        val next = GuiCycle.select(worldData.gravityValue ?: DEFAULT_GRAVITY, GRAVITY_VALUES, reverse)
         worldData.gravityValue = next
         MyWorldManagerApi.getWorldRepository()?.save(worldData)
         applyGravityToWorld(worldData.uuid, next)
@@ -212,7 +215,7 @@ class ChanponEnvironmentGui(
     }
 
     private fun cycleScale(player: Player, worldData: WorldData, reverse: Boolean) {
-        val next = nextValue(worldData.fixedScale, SCALE_VALUES, reverse)
+        val next = GuiCycle.select(worldData.fixedScale ?: DEFAULT_SCALE, SCALE_VALUES, reverse)
         worldData.fixedScale = next
         MyWorldManagerApi.getWorldRepository()?.save(worldData)
         applyScaleToWorld(worldData.uuid, next)
@@ -228,7 +231,7 @@ class ChanponEnvironmentGui(
 
     private fun cycleProtection(player: Player, worldData: WorldData, reverse: Boolean) {
         val current = storage.getProtectionMode(worldData.uuid)
-        val next = nextValue(current, PROTECTION_VALUES, reverse)
+        val next = GuiCycle.select(current, PROTECTION_VALUES, reverse)
         storage.setProtectionMode(worldData.uuid, next)
         buildPermissionService.sync(worldData)
         if (next == ChanponWorldProtectionMode.PASSWORD && !storage.hasProtectionPassword(worldData.uuid)) {
@@ -329,32 +332,6 @@ class ChanponEnvironmentGui(
         MyWorldManagerApi.getWorldEnvironmentService()?.applyFlight(worldUuid)
     }
 
-
-    private fun <T> nextValue(current: T?, values: List<T>, reverse: Boolean): T {
-        val index = values.indexOf(current)
-        if (index < 0) {
-            return if (reverse) values.last() else values.first()
-        }
-        val nextIndex = if (reverse) {
-            (index + values.size - 1) % values.size
-        } else {
-            (index + 1) % values.size
-        }
-        return values[nextIndex]
-    }
-
-    private fun <T> nextNullableValue(current: T?, values: List<T?>, reverse: Boolean): T? {
-        val index = values.indexOf(current)
-        if (index < 0) {
-            return if (reverse) values.last() else values.first()
-        }
-        val nextIndex = if (reverse) {
-            (index + values.size - 1) % values.size
-        } else {
-            (index + 1) % values.size
-        }
-        return values[nextIndex]
-    }
 
     // ---- Weather ----
 
@@ -533,7 +510,8 @@ class ChanponEnvironmentGui(
                     add(GuiLoreLine.Raw("$marker $color${option.display}"))
                 }
                 add(GuiLoreLine.Spacer)
-                add(GuiLoreLine.SingleAction(i18n(player, "common.action_next")))
+                add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.left"), i18n(player, "common.action_next")))
+                add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.right"), i18n(player, "common.action_previous")))
                 if (customTimeAction) {
                     add(GuiLoreLine.Action(i18n(player, "common.shift_left"), i18n(player, "time.custom.action")))
                 }
@@ -568,7 +546,8 @@ class ChanponEnvironmentGui(
                     add(GuiLoreLine.Warning(i18n(player, "protection.password_missing_warning")))
                 }
                 add(GuiLoreLine.Spacer)
-                add(GuiLoreLine.SingleAction(i18n(player, "common.action_next")))
+                add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.left"), i18n(player, "common.action_next")))
+                add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.right"), i18n(player, "common.action_previous")))
                 add(GuiLoreLine.Action(i18n(player, "common.shift_left"), i18n(player, "protection.password_change_action")))
             }, GuiLoreFrame.BOTH)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)

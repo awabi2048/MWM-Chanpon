@@ -1,6 +1,7 @@
 package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiCycle
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
@@ -104,24 +105,24 @@ class SubmissionAdminMenu(
                 val page = ItemTag.getTargetPage(item) ?: holder.page
                 open(player, page, holder.progressFilter, holder.sortType)
             }
-            TYPE_MENU_CONTROL -> handleControlItem(player, holder, item)
+            TYPE_MENU_CONTROL -> handleControlItem(player, holder, item, event.click.isRightClick)
             ItemTag.TYPE_GUI_WORLD_ITEM -> handleWorldItem(player, holder, item, event.click)
         }
     }
 
-    private fun handleControlItem(player: Player, holder: SubmissionAdminMenuHolder, item: ItemStack) {
+    private fun handleControlItem(player: Player, holder: SubmissionAdminMenuHolder, item: ItemStack, reverse: Boolean) {
         when (ItemTag.getString(item, ACTION_KEY)) {
             ACTION_PROGRESS_FILTER -> open(
                 player,
                 0,
-                holder.progressFilter.next(),
+                GuiCycle.select(holder.progressFilter, ProgressFilter.entries, reverse),
                 holder.sortType
             )
             ACTION_SORT -> open(
                 player,
                 0,
                 holder.progressFilter,
-                holder.sortType.next()
+                GuiCycle.select(holder.sortType, SortType.entries, reverse)
             )
             ACTION_CLOSE_SUBMISSIONS -> {
                 if (plugin.isSubmissionClosed()) {
@@ -543,7 +544,8 @@ class SubmissionAdminMenu(
                     add(GuiLoreLine.Raw("$marker $color${i18n(player, optionKey)}"))
                 }
                 add(GuiLoreLine.Spacer)
-                add(GuiLoreLine.SingleAction(i18n(player, "admin_menu.filter_cycle_action")))
+                add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.left"), i18n(player, "admin_menu.cycle.next")))
+                add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.right"), i18n(player, "admin_menu.cycle.previous")))
             }, GuiLoreFrame.BOTH)
         )
         item.editMeta { meta ->
@@ -648,26 +650,13 @@ class SubmissionAdminMenu(
         ALL("admin_menu.progress_filter.all"),
         UNSUBMITTED("admin_menu.progress_filter.unsubmitted"),
         SUBMITTED("admin_menu.progress_filter.submitted"),
-        COMPLETED("admin_menu.progress_filter.completed");
-
-        fun next(): ProgressFilter = when (this) {
-            ALL -> UNSUBMITTED
-            UNSUBMITTED -> SUBMITTED
-            SUBMITTED -> COMPLETED
-            COMPLETED -> ALL
-        }
+        COMPLETED("admin_menu.progress_filter.completed")
     }
 
     enum class SortType(val key: String) {
         CREATED_DESC("admin_menu.sort.created_desc"),
         CREATED_ASC("admin_menu.sort.created_asc"),
-        NAME_ASC("admin_menu.sort.name_asc");
-
-        fun next(): SortType = when (this) {
-            CREATED_DESC -> CREATED_ASC
-            CREATED_ASC -> NAME_ASC
-            NAME_ASC -> CREATED_DESC
-        }
+        NAME_ASC("admin_menu.sort.name_asc")
     }
 
     private class SubmissionAdminMenuHolder(

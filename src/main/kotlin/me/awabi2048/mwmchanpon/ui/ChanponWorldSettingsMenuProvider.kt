@@ -1,6 +1,7 @@
 package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiCycle
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
@@ -700,9 +701,8 @@ class ChanponWorldSettingsMenuProvider(
                     add(GuiLoreLine.Raw("$marker $color$displayName"))
                 }
                 add(GuiLoreLine.Spacer)
-                add(GuiLoreLine.SingleAction(
-                    i18n(player, "publish.cycle_action")
-                ))
+                add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.left"), i18n(player, "publish.cycle_next_action")))
+                add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.right"), i18n(player, "publish.cycle_previous_action")))
             }, GuiLoreFrame.BOTH)
         )
         return componentItem(Material.OAK_SIGN, i18n(player, "publish.title"), lore, ItemTag.TYPE_GUI_SETTING_PUBLISH)
@@ -1045,18 +1045,15 @@ class ChanponWorldSettingsMenuProvider(
     }
 
     private fun nextVisibility(current: ChanponWorldVisibility, reverse: Boolean): ChanponWorldVisibility {
-        val values = listOf(
+        return GuiCycle.select(
+            current,
+            listOf(
             ChanponWorldVisibility.PUBLIC,
             ChanponWorldVisibility.DEVELOPMENT,
             ChanponWorldVisibility.PRIVATE
+            ),
+            reverse
         )
-        val index = values.indexOf(current).let { if (it < 0) 0 else it }
-        val nextIndex = if (reverse) {
-            (index + values.size - 1) % values.size
-        } else {
-            (index + 1) % values.size
-        }
-        return values[nextIndex]
     }
 
     private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)
