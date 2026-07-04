@@ -1,6 +1,9 @@
 package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
@@ -159,7 +162,7 @@ class ChanponAdminWorldListMenu(
         val item = ItemStack(worldData.icon)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "admin_list.world.display", mapOf("world" to worldData.name)))
-            meta.lore(lore(worldLore(player, worldData, visibility, current)))
+            meta.lore(structuredLore(worldLore(player, worldData, visibility, current)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, if (current) ItemTag.TYPE_GUI_ADMIN_CURRENT_WORLD_INFO else ItemTag.TYPE_GUI_WORLD_ITEM)
@@ -172,7 +175,7 @@ class ChanponAdminWorldListMenu(
         worldData: WorldData,
         visibility: ChanponWorldVisibility,
         current: Boolean
-    ): List<String> {
+    ): List<GuiLoreLine> {
         val owner = Bukkit.getOfflinePlayer(worldData.owner).name ?: i18n(player, "admin_list.unknown")
         val members = (worldData.moderators + worldData.members)
             .distinct()
@@ -181,21 +184,23 @@ class ChanponAdminWorldListMenu(
                 if (it.isEmpty()) i18n(player, "admin_list.world.no_members")
                 else it.joinToString("§7, §f", prefix = "§f")
             }
-        val middle = if (player.gameMode == GameMode.CREATIVE) i18n(player, "admin_list.world.action_copy") else ""
-        val right = if (current) i18n(player, "admin_list.world.action_settings_current") else i18n(player, "admin_list.world.action_settings")
-        return i18nList(
-            player,
-            "admin_list.world.lore",
-            mapOf(
-                "owner" to owner,
-                "members" to members,
-                "created" to formatCreatedAt(worldData.createdAt),
-                "visibility" to visibilityName(player, visibility),
-                "world_directory" to worldDirectory(worldData),
-                "right_action" to right,
-                "middle_action" to middle
-            )
-        ).filter { it.isNotBlank() }
+        return buildList {
+            add(GuiLoreLine.Data(i18n(player, "admin_list.world.owner_label"), owner, "§f"))
+            add(GuiLoreLine.Data(i18n(player, "admin_list.world.members_label"), members, ""))
+            add(GuiLoreLine.Data(i18n(player, "admin_list.world.created_label"), formatCreatedAt(worldData.createdAt), "§f"))
+            add(GuiLoreLine.Data(i18n(player, "admin_list.world.visibility_label"), visibilityName(player, visibility), ""))
+            add(GuiLoreLine.Data(i18n(player, "admin_list.world.directory_label"), worldDirectory(worldData), "§f"))
+            add(GuiLoreLine.Spacer)
+            add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.left"), i18n(player, "admin_list.world.action_warp")))
+            if (current) {
+                add(GuiLoreLine.Text(i18n(player, "admin_list.world.action_settings_current")))
+            } else {
+                add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.right"), i18n(player, "admin_list.world.action_settings")))
+            }
+            if (player.gameMode == GameMode.CREATIVE) {
+                add(GuiLoreLine.Action(i18n(player, "common.middle_click"), i18n(player, "admin_list.world.action_copy")))
+            }
+        }
     }
 
     private fun visibilityName(player: Player, visibility: ChanponWorldVisibility): String {
@@ -207,25 +212,33 @@ class ChanponAdminWorldListMenu(
     }
 
     private fun visibilityFilterItem(player: Player, filter: VisibilityFilter): ItemStack {
-        return controlItem(
-            player,
-            Material.ENDER_EYE,
-            "admin_list.visibility_filter.display",
-            "admin_list.visibility_filter.lore",
-            ACTION_VISIBILITY_FILTER,
-            mapOf("filter" to i18n(player, filter.key))
-        )
+        return cycleControlItem(player, Material.ENDER_EYE, "admin_list.visibility_filter", i18n(player, filter.key), ACTION_VISIBILITY_FILTER)
     }
 
     private fun sortItem(player: Player, sortType: SortType): ItemStack {
-        return controlItem(
-            player,
-            Material.COMPARATOR,
-            "admin_list.sort.display",
-            "admin_list.sort.lore",
-            ACTION_SORT,
-            mapOf("sort" to i18n(player, sortType.key))
-        )
+        return cycleControlItem(player, Material.COMPARATOR, "admin_list.sort", i18n(player, sortType.key), ACTION_SORT)
+    }
+
+    private fun cycleControlItem(
+        player: Player,
+        material: Material,
+        key: String,
+        current: String,
+        action: String
+    ): ItemStack {
+        val item = ItemStack(material)
+        item.editMeta { meta ->
+            meta.displayName(i18nComponent(player, "$key.display"))
+            meta.lore(structuredLore(listOf(
+                GuiLoreLine.Data(i18n(player, "$key.label"), current, "§e"),
+                GuiLoreLine.SingleAction(i18n(player, "$key.action"))
+            )))
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
+        }
+        ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
+        ItemTag.setExtensionId(item, PROVIDER_ID)
+        ItemTag.setString(item, ACTION_KEY, action)
+        return item
     }
 
     private fun infoItem(player: Player, total: Int, page: Int, totalPages: Int): ItemStack {
@@ -352,6 +365,10 @@ class ChanponAdminWorldListMenu(
 
     private fun lore(lines: List<String>): List<Component> {
         return ChanponLore.build(lines)
+    }
+
+    private fun structuredLore(lines: List<GuiLoreLine>): List<Component> {
+        return CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(lines, GuiLoreFrame.BOTH))
     }
 
     private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): String {

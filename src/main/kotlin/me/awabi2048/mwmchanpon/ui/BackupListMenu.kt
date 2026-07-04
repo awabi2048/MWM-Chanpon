@@ -1,6 +1,9 @@
 package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.backup.BackupEntry
 import me.awabi2048.mwmchanpon.backup.BackupDisplay
@@ -229,13 +232,19 @@ class BackupListMenu(
         val item = ItemStack(materialFor(backup.kind))
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "backup_list.item.display", mapOf("name" to BackupDisplay.displayName(backup))))
-            meta.lore(lore(i18nList(player, "backup_list.item.lore", mapOf(
-                "kind" to i18n(player, "kind.${backup.kind.i18nKey}"),
-                "created" to BackupDisplay.formatCreatedAt(backup.createdAt),
-                "worlds" to backup.worldUuids.size,
-                "size" to formatBytes(backup.sizeBytes),
-                "actor" to BackupDisplay.actorName(backup)
-            ))))
+            meta.lore(structuredBlocks(listOf(
+                GuiLoreBlock(listOf(
+                    GuiLoreLine.Data(i18n(player, "backup_list.item.kind_label"), i18n(player, "kind.${backup.kind.i18nKey}"), ""),
+                    GuiLoreLine.Data(i18n(player, "backup_list.item.created_label"), BackupDisplay.formatCreatedAt(backup.createdAt), "§f"),
+                    GuiLoreLine.Data(i18n(player, "backup_list.item.worlds_label"), backup.worldUuids.size, "§f"),
+                    GuiLoreLine.Data(i18n(player, "backup_list.item.size_label"), formatBytes(backup.sizeBytes), "§f"),
+                    GuiLoreLine.Data(i18n(player, "backup_list.item.actor_label"), BackupDisplay.actorName(backup), "§f")
+                )),
+                GuiLoreBlock(listOf(
+                    GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.left"), i18n(player, "backup_list.item.rollback_action")),
+                    GuiLoreLine.Action(i18n(player, "common.middle_click"), i18n(player, "backup_list.item.delete_action"))
+                ))
+            )))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, TYPE_BACKUP_ITEM)
@@ -349,6 +358,8 @@ class BackupListMenu(
     private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
     private fun lore(lines: List<String>) = ChanponLore.build(lines)
+    private fun structuredBlocks(blocks: List<GuiLoreBlock>): List<Component> =
+        CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(blocks))
 
     private fun mwm(): me.awabi2048.myworldmanager.MyWorldManager =
         org.bukkit.plugin.java.JavaPlugin.getPlugin(me.awabi2048.myworldmanager.MyWorldManager::class.java)

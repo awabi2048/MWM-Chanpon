@@ -534,6 +534,9 @@ class ChanponEnvironmentGui(
                 }
                 add(GuiLoreLine.Spacer)
                 add(GuiLoreLine.SingleAction(i18n(player, "common.action_next")))
+                if (customTimeAction) {
+                    add(GuiLoreLine.Action(i18n(player, "common.shift_left"), i18n(player, "time.custom.action")))
+                }
             }, GuiLoreFrame.BOTH)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         }
@@ -581,7 +584,10 @@ class ChanponEnvironmentGui(
         )
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "$key.display"))
-            meta.lore(ChanponLore.build(i18nList(player, "$key.lore", mapOf("current" to currentValue))))
+            meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(listOf(
+                GuiLoreLine.Data(i18n(player, "common.current_label"), currentValue, "§e"),
+                GuiLoreLine.SingleAction(i18n(player, "common.action_next"))
+            ), GuiLoreFrame.BOTH)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
@@ -600,10 +606,7 @@ class ChanponEnvironmentGui(
         val item = ItemStack(material)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "weather.${weather.lowercase()}.display"))
-            meta.lore(ChanponLore.build(
-                i18nList(player, "weather.${weather.lowercase()}.lore", mapOf("marker" to selectionMarker(active))),
-                closingSeparator = true
-            ))
+            meta.lore(optionLore(player, selectionMarker(active), i18n(player, "weather.${weather.lowercase()}.display"), weatherColor(weather)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
@@ -616,10 +619,7 @@ class ChanponEnvironmentGui(
         val item = ItemStack(Material.CLOCK)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "time.$key.display"))
-            meta.lore(ChanponLore.build(
-                i18nList(player, "time.$key.lore", mapOf("marker" to selectionMarker(active))),
-                closingSeparator = true
-            ))
+            meta.lore(optionLore(player, selectionMarker(active), i18n(player, "time.$key.display"), "§e", i18n(player, "time.$key.value")))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
@@ -632,10 +632,7 @@ class ChanponEnvironmentGui(
         val item = ItemStack(Material.FEATHER)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "gravity.$key.display"))
-            meta.lore(ChanponLore.build(
-                i18nList(player, "gravity.$key.lore", mapOf("marker" to selectionMarker(active))),
-                closingSeparator = true
-            ))
+            meta.lore(optionLore(player, selectionMarker(active), i18n(player, "gravity.$key.display"), "§e", i18n(player, "gravity.$key.value")))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
@@ -648,10 +645,7 @@ class ChanponEnvironmentGui(
         val item = ItemStack(Material.PLAYER_HEAD)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "scale.$key.display"))
-            meta.lore(ChanponLore.build(
-                i18nList(player, "scale.$key.lore", mapOf("marker" to selectionMarker(active))),
-                closingSeparator = true
-            ))
+            meta.lore(optionLore(player, selectionMarker(active), i18n(player, "scale.$key.display"), "§e", i18n(player, "scale.$key.value")))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
@@ -669,6 +663,13 @@ class ChanponEnvironmentGui(
     }
 
     private fun selectionMarker(active: Boolean): String = if (active) "§a»" else "§8・"
+
+    private fun optionLore(player: Player, marker: String, display: String, color: String, detail: String? = null): List<Component> {
+        return CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(buildList {
+            add(GuiLoreLine.Raw("$marker $color$display${detail?.let { " §7($it)" } ?: ""}"))
+            add(GuiLoreLine.SingleAction(i18n(player, "common.action_set")))
+        }, GuiLoreFrame.BOTH))
+    }
 
     private fun backItem(player: Player): ItemStack {
         val item = ItemStack(Material.REDSTONE)

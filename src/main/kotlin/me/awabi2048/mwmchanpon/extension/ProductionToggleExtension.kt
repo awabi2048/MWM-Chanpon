@@ -2,6 +2,9 @@ package me.awabi2048.mwmchanpon.extension
 
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
@@ -357,7 +360,10 @@ class ProductionToggleExtension(
         val item = ItemStack(Material.HEART_OF_THE_SEA)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "production.display"))
-            meta.lore(lore(i18nList(player, "production.lore")))
+            meta.lore(structuredLore(listOf(
+                GuiLoreLine.SingleAction(i18n(player, "production.lore.action")),
+                GuiLoreLine.Warning(i18n(player, "production.lore.limit_warning"))
+            )))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
@@ -396,7 +402,17 @@ class ProductionToggleExtension(
             SubmissionState.SUBMITTED -> "submission.lore.submitted"
             SubmissionState.COMPLETED -> "submission.lore.completed"
         }
-        return lore(i18nList(player, key))
+        return when (state) {
+            SubmissionState.UNSUBMITTED -> structuredLore(listOf(
+                GuiLoreLine.SingleAction(i18n(player, "$key.action")),
+                GuiLoreLine.Warning(i18n(player, "$key.warning"))
+            ))
+            SubmissionState.SUBMITTED,
+            SubmissionState.COMPLETED -> structuredLore(listOf(
+                GuiLoreLine.Text(i18n(player, "$key.description")),
+                GuiLoreLine.Warning(i18n(player, "$key.warning"))
+            ))
+        }
     }
 
     private fun createSubmissionErrorItem(player: Player): ItemStack {
@@ -445,6 +461,10 @@ class ProductionToggleExtension(
 
     private fun lore(lines: List<String>): List<Component> {
         return ChanponLore.build(lines)
+    }
+
+    private fun structuredLore(lines: List<GuiLoreLine>): List<Component> {
+        return CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(lines, GuiLoreFrame.BOTH))
     }
 
     private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): String {

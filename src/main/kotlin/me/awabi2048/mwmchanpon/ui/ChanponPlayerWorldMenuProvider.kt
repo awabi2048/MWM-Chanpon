@@ -226,7 +226,7 @@ class ChanponPlayerWorldMenuProvider(
                 "gui.player_world.world_item.publish",
                 mapOf("level" to visibilityName(player, storage.getVisibility(world.uuid)), "status_color" to "")
             )
-            val progressLine = SubmissionProgressDisplay.line(player, storage, world.uuid)
+            val progressLine = SubmissionProgressDisplay.loreLine(player, storage, world.uuid)
             val tagLine = if (world.tags.isNotEmpty()) {
                 val tagNames = world.tags.joinToString(", ") { mwm.worldTagManager.getDisplayName(player, it) }
                 lang.getMessage(player, "gui.player_world.world_item.tag", mapOf("tags" to tagNames))
@@ -245,8 +245,12 @@ class ChanponPlayerWorldMenuProvider(
             meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(buildList {
                 if (description.isNotBlank()) add(GuiLoreBlock(listOf(GuiLoreLine.Raw(description))))
                 add(GuiLoreBlock(
-                    (listOf(ownerLine, publishLine, progressLine) + listOfNotNull(tagLine.takeIf(String::isNotBlank)))
-                        .map(GuiLoreLine::Raw)
+                    buildList {
+                        add(GuiLoreLine.Raw(ownerLine))
+                        add(GuiLoreLine.Raw(publishLine))
+                        progressLine?.let(::add)
+                        tagLine.takeIf(String::isNotBlank)?.let { add(GuiLoreLine.Raw(it)) }
+                    }
                 ))
                 if (expiresAtLine.isNotBlank()) add(GuiLoreBlock(listOf(GuiLoreLine.Raw(expiresAtLine))))
                 add(GuiLoreBlock(buildList {
@@ -271,10 +275,16 @@ class ChanponPlayerWorldMenuProvider(
         val item = ItemStack(Material.NETHER_STAR)
         item.editMeta { meta ->
             meta.displayName(mwm.languageManager.getComponent(player, "gui.player_world.creation_button.display"))
-            meta.lore(ChanponLore.build(
-                mwm.languageManager.getMessageList(player, "gui.player_world.creation_button.lore") +
-                    plugin.getMessage(player, "chanpon.player_world.easy_creation.action")
-            ))
+            // 操作名は共通キー、内容はChanpon側キーとして保持し、言語ファイルへ結合済み操作行を置かない。
+            meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(listOf(
+                GuiLoreBlock(mwm.languageManager.getMessageList(player, "gui.player_world.creation_button.lore").map(GuiLoreLine::Raw)),
+                GuiLoreBlock(listOf(
+                    GuiLoreLine.Action(
+                        mwm.languageManager.getMessage(player, "gui.settings.click.right"),
+                        plugin.getMessage(player, "chanpon.player_world.easy_creation.action")
+                    )
+                ))
+            ))))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_CREATION_BUTTON)

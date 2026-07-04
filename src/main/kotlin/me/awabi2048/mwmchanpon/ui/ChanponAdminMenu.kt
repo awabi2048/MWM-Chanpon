@@ -1,6 +1,9 @@
 package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.protection.SpawnWorldProtectionService
@@ -162,7 +165,18 @@ class ChanponAdminMenu(
         val enabled = MyWorldManagerApi.isWorldCreationEnabled()
         val key = if (enabled) "admin.world_creation.enabled" else "admin.world_creation.disabled"
         val material = if (enabled) Material.LIME_DYE else Material.GRAY_DYE
-        return menuItem(player, material, key, ACTION_WORLD_CREATION)
+        val item = ItemStack(material)
+        item.editMeta { meta ->
+            meta.displayName(i18nComponent(player, "$key.display"))
+            meta.lore(structuredBlocks(listOf(
+                GuiLoreBlock(listOf(GuiLoreLine.Text(i18n(player, "$key.description")))),
+                GuiLoreBlock(listOf(GuiLoreLine.SingleAction(i18n(player, "$key.action"))))
+            )))
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
+        }
+        ItemTag.tagItem(item, TYPE_CONTROL)
+        ItemTag.setString(item, ACTION_KEY, ACTION_WORLD_CREATION)
+        return item
     }
 
     private fun confirmButton(player: Player, confirm: Boolean): ItemStack {
@@ -194,7 +208,10 @@ class ChanponAdminMenu(
         val item = ItemStack(Material.NETHER_STAR)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "admin.switch_mwm.display"))
-            meta.lore(lore(i18nList(player, "admin.switch_mwm.lore")))
+            meta.lore(structuredBlocks(listOf(
+                GuiLoreBlock(listOf(GuiLoreLine.Text(i18n(player, "admin.switch_mwm.description")))),
+                GuiLoreBlock(listOf(GuiLoreLine.SingleAction(i18n(player, "admin.switch_mwm.action"))))
+            )))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, TYPE_CONTROL)
@@ -216,6 +233,8 @@ class ChanponAdminMenu(
         CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
 
     private fun lore(lines: List<String>) = ChanponLore.build(lines)
+    private fun structuredBlocks(blocks: List<GuiLoreBlock>): List<Component> =
+        CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(blocks))
 
     private fun mwm(): me.awabi2048.myworldmanager.MyWorldManager =
         org.bukkit.plugin.java.JavaPlugin.getPlugin(me.awabi2048.myworldmanager.MyWorldManager::class.java)

@@ -1,6 +1,9 @@
 package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.backup.BackupKind
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
@@ -193,11 +196,17 @@ class WorldDataManagementMenu(
         val item = ItemStack(world.icon)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "world_data.world.display", mapOf("world" to world.name)))
-            meta.lore(lore(i18nList(player, "world_data.world.lore", mapOf(
-                "owner" to (Bukkit.getOfflinePlayer(world.owner).name ?: "-"),
-                "created" to world.createdAt,
-                "backups" to backupService.listBackupsForWorld(world.uuid).size
-            ))))
+            meta.lore(structuredBlocks(listOf(
+                GuiLoreBlock(listOf(
+                    GuiLoreLine.Data(i18n(player, "world_data.world.owner_label"), Bukkit.getOfflinePlayer(world.owner).name ?: "-", "§f"),
+                    GuiLoreLine.Data(i18n(player, "world_data.world.created_label"), world.createdAt, "§f"),
+                    GuiLoreLine.Data(i18n(player, "world_data.world.backups_label"), backupService.listBackupsForWorld(world.uuid).size, "§f")
+                )),
+                GuiLoreBlock(listOf(
+                    GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.left"), i18n(player, "world_data.world.backup_action")),
+                    GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.right"), i18n(player, "world_data.world.list_action"))
+                ))
+            )))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_WORLD_ITEM)
@@ -217,7 +226,12 @@ class WorldDataManagementMenu(
         val item = ItemStack(material)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "$key.display"))
-            meta.lore(lore(i18nList(player, "$key.lore")))
+            meta.lore(structuredBlocks(listOf(GuiLoreBlock(buildList {
+                add(GuiLoreLine.Text(i18n(player, "$key.description")))
+                if (action == ACTION_ANNUAL_ARCHIVE) {
+                    add(GuiLoreLine.Warning(i18n(player, "$key.warning")))
+                }
+            }))))
         }
         ItemTag.tagItem(item, TYPE_CONTROL)
         ItemTag.setString(item, ACTION_KEY, action)
@@ -274,6 +288,8 @@ class WorldDataManagementMenu(
     private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
     private fun lore(lines: List<String>) = ChanponLore.build(lines)
+    private fun structuredBlocks(blocks: List<GuiLoreBlock>): List<Component> =
+        CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(blocks))
 
     private fun mwm(): me.awabi2048.myworldmanager.MyWorldManager =
         org.bukkit.plugin.java.JavaPlugin.getPlugin(me.awabi2048.myworldmanager.MyWorldManager::class.java)

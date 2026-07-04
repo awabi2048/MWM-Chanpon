@@ -18,9 +18,6 @@ import me.awabi2048.myworldmanager.api.extension.MenuExtensionContext
 import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.format.TextDecoration
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import org.bukkit.event.inventory.InventoryClickEvent
@@ -31,7 +28,6 @@ class ToolPermissionMenuExtension(
     private val controller: ToolPermissionController,
     private val definitions: List<ToolPermissionDefinition>
 ) : MenuExtension {
-    private val legacy = LegacyComponentSerializer.legacySection()
     override fun getId(): String = ToolPermissionMenu.EXTENSION_ID
 
     override fun onRender(inventory: Inventory, player: Player, context: MenuExtensionContext) {
@@ -44,9 +40,8 @@ class ToolPermissionMenuExtension(
             if (ItemTag.getType(item) != ItemTag.TYPE_GUI_MEMBER_ITEM) continue
 
             val memberUuid = ItemTag.getWorldUuid(item) ?: continue
-            val originalLore = item.itemMeta.lore() ?: emptyList()
             val states = controller.getMemberToolStates(worldData, memberUuid)
-            val newLore = rebuildLore(player, worldData, memberUuid, originalLore, states)
+            val newLore = rebuildLore(player, worldData, memberUuid, states)
             val meta = item.itemMeta
             meta.lore(newLore)
             item.itemMeta = meta
@@ -78,7 +73,6 @@ class ToolPermissionMenuExtension(
         player: Player,
         worldData: WorldData,
         memberUuid: UUID,
-        originalLore: List<Component>,
         states: Map<String, Boolean>
     ): List<Component> {
         val api = CCSystem.getAPI()
@@ -111,27 +105,14 @@ class ToolPermissionMenuExtension(
             GuiLoreLine.Spacer
         )
         if (memberUuid != worldData.owner) {
-            // MWM 側の lore は既にフレーム用セパレータを含むため、Chanpon 側の GuiLoreBlock へ
-            // そのまま取り込むと CC-System の不変条件に抵触する。末尾アクションブロックのみ抽出する。
-            extractTrailingActionLines(originalLore).forEach { actionLines.add(GuiLoreLine.Raw(it)) }
+            // MWM側の描画済みLoreから操作行を拾わず、Chanpon側で必要な操作を構造として明示する。
+            actionLines.add(GuiLoreLine.Action(i18n(player, "transfer_owner_operation"), i18n(player, "transfer_owner_action")))
+            actionLines.add(GuiLoreLine.Action(i18n(player, "remove_member_operation"), i18n(player, "remove_member_action")))
         }
 
         return api.getLoreService().render(GuiLoreSpec.Blocks(listOf(
             GuiLoreBlock(lines),
             GuiLoreBlock(actionLines)
         )))
-    }
-
-    private fun extractTrailingActionLines(originalLore: List<Component>): List<String> {
-        val serialized = originalLore.map { legacy.serialize(it) }
-        val lastSeparator = serialized.indexOfLast(::isSeparatorLine)
-        return serialized
-            .drop(lastSeparator + 1)
-            .filter { it.isNotBlank() && !isSeparatorLine(it) }
-    }
-
-    private fun isSeparatorLine(line: String): Boolean {
-        val stripped = line.replace(Regex("[§&][0-9A-FK-ORa-fk-or]"), "").trim()
-        return stripped.isNotBlank() && stripped.all { it == '─' || it == '━' || it == '-' }
     }
 }
