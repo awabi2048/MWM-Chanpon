@@ -30,14 +30,12 @@ import me.awabi2048.mwmchanpon.service.ChanponSpawnWorldService
 import me.awabi2048.mwmchanpon.service.EasyVoidWorldCreationService
 import me.awabi2048.mwmchanpon.service.ManualRollbackService
 import me.awabi2048.mwmchanpon.service.WorldDataExportService
-import me.awabi2048.mwmchanpon.service.WizardSessionService
 import me.awabi2048.mwmchanpon.service.ArchiveService
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.tool.LuckPermsToolPermissionService
 import me.awabi2048.mwmchanpon.tool.ToolPermissionConfig
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
-import me.awabi2048.mwmchanpon.ui.AdminWizardGui
 import me.awabi2048.mwmchanpon.ui.AutomationSettingsMenu
 import me.awabi2048.mwmchanpon.ui.BackupListMenu
 import me.awabi2048.mwmchanpon.ui.ChanponAdminMenu
@@ -56,10 +54,6 @@ import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
 
 class MWMChanponPlugin : JavaPlugin() {
-    lateinit var wizardSessionService: WizardSessionService
-        private set
-    lateinit var adminWizardGui: AdminWizardGui
-        private set
     private val coreApiBridge = CoreApiBridge()
     private lateinit var productionToggleExtension: ProductionToggleExtension
     private lateinit var productionWorldGuard: ProductionWorldGuard
@@ -101,12 +95,6 @@ class MWMChanponPlugin : JavaPlugin() {
         CCSystem.getAPI().getMenuNavigationService().registerMenuMatcher(MENU_OWNER) { inventory ->
             inventory.holder?.javaClass?.name?.startsWith("me.awabi2048.mwmchanpon") == true
         }
-
-        val timeoutSeconds = config.getLong("wizard.timeout_seconds", 300)
-        wizardSessionService = WizardSessionService(timeoutSeconds, logger)
-
-        adminWizardGui = AdminWizardGui(this, coreApiBridge)
-        server.pluginManager.registerEvents(adminWizardGui, this)
 
         val chanponStorage = ChanponWorldStorage(dataFolder)
         val globalStorage = ChanponGlobalStorage(dataFolder)
@@ -179,7 +167,7 @@ class MWMChanponPlugin : JavaPlugin() {
         worldPortalPolicy = ChanponWorldPortalPolicy(chanponStorage)
         worldPublishPolicy = ChanponWorldPublishPolicy(chanponStorage)
         worldRuntimePolicy = ChanponWorldRuntimePolicy()
-        commandExtension = ChanponCommandExtension(this, globalStorage, adminWizardGui)
+        commandExtension = ChanponCommandExtension(this, globalStorage)
         MyWorldManagerApi.registerWorldDeleteGuard(productionWorldGuard)
         MyWorldManagerApi.registerMenuExtension(productionToggleExtension)
         MyWorldManagerApi.registerAdminWorldListProvider(chanponAdminWorldListMenu)
@@ -196,7 +184,6 @@ class MWMChanponPlugin : JavaPlugin() {
         MyWorldManagerApi.registerWorldRuntimePolicy(worldRuntimePolicy)
         MyWorldManagerApi.registerAdminMenuProvider(chanponAdminMenu)
         MyWorldManagerApi.registerCommandPolicy(commandExtension)
-        MyWorldManagerApi.registerCreateCommandHandler(commandExtension)
         server.pluginManager.registerEvents(productionToggleExtension, this)
         server.pluginManager.registerEvents(submissionAdminMenu, this)
         server.pluginManager.registerEvents(chanponAdminMenu, this)
@@ -308,7 +295,6 @@ class MWMChanponPlugin : JavaPlugin() {
             MyWorldManagerApi.unregisterAdminMenuProvider(chanponAdminMenu)
         }
         if (::commandExtension.isInitialized) {
-            MyWorldManagerApi.unregisterCreateCommandHandler(commandExtension)
             MyWorldManagerApi.unregisterCommandPolicy(commandExtension)
         }
         if (::automationService.isInitialized) {
@@ -317,7 +303,6 @@ class MWMChanponPlugin : JavaPlugin() {
         if (::toolController.isInitialized) {
             toolController.clearOnlineActivePermissions()
         }
-        if (::wizardSessionService.isInitialized) wizardSessionService.clearAll()
         runCatching { CCSystem.getAPI().getMenuNavigationService().unregisterOwner(MENU_OWNER) }
         logger.info("MWM-Chanpon addon has been disabled.")
     }

@@ -12,5 +12,5 @@ softdepend:
 
 permissions:
   mwmchanpon.admin:
-    description: 管理者ウィザードを使用する権限
+    description: MWM-Chanponの管理者機能を使用する権限
     default: op
