@@ -99,7 +99,7 @@ class ChanponPlayerWorldMenuProvider(
         val creationBlockReason = creationBlockReason(player, currentCreateCount, maxCreateCount)
         if (isOwnMenu && creationBlockReason == null && hasCreatePermission(player)) {
             inventory.setItem(footerStart + 2, createCreationButton(player))
-        } else if (isOwnMenu && creationBlockReason != null && hasCreatePermission(player)) {
+        } else if (isOwnMenu && creationBlockReason != null) {
             inventory.setItem(footerStart + 2, createCreationUnavailableButton(player, creationBlockReason))
         }
         inventory.setItem(footerStart + 4, createPlayerInfoItem(player, targetPlayerUuid, targetPlayerName))
@@ -277,8 +277,14 @@ class ChanponPlayerWorldMenuProvider(
             meta.displayName(mwm.languageManager.getComponent(player, "gui.player_world.creation_button.display"))
             // 操作名は共通キー、内容はChanpon側キーとして保持し、言語ファイルへ結合済み操作行を置かない。
             meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(listOf(
-                GuiLoreBlock(mwm.languageManager.getMessageList(player, "gui.player_world.creation_button.lore").map(GuiLoreLine::Raw)),
+                GuiLoreBlock(mwm.languageManager.getMessageList(player, "gui.player_world.creation_button.lore")
+                    .filterNot(::isCreationButtonLegacyActionLine)
+                    .map(GuiLoreLine::Raw)),
                 GuiLoreBlock(listOf(
+                    GuiLoreLine.Action(
+                        mwm.languageManager.getMessage(player, "gui.settings.click.left"),
+                        mwm.languageManager.getMessage(player, "gui.player_world.creation_button.action")
+                    ),
                     GuiLoreLine.Action(
                         mwm.languageManager.getMessage(player, "gui.settings.click.right"),
                         plugin.getMessage(player, "chanpon.player_world.easy_creation.action")
@@ -289,6 +295,11 @@ class ChanponPlayerWorldMenuProvider(
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_CREATION_BUTTON)
         return item
+    }
+
+    private fun isCreationButtonLegacyActionLine(line: String): Boolean {
+        val plain = line.replace(Regex("[§&][0-9A-FK-ORa-fk-or]"), "").trim()
+        return plain.contains("クリックで開始") || plain.contains("Click to start")
     }
 
     private fun startEasyCreation(player: Player) {
