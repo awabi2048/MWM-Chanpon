@@ -35,15 +35,20 @@ import org.bukkit.plugin.java.JavaPlugin
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
+import me.awabi2048.mwmchanpon.storage.ChanponWorldProtectionMode
+import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
+import me.awabi2048.mwmchanpon.protection.WorldBuildPermissionService
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
 
 class ChanponEnvironmentGui(
     private val plugin: MWMChanponPlugin,
-    storage: me.awabi2048.mwmchanpon.storage.ChanponWorldStorage,
+    private val storage: ChanponWorldStorage,
     protectionService: me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService,
+    private val buildPermissionService: WorldBuildPermissionService,
 ) : Listener {
     private val accessGuard = WorldSettingsAccessGuard(storage, protectionService)
     private val pendingTimeInputs = ConcurrentHashMap<UUID, UUID>()
+    private val pendingProtectionPasswordInputs = ConcurrentHashMap<UUID, UUID>()
 
     fun open(player: Player, worldData: WorldData) {
         if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
@@ -57,15 +62,14 @@ class ChanponEnvironmentGui(
         val gravity = worldData.gravityValue
         val scale = worldData.fixedScale
         val allowFlight = worldData.allowFlight
-        val targetWorldName = worldData.customWorldName ?: "my_world.${worldData.uuid}"
-        val outsideTargetWorld = player.world.name != targetWorldName
+        val outsideTargetWorld = !isInTargetWorld(player, worldData)
 
         inventory.setItem(19, directSettingItem(player, ACTION_WEATHER, Material.LIGHT_BLUE_WOOL, weatherDisplay(player, weather), weatherOptions(player), weather ?: NONE_KEY, outsideTargetWorld))
         inventory.setItem(20, directSettingItem(player, ACTION_TIME, Material.CLOCK, timeDisplay(player, time), timeOptions(player, time), timeOptionKey(time), outsideTargetWorld, customTimeAction = true))
         inventory.setItem(21, directSettingItem(player, ACTION_GRAVITY, Material.FEATHER, gravityDisplay(player, gravity), gravityOptions(player), (gravity ?: DEFAULT_GRAVITY).toString(), outsideTargetWorld))
         inventory.setItem(23, directSettingItem(player, ACTION_SCALE, Material.PLAYER_HEAD, scaleDisplay(player, scale), scaleOptions(player), scale?.toString(), outsideTargetWorld))
         inventory.setItem(24, directSettingItem(player, ACTION_FLIGHT, Material.ELYTRA, flightDisplay(player, allowFlight), flightOptions(player), allowFlight.toString(), outsideTargetWorld))
-        inventory.setItem(25, emptySettingSlot())
+        inventory.setItem(25, protectionSettingItem(player, worldData))
         inventory.setItem(40, backItem(player))
 
         fill(inventory)
@@ -101,6 +105,13 @@ class ChanponEnvironmentGui(
             ACTION_GRAVITY -> cycleGravity(player, worldData, reverse = event.isRightClick)
             ACTION_SCALE -> cycleScale(player, worldData, reverse = event.isRightClick)
             ACTION_FLIGHT -> toggleFlight(player, worldData)
+            ACTION_PROTECTION -> {
+                if (event.isShiftClick && event.isLeftClick) {
+                    showProtectionPasswordDialog(player, worldData)
+                } else {
+                    cycleProtection(player, worldData, reverse = event.isRightClick)
+                }
+            }
         }
         if (ItemTag.isType(item, ItemTag.TYPE_GUI_RETURN)) {
             if (!mwm().menuRouteHistory.openPrevious(player)) {
@@ -144,6 +155,38 @@ class ChanponEnvironmentGui(
         open(player, worldData)
     }
 
+    @EventHandler
+    fun onProtectionPasswordInput(event: PlayerCustomClickEvent) {
+        val identifier = event.identifier
+        if (identifier != Key.key("mwmchanpon:environment/protection_password_submit") &&
+            identifier != Key.key("mwmchanpon:environment/protection_password_cancel")
+        ) {
+            return
+        }
+
+        val conn = event.commonConnection as? PlayerGameConnection ?: return
+        val player = conn.player
+        val worldUuid = pendingProtectionPasswordInputs.remove(player.uniqueId) ?: return
+        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
+        if (identifier == Key.key("mwmchanpon:environment/protection_password_cancel")) {
+            open(player, worldData)
+            return
+        }
+
+        val input = event.getDialogResponseView()?.getText("protection_password").orEmpty().trim()
+        if (input.length < MIN_PROTECTION_PASSWORD_LENGTH) {
+            player.sendMessage(i18n(player, "protection.password_too_short"))
+            showProtectionPasswordDialog(player, worldData, input)
+            return
+        }
+
+        storage.setProtectionPassword(worldData.uuid, input)
+        storage.setProtectionMode(worldData.uuid, ChanponWorldProtectionMode.PASSWORD)
+        buildPermissionService.sync(worldData)
+        player.sendMessage(i18n(player, "protection.password_updated"))
+        open(player, worldData)
+    }
+
     private fun cycleWeather(player: Player, worldData: WorldData, reverse: Boolean) {
         val next = nextNullableValue(worldData.fixedWeather, WEATHER_VALUES, reverse)
         worldData.fixedWeather = next
@@ -183,6 +226,18 @@ class ChanponEnvironmentGui(
         open(player, worldData)
     }
 
+    private fun cycleProtection(player: Player, worldData: WorldData, reverse: Boolean) {
+        val current = storage.getProtectionMode(worldData.uuid)
+        val next = nextValue(current, PROTECTION_VALUES, reverse)
+        storage.setProtectionMode(worldData.uuid, next)
+        buildPermissionService.sync(worldData)
+        if (next == ChanponWorldProtectionMode.PASSWORD && !storage.hasProtectionPassword(worldData.uuid)) {
+            showProtectionPasswordDialog(player, worldData)
+            return
+        }
+        open(player, worldData)
+    }
+
     private fun showCustomTimeDialog(player: Player, worldData: WorldData, initial: String = worldData.fixedTime?.toString() ?: "") {
         pendingTimeInputs[player.uniqueId] = worldData.uuid
         val dialog = Dialog.create { builder ->
@@ -213,6 +268,43 @@ class ChanponEnvironmentGui(
                             null,
                             200,
                             DialogAction.customClick(Key.key("mwmchanpon:environment/time_cancel"), null)
+                        )
+                    )
+                )
+        }
+        player.showDialog(dialog)
+    }
+
+    private fun showProtectionPasswordDialog(player: Player, worldData: WorldData, initial: String = "") {
+        pendingProtectionPasswordInputs[player.uniqueId] = worldData.uuid
+        val dialog = Dialog.create { builder ->
+            builder.empty()
+                .base(
+                    DialogBase.builder(i18nComponent(player, "protection.password_set_title"))
+                        .body(listOf(DialogBody.plainMessage(i18nComponent(player, "protection.password_set_body"))))
+                        .inputs(
+                            listOf(
+                                DialogInput.text("protection_password", i18nComponent(player, "protection.password_label"))
+                                    .initial(initial)
+                                    .maxLength(64)
+                                    .build()
+                            )
+                        )
+                        .build()
+                )
+                .type(
+                    DialogType.confirmation(
+                        ActionButton.create(
+                            i18nComponent(player, "protection.password_apply"),
+                            null,
+                            100,
+                            DialogAction.customClick(Key.key("mwmchanpon:environment/protection_password_submit"), null)
+                        ),
+                        ActionButton.create(
+                            Component.text(i18n(player, "common.back"), NamedTextColor.GRAY),
+                            null,
+                            200,
+                            DialogAction.customClick(Key.key("mwmchanpon:environment/protection_password_cancel"), null)
                         )
                     )
                 )
@@ -454,6 +546,35 @@ class ChanponEnvironmentGui(
         return decoration(Material.WHITE_STAINED_GLASS_PANE)
     }
 
+    private fun protectionSettingItem(player: Player, worldData: WorldData): ItemStack {
+        val mode = storage.getProtectionMode(worldData.uuid)
+        val item = ItemStack(Material.IRON_DOOR)
+        item.editMeta { meta ->
+            meta.displayName(i18nComponent(player, "protection.display"))
+            meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(buildList {
+                add(GuiLoreLine.Data(i18n(player, "common.current_label"), protectionDisplay(player, mode), "\u00A7e"))
+                add(GuiLoreLine.Text(i18n(player, "protection.description")))
+                add(GuiLoreLine.Spacer)
+                protectionOptions(player).forEach { option ->
+                    val selected = option.key == mode.storageValue
+                    val marker = if (selected) "\u00A7a\u00BB" else "\u00A78\u30FB"
+                    val color = if (selected) option.selectedColor else "\u00A77"
+                    add(GuiLoreLine.Raw("$marker $color${option.display}"))
+                }
+                if (mode == ChanponWorldProtectionMode.PASSWORD && !storage.hasProtectionPassword(worldData.uuid)) {
+                    add(GuiLoreLine.Warning(i18n(player, "protection.password_missing_warning")))
+                }
+                add(GuiLoreLine.Spacer)
+                add(GuiLoreLine.SingleAction(i18n(player, "common.action_next")))
+                add(GuiLoreLine.Action(i18n(player, "common.shift_left"), i18n(player, "protection.password_change_action")))
+            }, GuiLoreFrame.BOTH)))
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
+        }
+        ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
+        ItemTag.setString(item, ACTION_KEY, ACTION_PROTECTION)
+        return item
+    }
+
     private fun categoryItem(player: Player, key: String, currentValue: String, active: Boolean): ItemStack {
         val item = ItemStack(
             if (active) Material.GRASS_BLOCK else Material.GRASS_BLOCK
@@ -660,6 +781,22 @@ class ChanponEnvironmentGui(
         }
     }
 
+    private fun protectionDisplay(player: Player, mode: ChanponWorldProtectionMode): String =
+        i18n(player, "protection.${mode.i18nKey}.display")
+
+    private fun protectionOptions(player: Player): List<SettingOption> =
+        PROTECTION_VALUES.map { mode ->
+            SettingOption(mode.storageValue, protectionDisplay(player, mode), protectionColor(mode))
+        }
+
+    private fun protectionColor(mode: ChanponWorldProtectionMode): String =
+        when (mode) {
+            ChanponWorldProtectionMode.OWNER_ONLY -> "\u00A7c"
+            ChanponWorldProtectionMode.MEMBERS -> "\u00A7e"
+            ChanponWorldProtectionMode.PASSWORD -> "\u00A7d"
+            ChanponWorldProtectionMode.PUBLIC -> "\u00A7a"
+        }
+
     private fun weatherColor(weather: String): String {
         return when (weather) {
             "CLEAR" -> "\u00A7e"
@@ -695,6 +832,15 @@ class ChanponEnvironmentGui(
     }
 
     private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)
+
+    private fun isInTargetWorld(player: Player, worldData: WorldData): Boolean {
+        val currentWorldUuid = MyWorldManagerApi.getWorldRepository()?.findByWorldName(player.world.name)?.uuid
+        if (currentWorldUuid == worldData.uuid) return true
+        val targetWorldName = MyWorldManagerApi.getWorldService()?.getWorldFolderName(worldData)
+            ?: worldData.customWorldName
+            ?: "my_world.${worldData.uuid}"
+        return player.world.name == targetWorldName
+    }
 
     private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): String {
         return CCSystem.getAPI().getI18nString(player, "chanpon.environment.$key", placeholders)
@@ -748,12 +894,20 @@ class ChanponEnvironmentGui(
         private const val ACTION_GRAVITY = "gravity"
         private const val ACTION_SCALE = "scale"
         private const val ACTION_FLIGHT = "flight"
+        private const val ACTION_PROTECTION = "protection"
         private const val NONE_KEY = "NONE"
         private const val DEFAULT_GRAVITY = 0.08
         private const val DEFAULT_SCALE = 1.0
+        private const val MIN_PROTECTION_PASSWORD_LENGTH = 4
         private val WEATHER_VALUES = listOf<String?>(null, "CLEAR", "RAIN", "THUNDER")
         private val TIME_VALUES = listOf<Long?>(null, 0L, 6000L, 12500L, 18000L)
         private val GRAVITY_VALUES = listOf(0.08, 0.02, 0.01)
         private val SCALE_VALUES = listOf(1.0, 0.5, 2.0)
+        private val PROTECTION_VALUES = listOf(
+            ChanponWorldProtectionMode.OWNER_ONLY,
+            ChanponWorldProtectionMode.MEMBERS,
+            ChanponWorldProtectionMode.PASSWORD,
+            ChanponWorldProtectionMode.PUBLIC
+        )
     }
 }

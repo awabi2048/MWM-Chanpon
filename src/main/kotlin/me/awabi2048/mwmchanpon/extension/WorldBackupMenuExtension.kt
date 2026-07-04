@@ -59,6 +59,7 @@ class WorldBackupMenuExtension(
 
     override fun onRender(inventory: Inventory, player: Player, context: MenuExtensionContext) {
         if (context.menuType != "world_settings") return
+        if (context.get<Boolean>("isProtected") == true) return
         val worldData = context.get<WorldData>("worldData") ?: return
         if (!canManage(player, worldData)) return
         inventory.setItem(WORLD_MENU_SLOT, entryItem(player, worldData.uuid))

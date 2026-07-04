@@ -9,6 +9,7 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
+import me.awabi2048.mwmchanpon.service.EasyVoidWorldCreationService
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
@@ -41,7 +42,8 @@ import org.bukkit.plugin.java.JavaPlugin
 class ChanponPlayerWorldMenuProvider(
     private val plugin: MWMChanponPlugin,
     private val globalStorage: ChanponGlobalStorage,
-    private val storage: ChanponWorldStorage
+    private val storage: ChanponWorldStorage,
+    private val easyVoidCreationService: EasyVoidWorldCreationService
 ) : PlayerWorldMenuProvider, Listener {
     private val legacy = LegacyComponentSerializer.legacySection()
 
@@ -144,6 +146,10 @@ class ChanponPlayerWorldMenuProvider(
                     return
                 }
                 mwm.soundManager.playClickSound(player, item, "player_world")
+                if (event.isRightClick && !event.isShiftClick) {
+                    startEasyCreation(player)
+                    return
+                }
                 val session = mwm.creationSessionManager.startSession(player.uniqueId)
                 session.isDialogMode = true
                 player.closeInventory()
@@ -175,7 +181,12 @@ class ChanponPlayerWorldMenuProvider(
         }
         if (event.isLeftClick && !event.isShiftClick) {
             if (worldData.isArchived) return
-            if (isCurrentWorld(player, worldData)) return
+            if (isCurrentWorld(player, worldData)) {
+                if (canOpenSettings(player, worldData)) {
+                    openWorldSettings(player, holder, item, worldData)
+                }
+                return
+            }
             player.closeInventory()
             // MWM本体の具象サービスを直接呼ぶとKotlinランタイムのクラスローダー差で壊れるため、公開API境界だけを通す。
             MyWorldManagerApi.getWorldService()?.teleportToWorld(player, uuid)
@@ -184,15 +195,7 @@ class ChanponPlayerWorldMenuProvider(
             return
         }
         if (event.isRightClick && !event.isShiftClick && canOpenSettings(player, worldData)) {
-            mwm.soundManager.playClickSound(player, item, "player_world")
-            mwm.menuRouteHistory.pushPlayerWorld(player, holder.page, holder.showBackButton)
-            mwm.worldSettingsGui.open(
-                player,
-                worldData,
-                true,
-                true,
-                holder.showBackButton
-            )
+            openWorldSettings(player, holder, item, worldData)
         }
     }
 
@@ -235,11 +238,9 @@ class ChanponPlayerWorldMenuProvider(
             } else {
                 ""
             }
-            val warpAction = if (isCurrentWorld(player, world)) {
-                ""
-            } else {
-                lang.getMessage(player, "gui.player_world.world_item.warp")
-            }
+            val warpAction = lang.getMessage(player, "gui.player_world.world_item.warp")
+            val settingsAction = lang.getMessage(player, "gui.player_world.world_item.settings")
+            val isCurrentWorld = isCurrentWorld(player, world)
             // Chanpon changes domain values only; MWM and CC-System retain the shared block layout contract.
             meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(buildList {
                 if (description.isNotBlank()) add(GuiLoreBlock(listOf(GuiLoreLine.Raw(description))))
@@ -249,8 +250,12 @@ class ChanponPlayerWorldMenuProvider(
                 ))
                 if (expiresAtLine.isNotBlank()) add(GuiLoreBlock(listOf(GuiLoreLine.Raw(expiresAtLine))))
                 add(GuiLoreBlock(buildList {
-                    if (warpAction.isNotBlank()) add(GuiLoreLine.Raw(warpAction))
-                    add(GuiLoreLine.Raw(lang.getMessage(player, "gui.player_world.world_item.settings")))
+                    if (isCurrentWorld) {
+                        add(GuiLoreLine.SingleAction(settingsAction))
+                    } else {
+                        add(GuiLoreLine.Action(lang.getMessage(player, "gui.settings.click.left"), warpAction))
+                        add(GuiLoreLine.Action(lang.getMessage(player, "gui.settings.click.right"), settingsAction))
+                    }
                 }))
             })))
             if (world.isArchived) meta.setEnchantmentGlintOverride(true)
@@ -266,11 +271,18 @@ class ChanponPlayerWorldMenuProvider(
         val item = ItemStack(Material.NETHER_STAR)
         item.editMeta { meta ->
             meta.displayName(mwm.languageManager.getComponent(player, "gui.player_world.creation_button.display"))
-            meta.lore(ChanponLore.build(mwm.languageManager.getMessageList(player, "gui.player_world.creation_button.lore")))
+            meta.lore(ChanponLore.build(
+                mwm.languageManager.getMessageList(player, "gui.player_world.creation_button.lore") +
+                    plugin.getMessage(player, "chanpon.player_world.easy_creation.action")
+            ))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_CREATION_BUTTON)
         return item
+    }
+
+    private fun startEasyCreation(player: Player) {
+        easyVoidCreationService.start(player)
     }
 
     private fun createCreationUnavailableButton(player: Player, reason: CreationBlockReason): ItemStack {
@@ -364,6 +376,19 @@ class ChanponPlayerWorldMenuProvider(
         player.hasPermission("myworldmanager.admin") ||
             world.owner == player.uniqueId || world.moderators.contains(player.uniqueId) || world.members.contains(player.uniqueId)
 
+    private fun openWorldSettings(player: Player, holder: Holder, item: ItemStack, worldData: WorldData) {
+        val mwm = mwm()
+        mwm.soundManager.playClickSound(player, item, "player_world")
+        mwm.menuRouteHistory.pushPlayerWorld(player, holder.page, holder.showBackButton)
+        mwm.worldSettingsGui.open(
+            player,
+            worldData,
+            true,
+            true,
+            holder.showBackButton
+        )
+    }
+
     private fun isCurrentWorld(player: Player, world: WorldData): Boolean =
         mwm().worldConfigRepository.findByWorldName(player.world.name)?.uuid == world.uuid
 
@@ -373,9 +398,7 @@ class ChanponPlayerWorldMenuProvider(
             player.hasPermission("craftercrossing.test")
 
     private fun hasCreatePermission(player: Player): Boolean =
-        player.hasPermission("mwmchanpon.create_world") ||
-            player.hasPermission("myworldmanager.create") ||
-            player.hasPermission("myworldmanager.command.mwm.create") ||
+        player.hasPermission("myworldmanager.command.mwm.create") ||
             player.hasPermission("myworldmanager.admin") ||
             player.hasPermission("mwmchanpon.admin") ||
             player.hasPermission("craftercrossing.test")

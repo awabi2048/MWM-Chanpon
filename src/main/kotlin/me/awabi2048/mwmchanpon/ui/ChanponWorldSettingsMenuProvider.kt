@@ -62,6 +62,15 @@ class ChanponWorldSettingsMenuProvider(
         mwm.settingsSessionManager.getSession(player)?.showBackButton = request.showBackButton
         GuiHelper.scheduleGuiTransitionReset(mwm, player)
 
+        val session = mwm.settingsSessionManager.getSession(player)
+        val isAdminFlow = session?.isAdminFlow == true
+        val isActualOwner = worldData.owner == player.uniqueId || isAdminFlow
+        val isModerator = worldData.moderators.contains(player.uniqueId)
+        val isImportedArchive = storage.isImportedArchive(worldData.uuid)
+        val isOwner = isActualOwner && !isImportedArchive
+        val hasManagePermission = (isOwner || isModerator) && !isImportedArchive
+        val isProtected = protectionService.isProtected(worldData)
+
         val holder = SettingsHolder(worldData.uuid, request)
         val title = GuiHelper.inventoryTitle(
             mwm.languageManager.getComponent(
@@ -71,19 +80,11 @@ class ChanponWorldSettingsMenuProvider(
             )
         )
         val layout = ChanponGuiElements.settingsLayout()
-        val inventory = Bukkit.createInventory(holder, layout.size, title)
+        val inventorySize = if (isProtected) PROTECTED_SETTINGS_SIZE else layout.size
+        val inventory = Bukkit.createInventory(holder, inventorySize, title)
         holder.inv = inventory
 
         applyFrame(inventory)
-
-        val session = mwm.settingsSessionManager.getSession(player)
-        val isAdminFlow = session?.isAdminFlow == true
-        val isActualOwner = worldData.owner == player.uniqueId || isAdminFlow
-        val isModerator = worldData.moderators.contains(player.uniqueId)
-        val isImportedArchive = storage.isImportedArchive(worldData.uuid)
-        val isOwner = isActualOwner && !isImportedArchive
-        val hasManagePermission = (isOwner || isModerator) && !isImportedArchive
-        val isProtected = protectionService.isProtected(worldData)
 
         if (isProtected && isOwner) {
             // 完成済み/提出済みのワールドでは、公開レベル・訪問通知・ポータル取得のみ中央行に中央寄せで配置する。
@@ -107,7 +108,7 @@ class ChanponWorldSettingsMenuProvider(
         }
         inventory.setItem(4, worldInfoItem(player, worldData))
         if (request.showBackButton) {
-            inventory.setItem(49, returnItem(player))
+            inventory.setItem(if (isProtected) PROTECTED_BACK_SLOT else layout.backSlot, returnItem(player))
         }
 
         fill(inventory)
@@ -714,18 +715,7 @@ class ChanponWorldSettingsMenuProvider(
     private fun expansionItem(player: Player, worldData: WorldData): ItemStack {
         val level = worldData.borderExpansionLevel
         val max = maxExpansionLevel()
-        val border = currentBorder(worldData)
-        val lines = i18nList(
-            player,
-            if (level >= max) "expand.status_max" else "expand.status_available",
-            mapOf(
-                "current" to level,
-                "max" to max,
-                "size" to formatNumber(border.size),
-                "x" to formatNumber(border.x),
-                "z" to formatNumber(border.z)
-            )
-        )
+        val lines = if (level >= max) i18nList(player, "expand.status_max") else emptyList()
         return componentItem(
             Material.FILLED_MAP,
             i18n(player, "expand.display"),
@@ -977,18 +967,8 @@ class ChanponWorldSettingsMenuProvider(
         mwm().worldConfigRepository.findByWorldName(player.world.name)?.uuid == worldData.uuid
 
     private fun maxExpansionLevel(): Int {
-        return mwm().config.getConfigurationSection("expansion.costs")?.getKeys(false)?.size ?: 3
+        return plugin.config.getInt("world_expansion.max_level", 3).coerceAtLeast(0)
     }
-
-    private fun currentBorder(worldData: WorldData): BorderInfo {
-        val world = Bukkit.getWorld(worldData.customWorldName ?: "my_world.${worldData.uuid}")
-        val border = world?.worldBorder
-        val center = worldData.borderCenterPos ?: border?.center
-        val size = border?.size ?: mwm().config.getDouble("expansion.initial_size", 100.0)
-        return BorderInfo(center?.x ?: 0.0, center?.z ?: 0.0, size)
-    }
-
-    private fun formatNumber(value: Double): String = if (value % 1.0 == 0.0) value.toInt().toString() else "%.1f".format(value)
 
     private fun directionName(player: Player, direction: BlockFace): String {
         return i18n(player, "direction.${direction.name.lowercase()}")
@@ -1026,8 +1006,6 @@ class ChanponWorldSettingsMenuProvider(
     private fun i18nComponent(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): Component {
         return CCSystem.getAPI().getI18nComponent(player, "chanpon.settings.$key", placeholders)
     }
-
-    private data class BorderInfo(val x: Double, val z: Double, val size: Double)
 
     private class SettingsHolder(val worldUuid: UUID, val request: WorldSettingsMenuRequest) : WorldSettingsInventoryHolder {
         lateinit var inv: Inventory
@@ -1084,6 +1062,8 @@ class ChanponWorldSettingsMenuProvider(
 
     companion object {
         private const val PROVIDER_ID = "chanpon.world_settings"
+        private const val PROTECTED_SETTINGS_SIZE = 45
+        private const val PROTECTED_BACK_SLOT = 40
         private const val TYPE_EXPAND_DIRECTION = "chanpon_expand_direction"
         private const val DIRECTION_KEY = "chanpon_direction"
         private const val ACTION_CENTER = "center"

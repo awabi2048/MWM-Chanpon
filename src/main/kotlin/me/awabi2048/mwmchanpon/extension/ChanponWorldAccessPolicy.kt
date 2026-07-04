@@ -45,14 +45,13 @@ class ChanponWorldAccessPolicy(
         if (!canUseMyWorldSystem(player)) return false
         if (worldData.isArchived) return false
         if (player.hasPermission("myworldmanager.admin") || isMember) return true
-        return visibility(worldData) == ChanponWorldVisibility.PUBLIC
+        return visibility(worldData) != ChanponWorldVisibility.PRIVATE
     }
 
     override fun canShowMeetTarget(viewer: Player, target: Player, worldData: WorldData, isMember: Boolean): Boolean {
         if (!canUseMyWorldSystem(viewer)) return false
         if (target.world.uid == viewer.world.uid) return true
-        if (isMember) return true
-        return visibility(worldData) != ChanponWorldVisibility.PRIVATE
+        return isMember || visibility(worldData) != ChanponWorldVisibility.PRIVATE
     }
 
     override fun getMeetTargetAction(viewer: Player, target: Player, worldData: WorldData, isMember: Boolean): MeetTargetAction {
@@ -65,6 +64,17 @@ class ChanponWorldAccessPolicy(
         }
     }
 
+    override fun canDirectWorldWarp(player: Player, worldData: WorldData, isMember: Boolean): Boolean =
+        canUseMyWorldSystem(player) &&
+            !worldData.isArchived &&
+            (isMember || visibility(worldData) == ChanponWorldVisibility.PUBLIC)
+
+    override fun canRequestWorldWarp(player: Player, worldData: WorldData, isMember: Boolean): Boolean =
+        canUseMyWorldSystem(player) &&
+            !worldData.isArchived &&
+            !isMember &&
+            visibility(worldData) != ChanponWorldVisibility.PUBLIC
+
     private fun visibility(worldData: WorldData): ChanponWorldVisibility =
         storage.getVisibility(worldData.uuid)
 
@@ -72,8 +82,7 @@ class ChanponWorldAccessPolicy(
         !globalStorage.isArchiveLocked() || player.hasPermission("mwmchanpon.admin")
 
     private fun canCreateWorld(player: Player): Boolean =
-        player.hasPermission("mwmchanpon.create_world") ||
-            player.hasPermission("myworldmanager.command.mwm.create") ||
+        player.hasPermission("myworldmanager.command.mwm.create") ||
             player.hasPermission("myworldmanager.admin") ||
             player.hasPermission("mwmchanpon.admin") ||
             player.hasPermission("craftercrossing.test")

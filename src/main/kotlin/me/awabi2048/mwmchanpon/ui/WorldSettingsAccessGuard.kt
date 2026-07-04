@@ -43,10 +43,11 @@ internal class WorldSettingsAccessGuard(
         }
 
         if (requireTargetWorld) {
+            val currentWorldUuid = MyWorldManagerApi.getWorldRepository()?.findByWorldName(player.world.name)?.uuid
             val targetWorld = MyWorldManagerApi.getWorldService()?.getWorldFolderName(worldData)
                 ?: worldData.customWorldName
                 ?: "my_world.${worldData.uuid}"
-            if (player.world.name != targetWorld) {
+            if (currentWorldUuid != worldData.uuid && player.world.name != targetWorld) {
                 player.sendMessage(mwm.languageManager.getComponent(player, "gui.settings.common.must_be_in_world"))
                 denySound(player)
                 return false

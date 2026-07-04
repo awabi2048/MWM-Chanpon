@@ -9,6 +9,9 @@ production:
   menu_slot: 40
   forced_tags: []
 
+world_expansion:
+  max_level: 3
+
 submission:
   closed: false
 

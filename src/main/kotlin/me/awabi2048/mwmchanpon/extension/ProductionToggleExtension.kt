@@ -62,6 +62,7 @@ class ProductionToggleExtension(
                 inventory.setItem(plugin.config.getInt("production.menu_slot", 40), createCreationItem(enabled))
             }
             "world_settings" -> {
+                if (context.get<Boolean>("isProtected") == true) return
                 val worldData = context.get<WorldData>("worldData") ?: return
                 if (plugin.isSubmissionClosed()) {
                     inventory.setItem(WORLD_MENU_SLOT, createDecorationItem(Material.GRAY_STAINED_GLASS_PANE))
@@ -289,25 +290,6 @@ class ProductionToggleExtension(
                 }
                 player.sendMessage(i18n(player, "message.submitted"))
             }
-            ConfirmationAction.CANCEL_SUBMISSION -> {
-                if (plugin.isSubmissionClosed()) {
-                    player.sendMessage(i18n(player, "message.deadline_closed"))
-                    return
-                }
-                if (!ensureSubmissionState(player, worldUuid, SubmissionState.SUBMITTED)) return
-                storage.setSubmissionState(
-                    worldUuid,
-                    SubmissionState.UNSUBMITTED,
-                    player.uniqueId,
-                    player.name,
-                    "cancel_submission"
-                )
-                MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)?.let {
-                    protectionService.sync(it)
-                    toolPermissionController.syncWorld(it)
-                }
-                player.sendMessage(i18n(player, "message.cancelled"))
-            }
         }
     }
 
@@ -494,8 +476,7 @@ class ProductionToggleExtension(
     private enum class ConfirmationAction(val key: String, val material: Material) {
         SET_PRODUCTION("set_production", Material.HEART_OF_THE_SEA),
         UNSET_PRODUCTION("unset_production", Material.REDSTONE),
-        SUBMIT("submit", Material.BRICKS),
-        CANCEL_SUBMISSION("cancel_submission", Material.FLOW_BANNER_PATTERN)
+        SUBMIT("submit", Material.BRICKS)
     }
 
     private class SubmissionConfirmationHolder(
