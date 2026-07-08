@@ -9,6 +9,7 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
+import me.awabi2048.mwmchanpon.service.EasyVoidWorldCreationService
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
@@ -19,6 +20,7 @@ import me.awabi2048.myworldmanager.api.extension.PlayerWorldMenuProvider
 import me.awabi2048.myworldmanager.api.extension.PlayerWorldMenuRequest
 import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.session.SettingsAction
+import me.awabi2048.myworldmanager.util.GuiLoreActions
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
@@ -41,7 +43,8 @@ import org.bukkit.plugin.java.JavaPlugin
 class ChanponPlayerWorldMenuProvider(
     private val plugin: MWMChanponPlugin,
     private val globalStorage: ChanponGlobalStorage,
-    private val storage: ChanponWorldStorage
+    private val storage: ChanponWorldStorage,
+    private val easyVoidCreationService: EasyVoidWorldCreationService
 ) : PlayerWorldMenuProvider, Listener {
     private val legacy = LegacyComponentSerializer.legacySection()
 
@@ -97,7 +100,7 @@ class ChanponPlayerWorldMenuProvider(
         val creationBlockReason = creationBlockReason(player, currentCreateCount, maxCreateCount)
         if (isOwnMenu && creationBlockReason == null && hasCreatePermission(player)) {
             inventory.setItem(footerStart + 2, createCreationButton(player))
-        } else if (isOwnMenu && creationBlockReason != null && hasCreatePermission(player)) {
+        } else if (isOwnMenu && creationBlockReason != null) {
             inventory.setItem(footerStart + 2, createCreationUnavailableButton(player, creationBlockReason))
         }
         inventory.setItem(footerStart + 4, createPlayerInfoItem(player, targetPlayerUuid, targetPlayerName))
@@ -109,7 +112,7 @@ class ChanponPlayerWorldMenuProvider(
             inventory.setItem(footerStart + 1, createPageItem(player, page - 1, false))
         }
         if (request.showBackButton) {
-            inventory.setItem(footerStart, createReturnItem(player))
+            placeReturnItem(inventory, footerStart, player)
         }
         if ((page + 1) * ITEMS_PER_PAGE < worlds.size) {
             inventory.setItem(footerStart + 8, createPageItem(player, page + 1, true))
@@ -144,6 +147,10 @@ class ChanponPlayerWorldMenuProvider(
                     return
                 }
                 mwm.soundManager.playClickSound(player, item, "player_world")
+                if (event.isRightClick && !event.isShiftClick) {
+                    startEasyCreation(player, holder)
+                    return
+                }
                 val session = mwm.creationSessionManager.startSession(player.uniqueId)
                 session.isDialogMode = true
                 player.closeInventory()
@@ -175,7 +182,12 @@ class ChanponPlayerWorldMenuProvider(
         }
         if (event.isLeftClick && !event.isShiftClick) {
             if (worldData.isArchived) return
-            if (isCurrentWorld(player, worldData)) return
+            if (isCurrentWorld(player, worldData)) {
+                if (canOpenSettings(player, worldData)) {
+                    openWorldSettings(player, holder, item, worldData)
+                }
+                return
+            }
             player.closeInventory()
             // MWM本体の具象サービスを直接呼ぶとKotlinランタイムのクラスローダー差で壊れるため、公開API境界だけを通す。
             MyWorldManagerApi.getWorldService()?.teleportToWorld(player, uuid)
@@ -184,15 +196,7 @@ class ChanponPlayerWorldMenuProvider(
             return
         }
         if (event.isRightClick && !event.isShiftClick && canOpenSettings(player, worldData)) {
-            mwm.soundManager.playClickSound(player, item, "player_world")
-            mwm.menuRouteHistory.pushPlayerWorld(player, holder.page, holder.showBackButton)
-            mwm.worldSettingsGui.open(
-                player,
-                worldData,
-                true,
-                true,
-                holder.showBackButton
-            )
+            openWorldSettings(player, holder, item, worldData)
         }
     }
 
@@ -223,7 +227,7 @@ class ChanponPlayerWorldMenuProvider(
                 "gui.player_world.world_item.publish",
                 mapOf("level" to visibilityName(player, storage.getVisibility(world.uuid)), "status_color" to "")
             )
-            val progressLine = SubmissionProgressDisplay.line(player, storage, world.uuid)
+            val progressLine = SubmissionProgressDisplay.loreLine(player, storage, world.uuid)
             val tagLine = if (world.tags.isNotEmpty()) {
                 val tagNames = world.tags.joinToString(", ") { mwm.worldTagManager.getDisplayName(player, it) }
                 lang.getMessage(player, "gui.player_world.world_item.tag", mapOf("tags" to tagNames))
@@ -235,22 +239,28 @@ class ChanponPlayerWorldMenuProvider(
             } else {
                 ""
             }
-            val warpAction = if (isCurrentWorld(player, world)) {
-                ""
-            } else {
-                lang.getMessage(player, "gui.player_world.world_item.warp")
-            }
+            val warpAction = lang.getMessage(player, "gui.player_world.world_item.warp")
+            val settingsAction = lang.getMessage(player, "gui.player_world.world_item.settings")
+            val isCurrentWorld = isCurrentWorld(player, world)
             // Chanpon changes domain values only; MWM and CC-System retain the shared block layout contract.
             meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(buildList {
                 if (description.isNotBlank()) add(GuiLoreBlock(listOf(GuiLoreLine.Raw(description))))
                 add(GuiLoreBlock(
-                    (listOf(ownerLine, publishLine, progressLine) + listOfNotNull(tagLine.takeIf(String::isNotBlank)))
-                        .map(GuiLoreLine::Raw)
+                    buildList {
+                        add(GuiLoreLine.Raw(ownerLine))
+                        add(GuiLoreLine.Raw(publishLine))
+                        progressLine?.let(::add)
+                        tagLine.takeIf(String::isNotBlank)?.let { add(GuiLoreLine.Raw(it)) }
+                    }
                 ))
                 if (expiresAtLine.isNotBlank()) add(GuiLoreBlock(listOf(GuiLoreLine.Raw(expiresAtLine))))
                 add(GuiLoreBlock(buildList {
-                    if (warpAction.isNotBlank()) add(GuiLoreLine.Raw(warpAction))
-                    add(GuiLoreLine.Raw(lang.getMessage(player, "gui.player_world.world_item.settings")))
+                    if (isCurrentWorld) {
+                        add(GuiLoreActions.singleClick(lang, player, settingsAction))
+                    } else {
+                        add(GuiLoreLine.Action(lang.getMessage(player, "gui.settings.click.left"), warpAction))
+                        add(GuiLoreLine.Action(lang.getMessage(player, "gui.settings.click.right"), settingsAction))
+                    }
                 }))
             })))
             if (world.isArchived) meta.setEnchantmentGlintOverride(true)
@@ -266,11 +276,37 @@ class ChanponPlayerWorldMenuProvider(
         val item = ItemStack(Material.NETHER_STAR)
         item.editMeta { meta ->
             meta.displayName(mwm.languageManager.getComponent(player, "gui.player_world.creation_button.display"))
-            meta.lore(ChanponLore.build(mwm.languageManager.getMessageList(player, "gui.player_world.creation_button.lore")))
+            // 操作名は共通キー、内容はChanpon側キーとして保持し、言語ファイルへ結合済み操作行を置かない。
+            meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(listOf(
+                GuiLoreBlock(mwm.languageManager.getMessageList(player, "gui.player_world.creation_button.lore")
+                    .filterNot(::isCreationButtonLegacyActionLine)
+                    .map(GuiLoreLine::Raw)),
+                GuiLoreBlock(listOf(
+                    GuiLoreLine.Action(
+                        mwm.languageManager.getMessage(player, "gui.settings.click.left"),
+                        mwm.languageManager.getMessage(player, "gui.player_world.creation_button.action")
+                    ),
+                    GuiLoreLine.Action(
+                        mwm.languageManager.getMessage(player, "gui.settings.click.right"),
+                        plugin.getMessage(player, "chanpon.player_world.easy_creation.action")
+                    )
+                ))
+            ))))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_CREATION_BUTTON)
         return item
+    }
+
+    private fun isCreationButtonLegacyActionLine(line: String): Boolean {
+        val plain = line.replace(Regex("[§&][0-9A-FK-ORa-fk-or]"), "").trim()
+        return plain.contains("クリックで開始") || plain.contains("Click to start")
+    }
+
+    private fun startEasyCreation(player: Player, holder: Holder) {
+        // Dialogへ移る前の位置をCC-Systemのパンくずへ積み、キャンセル時に同じ一覧を再生成する。
+        mwm().menuRouteHistory.pushPlayerWorld(player, holder.page, holder.showBackButton)
+        easyVoidCreationService.start(player)
     }
 
     private fun createCreationUnavailableButton(player: Player, reason: CreationBlockReason): ItemStack {
@@ -336,6 +372,14 @@ class ChanponPlayerWorldMenuProvider(
         return item
     }
 
+    private fun placeReturnItem(inventory: Inventory, footerStart: Int, player: Player) {
+        // 戻るボタンは中央を第一候補にしつつ、既存の情報・操作アイコン配置は上書きしない。
+        val slot = (listOf(footerStart + 4, footerStart, footerStart + 8) + (footerStart until footerStart + 9))
+            .firstOrNull { inventory.getItem(it) == null }
+            ?: footerStart
+        inventory.setItem(slot, createReturnItem(player))
+    }
+
     private fun handleReturn(player: Player, item: ItemStack) {
         val mwm = mwm()
         mwm.soundManager.playClickSound(player, item, "player_world")
@@ -364,6 +408,19 @@ class ChanponPlayerWorldMenuProvider(
         player.hasPermission("myworldmanager.admin") ||
             world.owner == player.uniqueId || world.moderators.contains(player.uniqueId) || world.members.contains(player.uniqueId)
 
+    private fun openWorldSettings(player: Player, holder: Holder, item: ItemStack, worldData: WorldData) {
+        val mwm = mwm()
+        mwm.soundManager.playClickSound(player, item, "player_world")
+        mwm.menuRouteHistory.pushPlayerWorld(player, holder.page, holder.showBackButton)
+        mwm.worldSettingsGui.open(
+            player,
+            worldData,
+            true,
+            true,
+            holder.showBackButton
+        )
+    }
+
     private fun isCurrentWorld(player: Player, world: WorldData): Boolean =
         mwm().worldConfigRepository.findByWorldName(player.world.name)?.uuid == world.uuid
 
@@ -373,9 +430,7 @@ class ChanponPlayerWorldMenuProvider(
             player.hasPermission("craftercrossing.test")
 
     private fun hasCreatePermission(player: Player): Boolean =
-        player.hasPermission("mwmchanpon.create_world") ||
-            player.hasPermission("myworldmanager.create") ||
-            player.hasPermission("myworldmanager.command.mwm.create") ||
+        player.hasPermission("myworldmanager.command.mwm.create") ||
             player.hasPermission("myworldmanager.admin") ||
             player.hasPermission("mwmchanpon.admin") ||
             player.hasPermission("craftercrossing.test")

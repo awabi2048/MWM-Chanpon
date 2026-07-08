@@ -1,10 +1,14 @@
 package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.service.WorldDataExportService
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import me.awabi2048.myworldmanager.model.WorldData
+import me.awabi2048.myworldmanager.util.GuiLoreActions
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
@@ -91,10 +95,13 @@ class WorldDataExportMenu(
         val item = ItemStack(world.icon)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "export_menu.world.display", mapOf("world" to world.name)))
-            meta.lore(lore(i18nList(player, "export_menu.world.lore", mapOf(
-                "owner" to (Bukkit.getOfflinePlayer(world.owner).name ?: "-"),
-                "created" to world.createdAt
-            ))))
+            meta.lore(structuredBlocks(listOf(
+                GuiLoreBlock(listOf(
+                    GuiLoreLine.Data(i18n(player, "export_menu.world.owner_label"), Bukkit.getOfflinePlayer(world.owner).name ?: "-", "§f"),
+                    GuiLoreLine.Data(i18n(player, "export_menu.world.created_label"), world.createdAt, "§f")
+                )),
+                GuiLoreBlock(listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "export_menu.world.action"))))
+            )))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_WORLD_ITEM)
@@ -106,7 +113,10 @@ class WorldDataExportMenu(
         val item = ItemStack(Material.DISPENSER)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "export_menu.bulk.display"))
-            meta.lore(lore(i18nList(player, "export_menu.bulk.lore")))
+            meta.lore(structuredBlocks(listOf(
+                GuiLoreBlock(listOf(GuiLoreLine.Text(i18n(player, "export_menu.bulk.description")))),
+                GuiLoreBlock(listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "export_menu.bulk.action"))))
+            )))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, TYPE_CONTROL)
@@ -162,6 +172,8 @@ class WorldDataExportMenu(
         CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
 
     private fun lore(lines: List<String>) = ChanponLore.build(lines)
+    private fun structuredBlocks(blocks: List<GuiLoreBlock>): List<Component> =
+        CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(blocks))
 
     private fun mwm(): me.awabi2048.myworldmanager.MyWorldManager =
         org.bukkit.plugin.java.JavaPlugin.getPlugin(me.awabi2048.myworldmanager.MyWorldManager::class.java)

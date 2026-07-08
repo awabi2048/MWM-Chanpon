@@ -1,6 +1,9 @@
 package me.awabi2048.mwmchanpon.extension
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import io.papermc.paper.connection.PlayerGameConnection
 import io.papermc.paper.dialog.Dialog
 import io.papermc.paper.event.player.PlayerCustomClickEvent
@@ -27,6 +30,7 @@ import me.awabi2048.myworldmanager.api.extension.WorldSettingsMenuRequest
 import me.awabi2048.myworldmanager.api.extension.MenuExtension
 import me.awabi2048.myworldmanager.api.extension.MenuExtensionContext
 import me.awabi2048.myworldmanager.model.WorldData
+import me.awabi2048.myworldmanager.util.GuiLoreActions
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.key.Key
 import net.kyori.adventure.text.Component
@@ -59,6 +63,7 @@ class WorldBackupMenuExtension(
 
     override fun onRender(inventory: Inventory, player: Player, context: MenuExtensionContext) {
         if (context.menuType != "world_settings") return
+        if (context.get<Boolean>("isProtected") == true) return
         val worldData = context.get<WorldData>("worldData") ?: return
         if (!canManage(player, worldData)) return
         inventory.setItem(WORLD_MENU_SLOT, entryItem(player, worldData.uuid))
@@ -346,7 +351,10 @@ class WorldBackupMenuExtension(
         val item = ItemStack(Material.CHEST)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "owner_backup.display"))
-            meta.lore(lore(i18nList(player, "owner_backup.lore")))
+            meta.lore(structuredBlocks(listOf(
+                GuiLoreBlock(listOf(GuiLoreLine.Text(i18n(player, "owner_backup.description")))),
+                GuiLoreBlock(listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "owner_backup.action"))))
+            )))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
@@ -359,10 +367,15 @@ class WorldBackupMenuExtension(
         val item = ItemStack(materialFor(backup))
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "owner_backup.item.display", mapOf("name" to BackupDisplay.displayName(backup))))
-            meta.lore(lore(i18nList(player, "owner_backup.item.lore", mapOf(
-                "created" to BackupDisplay.formatCreatedAt(backup.createdAt),
-                "actor" to BackupDisplay.actorName(backup)
-            ))))
+            meta.lore(structuredBlocks(listOf(
+                GuiLoreBlock(listOf(
+                    GuiLoreLine.Data(i18n(player, "owner_backup.item.created_label"), BackupDisplay.formatCreatedAt(backup.createdAt), "§f"),
+                    GuiLoreLine.Data(i18n(player, "owner_backup.item.actor_label"), BackupDisplay.actorName(backup), "§f")
+                )),
+                GuiLoreBlock(listOf(
+                    GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.left"), i18n(player, "owner_backup.item.rollback_action"))
+                ))
+            )))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, TYPE_BACKUP_ITEM)
@@ -376,7 +389,16 @@ class WorldBackupMenuExtension(
         val key = if (remaining > 0) "owner_backup.cooldown" else "owner_backup.create"
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "$key.display", mapOf("remaining" to BackupDisplay.formatDuration(remaining))))
-            meta.lore(lore(i18nList(player, "$key.lore", mapOf("remaining" to BackupDisplay.formatDuration(remaining)))))
+            meta.lore(if (remaining > 0) {
+                structuredBlocks(listOf(GuiLoreBlock(listOf(
+                    GuiLoreLine.Text(i18n(player, "$key.description", mapOf("remaining" to BackupDisplay.formatDuration(remaining))))
+                ))))
+            } else {
+                structuredBlocks(listOf(
+                    GuiLoreBlock(listOf(GuiLoreLine.Text(i18n(player, "$key.description")))),
+                    GuiLoreBlock(listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "$key.action"))))
+                ))
+            })
         }
         ItemTag.tagItem(item, TYPE_CONTROL)
         ItemTag.setString(item, ACTION_KEY, ACTION_BACKUP)
@@ -511,6 +533,8 @@ class WorldBackupMenuExtension(
     private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
     private fun lore(lines: List<String>) = ChanponLore.build(lines)
+    private fun structuredBlocks(blocks: List<GuiLoreBlock>): List<Component> =
+        CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(blocks))
     private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)
 
     data class Holder(val worldUuid: UUID, val page: Int, val request: WorldSettingsMenuRequest) : WorldSettingsInventoryHolder {

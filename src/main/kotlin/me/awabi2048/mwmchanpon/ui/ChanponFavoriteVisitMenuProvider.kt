@@ -2,6 +2,9 @@ package me.awabi2048.mwmchanpon.ui
 
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.MyWorldManager
@@ -12,6 +15,7 @@ import me.awabi2048.myworldmanager.api.extension.FavoriteMenuProvider
 import me.awabi2048.myworldmanager.api.extension.VisitMenuProvider
 import me.awabi2048.myworldmanager.api.extension.VisitMenuRequest
 import me.awabi2048.myworldmanager.model.WorldData
+import me.awabi2048.myworldmanager.util.GuiLoreActions
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.TextDecoration
@@ -193,18 +197,33 @@ class ChanponFavoriteVisitMenuProvider(
         val item = ItemStack(world.icon)
         item.editMeta { meta ->
             meta.displayName(mwm().languageManager.getComponent(player, "gui.common.world_item_name", mapOf("world" to world.name)).decoration(TextDecoration.ITALIC, false))
-            val lines = mutableListOf<String>()
-            if (world.description.isNotBlank()) lines.add(mwm().languageManager.getMessage(player, "gui.common.world_desc", mapOf("description" to world.description)))
-            val ownerName = Bukkit.getOfflinePlayer(world.owner).name ?: mwm().languageManager.getMessage(player, "general.unknown")
-            lines.add(i18n(player, "favorite_visit.owner", mapOf("owner" to ownerName)))
-            lines.add(SubmissionProgressDisplay.line(player, storage, world.uuid))
-            if (world.tags.isNotEmpty()) {
-                lines.add(i18n(player, "favorite_visit.tags", mapOf("tags" to world.tags.joinToString(", ") { mwm().worldTagManager.getDisplayName(player, it) })))
+            val description = if (world.description.isNotBlank()) {
+                mwm().languageManager.getMessage(player, "gui.common.world_desc", mapOf("description" to world.description))
+            } else {
+                ""
             }
-            lines.add("")
-            lines.add(i18n(player, "favorite_visit.warp"))
-            if (!isMember(player, world)) lines.add(i18n(player, "favorite_visit.toggle_favorite"))
-            meta.lore(ChanponLore.build(lines.filter { it.isNotBlank() }))
+            val ownerName = Bukkit.getOfflinePlayer(world.owner).name ?: mwm().languageManager.getMessage(player, "general.unknown")
+            val ownerLine = i18n(player, "favorite_visit.owner", mapOf("owner" to ownerName))
+            val progressLine = SubmissionProgressDisplay.loreLine(player, storage, world.uuid)
+            val tagLine = if (world.tags.isNotEmpty()) {
+                i18n(player, "favorite_visit.tags", mapOf("tags" to world.tags.joinToString(", ") { mwm().worldTagManager.getDisplayName(player, it) }))
+            } else {
+                ""
+            }
+            val warpAction = i18n(player, "favorite_visit.warp")
+            val favoriteAction = if (!isMember(player, world)) i18n(player, "favorite_visit.toggle_favorite") else ""
+            meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(buildList {
+                if (description.isNotBlank()) add(GuiLoreBlock(listOf(GuiLoreLine.Raw(description))))
+                add(GuiLoreBlock(buildList {
+                    add(GuiLoreLine.Raw(ownerLine))
+                    progressLine?.let(::add)
+                    if (tagLine.isNotBlank()) add(GuiLoreLine.Raw(tagLine))
+                }))
+                add(GuiLoreBlock(buildList {
+                    add(GuiLoreActions.singleClick(mwm().languageManager, player, warpAction))
+                    if (favoriteAction.isNotBlank()) add(GuiLoreActions.singleClick(mwm().languageManager, player, favoriteAction))
+                }))
+            })))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_WORLD_ITEM)

@@ -12,8 +12,5 @@ softdepend:
 
 permissions:
   mwmchanpon.admin:
-    description: 管理者ウィザードを使用する権限
-    default: op
-  mwmchanpon.create_world:
-    description: Chanpon MyWorld creation permission
+    description: MWM-Chanponの管理者機能を使用する権限
     default: op

@@ -2,6 +2,9 @@ package me.awabi2048.mwmchanpon.extension
 
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
@@ -22,6 +25,7 @@ import me.awabi2048.myworldmanager.api.extension.WorldSettingsInventoryHolder
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsMenuRequest
 import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.session.WorldCreationSession
+import me.awabi2048.myworldmanager.util.GuiLoreActions
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
@@ -62,6 +66,7 @@ class ProductionToggleExtension(
                 inventory.setItem(plugin.config.getInt("production.menu_slot", 40), createCreationItem(enabled))
             }
             "world_settings" -> {
+                if (context.get<Boolean>("isProtected") == true) return
                 val worldData = context.get<WorldData>("worldData") ?: return
                 if (plugin.isSubmissionClosed()) {
                     inventory.setItem(WORLD_MENU_SLOT, createDecorationItem(Material.GRAY_STAINED_GLASS_PANE))
@@ -289,25 +294,6 @@ class ProductionToggleExtension(
                 }
                 player.sendMessage(i18n(player, "message.submitted"))
             }
-            ConfirmationAction.CANCEL_SUBMISSION -> {
-                if (plugin.isSubmissionClosed()) {
-                    player.sendMessage(i18n(player, "message.deadline_closed"))
-                    return
-                }
-                if (!ensureSubmissionState(player, worldUuid, SubmissionState.SUBMITTED)) return
-                storage.setSubmissionState(
-                    worldUuid,
-                    SubmissionState.UNSUBMITTED,
-                    player.uniqueId,
-                    player.name,
-                    "cancel_submission"
-                )
-                MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)?.let {
-                    protectionService.sync(it)
-                    toolPermissionController.syncWorld(it)
-                }
-                player.sendMessage(i18n(player, "message.cancelled"))
-            }
         }
     }
 
@@ -375,7 +361,10 @@ class ProductionToggleExtension(
         val item = ItemStack(Material.HEART_OF_THE_SEA)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "production.display"))
-            meta.lore(lore(i18nList(player, "production.lore")))
+            meta.lore(structuredLore(listOf(
+                GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "production.lore.action")),
+                GuiLoreLine.Warning(i18n(player, "production.lore.limit_warning"))
+            )))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
@@ -414,7 +403,17 @@ class ProductionToggleExtension(
             SubmissionState.SUBMITTED -> "submission.lore.submitted"
             SubmissionState.COMPLETED -> "submission.lore.completed"
         }
-        return lore(i18nList(player, key))
+        return when (state) {
+            SubmissionState.UNSUBMITTED -> structuredLore(listOf(
+                GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "$key.action")),
+                GuiLoreLine.Warning(i18n(player, "$key.warning"))
+            ))
+            SubmissionState.SUBMITTED,
+            SubmissionState.COMPLETED -> structuredLore(listOf(
+                GuiLoreLine.Text(i18n(player, "$key.description")),
+                GuiLoreLine.Warning(i18n(player, "$key.warning"))
+            ))
+        }
     }
 
     private fun createSubmissionErrorItem(player: Player): ItemStack {
@@ -465,6 +464,10 @@ class ProductionToggleExtension(
         return ChanponLore.build(lines)
     }
 
+    private fun structuredLore(lines: List<GuiLoreLine>): List<Component> {
+        return CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(lines, GuiLoreFrame.BOTH))
+    }
+
     private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): String {
         return CCSystem.getAPI().getI18nString(player, "chanpon.submission.$key", placeholders)
     }
@@ -494,8 +497,7 @@ class ProductionToggleExtension(
     private enum class ConfirmationAction(val key: String, val material: Material) {
         SET_PRODUCTION("set_production", Material.HEART_OF_THE_SEA),
         UNSET_PRODUCTION("unset_production", Material.REDSTONE),
-        SUBMIT("submit", Material.BRICKS),
-        CANCEL_SUBMISSION("cancel_submission", Material.FLOW_BANNER_PATTERN)
+        SUBMIT("submit", Material.BRICKS)
     }
 
     private class SubmissionConfirmationHolder(

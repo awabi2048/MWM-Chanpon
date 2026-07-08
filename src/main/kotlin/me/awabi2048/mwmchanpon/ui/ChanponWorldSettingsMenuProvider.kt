@@ -1,6 +1,8 @@
 package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiCycle
+import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
@@ -23,6 +25,7 @@ import me.awabi2048.myworldmanager.api.service.ExpansionSequencePhase
 import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.session.SettingsAction
 import me.awabi2048.myworldmanager.util.GuiHelper
+import me.awabi2048.myworldmanager.util.GuiLoreActions
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
@@ -62,6 +65,15 @@ class ChanponWorldSettingsMenuProvider(
         mwm.settingsSessionManager.getSession(player)?.showBackButton = request.showBackButton
         GuiHelper.scheduleGuiTransitionReset(mwm, player)
 
+        val session = mwm.settingsSessionManager.getSession(player)
+        val isAdminFlow = session?.isAdminFlow == true
+        val isActualOwner = worldData.owner == player.uniqueId || isAdminFlow
+        val isModerator = worldData.moderators.contains(player.uniqueId)
+        val isImportedArchive = storage.isImportedArchive(worldData.uuid)
+        val isOwner = isActualOwner && !isImportedArchive
+        val hasManagePermission = (isOwner || isModerator) && !isImportedArchive
+        val isProtected = protectionService.isProtected(worldData)
+
         val holder = SettingsHolder(worldData.uuid, request)
         val title = GuiHelper.inventoryTitle(
             mwm.languageManager.getComponent(
@@ -71,19 +83,11 @@ class ChanponWorldSettingsMenuProvider(
             )
         )
         val layout = ChanponGuiElements.settingsLayout()
-        val inventory = Bukkit.createInventory(holder, layout.size, title)
+        val inventorySize = if (isProtected) PROTECTED_SETTINGS_SIZE else layout.size
+        val inventory = Bukkit.createInventory(holder, inventorySize, title)
         holder.inv = inventory
 
         applyFrame(inventory)
-
-        val session = mwm.settingsSessionManager.getSession(player)
-        val isAdminFlow = session?.isAdminFlow == true
-        val isActualOwner = worldData.owner == player.uniqueId || isAdminFlow
-        val isModerator = worldData.moderators.contains(player.uniqueId)
-        val isImportedArchive = storage.isImportedArchive(worldData.uuid)
-        val isOwner = isActualOwner && !isImportedArchive
-        val hasManagePermission = (isOwner || isModerator) && !isImportedArchive
-        val isProtected = protectionService.isProtected(worldData)
 
         if (isProtected && isOwner) {
             // 完成済み/提出済みのワールドでは、公開レベル・訪問通知・ポータル取得のみ中央行に中央寄せで配置する。
@@ -107,7 +111,7 @@ class ChanponWorldSettingsMenuProvider(
         }
         inventory.setItem(4, worldInfoItem(player, worldData))
         if (request.showBackButton) {
-            inventory.setItem(49, returnItem(player))
+            inventory.setItem(if (isProtected) PROTECTED_BACK_SLOT else layout.backSlot, returnItem(player))
         }
 
         fill(inventory)
@@ -509,15 +513,11 @@ class ChanponWorldSettingsMenuProvider(
 
     private fun openBedrockConfirmForm(player: Player, worldData: WorldData, action: ConfirmAction, direction: BlockFace?): Boolean {
         val directionName = direction?.let { directionName(player, it) } ?: i18n(player, "direction.center")
-        val key = if (action == ConfirmAction.STEP_BACK && worldData.latestBorderExpansionRecord()?.modified == true) {
-            "confirm.${action.key}.lore_modified"
-        } else {
-            "confirm.${action.key}.lore"
-        }
+        val modified = action == ConfirmAction.STEP_BACK && worldData.latestBorderExpansionRecord()?.modified == true
         return mwm().floodgateFormBridge.sendSimpleForm(
             player = player,
             title = i18n(player, "confirm.${action.key}.title"),
-            content = i18nList(player, key, mapOf("direction" to directionName)).joinToString("\n"),
+            content = confirmContentLines(player, action, directionName, modified).joinToString("\n"),
             buttons = listOf(
                 i18n(player, "confirm.button.confirm"),
                 i18n(player, "confirm.button.cancel")
@@ -566,25 +566,24 @@ class ChanponWorldSettingsMenuProvider(
         val inventory = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "${key}_title"))
         holder.inv = inventory
         applyFrame(inventory)
-        val loreLines = i18nList(player, "${key}_lore", mapOf("world" to worldData.name))
+        val lore = if (finalStep) {
+            loreBlocks(listOf(GuiLoreBlock(listOf(
+                GuiLoreLine.Text(i18n(player, "critical.final_description")),
+                GuiLoreLine.Danger(i18n(player, "critical.final_danger"))
+            ))))
+        } else {
+            loreBlocks(listOf(GuiLoreBlock(listOf(
+                GuiLoreLine.Data(i18n(player, "critical.confirm_target_label"), worldData.name, "§e"),
+                GuiLoreLine.Danger(i18n(player, "critical.confirm_danger"))
+            ))))
+        }
         val centerItem =
-            if (finalStep) {
-                componentItem(
-                    Material.TNT,
-                    i18n(player, "${key}_display"),
-                    CCSystem.getAPI().getLoreService().render(
-                        GuiLoreSpec.Rich(loreLines.map { GuiLoreLine.Danger(it) }, GuiLoreFrame.BOTH)
-                    ),
-                    ItemTag.TYPE_GUI_INFO
-                )
-            } else {
-                item(
-                    Material.TNT,
-                    i18n(player, "${key}_display"),
-                    loreLines,
-                    ItemTag.TYPE_GUI_INFO
-                )
-            }
+            componentItem(
+                Material.TNT,
+                i18n(player, "${key}_display"),
+                lore,
+                ItemTag.TYPE_GUI_INFO
+            )
         ChanponGuiElements.setConfirmationItems(
             inventory,
             centerItem,
@@ -703,9 +702,8 @@ class ChanponWorldSettingsMenuProvider(
                     add(GuiLoreLine.Raw("$marker $color$displayName"))
                 }
                 add(GuiLoreLine.Spacer)
-                add(GuiLoreLine.SingleAction(
-                    i18n(player, "publish.cycle_action")
-                ))
+                add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.left"), i18n(player, "publish.cycle_next_action")))
+                add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.right"), i18n(player, "publish.cycle_previous_action")))
             }, GuiLoreFrame.BOTH)
         )
         return componentItem(Material.OAK_SIGN, i18n(player, "publish.title"), lore, ItemTag.TYPE_GUI_SETTING_PUBLISH)
@@ -714,18 +712,7 @@ class ChanponWorldSettingsMenuProvider(
     private fun expansionItem(player: Player, worldData: WorldData): ItemStack {
         val level = worldData.borderExpansionLevel
         val max = maxExpansionLevel()
-        val border = currentBorder(worldData)
-        val lines = i18nList(
-            player,
-            if (level >= max) "expand.status_max" else "expand.status_available",
-            mapOf(
-                "current" to level,
-                "max" to max,
-                "size" to formatNumber(border.size),
-                "x" to formatNumber(border.x),
-                "z" to formatNumber(border.z)
-            )
-        )
+        val lines = if (level >= max) i18nList(player, "expand.status_max") else emptyList()
         return componentItem(
             Material.FILLED_MAP,
             i18n(player, "expand.display"),
@@ -744,10 +731,13 @@ class ChanponWorldSettingsMenuProvider(
         return componentItem(
             if (worldData.notificationEnabled) Material.BELL else Material.OAK_DOOR,
             mwm().languageManager.getMessage(player, "gui.settings.notification.display"),
-            describedLore(
+            describedStructuredLore(
                 player,
                 mwm().languageManager.getMessageList(player, "gui.settings.notification.blocks.description"),
-                i18nList(player, "notification.lore", mapOf("status" to status))
+                listOf(
+                    GuiLoreLine.Data(i18n(player, "notification.current_label"), status, "§e"),
+                    GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "notification.action"))
+                )
             ),
             ItemTag.TYPE_GUI_SETTING_NOTIFICATION
         )
@@ -760,10 +750,10 @@ class ChanponWorldSettingsMenuProvider(
         return componentItem(
             Material.TNT,
             i18n(player, "critical.display"),
-            describedLore(
+            describedStructuredLore(
                 player,
                 mwm().languageManager.getMessageList(player, "gui.settings.critical.blocks.summary"),
-                i18nList(player, "critical.action_lore"),
+                listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "critical.action"))),
                 requireTargetWorld = true
             ),
             ItemTag.TYPE_GUI_SETTING_CRITICAL
@@ -772,36 +762,49 @@ class ChanponWorldSettingsMenuProvider(
 
     private fun criticalUnavailableLoreKey(player: Player, worldData: WorldData): String? {
         // 重大な設定に入れない理由を一覧表示と遷移防御で共有し、専用メニューへの侵入を防ぐ。
-        if (storage.isProductionWorld(worldData.uuid)) return "critical.production_lore"
-        if (!mwm().playerStatsRepository.findByUuid(player.uniqueId).criticalSettingsEnabled) return "critical.disabled_lore"
+        if (storage.isProductionWorld(worldData.uuid)) return "critical.production_warning"
+        if (!mwm().playerStatsRepository.findByUuid(player.uniqueId).criticalSettingsEnabled) return "critical.disabled_warning"
         return null
     }
 
     private fun deleteWorldItem(player: Player): ItemStack {
-        return item(Material.TNT, i18n(player, "critical.delete_display"), i18nList(player, "critical.delete_lore"), ItemTag.TYPE_GUI_SETTING_DELETE_WORLD)
+        val lore = CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(listOf(
+            GuiLoreBlock(listOf(
+                GuiLoreLine.Text(i18n(player, "critical.delete_description")),
+                GuiLoreLine.Danger(i18n(player, "critical.delete_danger"))
+            )),
+            GuiLoreBlock(listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "critical.delete_action"))))
+        )))
+        return componentItem(Material.TNT, i18n(player, "critical.delete_display"), lore, ItemTag.TYPE_GUI_SETTING_DELETE_WORLD)
     }
 
     private fun criticalUnavailableItem(player: Player, loreKey: String): ItemStack {
         return componentItem(
             Material.BARRIER,
             i18n(player, "critical.unavailable_display"),
-            describedLore(
+            describedStructuredLore(
                 player,
                 mwm().languageManager.getMessageList(player, "gui.settings.critical.blocks.summary"),
-                i18nList(player, loreKey)
+                listOf(GuiLoreLine.Warning(i18n(player, loreKey)))
             ),
             ItemTag.TYPE_GUI_INFO
         )
     }
 
     private fun worldInfoItem(player: Player, worldData: WorldData): ItemStack {
-        val lore = buildList {
-            addAll(i18nList(player, "info.lore", mapOf("description" to worldData.description.ifBlank { "-" })))
+        val lore = CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(buildList {
+            add(GuiLoreBlock(listOf(
+                GuiLoreLine.Data(i18n(player, "info.description_label"), worldData.description.ifBlank { "-" }, "§f")
+            )))
             if (!isCurrentWorld(player, worldData)) {
-                add(mwm().languageManager.getMessage(player, "gui.player_world.world_item.warp"))
+                add(GuiLoreBlock(listOf(GuiLoreActions.singleClick(
+                    mwm().languageManager,
+                    player,
+                    mwm().languageManager.getMessage(player, "gui.player_world.world_item.warp")
+                ))))
             }
-        }
-        val item = item(
+        }))
+        val item = componentItem(
             worldData.icon,
             "§e${worldData.name}",
             lore,
@@ -820,10 +823,10 @@ class ChanponWorldSettingsMenuProvider(
         requireTargetWorld: Boolean = false
     ): ItemStack {
         val display = mwm().languageManager.getMessage(player, "$langPrefix.display")
-        val lore = describedLore(
+        val lore = describedStructuredLore(
             player,
             mwmDescription(player, iconKey),
-            i18nList(player, "mwm_action.lore"),
+            listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "mwm_action.action"))),
             requireTargetWorld = requireTargetWorld
         )
         val icon = mwm().menuConfigManager.getIconMaterial("world_settings", iconKey, material)
@@ -846,6 +849,15 @@ class ChanponWorldSettingsMenuProvider(
     }
 
     private fun describedLore(player: Player, description: List<String>, existing: List<String>, requireTargetWorld: Boolean = false): List<Component> {
+        return describedStructuredLore(
+            player,
+            description,
+            existing.map { line -> if (line.isBlank()) GuiLoreLine.Spacer else GuiLoreLine.Raw(line) },
+            requireTargetWorld
+        )
+    }
+
+    private fun describedStructuredLore(player: Player, description: List<String>, existing: List<GuiLoreLine>, requireTargetWorld: Boolean = false): List<Component> {
         return CCSystem.getAPI().getLoreService().render(
             GuiLoreSpec.Rich(
                 buildList {
@@ -853,12 +865,10 @@ class ChanponWorldSettingsMenuProvider(
                         add(GuiLoreLine.Warning(i18n(player, "common.must_be_in_world_warning")))
                     }
                     description.filter { it.isNotBlank() }.forEach { add(GuiLoreLine.Raw(it)) }
-                    if (description.any { it.isNotBlank() } && existing.any { it.isNotBlank() }) {
+                    if (description.any { it.isNotBlank() } && existing.any { it != GuiLoreLine.Spacer }) {
                         add(GuiLoreLine.Spacer)
                     }
-                    existing.forEach { line ->
-                        add(if (line.isBlank()) GuiLoreLine.Spacer else GuiLoreLine.Raw(line))
-                    }
+                    addAll(existing)
                 },
                 GuiLoreFrame.BOTH
             )
@@ -866,33 +876,80 @@ class ChanponWorldSettingsMenuProvider(
     }
 
     private fun expansionOptionItem(player: Player, key: String, material: Material, action: String): ItemStack {
-        val item = item(material, i18n(player, "expand_menu.$key.display"), i18nList(player, "expand_menu.$key.lore"), TYPE_EXPAND_DIRECTION)
+        val item = componentItem(
+            material,
+            i18n(player, "expand_menu.$key.display"),
+            loreBlocks(listOf(
+                GuiLoreBlock(listOf(GuiLoreLine.Text(i18n(player, "expand_menu.$key.description")))),
+                GuiLoreBlock(listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "expand_menu.$key.action"))))
+            )),
+            TYPE_EXPAND_DIRECTION
+        )
         ItemTag.setString(item, DIRECTION_KEY, action)
         return item
     }
 
     private fun stepBackItem(player: Player, worldData: WorldData): ItemStack {
-        val key = if (worldData.latestBorderExpansionRecord()?.modified == true) "step_back.lore_modified" else "step_back.lore"
-        return item(Material.RECOVERY_COMPASS, i18n(player, "step_back.display"), i18nList(player, key), ItemTag.TYPE_GUI_SETTING_STEP_BACK_EXPANSION)
+        val modified = worldData.latestBorderExpansionRecord()?.modified == true
+        val lines = buildList {
+            add(GuiLoreLine.Text(i18n(player, "step_back.description")))
+            if (modified) add(GuiLoreLine.Warning(i18n(player, "step_back.modified_warning")))
+        }
+        return componentItem(
+            Material.RECOVERY_COMPASS,
+            i18n(player, "step_back.display"),
+            loreBlocks(listOf(
+                GuiLoreBlock(lines),
+                GuiLoreBlock(listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "step_back.action"))))
+            )),
+            ItemTag.TYPE_GUI_SETTING_STEP_BACK_EXPANSION
+        )
     }
 
     private fun modifiedWarningItem(player: Player): ItemStack {
-        return item(
+        return componentItem(
             Material.REDSTONE_TORCH,
             i18n(player, "modified_warning.display"),
-            i18nList(player, "modified_warning.lore"),
+            loreBlocks(listOf(
+                GuiLoreBlock(listOf(
+                    GuiLoreLine.Warning(i18n(player, "modified_warning.description")),
+                    GuiLoreLine.Text(i18n(player, "modified_warning.consequence"))
+                )),
+                GuiLoreBlock(listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "modified_warning.action"))))
+            )),
             ItemTag.TYPE_GUI_INFO
         )
     }
 
     private fun confirmCenterItem(player: Player, worldData: WorldData, action: ConfirmAction, direction: BlockFace?): ItemStack {
         val directionName = direction?.let { directionName(player, it) } ?: i18n(player, "direction.center")
-        val key = if (action == ConfirmAction.STEP_BACK && worldData.latestBorderExpansionRecord()?.modified == true) {
-            "confirm.${action.key}.lore_modified"
-        } else {
-            "confirm.${action.key}.lore"
+        val modified = action == ConfirmAction.STEP_BACK && worldData.latestBorderExpansionRecord()?.modified == true
+        val lines = when (action) {
+            ConfirmAction.EXPAND -> listOf(
+                GuiLoreLine.Data(i18n(player, "confirm.expand.direction_label"), directionName, "§e"),
+                GuiLoreLine.Text(i18n(player, "confirm.expand.description"))
+            )
+            ConfirmAction.STEP_BACK -> buildList {
+                add(GuiLoreLine.Text(i18n(player, "confirm.step_back.description")))
+                if (modified) {
+                    add(GuiLoreLine.Warning(i18n(player, "confirm.step_back.modified_warning")))
+                }
+            }
         }
-        return item(action.material, i18n(player, "confirm.${action.key}.display"), i18nList(player, key, mapOf("direction" to directionName)), ItemTag.TYPE_GUI_INFO)
+        return componentItem(action.material, i18n(player, "confirm.${action.key}.display"), loreBlocks(listOf(GuiLoreBlock(lines))), ItemTag.TYPE_GUI_INFO)
+    }
+
+    private fun confirmContentLines(player: Player, action: ConfirmAction, directionName: String, modified: Boolean): List<String> {
+        return when (action) {
+            ConfirmAction.EXPAND -> listOf(
+                "${i18n(player, "confirm.expand.direction_label")}: $directionName",
+                i18n(player, "confirm.expand.description")
+            )
+            ConfirmAction.STEP_BACK -> buildList {
+                add(i18n(player, "confirm.step_back.description"))
+                if (modified) add(i18n(player, "confirm.step_back.modified_warning"))
+            }
+        }
     }
 
     private fun confirmButton(player: Player, confirm: Boolean): ItemStack {
@@ -977,18 +1034,12 @@ class ChanponWorldSettingsMenuProvider(
         mwm().worldConfigRepository.findByWorldName(player.world.name)?.uuid == worldData.uuid
 
     private fun maxExpansionLevel(): Int {
-        return mwm().config.getConfigurationSection("expansion.costs")?.getKeys(false)?.size ?: 3
+        return plugin.config.getInt("world_expansion.max_level", 3).coerceAtLeast(0)
     }
 
-    private fun currentBorder(worldData: WorldData): BorderInfo {
-        val world = Bukkit.getWorld(worldData.customWorldName ?: "my_world.${worldData.uuid}")
-        val border = world?.worldBorder
-        val center = worldData.borderCenterPos ?: border?.center
-        val size = border?.size ?: mwm().config.getDouble("expansion.initial_size", 100.0)
-        return BorderInfo(center?.x ?: 0.0, center?.z ?: 0.0, size)
+    private fun loreBlocks(blocks: List<GuiLoreBlock>): List<Component> {
+        return CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(blocks))
     }
-
-    private fun formatNumber(value: Double): String = if (value % 1.0 == 0.0) value.toInt().toString() else "%.1f".format(value)
 
     private fun directionName(player: Player, direction: BlockFace): String {
         return i18n(player, "direction.${direction.name.lowercase()}")
@@ -999,18 +1050,15 @@ class ChanponWorldSettingsMenuProvider(
     }
 
     private fun nextVisibility(current: ChanponWorldVisibility, reverse: Boolean): ChanponWorldVisibility {
-        val values = listOf(
+        return GuiCycle.select(
+            current,
+            listOf(
             ChanponWorldVisibility.PUBLIC,
             ChanponWorldVisibility.DEVELOPMENT,
             ChanponWorldVisibility.PRIVATE
+            ),
+            reverse
         )
-        val index = values.indexOf(current).let { if (it < 0) 0 else it }
-        val nextIndex = if (reverse) {
-            (index + values.size - 1) % values.size
-        } else {
-            (index + 1) % values.size
-        }
-        return values[nextIndex]
     }
 
     private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)
@@ -1026,8 +1074,6 @@ class ChanponWorldSettingsMenuProvider(
     private fun i18nComponent(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): Component {
         return CCSystem.getAPI().getI18nComponent(player, "chanpon.settings.$key", placeholders)
     }
-
-    private data class BorderInfo(val x: Double, val z: Double, val size: Double)
 
     private class SettingsHolder(val worldUuid: UUID, val request: WorldSettingsMenuRequest) : WorldSettingsInventoryHolder {
         lateinit var inv: Inventory
@@ -1084,6 +1130,8 @@ class ChanponWorldSettingsMenuProvider(
 
     companion object {
         private const val PROVIDER_ID = "chanpon.world_settings"
+        private const val PROTECTED_SETTINGS_SIZE = 45
+        private const val PROTECTED_BACK_SLOT = 40
         private const val TYPE_EXPAND_DIRECTION = "chanpon_expand_direction"
         private const val DIRECTION_KEY = "chanpon_direction"
         private const val ACTION_CENTER = "center"

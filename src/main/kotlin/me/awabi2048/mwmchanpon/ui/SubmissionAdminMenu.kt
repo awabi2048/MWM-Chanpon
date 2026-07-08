@@ -1,6 +1,7 @@
 package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiCycle
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
@@ -104,24 +105,24 @@ class SubmissionAdminMenu(
                 val page = ItemTag.getTargetPage(item) ?: holder.page
                 open(player, page, holder.progressFilter, holder.sortType)
             }
-            TYPE_MENU_CONTROL -> handleControlItem(player, holder, item)
+            TYPE_MENU_CONTROL -> handleControlItem(player, holder, item, event.click.isRightClick)
             ItemTag.TYPE_GUI_WORLD_ITEM -> handleWorldItem(player, holder, item, event.click)
         }
     }
 
-    private fun handleControlItem(player: Player, holder: SubmissionAdminMenuHolder, item: ItemStack) {
+    private fun handleControlItem(player: Player, holder: SubmissionAdminMenuHolder, item: ItemStack, reverse: Boolean) {
         when (ItemTag.getString(item, ACTION_KEY)) {
             ACTION_PROGRESS_FILTER -> open(
                 player,
                 0,
-                holder.progressFilter.next(),
+                GuiCycle.select(holder.progressFilter, ProgressFilter.entries, reverse),
                 holder.sortType
             )
             ACTION_SORT -> open(
                 player,
                 0,
                 holder.progressFilter,
-                holder.sortType.next()
+                GuiCycle.select(holder.sortType, SortType.entries, reverse)
             )
             ACTION_CLOSE_SUBMISSIONS -> {
                 if (plugin.isSubmissionClosed()) {
@@ -383,7 +384,7 @@ class SubmissionAdminMenu(
         val item = ItemStack(worldData.icon)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "admin_menu.world.display", mapOf("world" to worldData.name)))
-            meta.lore(lore(worldLore(player, worldData, state)))
+            meta.lore(structuredLore(worldLore(player, worldData, state)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_WORLD_ITEM)
@@ -391,7 +392,7 @@ class SubmissionAdminMenu(
         return item
     }
 
-    private fun worldLore(player: Player, worldData: WorldData, state: SubmissionState): List<String> {
+    private fun worldLore(player: Player, worldData: WorldData, state: SubmissionState): List<GuiLoreLine> {
         val unknown = i18n(player, "admin_menu.unknown")
         val ownerName = playerName(worldData.owner, unknown)
         val members = (worldData.moderators + worldData.members)
@@ -413,25 +414,20 @@ class SubmissionAdminMenu(
         } else {
             i18n(player, "admin_menu.world.completed_no")
         }
-        val middleAction = if (player.gameMode == GameMode.CREATIVE) {
-            i18n(player, "admin_menu.world.action_complete")
-        } else {
-            ""
+        return buildList {
+            add(GuiLoreLine.Data(i18n(player, "admin_menu.world.owner_label"), ownerName, "§f"))
+            add(GuiLoreLine.Data(i18n(player, "admin_menu.world.members_label"), memberLine, ""))
+            add(GuiLoreLine.Data(i18n(player, "admin_menu.world.created_label"), created, "§f"))
+            add(GuiLoreLine.Data(i18n(player, "admin_menu.world.production_label"), production, ""))
+            add(GuiLoreLine.Data(i18n(player, "admin_menu.world.state_label"), i18n(player, "state.${state.i18nKey}"), ""))
+            add(GuiLoreLine.Data(i18n(player, "admin_menu.world.completed_label"), completed, ""))
+            add(GuiLoreLine.Spacer)
+            add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.left"), i18n(player, "admin_menu.world.action_warp")))
+            if (player.gameMode == GameMode.CREATIVE) {
+                add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.right"), i18n(player, "admin_menu.world.action_complete")))
+            }
+            add(GuiLoreLine.Action(i18n(player, "common.middle_click"), i18n(player, "admin_menu.world.action_toggle_production")))
         }
-        return i18nList(
-            player,
-            "admin_menu.world.lore",
-            mapOf(
-                "owner" to ownerName,
-                "members" to memberLine,
-                "created" to created,
-                "production" to production,
-                "state" to i18n(player, "state.${state.i18nKey}"),
-                "completed" to completed,
-                "production_action" to i18n(player, "admin_menu.world.action_toggle_production"),
-                "middle_action" to middleAction
-            )
-        ).filter { it.isNotBlank() }
     }
 
     private fun productionToggleConfirmationItem(player: Player, key: String): ItemStack {
@@ -548,7 +544,8 @@ class SubmissionAdminMenu(
                     add(GuiLoreLine.Raw("$marker $color${i18n(player, optionKey)}"))
                 }
                 add(GuiLoreLine.Spacer)
-                add(GuiLoreLine.SingleAction(i18n(player, "admin_menu.filter_cycle_action")))
+                add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.left"), i18n(player, "admin_menu.cycle.next")))
+                add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.right"), i18n(player, "admin_menu.cycle.previous")))
             }, GuiLoreFrame.BOTH)
         )
         item.editMeta { meta ->
@@ -630,6 +627,10 @@ class SubmissionAdminMenu(
         return ChanponLore.build(lines)
     }
 
+    private fun structuredLore(lines: List<GuiLoreLine>): List<Component> {
+        return CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(lines, GuiLoreFrame.BOTH))
+    }
+
     private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): String {
         return CCSystem.getAPI().getI18nString(player, "chanpon.submission.$key", placeholders)
     }
@@ -649,26 +650,13 @@ class SubmissionAdminMenu(
         ALL("admin_menu.progress_filter.all"),
         UNSUBMITTED("admin_menu.progress_filter.unsubmitted"),
         SUBMITTED("admin_menu.progress_filter.submitted"),
-        COMPLETED("admin_menu.progress_filter.completed");
-
-        fun next(): ProgressFilter = when (this) {
-            ALL -> UNSUBMITTED
-            UNSUBMITTED -> SUBMITTED
-            SUBMITTED -> COMPLETED
-            COMPLETED -> ALL
-        }
+        COMPLETED("admin_menu.progress_filter.completed")
     }
 
     enum class SortType(val key: String) {
         CREATED_DESC("admin_menu.sort.created_desc"),
         CREATED_ASC("admin_menu.sort.created_asc"),
-        NAME_ASC("admin_menu.sort.name_asc");
-
-        fun next(): SortType = when (this) {
-            CREATED_DESC -> CREATED_ASC
-            CREATED_ASC -> NAME_ASC
-            NAME_ASC -> CREATED_DESC
-        }
+        NAME_ASC("admin_menu.sort.name_asc")
     }
 
     private class SubmissionAdminMenuHolder(

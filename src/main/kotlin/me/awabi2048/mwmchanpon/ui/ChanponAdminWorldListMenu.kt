@@ -1,6 +1,10 @@
 package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiCycle
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
@@ -106,16 +110,16 @@ class ChanponAdminWorldListMenu(
             ItemTag.TYPE_GUI_NAV_PREV, ItemTag.TYPE_GUI_NAV_NEXT -> {
                 open(player, ItemTag.getTargetPage(item) ?: holder.page, holder.visibilityFilter, holder.sortType, holder.fromAdminMenu)
             }
-            ItemTag.TYPE_GUI_EXTENSION -> handleControl(player, holder, item)
+            ItemTag.TYPE_GUI_EXTENSION -> handleControl(player, holder, item, event.click.isRightClick)
             ItemTag.TYPE_GUI_WORLD_ITEM, ItemTag.TYPE_GUI_ADMIN_CURRENT_WORLD_INFO -> handleWorldClick(player, item, event.click)
         }
     }
 
-    private fun handleControl(player: Player, holder: ChanponAdminWorldListHolder, item: ItemStack) {
+    private fun handleControl(player: Player, holder: ChanponAdminWorldListHolder, item: ItemStack, reverse: Boolean) {
         if (ItemTag.getExtensionId(item) != PROVIDER_ID) return
         when (ItemTag.getString(item, ACTION_KEY)) {
-            ACTION_VISIBILITY_FILTER -> open(player, 0, holder.visibilityFilter.next(), holder.sortType, holder.fromAdminMenu)
-            ACTION_SORT -> open(player, 0, holder.visibilityFilter, holder.sortType.next(), holder.fromAdminMenu)
+            ACTION_VISIBILITY_FILTER -> open(player, 0, GuiCycle.select(holder.visibilityFilter, VisibilityFilter.entries, reverse), holder.sortType, holder.fromAdminMenu)
+            ACTION_SORT -> open(player, 0, holder.visibilityFilter, GuiCycle.select(holder.sortType, SortType.entries, reverse), holder.fromAdminMenu)
         }
     }
 
@@ -159,7 +163,7 @@ class ChanponAdminWorldListMenu(
         val item = ItemStack(worldData.icon)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "admin_list.world.display", mapOf("world" to worldData.name)))
-            meta.lore(lore(worldLore(player, worldData, visibility, current)))
+            meta.lore(structuredLore(worldLore(player, worldData, visibility, current)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, if (current) ItemTag.TYPE_GUI_ADMIN_CURRENT_WORLD_INFO else ItemTag.TYPE_GUI_WORLD_ITEM)
@@ -172,7 +176,7 @@ class ChanponAdminWorldListMenu(
         worldData: WorldData,
         visibility: ChanponWorldVisibility,
         current: Boolean
-    ): List<String> {
+    ): List<GuiLoreLine> {
         val owner = Bukkit.getOfflinePlayer(worldData.owner).name ?: i18n(player, "admin_list.unknown")
         val members = (worldData.moderators + worldData.members)
             .distinct()
@@ -181,21 +185,23 @@ class ChanponAdminWorldListMenu(
                 if (it.isEmpty()) i18n(player, "admin_list.world.no_members")
                 else it.joinToString("§7, §f", prefix = "§f")
             }
-        val middle = if (player.gameMode == GameMode.CREATIVE) i18n(player, "admin_list.world.action_copy") else ""
-        val right = if (current) i18n(player, "admin_list.world.action_settings_current") else i18n(player, "admin_list.world.action_settings")
-        return i18nList(
-            player,
-            "admin_list.world.lore",
-            mapOf(
-                "owner" to owner,
-                "members" to members,
-                "created" to formatCreatedAt(worldData.createdAt),
-                "visibility" to visibilityName(player, visibility),
-                "world_directory" to worldDirectory(worldData),
-                "right_action" to right,
-                "middle_action" to middle
-            )
-        ).filter { it.isNotBlank() }
+        return buildList {
+            add(GuiLoreLine.Data(i18n(player, "admin_list.world.owner_label"), owner, "§f"))
+            add(GuiLoreLine.Data(i18n(player, "admin_list.world.members_label"), members, ""))
+            add(GuiLoreLine.Data(i18n(player, "admin_list.world.created_label"), formatCreatedAt(worldData.createdAt), "§f"))
+            add(GuiLoreLine.Data(i18n(player, "admin_list.world.visibility_label"), visibilityName(player, visibility), ""))
+            add(GuiLoreLine.Data(i18n(player, "admin_list.world.directory_label"), worldDirectory(worldData), "§f"))
+            add(GuiLoreLine.Spacer)
+            add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.left"), i18n(player, "admin_list.world.action_warp")))
+            if (current) {
+                add(GuiLoreLine.Text(i18n(player, "admin_list.world.action_settings_current")))
+            } else {
+                add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.right"), i18n(player, "admin_list.world.action_settings")))
+            }
+            if (player.gameMode == GameMode.CREATIVE) {
+                add(GuiLoreLine.Action(i18n(player, "common.middle_click"), i18n(player, "admin_list.world.action_copy")))
+            }
+        }
     }
 
     private fun visibilityName(player: Player, visibility: ChanponWorldVisibility): String {
@@ -207,25 +213,34 @@ class ChanponAdminWorldListMenu(
     }
 
     private fun visibilityFilterItem(player: Player, filter: VisibilityFilter): ItemStack {
-        return controlItem(
-            player,
-            Material.ENDER_EYE,
-            "admin_list.visibility_filter.display",
-            "admin_list.visibility_filter.lore",
-            ACTION_VISIBILITY_FILTER,
-            mapOf("filter" to i18n(player, filter.key))
-        )
+        return cycleControlItem(player, Material.ENDER_EYE, "admin_list.visibility_filter", i18n(player, filter.key), ACTION_VISIBILITY_FILTER)
     }
 
     private fun sortItem(player: Player, sortType: SortType): ItemStack {
-        return controlItem(
-            player,
-            Material.COMPARATOR,
-            "admin_list.sort.display",
-            "admin_list.sort.lore",
-            ACTION_SORT,
-            mapOf("sort" to i18n(player, sortType.key))
-        )
+        return cycleControlItem(player, Material.COMPARATOR, "admin_list.sort", i18n(player, sortType.key), ACTION_SORT)
+    }
+
+    private fun cycleControlItem(
+        player: Player,
+        material: Material,
+        key: String,
+        current: String,
+        action: String
+    ): ItemStack {
+        val item = ItemStack(material)
+        item.editMeta { meta ->
+            meta.displayName(i18nComponent(player, "$key.display"))
+            meta.lore(structuredLore(listOf(
+                GuiLoreLine.Data(i18n(player, "$key.label"), current, "§e"),
+                GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.left"), i18n(player, "admin_list.cycle.next")),
+                GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.right"), i18n(player, "admin_list.cycle.previous"))
+            )))
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
+        }
+        ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
+        ItemTag.setExtensionId(item, PROVIDER_ID)
+        ItemTag.setString(item, ACTION_KEY, action)
+        return item
     }
 
     private fun infoItem(player: Player, total: Int, page: Int, totalPages: Int): ItemStack {
@@ -354,6 +369,10 @@ class ChanponAdminWorldListMenu(
         return ChanponLore.build(lines)
     }
 
+    private fun structuredLore(lines: List<GuiLoreLine>): List<Component> {
+        return CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(lines, GuiLoreFrame.BOTH))
+    }
+
     private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): String {
         return CCSystem.getAPI().getI18nString(player, "chanpon.submission.$key", placeholders)
     }
@@ -389,23 +408,13 @@ class ChanponAdminWorldListMenu(
         ALL("admin_list.visibility_filter.all"),
         PUBLIC("admin_list.visibility_filter.public"),
         DEVELOPMENT("admin_list.visibility_filter.development"),
-        PRIVATE("admin_list.visibility_filter.private");
-
-        fun next(): VisibilityFilter {
-            val values = entries
-            return values[(ordinal + 1) % values.size]
-        }
+        PRIVATE("admin_list.visibility_filter.private")
     }
 
     enum class SortType(val key: String) {
         CREATED_DESC("admin_list.sort.created_desc"),
         CREATED_ASC("admin_list.sort.created_asc"),
-        WORLD_SIZE_DESC("admin_list.sort.world_size_desc");
-
-        fun next(): SortType {
-            val values = entries
-            return values[(ordinal + 1) % values.size]
-        }
+        WORLD_SIZE_DESC("admin_list.sort.world_size_desc")
     }
 
     companion object {

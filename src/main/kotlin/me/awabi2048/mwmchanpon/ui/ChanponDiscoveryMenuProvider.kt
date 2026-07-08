@@ -1,6 +1,9 @@
 package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
@@ -10,6 +13,7 @@ import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.DiscoveryMenuProvider
 import me.awabi2048.myworldmanager.api.extension.DiscoveryMenuRequest
 import me.awabi2048.myworldmanager.model.WorldData
+import me.awabi2048.myworldmanager.util.GuiLoreActions
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
@@ -135,13 +139,17 @@ class ChanponDiscoveryMenuProvider(
             )
             val ownerName = Bukkit.getOfflinePlayer(worldData.owner).name
                 ?: mwm.languageManager.getMessage(player, "general.unknown")
-            val lines = listOf(
-                mwm.languageManager.getMessage(player, "gui.player_world.world_item.owner", mapOf("owner" to ownerName)),
-                SubmissionProgressDisplay.line(player, storage, worldData.uuid),
-                "",
-                mwm.languageManager.getMessage(player, "gui.player_world.world_item.warp")
-            )
-            meta.lore(ChanponLore.build(lines))
+            meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(listOf(
+                GuiLoreBlock(buildList {
+                    add(GuiLoreLine.Raw(mwm.languageManager.getMessage(player, "gui.player_world.world_item.owner", mapOf("owner" to ownerName))))
+                    SubmissionProgressDisplay.loreLine(player, storage, worldData.uuid)?.let(::add)
+                }),
+                GuiLoreBlock(listOf(GuiLoreActions.singleClick(
+                    mwm.languageManager,
+                    player,
+                    mwm.languageManager.getMessage(player, "gui.player_world.world_item.warp")
+                )))
+            ))))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_WORLD_ITEM)
