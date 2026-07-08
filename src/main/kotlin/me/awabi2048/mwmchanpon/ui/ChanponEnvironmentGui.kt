@@ -18,6 +18,7 @@ import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsInventoryHolder
 import me.awabi2048.myworldmanager.model.WorldData
+import me.awabi2048.myworldmanager.util.GuiLoreActions
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.key.Key
 import net.kyori.adventure.text.Component
@@ -565,7 +566,7 @@ class ChanponEnvironmentGui(
             meta.displayName(i18nComponent(player, "$key.display"))
             meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(listOf(
                 GuiLoreLine.Data(i18n(player, "common.current_label"), currentValue, "§e"),
-                GuiLoreLine.SingleAction(i18n(player, "common.action_next"))
+                GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "common.action_next"))
             ), GuiLoreFrame.BOTH)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         }
@@ -646,7 +647,7 @@ class ChanponEnvironmentGui(
     private fun optionLore(player: Player, marker: String, display: String, color: String, detail: String? = null): List<Component> {
         return CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(buildList {
             add(GuiLoreLine.Raw("$marker $color$display${detail?.let { " §7($it)" } ?: ""}"))
-            add(GuiLoreLine.SingleAction(i18n(player, "common.action_set")))
+            add(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "common.action_set")))
         }, GuiLoreFrame.BOTH))
     }
 

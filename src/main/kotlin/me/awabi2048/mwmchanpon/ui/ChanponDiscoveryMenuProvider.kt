@@ -13,6 +13,7 @@ import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.DiscoveryMenuProvider
 import me.awabi2048.myworldmanager.api.extension.DiscoveryMenuRequest
 import me.awabi2048.myworldmanager.model.WorldData
+import me.awabi2048.myworldmanager.util.GuiLoreActions
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
@@ -143,7 +144,11 @@ class ChanponDiscoveryMenuProvider(
                     add(GuiLoreLine.Raw(mwm.languageManager.getMessage(player, "gui.player_world.world_item.owner", mapOf("owner" to ownerName))))
                     SubmissionProgressDisplay.loreLine(player, storage, worldData.uuid)?.let(::add)
                 }),
-                GuiLoreBlock(listOf(GuiLoreLine.SingleAction(mwm.languageManager.getMessage(player, "gui.player_world.world_item.warp"))))
+                GuiLoreBlock(listOf(GuiLoreActions.singleClick(
+                    mwm.languageManager,
+                    player,
+                    mwm.languageManager.getMessage(player, "gui.player_world.world_item.warp")
+                )))
             ))))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }

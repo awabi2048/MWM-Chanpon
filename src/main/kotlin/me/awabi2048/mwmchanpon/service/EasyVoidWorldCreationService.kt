@@ -65,12 +65,19 @@ class EasyVoidWorldCreationService(
         val player = connection.player
         when (identifier) {
             NAME_SUBMIT -> handleNameSubmit(player, event)
-            NAME_CANCEL -> pendingNames.remove(player.uniqueId)
+            NAME_CANCEL -> cancelFlow(player)
             CONFIRM_CREATE -> {
                 val name = pendingNames.remove(player.uniqueId) ?: return
                 create(player, name)
             }
             CONFIRM_BACK -> showNameDialog(player, pendingNames[player.uniqueId].orEmpty())
+        }
+    }
+
+    private fun cancelFlow(player: Player) {
+        pendingNames.remove(player.uniqueId)
+        if (!CCSystem.getAPI().getMenuNavigationService().openPrevious(player)) {
+            player.closeInventory()
         }
     }
 
@@ -215,6 +222,7 @@ class EasyVoidWorldCreationService(
                 )
             )
             player.sendMessage(mwm.languageManager.getMessage(player, "messages.world_creation_success", mapOf("world" to worldName)))
+            CCSystem.getAPI().getMenuNavigationService().clear(player)
             mwm.worldService.teleportToWorld(player, uuid)
             mwm.macroManager.execute(
                 "on_world_create",

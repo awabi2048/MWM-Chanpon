@@ -25,6 +25,7 @@ import me.awabi2048.myworldmanager.api.service.ExpansionSequencePhase
 import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.session.SettingsAction
 import me.awabi2048.myworldmanager.util.GuiHelper
+import me.awabi2048.myworldmanager.util.GuiLoreActions
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
@@ -735,7 +736,7 @@ class ChanponWorldSettingsMenuProvider(
                 mwm().languageManager.getMessageList(player, "gui.settings.notification.blocks.description"),
                 listOf(
                     GuiLoreLine.Data(i18n(player, "notification.current_label"), status, "§e"),
-                    GuiLoreLine.SingleAction(i18n(player, "notification.action"))
+                    GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "notification.action"))
                 )
             ),
             ItemTag.TYPE_GUI_SETTING_NOTIFICATION
@@ -752,7 +753,7 @@ class ChanponWorldSettingsMenuProvider(
             describedStructuredLore(
                 player,
                 mwm().languageManager.getMessageList(player, "gui.settings.critical.blocks.summary"),
-                listOf(GuiLoreLine.SingleAction(i18n(player, "critical.action"))),
+                listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "critical.action"))),
                 requireTargetWorld = true
             ),
             ItemTag.TYPE_GUI_SETTING_CRITICAL
@@ -772,7 +773,7 @@ class ChanponWorldSettingsMenuProvider(
                 GuiLoreLine.Text(i18n(player, "critical.delete_description")),
                 GuiLoreLine.Danger(i18n(player, "critical.delete_danger"))
             )),
-            GuiLoreBlock(listOf(GuiLoreLine.SingleAction(i18n(player, "critical.delete_action"))))
+            GuiLoreBlock(listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "critical.delete_action"))))
         )))
         return componentItem(Material.TNT, i18n(player, "critical.delete_display"), lore, ItemTag.TYPE_GUI_SETTING_DELETE_WORLD)
     }
@@ -796,7 +797,11 @@ class ChanponWorldSettingsMenuProvider(
                 GuiLoreLine.Data(i18n(player, "info.description_label"), worldData.description.ifBlank { "-" }, "§f")
             )))
             if (!isCurrentWorld(player, worldData)) {
-                add(GuiLoreBlock(listOf(GuiLoreLine.SingleAction(mwm().languageManager.getMessage(player, "gui.player_world.world_item.warp")))))
+                add(GuiLoreBlock(listOf(GuiLoreActions.singleClick(
+                    mwm().languageManager,
+                    player,
+                    mwm().languageManager.getMessage(player, "gui.player_world.world_item.warp")
+                ))))
             }
         }))
         val item = componentItem(
@@ -821,7 +826,7 @@ class ChanponWorldSettingsMenuProvider(
         val lore = describedStructuredLore(
             player,
             mwmDescription(player, iconKey),
-            listOf(GuiLoreLine.SingleAction(i18n(player, "mwm_action.action"))),
+            listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "mwm_action.action"))),
             requireTargetWorld = requireTargetWorld
         )
         val icon = mwm().menuConfigManager.getIconMaterial("world_settings", iconKey, material)
@@ -876,7 +881,7 @@ class ChanponWorldSettingsMenuProvider(
             i18n(player, "expand_menu.$key.display"),
             loreBlocks(listOf(
                 GuiLoreBlock(listOf(GuiLoreLine.Text(i18n(player, "expand_menu.$key.description")))),
-                GuiLoreBlock(listOf(GuiLoreLine.SingleAction(i18n(player, "expand_menu.$key.action"))))
+                GuiLoreBlock(listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "expand_menu.$key.action"))))
             )),
             TYPE_EXPAND_DIRECTION
         )
@@ -895,7 +900,7 @@ class ChanponWorldSettingsMenuProvider(
             i18n(player, "step_back.display"),
             loreBlocks(listOf(
                 GuiLoreBlock(lines),
-                GuiLoreBlock(listOf(GuiLoreLine.SingleAction(i18n(player, "step_back.action"))))
+                GuiLoreBlock(listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "step_back.action"))))
             )),
             ItemTag.TYPE_GUI_SETTING_STEP_BACK_EXPANSION
         )
@@ -910,7 +915,7 @@ class ChanponWorldSettingsMenuProvider(
                     GuiLoreLine.Warning(i18n(player, "modified_warning.description")),
                     GuiLoreLine.Text(i18n(player, "modified_warning.consequence"))
                 )),
-                GuiLoreBlock(listOf(GuiLoreLine.SingleAction(i18n(player, "modified_warning.action"))))
+                GuiLoreBlock(listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "modified_warning.action"))))
             )),
             ItemTag.TYPE_GUI_INFO
         )

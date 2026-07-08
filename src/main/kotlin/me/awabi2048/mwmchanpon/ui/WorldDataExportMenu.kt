@@ -8,6 +8,7 @@ import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.service.WorldDataExportService
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import me.awabi2048.myworldmanager.model.WorldData
+import me.awabi2048.myworldmanager.util.GuiLoreActions
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
@@ -99,7 +100,7 @@ class WorldDataExportMenu(
                     GuiLoreLine.Data(i18n(player, "export_menu.world.owner_label"), Bukkit.getOfflinePlayer(world.owner).name ?: "-", "§f"),
                     GuiLoreLine.Data(i18n(player, "export_menu.world.created_label"), world.createdAt, "§f")
                 )),
-                GuiLoreBlock(listOf(GuiLoreLine.SingleAction(i18n(player, "export_menu.world.action"))))
+                GuiLoreBlock(listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "export_menu.world.action"))))
             )))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
@@ -114,7 +115,7 @@ class WorldDataExportMenu(
             meta.displayName(i18nComponent(player, "export_menu.bulk.display"))
             meta.lore(structuredBlocks(listOf(
                 GuiLoreBlock(listOf(GuiLoreLine.Text(i18n(player, "export_menu.bulk.description")))),
-                GuiLoreBlock(listOf(GuiLoreLine.SingleAction(i18n(player, "export_menu.bulk.action"))))
+                GuiLoreBlock(listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "export_menu.bulk.action"))))
             )))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }

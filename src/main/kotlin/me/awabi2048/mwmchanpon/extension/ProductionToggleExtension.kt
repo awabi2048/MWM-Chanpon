@@ -25,6 +25,7 @@ import me.awabi2048.myworldmanager.api.extension.WorldSettingsInventoryHolder
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsMenuRequest
 import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.session.WorldCreationSession
+import me.awabi2048.myworldmanager.util.GuiLoreActions
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
@@ -361,7 +362,7 @@ class ProductionToggleExtension(
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "production.display"))
             meta.lore(structuredLore(listOf(
-                GuiLoreLine.SingleAction(i18n(player, "production.lore.action")),
+                GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "production.lore.action")),
                 GuiLoreLine.Warning(i18n(player, "production.lore.limit_warning"))
             )))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
@@ -404,7 +405,7 @@ class ProductionToggleExtension(
         }
         return when (state) {
             SubmissionState.UNSUBMITTED -> structuredLore(listOf(
-                GuiLoreLine.SingleAction(i18n(player, "$key.action")),
+                GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "$key.action")),
                 GuiLoreLine.Warning(i18n(player, "$key.warning"))
             ))
             SubmissionState.SUBMITTED,

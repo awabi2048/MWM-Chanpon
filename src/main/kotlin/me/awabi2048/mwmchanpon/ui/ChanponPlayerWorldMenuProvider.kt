@@ -20,6 +20,7 @@ import me.awabi2048.myworldmanager.api.extension.PlayerWorldMenuProvider
 import me.awabi2048.myworldmanager.api.extension.PlayerWorldMenuRequest
 import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.session.SettingsAction
+import me.awabi2048.myworldmanager.util.GuiLoreActions
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
@@ -111,7 +112,7 @@ class ChanponPlayerWorldMenuProvider(
             inventory.setItem(footerStart + 1, createPageItem(player, page - 1, false))
         }
         if (request.showBackButton) {
-            inventory.setItem(footerStart, createReturnItem(player))
+            placeReturnItem(inventory, footerStart, player)
         }
         if ((page + 1) * ITEMS_PER_PAGE < worlds.size) {
             inventory.setItem(footerStart + 8, createPageItem(player, page + 1, true))
@@ -147,7 +148,7 @@ class ChanponPlayerWorldMenuProvider(
                 }
                 mwm.soundManager.playClickSound(player, item, "player_world")
                 if (event.isRightClick && !event.isShiftClick) {
-                    startEasyCreation(player)
+                    startEasyCreation(player, holder)
                     return
                 }
                 val session = mwm.creationSessionManager.startSession(player.uniqueId)
@@ -255,7 +256,7 @@ class ChanponPlayerWorldMenuProvider(
                 if (expiresAtLine.isNotBlank()) add(GuiLoreBlock(listOf(GuiLoreLine.Raw(expiresAtLine))))
                 add(GuiLoreBlock(buildList {
                     if (isCurrentWorld) {
-                        add(GuiLoreLine.SingleAction(settingsAction))
+                        add(GuiLoreActions.singleClick(lang, player, settingsAction))
                     } else {
                         add(GuiLoreLine.Action(lang.getMessage(player, "gui.settings.click.left"), warpAction))
                         add(GuiLoreLine.Action(lang.getMessage(player, "gui.settings.click.right"), settingsAction))
@@ -302,7 +303,9 @@ class ChanponPlayerWorldMenuProvider(
         return plain.contains("クリックで開始") || plain.contains("Click to start")
     }
 
-    private fun startEasyCreation(player: Player) {
+    private fun startEasyCreation(player: Player, holder: Holder) {
+        // Dialogへ移る前の位置をCC-Systemのパンくずへ積み、キャンセル時に同じ一覧を再生成する。
+        mwm().menuRouteHistory.pushPlayerWorld(player, holder.page, holder.showBackButton)
         easyVoidCreationService.start(player)
     }
 
@@ -367,6 +370,14 @@ class ChanponPlayerWorldMenuProvider(
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_RETURN)
         return item
+    }
+
+    private fun placeReturnItem(inventory: Inventory, footerStart: Int, player: Player) {
+        // 戻るボタンは中央を第一候補にしつつ、既存の情報・操作アイコン配置は上書きしない。
+        val slot = (listOf(footerStart + 4, footerStart, footerStart + 8) + (footerStart until footerStart + 9))
+            .firstOrNull { inventory.getItem(it) == null }
+            ?: footerStart
+        inventory.setItem(slot, createReturnItem(player))
     }
 
     private fun handleReturn(player: Player, item: ItemStack) {

@@ -15,6 +15,7 @@ import me.awabi2048.myworldmanager.api.extension.FavoriteMenuProvider
 import me.awabi2048.myworldmanager.api.extension.VisitMenuProvider
 import me.awabi2048.myworldmanager.api.extension.VisitMenuRequest
 import me.awabi2048.myworldmanager.model.WorldData
+import me.awabi2048.myworldmanager.util.GuiLoreActions
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.TextDecoration
@@ -219,8 +220,8 @@ class ChanponFavoriteVisitMenuProvider(
                     if (tagLine.isNotBlank()) add(GuiLoreLine.Raw(tagLine))
                 }))
                 add(GuiLoreBlock(buildList {
-                    add(GuiLoreLine.SingleAction(warpAction))
-                    if (favoriteAction.isNotBlank()) add(GuiLoreLine.SingleAction(favoriteAction))
+                    add(GuiLoreActions.singleClick(mwm().languageManager, player, warpAction))
+                    if (favoriteAction.isNotBlank()) add(GuiLoreActions.singleClick(mwm().languageManager, player, favoriteAction))
                 }))
             })))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)

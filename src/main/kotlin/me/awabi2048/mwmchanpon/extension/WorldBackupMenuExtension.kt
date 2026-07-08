@@ -30,6 +30,7 @@ import me.awabi2048.myworldmanager.api.extension.WorldSettingsMenuRequest
 import me.awabi2048.myworldmanager.api.extension.MenuExtension
 import me.awabi2048.myworldmanager.api.extension.MenuExtensionContext
 import me.awabi2048.myworldmanager.model.WorldData
+import me.awabi2048.myworldmanager.util.GuiLoreActions
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.key.Key
 import net.kyori.adventure.text.Component
@@ -352,7 +353,7 @@ class WorldBackupMenuExtension(
             meta.displayName(i18nComponent(player, "owner_backup.display"))
             meta.lore(structuredBlocks(listOf(
                 GuiLoreBlock(listOf(GuiLoreLine.Text(i18n(player, "owner_backup.description")))),
-                GuiLoreBlock(listOf(GuiLoreLine.SingleAction(i18n(player, "owner_backup.action"))))
+                GuiLoreBlock(listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "owner_backup.action"))))
             )))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
@@ -395,7 +396,7 @@ class WorldBackupMenuExtension(
             } else {
                 structuredBlocks(listOf(
                     GuiLoreBlock(listOf(GuiLoreLine.Text(i18n(player, "$key.description")))),
-                    GuiLoreBlock(listOf(GuiLoreLine.SingleAction(i18n(player, "$key.action"))))
+                    GuiLoreBlock(listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "$key.action"))))
                 ))
             })
         }

@@ -10,6 +10,7 @@ import me.awabi2048.mwmchanpon.protection.SpawnWorldProtectionService
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.AdminMenuProvider
+import me.awabi2048.myworldmanager.util.GuiLoreActions
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
@@ -170,7 +171,7 @@ class ChanponAdminMenu(
             meta.displayName(i18nComponent(player, "$key.display"))
             meta.lore(structuredBlocks(listOf(
                 GuiLoreBlock(listOf(GuiLoreLine.Text(i18n(player, "$key.description")))),
-                GuiLoreBlock(listOf(GuiLoreLine.SingleAction(i18n(player, "$key.action"))))
+                GuiLoreBlock(listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "$key.action"))))
             )))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
@@ -210,7 +211,7 @@ class ChanponAdminMenu(
             meta.displayName(i18nComponent(player, "admin.switch_mwm.display"))
             meta.lore(structuredBlocks(listOf(
                 GuiLoreBlock(listOf(GuiLoreLine.Text(i18n(player, "admin.switch_mwm.description")))),
-                GuiLoreBlock(listOf(GuiLoreLine.SingleAction(i18n(player, "admin.switch_mwm.action"))))
+                GuiLoreBlock(listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "admin.switch_mwm.action"))))
             )))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
