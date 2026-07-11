@@ -539,9 +539,7 @@ class SubmissionAdminMenu(
             GuiLoreSpec.Rich(buildList {
                 optionKeys.forEach { optionKey ->
                     val selected = optionKey == selectedKey
-                    val marker = if (selected) "\u00A7a\u00BB" else "\u00A78\u30FB"
-                    val color = if (selected) "\u00A7f" else "\u00A77"
-                    add(GuiLoreLine.Raw("$marker $color${i18n(player, optionKey)}"))
+                    add(GuiLoreLine.Option(i18n(player, optionKey), selected, "\u00A7f", "\u00A77"))
                 }
                 add(GuiLoreLine.Spacer)
                 add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.left"), i18n(player, "admin_menu.cycle.next")))
