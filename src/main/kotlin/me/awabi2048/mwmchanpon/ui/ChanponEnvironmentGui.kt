@@ -235,10 +235,6 @@ class ChanponEnvironmentGui(
         val next = GuiCycle.select(current, PROTECTION_VALUES, reverse)
         storage.setProtectionMode(worldData.uuid, next)
         buildPermissionService.sync(worldData)
-        if (next == ChanponWorldProtectionMode.PASSWORD && !storage.hasProtectionPassword(worldData.uuid)) {
-            showProtectionPasswordDialog(player, worldData)
-            return
-        }
         open(player, worldData)
     }
 
@@ -506,16 +502,19 @@ class ChanponEnvironmentGui(
                 add(GuiLoreLine.Spacer)
                 options.forEach { option ->
                     val selected = option.key == currentKey
-                    val marker = if (selected) "\u00A7a\u00BB" else "\u00A78\u30FB"
-                    val color = if (selected) option.selectedColor else "\u00A77"
-                    add(GuiLoreLine.Raw("$marker $color${option.display}"))
+                    add(GuiLoreLine.Option(option.display, selected, option.selectedColor, "\u00A77"))
                 }
                 add(GuiLoreLine.Spacer)
-                add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.left"), i18n(player, "common.action_next")))
-                add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.right"), i18n(player, "common.action_previous")))
-                if (customTimeAction) {
-                    add(GuiLoreLine.Action(i18n(player, "common.shift_left"), i18n(player, "time.custom.action")))
-                }
+                addAll(
+                    listNavigationActionLines(
+                        player,
+                        if (customTimeAction) {
+                            listOf(GuiLoreLine.Action(i18n(player, "common.shift_left"), i18n(player, "time.custom.action")))
+                        } else {
+                            emptyList()
+                        }
+                    )
+                )
             }, GuiLoreFrame.BOTH)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         }
@@ -539,23 +538,33 @@ class ChanponEnvironmentGui(
                 add(GuiLoreLine.Spacer)
                 protectionOptions(player).forEach { option ->
                     val selected = option.key == mode.storageValue
-                    val marker = if (selected) "\u00A7a\u00BB" else "\u00A78\u30FB"
-                    val color = if (selected) option.selectedColor else "\u00A77"
-                    add(GuiLoreLine.Raw("$marker $color${option.display}"))
+                    add(GuiLoreLine.Option(option.display, selected, option.selectedColor, "\u00A77"))
                 }
                 if (mode == ChanponWorldProtectionMode.PASSWORD && !storage.hasProtectionPassword(worldData.uuid)) {
                     add(GuiLoreLine.Warning(i18n(player, "protection.password_missing_warning")))
                 }
                 add(GuiLoreLine.Spacer)
-                add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.left"), i18n(player, "common.action_next")))
-                add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.right"), i18n(player, "common.action_previous")))
-                add(GuiLoreLine.Action(i18n(player, "common.shift_left"), i18n(player, "protection.password_change_action")))
+                addAll(
+                    listNavigationActionLines(
+                        player,
+                        listOf(GuiLoreLine.Action(i18n(player, "common.shift_left"), i18n(player, "protection.password_change_action")))
+                    )
+                )
             }, GuiLoreFrame.BOTH)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
         ItemTag.setString(item, ACTION_KEY, ACTION_PROTECTION)
         return item
+    }
+
+    private fun listNavigationActionLines(player: Player, extraActions: List<GuiLoreLine>): List<GuiLoreLine> {
+        if (extraActions.isEmpty()) {
+            return listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "common.action_next")))
+        }
+        return listOf(
+            GuiLoreLine.Action(i18n(player, "common.left_right_click"), i18n(player, "common.action_next"))
+        ) + extraActions
     }
 
     private fun categoryItem(player: Player, key: String, currentValue: String, active: Boolean): ItemStack {
@@ -646,7 +655,7 @@ class ChanponEnvironmentGui(
 
     private fun optionLore(player: Player, marker: String, display: String, color: String, detail: String? = null): List<Component> {
         return CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(buildList {
-            add(GuiLoreLine.Raw("$marker $color$display${detail?.let { " §7($it)" } ?: ""}"))
+            add(GuiLoreLine.Option(detail?.let { "$display §7($it)" } ?: display, marker.contains("\u00A7a"), color, "\u00A77"))
             add(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "common.action_set")))
         }, GuiLoreFrame.BOTH))
     }

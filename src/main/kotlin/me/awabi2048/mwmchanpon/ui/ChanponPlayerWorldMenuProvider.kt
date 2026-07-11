@@ -63,18 +63,14 @@ class ChanponPlayerWorldMenuProvider(
 
         val session = mwm.playerWorldSessionManager.getSession(player.uniqueId)
         session.showBackButton = request.showBackButton
-        session.currentPage = request.page
-
         val worlds = mwm.playerWorldGui.getPlayerWorlds(targetPlayerUuid)
-        val totalPages = if (worlds.isEmpty()) 1 else (worlds.size + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE
-        val page = request.page.coerceIn(0, totalPages - 1)
-        val pageWorlds = worlds.drop(page * ITEMS_PER_PAGE).take(ITEMS_PER_PAGE)
-        val neededDataRows = if (pageWorlds.isEmpty()) 1 else (pageWorlds.size + WORLDS_PER_ROW - 1) / WORLDS_PER_ROW
-        val rowCount = (neededDataRows + 2).coerceIn(3, 6)
-        val footerStart = (rowCount - 1) * 9
+        val pageLayout = CCSystem.getAPI().getGuiLayoutService().sevenColumnPage(worlds.size, request.page)
+        val page = pageLayout.page
+        session.currentPage = page
+        val pageWorlds = worlds.drop(pageLayout.startIndex).take(pageLayout.itemCount)
         val title = inventoryTitle(mwm.languageManager.getMessage(player, "gui.player_world.title"))
         val holder = Holder(page, request.showBackButton, targetPlayerUuid, targetPlayerName)
-        val inventory = Bukkit.createInventory(holder, rowCount * 9, title)
+        val inventory = Bukkit.createInventory(holder, pageLayout.layout.size, title)
         holder.inv = inventory
 
         mwm.settingsSessionManager.updateSessionAction(
@@ -87,11 +83,9 @@ class ChanponPlayerWorldMenuProvider(
             null
         )
 
-        applyFrame(inventory, neededDataRows, footerStart)
+        applyFrame(inventory)
         pageWorlds.forEachIndexed { index, worldData ->
-            val row = index / WORLDS_PER_ROW
-            val col = index % WORLDS_PER_ROW
-            inventory.setItem((row + 1) * 9 + 1 + col, createWorldItem(player, worldData))
+            inventory.setItem(pageLayout.layout.itemSlots[index], createWorldItem(player, worldData))
         }
 
         val currentCreateCount = worlds.count { it.owner == targetPlayerUuid }
@@ -99,23 +93,23 @@ class ChanponPlayerWorldMenuProvider(
         val maxCreateCount = MyWorldManagerApi.getWorldRuntimePolicy().getMaxCreateCountDefault(configuredMaxCreateCount)
         val creationBlockReason = creationBlockReason(player, currentCreateCount, maxCreateCount)
         if (isOwnMenu && creationBlockReason == null && hasCreatePermission(player)) {
-            inventory.setItem(footerStart + 2, createCreationButton(player))
+            inventory.setItem(pageLayout.layout.actionSlot - 2, createCreationButton(player))
         } else if (isOwnMenu && creationBlockReason != null) {
-            inventory.setItem(footerStart + 2, createCreationUnavailableButton(player, creationBlockReason))
+            inventory.setItem(pageLayout.layout.actionSlot - 2, createCreationUnavailableButton(player, creationBlockReason))
         }
-        inventory.setItem(footerStart + 4, createPlayerInfoItem(player, targetPlayerUuid, targetPlayerName))
+        inventory.setItem(pageLayout.layout.actionSlot, createPlayerInfoItem(player, targetPlayerUuid, targetPlayerName))
         if (isOwnMenu) {
-            inventory.setItem(footerStart + 6, createUserSettingsButton(player))
+            inventory.setItem(pageLayout.layout.actionSlot + 2, createUserSettingsButton(player))
         }
 
         if (page > 0) {
-            inventory.setItem(footerStart + 1, createPageItem(player, page - 1, false))
+            inventory.setItem(pageLayout.layout.previousPageSlot, createPageItem(player, page - 1, false))
         }
         if (request.showBackButton) {
-            placeReturnItem(inventory, footerStart, player)
+            inventory.setItem(pageLayout.layout.backSlot, createReturnItem(player))
         }
-        if ((page + 1) * ITEMS_PER_PAGE < worlds.size) {
-            inventory.setItem(footerStart + 8, createPageItem(player, page + 1, true))
+        if (page + 1 < pageLayout.totalPages) {
+            inventory.setItem(pageLayout.layout.nextPageSlot, createPageItem(player, page + 1, true))
         }
 
         mwm.soundManager.playMenuOpenSound(player, "player_world")
@@ -200,8 +194,7 @@ class ChanponPlayerWorldMenuProvider(
         }
     }
 
-    private fun applyFrame(inventory: Inventory, neededDataRows: Int, footerStart: Int) {
-        // The row count parameters remain part of the provider contract; the inventory size determines the same frame.
+    private fun applyFrame(inventory: Inventory) {
         ChanponGuiElements.applyStandardFrame(inventory)
         ChanponGuiElements.fill(inventory)
     }
@@ -278,9 +271,7 @@ class ChanponPlayerWorldMenuProvider(
             meta.displayName(mwm.languageManager.getComponent(player, "gui.player_world.creation_button.display"))
             // 操作名は共通キー、内容はChanpon側キーとして保持し、言語ファイルへ結合済み操作行を置かない。
             meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(listOf(
-                GuiLoreBlock(mwm.languageManager.getMessageList(player, "gui.player_world.creation_button.lore")
-                    .filterNot(::isCreationButtonLegacyActionLine)
-                    .map(GuiLoreLine::Raw)),
+                GuiLoreBlock(mwm.languageManager.getMessageList(player, "gui.player_world.creation_button.description").map(GuiLoreLine::Text)),
                 GuiLoreBlock(listOf(
                     GuiLoreLine.Action(
                         mwm.languageManager.getMessage(player, "gui.settings.click.left"),
@@ -296,11 +287,6 @@ class ChanponPlayerWorldMenuProvider(
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_CREATION_BUTTON)
         return item
-    }
-
-    private fun isCreationButtonLegacyActionLine(line: String): Boolean {
-        val plain = line.replace(Regex("[§&][0-9A-FK-ORa-fk-or]"), "").trim()
-        return plain.contains("クリックで開始") || plain.contains("Click to start")
     }
 
     private fun startEasyCreation(player: Player, holder: Holder) {
@@ -326,9 +312,11 @@ class ChanponPlayerWorldMenuProvider(
             GuiItemSpec(
                 material = Material.WRITABLE_BOOK,
                 name = GuiNameSpec.Text(mwm.languageManager.getMessage(player, "gui.user_settings.button.display"), GuiNameStyle.PRIMARY),
-                lore = GuiLoreSpec.Simple(
-                    listOf(mwm.languageManager.getMessage(player, "gui.user_settings.button.action"))
-                ),
+                lore = GuiLoreSpec.Blocks(listOf(GuiLoreBlock(listOf(GuiLoreActions.singleClick(
+                        mwm.languageManager,
+                        player,
+                        mwm.languageManager.getMessage(player, "gui.user_settings.button.action")
+                    ))))),
                 role = GuiElementRole.ACTION,
                 amount = 1
             )
@@ -370,14 +358,6 @@ class ChanponPlayerWorldMenuProvider(
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_RETURN)
         return item
-    }
-
-    private fun placeReturnItem(inventory: Inventory, footerStart: Int, player: Player) {
-        // 戻るボタンは中央を第一候補にしつつ、既存の情報・操作アイコン配置は上書きしない。
-        val slot = (listOf(footerStart + 4, footerStart, footerStart + 8) + (footerStart until footerStart + 9))
-            .firstOrNull { inventory.getItem(it) == null }
-            ?: footerStart
-        inventory.setItem(slot, createReturnItem(player))
     }
 
     private fun handleReturn(player: Player, item: ItemStack) {
@@ -492,7 +472,5 @@ class ChanponPlayerWorldMenuProvider(
 
     companion object {
         private const val PROVIDER_ID = "chanpon.player_world_menu"
-        private const val WORLDS_PER_ROW = 7
-        private const val ITEMS_PER_PAGE = 28
     }
 }

@@ -172,23 +172,20 @@ class ChanponFavoriteVisitMenuProvider(
         owner: OfflinePlayer?,
         showBackButton: Boolean
     ) {
-        val pages = if (worlds.isEmpty()) 1 else (worlds.size + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE
-        val safePage = page.coerceIn(0, pages - 1)
+        val pageLayout = CCSystem.getAPI().getGuiLayoutService().sevenColumnPage(worlds.size, page)
+        val safePage = pageLayout.page
         val holder = WorldListHolder(mode, safePage, returnWorld?.uuid, owner?.uniqueId, showBackButton)
-        val layout = ChanponGuiElements.pagedListLayout()
+        val layout = pageLayout.layout
         val inventory = Bukkit.createInventory(holder, layout.size, i18nComponent(player, if (mode == ListMode.FAVORITE) "favorite_list.title" else "visit_list.title"))
         holder.inv = inventory
         applyFrame(inventory)
-        worlds.drop(safePage * ITEMS_PER_PAGE).take(ITEMS_PER_PAGE).forEachIndexed { index, world ->
-            inventory.setItem(WORLD_SLOTS[index], worldListItem(player, world))
+        worlds.drop(pageLayout.startIndex).take(pageLayout.itemCount).forEachIndexed { index, world ->
+            inventory.setItem(layout.itemSlots[index], worldListItem(player, world))
         }
-        ChanponGuiElements.setPagedListNavigation(
-            inventory,
-            if (safePage > 0) navItem(player, safePage - 1, false) else null,
-            if (safePage < pages - 1) navItem(player, safePage + 1, true) else null,
-            if (showBackButton || returnWorld != null) returnItem(player) else null,
-            infoItem(player, worlds.size, safePage + 1, pages)
-        )
+        if (safePage > 0) inventory.setItem(layout.previousPageSlot, navItem(player, safePage - 1, false))
+        if (safePage + 1 < pageLayout.totalPages) inventory.setItem(layout.nextPageSlot, navItem(player, safePage + 1, true))
+        if (showBackButton || returnWorld != null) inventory.setItem(layout.backSlot, returnItem(player))
+        inventory.setItem(layout.actionSlot, infoItem(player, worlds.size, safePage + 1, pageLayout.totalPages))
         fill(inventory)
         player.openInventory(inventory)
     }
@@ -377,7 +374,5 @@ class ChanponFavoriteVisitMenuProvider(
         private const val ACTION_OTHER_WORLDS = "other_worlds"
         private const val ACTION_FAVORITE_LIST = "favorite_list"
         private const val ACTION_TOGGLE_FAVORITE = "toggle_favorite"
-        private const val ITEMS_PER_PAGE = 28
-        private val WORLD_SLOTS = (0 until 4).flatMap { row -> (0 until 7).map { col -> (row + 1) * 9 + 1 + col } }
     }
 }

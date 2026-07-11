@@ -2,10 +2,16 @@ package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiCycle
+import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuIconAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuIconData
+import com.awabi2048.ccsystem.api.gui.GuiMenuIconSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import java.util.UUID
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
@@ -95,23 +101,23 @@ class ChanponWorldSettingsMenuProvider(
             inventory.setItem(21, publishItem(player, worldData))
             inventory.setItem(22, notificationItem(player, worldData))
         } else if (hasManagePermission) {
-            inventory.setItem(19, mwmItem(player, "info", Material.NAME_TAG, ItemTag.TYPE_GUI_SETTING_INFO))
-            inventory.setItem(20, mwmItem(player, "icon", Material.ANVIL, ItemTag.TYPE_GUI_SETTING_ICON))
-            inventory.setItem(21, mwmItem(player, "spawn", Material.COMPASS, ItemTag.TYPE_GUI_SETTING_SPAWN, requireTargetWorld = true))
-            inventory.setItem(28, mwmItem(player, "announcement", Material.OAK_SIGN, ItemTag.TYPE_GUI_SETTING_ANNOUNCEMENT))
+            inventory.setItem(19, mwmItem(player, worldData, "info", Material.NAME_TAG, ItemTag.TYPE_GUI_SETTING_INFO))
+            inventory.setItem(20, mwmItem(player, worldData, "icon", Material.ANVIL, ItemTag.TYPE_GUI_SETTING_ICON))
+            inventory.setItem(21, mwmItem(player, worldData, "spawn", Material.COMPASS, ItemTag.TYPE_GUI_SETTING_SPAWN, requireTargetWorld = true))
+            inventory.setItem(28, mwmItem(player, worldData, "announcement", Material.OAK_SIGN, ItemTag.TYPE_GUI_SETTING_ANNOUNCEMENT))
             inventory.setItem(29, notificationItem(player, worldData))
-            inventory.setItem(47, mwmItem(player, "tour", Material.PALE_OAK_BOAT, ItemTag.TYPE_GUI_SETTING_TOUR, "gui.tour.worldmenu"))
+            inventory.setItem(47, mwmItem(player, worldData, "tour", Material.PALE_OAK_BOAT, ItemTag.TYPE_GUI_SETTING_TOUR, "gui.tour.worldmenu"))
         }
         if (isOwner && !isProtected) {
             inventory.setItem(23, expansionItem(player, worldData))
             inventory.setItem(24, publishItem(player, worldData))
-            inventory.setItem(25, mwmItem(player, "member", Material.PLAYER_HEAD, ItemTag.TYPE_GUI_SETTING_MEMBER))
-            inventory.setItem(32, mwmItem(player, "environment", Material.GRASS_BLOCK, ItemTag.TYPE_GUI_SETTING_ENVIRONMENT, requireTargetWorld = true))
+            inventory.setItem(25, mwmItem(player, worldData, "member", Material.PLAYER_HEAD, ItemTag.TYPE_GUI_SETTING_MEMBER))
+            inventory.setItem(32, mwmItem(player, worldData, "environment", Material.GRASS_BLOCK, ItemTag.TYPE_GUI_SETTING_ENVIRONMENT, requireTargetWorld = true))
             inventory.setItem(33, criticalItem(player, worldData))
         }
         inventory.setItem(4, worldInfoItem(player, worldData))
         if (request.showBackButton) {
-            inventory.setItem(if (isProtected) PROTECTED_BACK_SLOT else layout.backSlot, returnItem(player))
+            inventory.setItem(if (isProtected) PROTECTED_BACK_SLOT else layout.infoSlot, returnItem(player))
         }
 
         fill(inventory)
@@ -148,19 +154,24 @@ class ChanponWorldSettingsMenuProvider(
         if (type == ItemTag.TYPE_GUI_INFO && ItemTag.getWorldUuid(item) == worldData.uuid) {
             if (isCurrentWorld(player, worldData)) return
             mwm.soundManager.playClickSound(player, item, "world_settings")
+            mwm.settingsSessionManager.getSession(player)?.isGuiTransition = true
             mwm.worldService.teleportToWorldKeepingInventory(
                 player,
                 worldData.uuid,
                 MwmWarpReason.DIRECT,
                 Runnable {
-                player.sendMessage(
-                    mwm.languageManager.getMessage(
-                        player,
-                        "messages.warp_success",
-                        mapOf("world" to worldData.name)
-                    )
-                )
-                open(player, worldData, currentRequest(player))
+                    Bukkit.getScheduler().runTask(plugin, Runnable {
+                        if (player.isOnline) {
+                            player.sendMessage(
+                                mwm.languageManager.getMessage(
+                                    player,
+                                    "messages.warp_success",
+                                    mapOf("world" to worldData.name)
+                                )
+                            )
+                            open(player, worldData, currentRequest(player))
+                        }
+                    })
                 }
             )
             return
@@ -697,9 +708,7 @@ class ChanponWorldSettingsMenuProvider(
                 add(GuiLoreLine.Spacer)
                 options.forEach { (option, displayName, selectedColor) ->
                     val selected = option == visibility
-                    val marker = if (selected) "\u00A7a\u00BB" else "\u00A78\u30FB"
-                    val color = if (selected) selectedColor else "\u00A77"
-                    add(GuiLoreLine.Raw("$marker $color$displayName"))
+                    add(GuiLoreLine.Option(displayName, selected, selectedColor, "\u00A77"))
                 }
                 add(GuiLoreLine.Spacer)
                 add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.left"), i18n(player, "publish.cycle_next_action")))
@@ -720,7 +729,8 @@ class ChanponWorldSettingsMenuProvider(
                 player,
                 mwm().languageManager.getMessageList(player, "gui.settings.expand.blocks.description"),
                 lines,
-                requireTargetWorld = true
+                requireTargetWorld = true,
+                worldData = worldData
             ),
             ItemTag.TYPE_GUI_SETTING_EXPAND
         )
@@ -728,19 +738,38 @@ class ChanponWorldSettingsMenuProvider(
 
     private fun notificationItem(player: Player, worldData: WorldData): ItemStack {
         val status = i18n(player, if (worldData.notificationEnabled) "common.on" else "common.off")
-        return componentItem(
-            if (worldData.notificationEnabled) Material.BELL else Material.OAK_DOOR,
-            mwm().languageManager.getMessage(player, "gui.settings.notification.display"),
-            describedStructuredLore(
-                player,
-                mwm().languageManager.getMessageList(player, "gui.settings.notification.blocks.description"),
-                listOf(
-                    GuiLoreLine.Data(i18n(player, "notification.current_label"), status, "§e"),
-                    GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "notification.action"))
-                )
-            ),
-            ItemTag.TYPE_GUI_SETTING_NOTIFICATION
+        val singleAction = GuiLoreActions.singleClick(
+            mwm().languageManager,
+            player,
+            i18n(player, "notification.action")
         )
+        val item = CCSystem.getAPI().getGuiElementService().menuIcon(
+            GuiMenuIconSpec(
+                Material.BELL,
+                GuiNameSpec.Text(
+                    mwm().languageManager.getMessage(player, "gui.settings.notification.display"),
+                    GuiNameStyle.DEFAULT
+                ),
+                GuiElementRole.CONTENT,
+                1,
+                mwm().languageManager.getMessageList(player, "gui.settings.notification.blocks.description"),
+                listOf(GuiMenuIconData(i18n(player, "notification.current_label"), status, "§e")),
+                emptyList(),
+                emptyList(),
+                emptyList(),
+                listOf(
+                    GuiMenuIconAction(
+                        singleAction.operation,
+                        singleAction.action,
+                        singleAction.resolvedText,
+                        true
+                    )
+                ),
+                worldData.notificationEnabled
+            )
+        )
+        ItemTag.tagItem(item, ItemTag.TYPE_GUI_SETTING_NOTIFICATION)
+        return item
     }
 
     private fun criticalItem(player: Player, worldData: WorldData): ItemStack {
@@ -754,7 +783,8 @@ class ChanponWorldSettingsMenuProvider(
                 player,
                 mwm().languageManager.getMessageList(player, "gui.settings.critical.blocks.summary"),
                 listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "critical.action"))),
-                requireTargetWorld = true
+                requireTargetWorld = true,
+                worldData = worldData
             ),
             ItemTag.TYPE_GUI_SETTING_CRITICAL
         )
@@ -816,6 +846,7 @@ class ChanponWorldSettingsMenuProvider(
 
     private fun mwmItem(
         player: Player,
+        worldData: WorldData,
         iconKey: String,
         material: Material,
         type: String,
@@ -827,19 +858,19 @@ class ChanponWorldSettingsMenuProvider(
             player,
             mwmDescription(player, iconKey),
             listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "mwm_action.action"))),
-            requireTargetWorld = requireTargetWorld
+            requireTargetWorld = requireTargetWorld,
+            worldData = worldData
         )
         val icon = mwm().menuConfigManager.getIconMaterial("world_settings", iconKey, material)
         return componentItem(icon, display, lore, type)
     }
 
     private fun mwmDescription(player: Player, iconKey: String): List<String> {
-        val bedrock = mwm().playerPlatformResolver.isBedrock(player)
         val key = when (iconKey) {
-            "info" -> if (bedrock) "gui.settings.info.blocks.summary_be" else "gui.settings.info.blocks.summary_je"
+            "info" -> "gui.settings.info.blocks.summary"
             "icon" -> "gui.settings.icon.blocks.description"
-            "spawn" -> if (bedrock) "gui.settings.spawn.blocks.description_be" else "gui.settings.spawn.blocks.description_je"
-            "announcement" -> if (bedrock) "gui.settings.announcement.blocks.description_be" else "gui.settings.announcement.blocks.description_je"
+            "spawn" -> "gui.settings.spawn.blocks.description"
+            "announcement" -> "gui.settings.announcement.blocks.description"
             "member" -> "gui.settings.member.blocks.description"
             "environment" -> "gui.settings.environment.blocks.summary"
             "tour" -> "gui.tour.worldmenu.blocks.description"
@@ -848,27 +879,42 @@ class ChanponWorldSettingsMenuProvider(
         return mwm().languageManager.getMessageList(player, key)
     }
 
-    private fun describedLore(player: Player, description: List<String>, existing: List<String>, requireTargetWorld: Boolean = false): List<Component> {
+    private fun describedLore(
+        player: Player,
+        description: List<String>,
+        existing: List<String>,
+        requireTargetWorld: Boolean = false,
+        worldData: WorldData? = null
+    ): List<Component> {
         return describedStructuredLore(
             player,
             description,
             existing.map { line -> if (line.isBlank()) GuiLoreLine.Spacer else GuiLoreLine.Raw(line) },
-            requireTargetWorld
+            requireTargetWorld,
+            worldData
         )
     }
 
-    private fun describedStructuredLore(player: Player, description: List<String>, existing: List<GuiLoreLine>, requireTargetWorld: Boolean = false): List<Component> {
+    private fun describedStructuredLore(
+        player: Player,
+        description: List<String>,
+        existing: List<GuiLoreLine>,
+        requireTargetWorld: Boolean = false,
+        worldData: WorldData? = null
+    ): List<Component> {
+        val outsideTargetWorld = requireTargetWorld && worldData != null && !isCurrentWorld(player, worldData)
+        val actionLines = if (outsideTargetWorld) emptyList() else existing
         return CCSystem.getAPI().getLoreService().render(
             GuiLoreSpec.Rich(
                 buildList {
-                    if (requireTargetWorld) {
+                    if (outsideTargetWorld) {
                         add(GuiLoreLine.Warning(i18n(player, "common.must_be_in_world_warning")))
                     }
                     description.filter { it.isNotBlank() }.forEach { add(GuiLoreLine.Raw(it)) }
-                    if (description.any { it.isNotBlank() } && existing.any { it != GuiLoreLine.Spacer }) {
+                    if (description.any { it.isNotBlank() } && actionLines.any { it != GuiLoreLine.Spacer }) {
                         add(GuiLoreLine.Spacer)
                     }
-                    addAll(existing)
+                    addAll(actionLines)
                 },
                 GuiLoreFrame.BOTH
             )
