@@ -141,7 +141,7 @@ class ChanponDiscoveryMenuProvider(
                 ?: mwm.languageManager.getMessage(player, "general.unknown")
             meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(listOf(
                 GuiLoreBlock(buildList {
-                    add(GuiLoreLine.Raw(mwm.languageManager.getMessage(player, "gui.player_world.world_item.owner", mapOf("owner" to ownerName))))
+                    add(GuiLoreLine.Data(CCSystem.getAPI().getI18nString(player, "gui_data.owner"), ownerName, "§f"))
                     SubmissionProgressDisplay.loreLine(player, storage, worldData.uuid)?.let(::add)
                 }),
                 GuiLoreBlock(listOf(GuiLoreActions.singleClick(

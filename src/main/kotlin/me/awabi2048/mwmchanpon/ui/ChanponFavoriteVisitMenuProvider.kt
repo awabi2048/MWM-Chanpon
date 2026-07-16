@@ -194,27 +194,17 @@ class ChanponFavoriteVisitMenuProvider(
         val item = ItemStack(world.icon)
         item.editMeta { meta ->
             meta.displayName(mwm().languageManager.getComponent(player, "gui.common.world_item_name", mapOf("world" to world.name)).decoration(TextDecoration.ITALIC, false))
-            val description = if (world.description.isNotBlank()) {
-                mwm().languageManager.getMessage(player, "gui.common.world_desc", mapOf("description" to world.description))
-            } else {
-                ""
-            }
             val ownerName = Bukkit.getOfflinePlayer(world.owner).name ?: mwm().languageManager.getMessage(player, "general.unknown")
-            val ownerLine = i18n(player, "favorite_visit.owner", mapOf("owner" to ownerName))
             val progressLine = SubmissionProgressDisplay.loreLine(player, storage, world.uuid)
-            val tagLine = if (world.tags.isNotEmpty()) {
-                i18n(player, "favorite_visit.tags", mapOf("tags" to world.tags.joinToString(", ") { mwm().worldTagManager.getDisplayName(player, it) }))
-            } else {
-                ""
-            }
+            val tagNames = world.tags.joinToString(", ") { mwm().worldTagManager.getDisplayName(player, it) }
             val warpAction = i18n(player, "favorite_visit.warp")
             val favoriteAction = if (!isMember(player, world)) i18n(player, "favorite_visit.toggle_favorite") else ""
             meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(buildList {
-                if (description.isNotBlank()) add(GuiLoreBlock(listOf(GuiLoreLine.Raw(description))))
+                if (world.description.isNotBlank()) add(GuiLoreBlock(listOf(GuiLoreLine.Text(world.description))))
                 add(GuiLoreBlock(buildList {
-                    add(GuiLoreLine.Raw(ownerLine))
+                    add(GuiLoreLine.Data(CCSystem.getAPI().getI18nString(player, "gui_data.owner"), ownerName, "§f"))
                     progressLine?.let(::add)
-                    if (tagLine.isNotBlank()) add(GuiLoreLine.Raw(tagLine))
+                    if (tagNames.isNotBlank()) add(GuiLoreLine.Data(CCSystem.getAPI().getI18nString(player, "gui_data.tags"), tagNames, "§f"))
                 }))
                 add(GuiLoreBlock(buildList {
                     add(GuiLoreActions.singleClick(mwm().languageManager, player, warpAction))
@@ -259,7 +249,7 @@ class ChanponFavoriteVisitMenuProvider(
         val item = ItemStack(material)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "favorite_menu.$key.display"))
-            meta.lore(ChanponLore.build(i18nList(player, "favorite_menu.$key.lore")))
+            meta.lore(ChanponLore.build(i18nList(player, "favorite_menu.$key.lore").map(GuiLoreLine::Text)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, TYPE_CONTROL)
@@ -278,7 +268,11 @@ class ChanponFavoriteVisitMenuProvider(
         val item = ItemStack(worldData.icon)
         item.editMeta { meta ->
             meta.displayName(CCSystem.getAPI().getGuiElementService().name(worldData.name))
-            meta.lore(ChanponLore.build(listOf(i18n(player, "favorite_visit.owner", mapOf("owner" to (Bukkit.getOfflinePlayer(worldData.owner).name ?: "-"))))))
+            meta.lore(ChanponLore.build(listOf(GuiLoreLine.Data(
+                i18n(player, "favorite_visit.owner_label"),
+                Bukkit.getOfflinePlayer(worldData.owner).name ?: "-",
+                "§f"
+            ))))
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
         return item
@@ -319,7 +313,7 @@ class ChanponFavoriteVisitMenuProvider(
         val item = ItemStack(Material.PAPER)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "favorite_visit.info.display"))
-            meta.lore(ChanponLore.build(i18nList(player, "favorite_visit.info.lore", mapOf("count" to count, "page" to page, "pages" to pages))))
+            meta.lore(ChanponLore.build(i18nList(player, "favorite_visit.info.lore", mapOf("count" to count, "page" to page, "pages" to pages)).map(GuiLoreLine::Text)))
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
         return item

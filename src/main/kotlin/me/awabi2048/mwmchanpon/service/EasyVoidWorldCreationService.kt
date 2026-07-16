@@ -18,9 +18,13 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.myworldmanager.MyWorldManager
+import me.awabi2048.myworldmanager.api.MyWorldManagerApi
+import me.awabi2048.myworldmanager.api.extension.WorldCreationOperation
+import me.awabi2048.myworldmanager.api.extension.WorldCreationRequest
 import me.awabi2048.myworldmanager.api.event.MwmWorldCreatedEvent
 import me.awabi2048.myworldmanager.model.PublishLevel
 import me.awabi2048.myworldmanager.model.WorldData
+import me.awabi2048.myworldmanager.api.extension.WorldCreationType
 import me.awabi2048.myworldmanager.util.WorldNameValidation
 import me.awabi2048.myworldmanager.util.WorldWarpId
 import net.kyori.adventure.key.Key
@@ -50,6 +54,7 @@ class EasyVoidWorldCreationService(
     private val creatingPlayers = ConcurrentHashMap.newKeySet<UUID>()
 
     fun start(player: Player) {
+        if (!canCreate(player)) return
         pendingNames.remove(player.uniqueId)
         player.closeInventory()
         player.sendMessage(i18n(player, "start"))
@@ -155,6 +160,7 @@ class EasyVoidWorldCreationService(
     }
 
     private fun create(player: Player, worldName: String) {
+        if (!canCreate(player)) return
         if (!creatingPlayers.add(player.uniqueId)) {
             player.sendMessage(mwm().languageManager.getMessage(player, "error.world_creation_in_progress"))
             return
@@ -249,6 +255,19 @@ class EasyVoidWorldCreationService(
             }
         }
         error("Unable to allocate unique MyWorld warp id after 100 attempts")
+    }
+
+    private fun canCreate(player: Player): Boolean {
+        val decision = MyWorldManagerApi.checkWorldCreation(
+            WorldCreationRequest(
+                actor = player,
+                player = player,
+                operation = WorldCreationOperation.NORMAL,
+                type = WorldCreationType.RANDOM
+            )
+        )
+        if (!decision.allowed) decision.denialMessage?.let(player::sendMessage)
+        return decision.allowed
     }
 
     private fun applyInitialBorder(mwm: MyWorldManager, world: World) {

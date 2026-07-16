@@ -1,6 +1,7 @@
 package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import java.util.UUID
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.mwmchanpon.tool.ToolPermissionDefinition
@@ -65,10 +66,18 @@ class ToolPermissionMenu(
         val enabled = controller.isEnabled(worldData, targetPlayerUuid, definition.id)
         val item = ItemStack(definition.material)
         item.editMeta { meta ->
-            meta.displayName(CCSystem.getAPI().getGuiElementService().name("${if (enabled) "§a" else "§7"}${definition.displayName}"))
+            meta.displayName(CCSystem.getAPI().getGuiElementService().name("§f${definition.displayName}"))
             meta.lore(ChanponLore.build(listOf(
-                "§7状態: ${if (enabled) "§aオン" else "§cオフ"}",
-                "§eクリックで切り替え"
+                GuiLoreLine.Data(
+                    i18n("state_label"),
+                    i18n(if (enabled) "enabled" else "disabled"),
+                    if (enabled) "§a" else "§c"
+                ),
+                GuiLoreLine.SingleAction(
+                    i18n("toggle_operation"),
+                    i18n("toggle_action"),
+                    i18n("toggle_resolved")
+                )
             )))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         }
@@ -78,5 +87,9 @@ class ToolPermissionMenu(
         ItemTag.setString(item, "chanpon_action", "toggle_tool")
         ItemTag.setString(item, "chanpon_tool", definition.id)
         return item
+    }
+
+    private fun i18n(key: String): String {
+        return CCSystem.getAPI().getI18nString(null, "chanpon.member_lore.permission_menu.$key")
     }
 }

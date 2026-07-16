@@ -19,6 +19,7 @@ import me.awabi2048.myworldmanager.api.extension.AdminWorldListProvider
 import me.awabi2048.myworldmanager.api.extension.AdminWorldListRequest
 import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.session.SettingsAction
+import me.awabi2048.myworldmanager.util.GuiLoreActions
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.event.ClickEvent
@@ -232,8 +233,7 @@ class ChanponAdminWorldListMenu(
             meta.displayName(i18nComponent(player, "$key.display"))
             meta.lore(structuredLore(listOf(
                 GuiLoreLine.Data(i18n(player, "$key.label"), current, "§e"),
-                GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.left"), i18n(player, "admin_list.cycle.next")),
-                GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.right"), i18n(player, "admin_list.cycle.previous"))
+                GuiLoreActions.cycle(mwm().languageManager, player)
             )))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
@@ -247,7 +247,7 @@ class ChanponAdminWorldListMenu(
         val item = ItemStack(Material.BOOK)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "admin_list.info.display"))
-            meta.lore(lore(i18nList(player, "admin_list.info.lore", mapOf("count" to total, "page" to page, "pages" to totalPages))))
+            meta.lore(ChanponLore.build(i18nList(player, "admin_list.info.lore", mapOf("count" to total, "page" to page, "pages" to totalPages)).map(GuiLoreLine::Text)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
@@ -265,7 +265,7 @@ class ChanponAdminWorldListMenu(
         val item = ItemStack(material)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, displayKey, placeholders))
-            meta.lore(lore(i18nList(player, loreKey, placeholders)))
+            meta.lore(ChanponLore.build(i18nList(player, loreKey, placeholders).map(GuiLoreLine::Text)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
@@ -363,10 +363,6 @@ class ChanponAdminWorldListMenu(
 
     private fun decoration(material: Material): ItemStack {
         return ChanponGuiElements.decoration(material)
-    }
-
-    private fun lore(lines: List<String>): List<Component> {
-        return ChanponLore.build(lines)
     }
 
     private fun structuredLore(lines: List<GuiLoreLine>): List<Component> {

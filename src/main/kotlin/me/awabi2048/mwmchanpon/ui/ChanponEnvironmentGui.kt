@@ -108,8 +108,13 @@ class ChanponEnvironmentGui(
             ACTION_SCALE -> cycleScale(player, worldData, reverse = event.isRightClick)
             ACTION_FLIGHT -> toggleFlight(player, worldData)
             ACTION_PROTECTION -> {
-                if (event.isShiftClick && event.isLeftClick) {
-                    showProtectionPasswordDialog(player, worldData)
+                val mode = storage.getProtectionMode(worldData.uuid)
+                if (event.isShiftClick && event.isLeftClick && mode == ChanponWorldProtectionMode.PASSWORD) {
+                    showProtectionPasswordDialog(
+                        player,
+                        worldData,
+                        storage.getProtectionPassword(worldData.uuid).orEmpty()
+                    )
                 } else {
                     cycleProtection(player, worldData, reverse = event.isRightClick)
                 }
@@ -183,7 +188,6 @@ class ChanponEnvironmentGui(
         }
 
         storage.setProtectionPassword(worldData.uuid, input)
-        storage.setProtectionMode(worldData.uuid, ChanponWorldProtectionMode.PASSWORD)
         buildPermissionService.sync(worldData)
         player.sendMessage(i18n(player, "protection.password_updated"))
         open(player, worldData)
@@ -533,21 +537,34 @@ class ChanponEnvironmentGui(
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "protection.display"))
             meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(buildList {
+                val password =
+                    if (mode == ChanponWorldProtectionMode.PASSWORD) {
+                        storage.getProtectionPassword(worldData.uuid)
+                    } else {
+                        null
+                    }
                 add(GuiLoreLine.Data(i18n(player, "common.current_label"), protectionDisplay(player, mode), "\u00A7e"))
                 add(GuiLoreLine.Text(i18n(player, "protection.description")))
+                if (password != null) {
+                    add(GuiLoreLine.Data(i18n(player, "protection.password_label"), password, "\u00A7f"))
+                }
                 add(GuiLoreLine.Spacer)
                 protectionOptions(player).forEach { option ->
                     val selected = option.key == mode.storageValue
                     add(GuiLoreLine.Option(option.display, selected, option.selectedColor, "\u00A77"))
                 }
-                if (mode == ChanponWorldProtectionMode.PASSWORD && !storage.hasProtectionPassword(worldData.uuid)) {
+                if (mode == ChanponWorldProtectionMode.PASSWORD && password == null) {
                     add(GuiLoreLine.Warning(i18n(player, "protection.password_missing_warning")))
                 }
                 add(GuiLoreLine.Spacer)
                 addAll(
                     listNavigationActionLines(
                         player,
-                        listOf(GuiLoreLine.Action(i18n(player, "common.shift_left"), i18n(player, "protection.password_change_action")))
+                        if (mode == ChanponWorldProtectionMode.PASSWORD) {
+                            listOf(GuiLoreLine.Action(i18n(player, "common.shift_left"), i18n(player, "protection.password_change_action")))
+                        } else {
+                            emptyList()
+                        }
                     )
                 )
             }, GuiLoreFrame.BOTH)))
@@ -559,9 +576,6 @@ class ChanponEnvironmentGui(
     }
 
     private fun listNavigationActionLines(player: Player, extraActions: List<GuiLoreLine>): List<GuiLoreLine> {
-        if (extraActions.isEmpty()) {
-            return listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "common.action_next")))
-        }
         return listOf(
             GuiLoreLine.Action(i18n(player, "common.left_right_click"), i18n(player, "common.action_next"))
         ) + extraActions

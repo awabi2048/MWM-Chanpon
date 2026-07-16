@@ -55,12 +55,20 @@ class ChanponGlobalStorage(dataFolder: File) {
         config.save(settingsFile)
     }
 
-    fun isWorldCreationEnabled(): Boolean =
-        settings().getBoolean("world_creation.enabled", true)
-
-    fun setWorldCreationEnabled(enabled: Boolean) {
+    fun getPhase(): ChanponPhase {
         val config = settings()
-        config.set("world_creation.enabled", enabled)
+        val raw = config.getString("phase")
+        if (raw == null) {
+            config.set("phase", ChanponPhase.PRODUCTION_ALLOWED.name)
+            config.save(settingsFile)
+            return ChanponPhase.PRODUCTION_ALLOWED
+        }
+        return ChanponPhase.valueOf(raw)
+    }
+
+    fun setPhase(phase: ChanponPhase) {
+        val config = settings()
+        config.set("phase", phase.name)
         config.save(settingsFile)
     }
 

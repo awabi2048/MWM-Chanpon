@@ -10,6 +10,11 @@ depend:
 softdepend:
   - floodgate
 
+commands:
+  chanpon-mwm:
+    description: Chanponの管理メニューを開く
+    usage: /chanpon-mwm
+
 permissions:
   mwmchanpon.admin:
     description: MWM-Chanponの管理者機能を使用する権限

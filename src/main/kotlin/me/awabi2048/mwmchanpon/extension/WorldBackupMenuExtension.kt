@@ -409,11 +409,11 @@ class WorldBackupMenuExtension(
         val item = ItemStack(world.icon)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "owner_backup.info.display", mapOf("world" to world.name)))
-            meta.lore(lore(i18nList(player, "owner_backup.info.lore", mapOf(
+            meta.lore(ChanponLore.build(i18nList(player, "owner_backup.info.lore", mapOf(
                 "count" to count,
                 "page" to page,
                 "pages" to pages
-            ))))
+            )).map(GuiLoreLine::Text)))
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
         return item
@@ -423,7 +423,7 @@ class WorldBackupMenuExtension(
         val item = ItemStack(material)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "$key.display", placeholders))
-            meta.lore(lore(i18nList(player, "$key.lore", placeholders)))
+            meta.lore(ChanponLore.build(i18nList(player, "$key.lore", placeholders).map(GuiLoreLine::Text)))
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
         return item
@@ -532,7 +532,6 @@ class WorldBackupMenuExtension(
         CCSystem.getAPI().getI18nString(player, "chanpon.backup.$key", placeholders)
     private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
-    private fun lore(lines: List<String>) = ChanponLore.build(lines)
     private fun structuredBlocks(blocks: List<GuiLoreBlock>): List<Component> =
         CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(blocks))
     private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)

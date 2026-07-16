@@ -2,6 +2,7 @@ package me.awabi2048.mwmchanpon.ui
 
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import java.util.UUID
 import me.awabi2048.mwmchanpon.protection.ProtectionReason
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
@@ -114,19 +115,19 @@ class SubmittedWorldMenuProvider(
         val item = ItemStack(worldData.icon)
         item.editMeta { meta ->
             meta.displayName(CCSystem.getAPI().getGuiElementService().name("§e${worldData.name}"))
-            meta.lore(
-                lore(
-                    i18nList(
-                        player,
-                        "submitted_menu.world_lore",
-                        mapOf(
-                            "state" to i18n(player, "state.${state.i18nKey}"),
-                            "reason" to protectionReasonText(player, reasons),
-                            "description" to worldData.description.ifBlank { "-" }
-                        )
-                    )
-                )
-            )
+            meta.lore(ChanponLore.build(listOf(
+                GuiLoreLine.Data(
+                    i18n(player, "submitted_menu.state_label"),
+                    i18n(player, "state.${state.i18nKey}"),
+                    when (state) {
+                        SubmissionState.UNSUBMITTED -> "§6"
+                        SubmissionState.SUBMITTED -> "§a"
+                        SubmissionState.COMPLETED -> "§b"
+                    }
+                ),
+                GuiLoreLine.Data(i18n(player, "submitted_menu.reason_label"), protectionReasonText(player, reasons), "§f"),
+                GuiLoreLine.UserText(worldData.description.ifBlank { "-" })
+            )))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
@@ -151,10 +152,6 @@ class SubmittedWorldMenuProvider(
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_RETURN)
         return item
-    }
-
-    private fun lore(lines: List<String>): List<Component> {
-        return ChanponLore.build(lines)
     }
 
     private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): String {
