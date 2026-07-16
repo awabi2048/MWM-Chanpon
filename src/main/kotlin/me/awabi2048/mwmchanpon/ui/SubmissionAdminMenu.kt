@@ -12,10 +12,12 @@ import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
+import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.storage.SubmissionState
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.model.WorldData
+import me.awabi2048.myworldmanager.util.GuiLoreActions
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
@@ -34,6 +36,7 @@ import org.bukkit.inventory.ItemStack
 class SubmissionAdminMenu(
     private val plugin: MWMChanponPlugin,
     private val storage: ChanponWorldStorage,
+    private val globalStorage: ChanponGlobalStorage,
     private val protectionService: SubmittedWorldProtectionService,
     private val toolPermissionController: ToolPermissionController
 ) : Listener {
@@ -273,7 +276,7 @@ class SubmissionAdminMenu(
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "admin_menu.stats.display"))
             meta.lore(
-                lore(
+                ChanponLore.build(
                     i18nList(
                         player,
                         "admin_menu.stats.lore",
@@ -282,7 +285,7 @@ class SubmissionAdminMenu(
                             "total" to worlds.size,
                             "completed" to completed
                         )
-                    )
+                    ).map(GuiLoreLine::Text)
                 )
             )
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
@@ -308,6 +311,7 @@ class SubmissionAdminMenu(
     }
 
     private fun openProductionToggleConfirmation(player: Player, worldData: WorldData, source: SubmissionAdminMenuHolder) {
+        if (!canToggleProduction(player)) return
         val enabling = !storage.isProductionWorld(worldData.uuid)
         val holder = ProductionToggleConfirmationHolder(worldData.uuid, enabling, source.page, source.progressFilter, source.sortType)
         val key = if (enabling) "confirm.set_production" else "confirm.unset_production"
@@ -348,6 +352,7 @@ class SubmissionAdminMenu(
         when (ItemTag.getType(event.currentItem ?: return)) {
             ItemTag.TYPE_GUI_CANCEL -> open(player, holder.page, holder.progressFilter, holder.sortType)
             ItemTag.TYPE_GUI_CONFIRM -> {
+                if (!canToggleProduction(player)) return
                 val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(holder.worldUuid) ?: return
                 if (holder.enabling && ownerHasProductionWorld(worldData.owner, worldData.uuid)) {
                     player.sendMessage(i18nComponent(player, "admin_menu.production_limit"))
@@ -419,7 +424,15 @@ class SubmissionAdminMenu(
             add(GuiLoreLine.Data(i18n(player, "admin_menu.world.members_label"), memberLine, ""))
             add(GuiLoreLine.Data(i18n(player, "admin_menu.world.created_label"), created, "§f"))
             add(GuiLoreLine.Data(i18n(player, "admin_menu.world.production_label"), production, ""))
-            add(GuiLoreLine.Data(i18n(player, "admin_menu.world.state_label"), i18n(player, "state.${state.i18nKey}"), ""))
+            add(GuiLoreLine.Data(
+                i18n(player, "admin_menu.world.state_label"),
+                i18n(player, "state.${state.i18nKey}"),
+                when (state) {
+                    SubmissionState.UNSUBMITTED -> "§6"
+                    SubmissionState.SUBMITTED -> "§a"
+                    SubmissionState.COMPLETED -> "§b"
+                }
+            ))
             add(GuiLoreLine.Data(i18n(player, "admin_menu.world.completed_label"), completed, ""))
             add(GuiLoreLine.Spacer)
             add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.left"), i18n(player, "admin_menu.world.action_warp")))
@@ -434,7 +447,7 @@ class SubmissionAdminMenu(
         val item = ItemStack(Material.HEART_OF_THE_SEA)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "$key.display"))
-            meta.lore(lore(i18nList(player, "$key.lore")))
+            meta.lore(ChanponLore.build(i18nList(player, "$key.lore").map(GuiLoreLine::Text)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
@@ -445,7 +458,7 @@ class SubmissionAdminMenu(
         val item = ItemStack(Material.GOLDEN_APPLE)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "confirm.complete_unsubmitted.display"))
-            meta.lore(lore(i18nList(player, "confirm.complete_unsubmitted.lore")))
+            meta.lore(ChanponLore.build(i18nList(player, "confirm.complete_unsubmitted.lore").map(GuiLoreLine::Text)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
@@ -457,6 +470,19 @@ class SubmissionAdminMenu(
             ?.findAll()
             .orEmpty()
             .any { it.owner == ownerUuid && it.uuid != excludingWorldUuid && storage.isProductionWorld(it.uuid) }
+    }
+
+    private fun canToggleProduction(player: Player): Boolean {
+        val decision = MyWorldManagerApi.checkWorldCreation(
+            me.awabi2048.myworldmanager.api.extension.WorldCreationRequest(
+                actor = player,
+                player = player,
+                operation = me.awabi2048.myworldmanager.api.extension.WorldCreationOperation.PRODUCTION,
+                type = null
+            )
+        )
+        if (!decision.allowed) decision.denialMessage?.let(player::sendMessage)
+        return decision.allowed
     }
 
     private fun applyForcedTags(worldData: WorldData) {
@@ -542,8 +568,7 @@ class SubmissionAdminMenu(
                     add(GuiLoreLine.Option(i18n(player, optionKey), selected, "\u00A7f", "\u00A77"))
                 }
                 add(GuiLoreLine.Spacer)
-                add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.left"), i18n(player, "admin_menu.cycle.next")))
-                add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.right"), i18n(player, "admin_menu.cycle.previous")))
+                add(GuiLoreActions.cycle(mwm().languageManager, player))
             }, GuiLoreFrame.BOTH)
         )
         item.editMeta { meta ->
@@ -575,7 +600,7 @@ class SubmissionAdminMenu(
         val item = ItemStack(Material.REDSTONE_BLOCK)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "confirm.close_submissions.display"))
-            meta.lore(lore(i18nList(player, "confirm.close_submissions.lore")))
+            meta.lore(ChanponLore.build(i18nList(player, "confirm.close_submissions.lore").map(GuiLoreLine::Text)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
@@ -587,7 +612,7 @@ class SubmissionAdminMenu(
         val key = if (confirm) "confirm.button.confirm" else "confirm.button.cancel"
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "$key.display"))
-            meta.lore(lore(i18nList(player, "$key.lore")))
+            meta.lore(ChanponLore.build(i18nList(player, "$key.lore").map(GuiLoreLine::Text)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, if (confirm) ItemTag.TYPE_GUI_CONFIRM else ItemTag.TYPE_GUI_CANCEL)
@@ -609,7 +634,7 @@ class SubmissionAdminMenu(
         val item = ItemStack(material)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, displayKey, placeholders))
-            meta.lore(lore(i18nList(player, loreKey, placeholders)))
+            meta.lore(ChanponLore.build(i18nList(player, loreKey, placeholders).map(GuiLoreLine::Text)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, TYPE_MENU_CONTROL)
@@ -619,10 +644,6 @@ class SubmissionAdminMenu(
 
     private fun decoration(material: Material): ItemStack {
         return ChanponGuiElements.decoration(material)
-    }
-
-    private fun lore(lines: List<String>): List<Component> {
-        return ChanponLore.build(lines)
     }
 
     private fun structuredLore(lines: List<GuiLoreLine>): List<Component> {

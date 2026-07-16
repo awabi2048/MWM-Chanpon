@@ -4,8 +4,16 @@ import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiCycle
+import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiMenuIconAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuIconOption
+import com.awabi2048.ccsystem.api.gui.GuiMenuIconSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
+import me.awabi2048.mwmchanpon.storage.ChanponPhase
 import me.awabi2048.mwmchanpon.protection.SpawnWorldProtectionService
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
@@ -55,7 +63,7 @@ class ChanponAdminMenu(
         inventory.setItem(21, menuItem(player, Material.CHEST, "admin.world_data", ACTION_WORLD_DATA))
         inventory.setItem(23, menuItem(player, Material.CLOCK, "admin.automation", ACTION_AUTOMATION))
         inventory.setItem(25, menuItem(player, Material.DISPENSER, "admin.export", ACTION_EXPORT))
-        inventory.setItem(38, worldCreationItem(player))
+        inventory.setItem(38, phaseItem(player))
         inventory.setItem(40, switchToMwmItem(player))
         currentWorldUuid(player)?.let { worldUuid ->
             inventory.setItem(42, spawnWorldItem(player, worldUuid))
@@ -79,8 +87,13 @@ class ChanponAdminMenu(
                 ACTION_AUTOMATION -> openChild(player) { automationSettingsMenu.open(player) }
                 ACTION_EXPORT -> openChild(player) { worldDataExportMenu.open(player) }
                 ACTION_SWITCH_MWM -> mwm().adminCommandGui.open(player)
-                ACTION_WORLD_CREATION -> {
-                    MyWorldManagerApi.setWorldCreationEnabled(!MyWorldManagerApi.isWorldCreationEnabled())
+                ACTION_PHASE -> {
+                    val phase = GuiCycle.select(
+                        globalStorage.getPhase(),
+                        ChanponPhase.entries.toList(),
+                        reverse = event.isRightClick
+                    )
+                    plugin.setPhase(phase)
                     open(player)
                 }
                 ACTION_SET_SPAWN_WORLD -> {
@@ -116,7 +129,7 @@ class ChanponAdminMenu(
             menuItem(player, Material.COMPASS, "spawn_world.confirm.center", ACTION_NONE).also {
                 it.editMeta { meta ->
                     meta.displayName(i18nComponent(player, "spawn_world.confirm.center.display", mapOf("world" to worldData.name)))
-                    meta.lore(lore(i18nList(player, "spawn_world.confirm.center.lore", mapOf("world" to worldData.name))))
+                    meta.lore(ChanponLore.build(i18nList(player, "spawn_world.confirm.center.lore", mapOf("world" to worldData.name)).map(GuiLoreLine::Text)))
                 }
             },
             confirmButton(player, true),
@@ -146,7 +159,7 @@ class ChanponAdminMenu(
         val item = ItemStack(material)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "$key.display"))
-            meta.lore(lore(i18nList(player, "$key.lore")))
+            meta.lore(ChanponLore.build(i18nList(player, "$key.lore").map(GuiLoreLine::Text)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, TYPE_CONTROL)
@@ -162,21 +175,51 @@ class ChanponAdminMenu(
         }
     }
 
-    private fun worldCreationItem(player: Player): ItemStack {
-        val enabled = MyWorldManagerApi.isWorldCreationEnabled()
-        val key = if (enabled) "admin.world_creation.enabled" else "admin.world_creation.disabled"
-        val material = if (enabled) Material.LIME_DYE else Material.GRAY_DYE
-        val item = ItemStack(material)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "$key.display"))
-            meta.lore(structuredBlocks(listOf(
-                GuiLoreBlock(listOf(GuiLoreLine.Text(i18n(player, "$key.description")))),
-                GuiLoreBlock(listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "$key.action"))))
-            )))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
+    private fun phaseItem(player: Player): ItemStack {
+        val phase = globalStorage.getPhase()
+        val phaseKey = phase.name.lowercase()
+        val material = when (phase) {
+            ChanponPhase.BUILD_LOCKED -> Material.REDSTONE_BLOCK
+            ChanponPhase.CREATION_ALLOWED -> Material.CRAFTING_TABLE
+            ChanponPhase.PRODUCTION_ALLOWED -> Material.NETHER_STAR
         }
+        val item = CCSystem.getAPI().getGuiElementService().menuIcon(
+            GuiMenuIconSpec(
+                material = material,
+                name = GuiNameSpec.Text(phaseI18n(player, "selector.display"), GuiNameStyle.PRIMARY),
+                role = GuiElementRole.ACTION,
+                amount = 1,
+                description = listOf(phaseI18n(player, "state.$phaseKey.description")),
+                data = listOf(com.awabi2048.ccsystem.api.gui.GuiMenuIconData(phaseI18n(player, "selector.current"), phaseI18n(player, "state.$phaseKey.display"), "§e")),
+                options = ChanponPhase.entries.map { option ->
+                    GuiMenuIconOption(
+                        label = phaseI18n(player, "state.${option.name.lowercase()}.display"),
+                        selected = option == phase,
+                        selectedColor = "§a",
+                        inactiveColor = "§7"
+                    )
+                },
+                warnings = emptyList(),
+                dangers = emptyList(),
+                actions = listOf(
+                    GuiMenuIconAction(
+                        operation = mwm().languageManager.getMessage(player, "gui.settings.click.left"),
+                        action = phaseI18n(player, "state.next_action"),
+                        resolvedText = null,
+                        enabled = true
+                    ),
+                    GuiMenuIconAction(
+                        operation = mwm().languageManager.getMessage(player, "gui.settings.click.right"),
+                        action = phaseI18n(player, "state.previous_action"),
+                        resolvedText = null,
+                        enabled = true
+                    )
+                ),
+                glint = null
+            )
+        )
         ItemTag.tagItem(item, TYPE_CONTROL)
-        ItemTag.setString(item, ACTION_KEY, ACTION_WORLD_CREATION)
+        ItemTag.setString(item, ACTION_KEY, ACTION_PHASE)
         return item
     }
 
@@ -198,7 +241,7 @@ class ChanponAdminMenu(
         val item = ItemStack(Material.NETHER_STAR)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "admin.info.display"))
-            meta.lore(lore(i18nList(player, "admin.info.lore", mapOf("version" to plugin.pluginMeta.version))))
+            meta.lore(ChanponLore.build(i18nList(player, "admin.info.lore", mapOf("version" to plugin.pluginMeta.version)).map(GuiLoreLine::Text)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
@@ -230,10 +273,12 @@ class ChanponAdminMenu(
     private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nString(player, "chanpon.backup.$key", placeholders)
 
+    private fun phaseI18n(player: Player?, key: String) =
+        CCSystem.getAPI().getI18nString(player, "chanpon.phase.$key")
+
     private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
 
-    private fun lore(lines: List<String>) = ChanponLore.build(lines)
     private fun structuredBlocks(blocks: List<GuiLoreBlock>): List<Component> =
         CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(blocks))
 
@@ -258,7 +303,7 @@ class ChanponAdminMenu(
         private const val ACTION_AUTOMATION = "automation"
         private const val ACTION_EXPORT = "export"
         private const val ACTION_SWITCH_MWM = "switch_mwm"
-        private const val ACTION_WORLD_CREATION = "world_creation"
+        private const val ACTION_PHASE = "phase"
         private const val ACTION_SET_SPAWN_WORLD = "set_spawn_world"
         private const val ACTION_NONE = "none"
         private const val ROUTE_ADMIN_MENU = "chanpon.admin_menu"

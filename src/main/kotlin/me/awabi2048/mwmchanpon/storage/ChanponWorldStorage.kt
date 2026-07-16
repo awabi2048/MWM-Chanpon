@@ -1,10 +1,7 @@
 package me.awabi2048.mwmchanpon.storage
 
 import java.io.File
-import java.security.MessageDigest
-import java.security.SecureRandom
 import java.time.LocalDateTime
-import java.util.Base64
 import java.util.UUID
 import org.bukkit.configuration.file.YamlConfiguration
 
@@ -111,24 +108,23 @@ class ChanponWorldStorage(dataFolder: File) {
     }
 
     fun hasProtectionPassword(worldUuid: UUID): Boolean {
-        return load(worldUuid)?.getString("protection.password_hash").isNullOrBlank().not()
+        return getProtectionPassword(worldUuid) != null
+    }
+
+    fun getProtectionPassword(worldUuid: UUID): String? {
+        return load(worldUuid)?.getString("protection.password")?.takeIf { it.isNotBlank() }
     }
 
     fun setProtectionPassword(worldUuid: UUID, password: String) {
         val config = loadOrCreate(worldUuid)
-        config.set("protection.password_hash", hashPassword(password))
+        config.set("protection.password", password)
+        config.set("protection.password_hash", null)
         config.set("protection.password_updated_at", LocalDateTime.now().toString())
         config.save(worldFile(worldUuid))
     }
 
     fun matchesProtectionPassword(worldUuid: UUID, password: String): Boolean {
-        val stored = load(worldUuid)?.getString("protection.password_hash") ?: return false
-        val parts = stored.split(":")
-        if (parts.size != 3 || parts[0] != PASSWORD_HASH_VERSION) return false
-        val salt = runCatching { Base64.getUrlDecoder().decode(parts[1]) }.getOrNull() ?: return false
-        val expected = runCatching { Base64.getUrlDecoder().decode(parts[2]) }.getOrNull() ?: return false
-        val actual = digest(salt, password)
-        return MessageDigest.isEqual(expected, actual)
+        return getProtectionPassword(worldUuid) == password
     }
 
     fun initializeSubmissionState(worldUuid: UUID) {
@@ -275,26 +271,4 @@ class ChanponWorldStorage(dataFolder: File) {
         return YamlConfiguration.loadConfiguration(file)
     }
 
-    private fun hashPassword(password: String): String {
-        val salt = ByteArray(16)
-        RANDOM.nextBytes(salt)
-        val hash = digest(salt, password)
-        return listOf(
-            PASSWORD_HASH_VERSION,
-            Base64.getUrlEncoder().withoutPadding().encodeToString(salt),
-            Base64.getUrlEncoder().withoutPadding().encodeToString(hash)
-        ).joinToString(":")
-    }
-
-    private fun digest(salt: ByteArray, password: String): ByteArray {
-        val digest = MessageDigest.getInstance("SHA-256")
-        digest.update(salt)
-        digest.update(password.toByteArray(Charsets.UTF_8))
-        return digest.digest()
-    }
-
-    private companion object {
-        private const val PASSWORD_HASH_VERSION = "sha256"
-        private val RANDOM = SecureRandom()
-    }
 }

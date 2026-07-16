@@ -31,6 +31,7 @@ import me.awabi2048.myworldmanager.api.service.ExpansionSequencePhase
 import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.session.SettingsAction
 import me.awabi2048.myworldmanager.util.GuiHelper
+import me.awabi2048.myworldmanager.util.GuiItemFactory
 import me.awabi2048.myworldmanager.util.GuiLoreActions
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
@@ -59,6 +60,11 @@ class ChanponWorldSettingsMenuProvider(
 
     override fun open(player: Player, worldData: WorldData, request: WorldSettingsMenuRequest): Boolean {
         val mwm = mwm()
+        mwm.logWorldSettingsDebug(
+            "chanpon_open=request player=${player.name}/${player.uniqueId} world=${worldData.uuid} " +
+                "showBack=${request.showBackButton} playerFlow=${request.isPlayerWorldFlow} " +
+                "currentHolder=${player.openInventory.topInventory.holder?.javaClass?.name ?: "none"}"
+        )
         mwm.settingsSessionManager.updateSessionAction(
             player,
             worldData.uuid,
@@ -123,13 +129,28 @@ class ChanponWorldSettingsMenuProvider(
         fill(inventory)
         renderExtensions(inventory, player, worldData, request.showBackButton, isOwner, isModerator, isProtected)
         player.openInventory(inventory)
+        mwm.logWorldSettingsDebug(
+            "chanpon_open=inventory player=${player.name}/${player.uniqueId} world=${worldData.uuid} " +
+                "holder=${holder.javaClass.name} size=${inventory.size} protected=$isProtected"
+        )
         return true
     }
 
     @EventHandler(priority = EventPriority.LOWEST)
     fun onClick(event: InventoryClickEvent) {
         val player = event.whoClicked as? Player ?: return
-        when (val holder = event.view.topInventory.holder) {
+        val mwm = mwm()
+        val holder = event.view.topInventory.holder
+        if (holder is WorldSettingsInventoryHolder) {
+            val session = mwm.settingsSessionManager.getSession(player)
+            mwm.logWorldSettingsDebug(
+                "chanpon_click=received player=${player.name}/${player.uniqueId} " +
+                    "holder=${holder.javaClass.name} rawSlot=${event.rawSlot} click=${event.click} " +
+                    "action=${event.action} cancelled=${event.isCancelled} " +
+                    "session=${session?.action ?: "none"}/${session?.worldUuid ?: "none"}"
+            )
+        }
+        when (holder) {
             is SettingsHolder -> handleSettingsClick(event, player, holder.worldUuid)
             is ExpansionHolder -> handleExpansionClick(event, player, holder.worldUuid)
             is WarningHolder -> handleWarningClick(event, player, holder)
@@ -142,6 +163,17 @@ class ChanponWorldSettingsMenuProvider(
     private fun handleSettingsClick(event: InventoryClickEvent, player: Player, worldUuid: UUID) {
         event.cancelWithDebug("ChanponWorldSettingsMenuProvider.handleSettingsClick: menu_click")
         val mwm = mwm()
+        if (mwm.settingsSessionManager.getSession(player) == null) {
+            mwm.logWorldSettingsDebug(
+                "chanpon_click=session_recovery player=${player.name}/${player.uniqueId} world=$worldUuid"
+            )
+            mwm.settingsSessionManager.updateSessionAction(
+                player,
+                worldUuid,
+                SettingsAction.VIEW_SETTINGS,
+                isGui = false
+            )
+        }
         mwm.settingsSessionManager.getSession(player)?.let { it.isGuiTransition = false }
         if (event.clickedInventory != event.view.topInventory) return
         val item = event.currentItem ?: return
@@ -151,6 +183,11 @@ class ChanponWorldSettingsMenuProvider(
         val isModerator = worldData.moderators.contains(player.uniqueId)
 
         val type = ItemTag.getType(item)
+        mwm.logWorldSettingsDebug(
+            "chanpon_click=dispatch player=${player.name}/${player.uniqueId} world=$worldUuid " +
+                "itemType=${type ?: "none"} slot=${event.rawSlot} sessionAction=${session?.action ?: "none"}"
+        )
+        // オーバーレイはMWM公開APIで表現できる設定だけを処理し、未公開のタグ編集入口を再公開しない。
         if (type == ItemTag.TYPE_GUI_INFO && ItemTag.getWorldUuid(item) == worldData.uuid) {
             if (isCurrentWorld(player, worldData)) return
             mwm.soundManager.playClickSound(player, item, "world_settings")
@@ -160,7 +197,12 @@ class ChanponWorldSettingsMenuProvider(
                 worldData.uuid,
                 MwmWarpReason.DIRECT,
                 Runnable {
-                    Bukkit.getScheduler().runTask(plugin, Runnable {
+                    mwm.logWorldSettingsDebug(
+                        "chanpon_warp=callback player=${player.name}/${player.uniqueId} world=${worldData.uuid} " +
+                            "currentWorld=${player.world.name} holder=${player.openInventory.topInventory.holder?.javaClass?.name ?: "none"}"
+                    )
+                    mwm.settingsSessionManager.getSession(player)?.isGuiTransition = true
+                    Bukkit.getScheduler().runTaskLater(plugin, Runnable {
                         if (player.isOnline) {
                             player.sendMessage(
                                 mwm.languageManager.getMessage(
@@ -170,8 +212,13 @@ class ChanponWorldSettingsMenuProvider(
                                 )
                             )
                             open(player, worldData, currentRequest(player))
+                            mwm.settingsSessionManager.getSession(player)?.isGuiTransition = false
+                            mwm.logWorldSettingsDebug(
+                                "chanpon_warp=reopened player=${player.name}/${player.uniqueId} world=${worldData.uuid} " +
+                                    "holder=${player.openInventory.topInventory.holder?.javaClass?.name ?: "none"}"
+                            )
                         }
-                    })
+                    }, 3L)
                 }
             )
             return
@@ -266,10 +313,6 @@ class ChanponWorldSettingsMenuProvider(
             ItemTag.TYPE_GUI_SETTING_NOTIFICATION -> {
                 mwm.worldSettingsGui.toggleNotification(player, worldData)
                 open(player, worldData, currentRequest(player))
-            }
-            ItemTag.TYPE_GUI_SETTING_TAGS -> {
-                mwm.soundManager.playClickSound(player, item, "world_settings")
-                mwm.worldSettingsGui.openTagEditor(player, worldData)
             }
             ItemTag.TYPE_GUI_SETTING_ANNOUNCEMENT -> {
                 if (event.isLeftClick) {
@@ -711,8 +754,7 @@ class ChanponWorldSettingsMenuProvider(
                     add(GuiLoreLine.Option(displayName, selected, selectedColor, "\u00A77"))
                 }
                 add(GuiLoreLine.Spacer)
-                add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.left"), i18n(player, "publish.cycle_next_action")))
-                add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.right"), i18n(player, "publish.cycle_previous_action")))
+                add(GuiLoreActions.cycle(mwm().languageManager, player))
             }, GuiLoreFrame.BOTH)
         )
         return componentItem(Material.OAK_SIGN, i18n(player, "publish.title"), lore, ItemTag.TYPE_GUI_SETTING_PUBLISH)
@@ -725,10 +767,10 @@ class ChanponWorldSettingsMenuProvider(
         return componentItem(
             Material.FILLED_MAP,
             i18n(player, "expand.display"),
-            describedLore(
+            describedStructuredLore(
                 player,
-                mwm().languageManager.getMessageList(player, "gui.settings.expand.blocks.description"),
-                lines,
+                mwm().languageManager.getMessageList(player, "gui.settings.expand.blocks.description").map(GuiLoreLine::Text),
+                lines.map(GuiLoreLine::Text),
                 requireTargetWorld = true,
                 worldData = worldData
             ),
@@ -781,7 +823,7 @@ class ChanponWorldSettingsMenuProvider(
             i18n(player, "critical.display"),
             describedStructuredLore(
                 player,
-                mwm().languageManager.getMessageList(player, "gui.settings.critical.blocks.summary"),
+                mwm().languageManager.getMessageList(player, "gui.settings.critical.blocks.summary").map(GuiLoreLine::Text),
                 listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "critical.action"))),
                 requireTargetWorld = true,
                 worldData = worldData
@@ -814,7 +856,7 @@ class ChanponWorldSettingsMenuProvider(
             i18n(player, "critical.unavailable_display"),
             describedStructuredLore(
                 player,
-                mwm().languageManager.getMessageList(player, "gui.settings.critical.blocks.summary"),
+                mwm().languageManager.getMessageList(player, "gui.settings.critical.blocks.summary").map(GuiLoreLine::Text),
                 listOf(GuiLoreLine.Warning(i18n(player, loreKey)))
             ),
             ItemTag.TYPE_GUI_INFO
@@ -865,7 +907,7 @@ class ChanponWorldSettingsMenuProvider(
         return componentItem(icon, display, lore, type)
     }
 
-    private fun mwmDescription(player: Player, iconKey: String): List<String> {
+    private fun mwmDescription(player: Player, iconKey: String): List<GuiLoreLine> {
         val key = when (iconKey) {
             "info" -> "gui.settings.info.blocks.summary"
             "icon" -> "gui.settings.icon.blocks.description"
@@ -876,28 +918,12 @@ class ChanponWorldSettingsMenuProvider(
             "tour" -> "gui.tour.worldmenu.blocks.description"
             else -> return emptyList()
         }
-        return mwm().languageManager.getMessageList(player, key)
-    }
-
-    private fun describedLore(
-        player: Player,
-        description: List<String>,
-        existing: List<String>,
-        requireTargetWorld: Boolean = false,
-        worldData: WorldData? = null
-    ): List<Component> {
-        return describedStructuredLore(
-            player,
-            description,
-            existing.map { line -> if (line.isBlank()) GuiLoreLine.Spacer else GuiLoreLine.Raw(line) },
-            requireTargetWorld,
-            worldData
-        )
+        return mwm().languageManager.getMessageList(player, key).map(GuiLoreLine::Text)
     }
 
     private fun describedStructuredLore(
         player: Player,
-        description: List<String>,
+        description: List<GuiLoreLine>,
         existing: List<GuiLoreLine>,
         requireTargetWorld: Boolean = false,
         worldData: WorldData? = null
@@ -910,8 +936,8 @@ class ChanponWorldSettingsMenuProvider(
                     if (outsideTargetWorld) {
                         add(GuiLoreLine.Warning(i18n(player, "common.must_be_in_world_warning")))
                     }
-                    description.filter { it.isNotBlank() }.forEach { add(GuiLoreLine.Raw(it)) }
-                    if (description.any { it.isNotBlank() } && actionLines.any { it != GuiLoreLine.Spacer }) {
+                    addAll(description)
+                    if (description.isNotEmpty() && actionLines.any { it != GuiLoreLine.Spacer }) {
                         add(GuiLoreLine.Spacer)
                     }
                     addAll(actionLines)
@@ -1020,7 +1046,7 @@ class ChanponWorldSettingsMenuProvider(
         return item(Material.REDSTONE, i18n(player, "common.back"), emptyList(), ItemTag.TYPE_GUI_RETURN)
     }
 
-    private fun item(material: Material, display: String, loreLines: List<String>, type: String): ItemStack {
+    private fun item(material: Material, display: String, loreLines: List<GuiLoreLine>, type: String): ItemStack {
         val item = ItemStack(material)
         item.editMeta { meta ->
             meta.displayName(CCSystem.getAPI().getGuiElementService().name(display))

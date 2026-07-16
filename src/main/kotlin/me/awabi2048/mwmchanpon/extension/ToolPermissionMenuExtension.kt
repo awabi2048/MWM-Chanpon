@@ -96,7 +96,7 @@ class ToolPermissionMenuExtension(
         } else {
             lines.add(GuiLoreLine.Data(i18n(player, "tool_permission_title"), null, ""))
             enabledTools.forEach { def ->
-                lines.add(GuiLoreLine.Raw("§8・${def.color}${def.displayName}"))
+                lines.add(GuiLoreLine.Option(def.displayName, true, def.color, "§7"))
             }
         }
 

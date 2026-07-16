@@ -2,6 +2,7 @@ package me.awabi2048.mwmchanpon.ui
 
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.backup.BackupKind
 import me.awabi2048.mwmchanpon.backup.BackupOperationStatus
@@ -172,7 +173,7 @@ class AutomationSettingsMenu(
         val item = ItemStack(material)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "$key.display", placeholders))
-            meta.lore(lore(i18nList(player, "$key.lore", placeholders)))
+            meta.lore(ChanponLore.build(i18nList(player, "$key.lore", placeholders).map(GuiLoreLine::Text)))
             meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ATTRIBUTES, org.bukkit.inventory.ItemFlag.HIDE_ENCHANTS)
         }
         ItemTag.tagItem(item, TYPE_CONTROL)
@@ -184,7 +185,7 @@ class AutomationSettingsMenu(
         val item = ItemStack(material)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "$key.display", placeholders))
-            meta.lore(lore(i18nList(player, "$key.lore", placeholders)))
+            meta.lore(ChanponLore.build(i18nList(player, "$key.lore", placeholders).map(GuiLoreLine::Text)))
             meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
@@ -212,8 +213,6 @@ class AutomationSettingsMenu(
         CCSystem.getAPI().getI18nComponent(player, "chanpon.backup.$key", placeholders)
     private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
-    private fun lore(lines: List<String>) = ChanponLore.build(lines)
-
     private fun mwm(): me.awabi2048.myworldmanager.MyWorldManager =
         org.bukkit.plugin.java.JavaPlugin.getPlugin(me.awabi2048.myworldmanager.MyWorldManager::class.java)
 

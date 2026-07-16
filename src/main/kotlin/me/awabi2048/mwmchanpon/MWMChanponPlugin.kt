@@ -4,11 +4,13 @@ import com.awabi2048.ccsystem.CCSystem
 import me.awabi2048.mwmchanpon.backup.BackupService
 import me.awabi2048.mwmchanpon.bridge.CoreApiBridge
 import me.awabi2048.mwmchanpon.extension.ChanponCommandExtension
+import me.awabi2048.mwmchanpon.extension.ChanponWorldCreationGuard
 import me.awabi2048.mwmchanpon.extension.ChanponWorldAccessPolicy
 import me.awabi2048.mwmchanpon.extension.ChanponWorldMenuAccessProvider
 import me.awabi2048.mwmchanpon.extension.ChanponWorldPortalPolicy
 import me.awabi2048.mwmchanpon.extension.ChanponWorldPublishPolicy
 import me.awabi2048.mwmchanpon.extension.ChanponWorldRuntimePolicy
+import me.awabi2048.mwmchanpon.extension.ChanponWorldPlayerStatePolicy
 import me.awabi2048.mwmchanpon.extension.ChanponWorldWorkPermissionPolicy
 import me.awabi2048.mwmchanpon.extension.LinkedPortalMenuExtension
 import me.awabi2048.mwmchanpon.extension.ProductionToggleExtension
@@ -33,6 +35,8 @@ import me.awabi2048.mwmchanpon.service.WorldDataExportService
 import me.awabi2048.mwmchanpon.service.ArchiveService
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
+import me.awabi2048.mwmchanpon.storage.ChanponPhase
+import me.awabi2048.mwmchanpon.command.ChanponAdminCommand
 import me.awabi2048.mwmchanpon.tool.LuckPermsToolPermissionService
 import me.awabi2048.mwmchanpon.tool.ToolPermissionConfig
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
@@ -48,6 +52,7 @@ import me.awabi2048.mwmchanpon.ui.SubmittedWorldMenuProvider
 import me.awabi2048.mwmchanpon.ui.ToolPermissionMenu
 import me.awabi2048.mwmchanpon.ui.WorldDataExportMenu
 import me.awabi2048.mwmchanpon.ui.WorldDataManagementMenu
+import me.awabi2048.mwmchanpon.ui.bedrock.AdminWizardForm
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import net.luckperms.api.LuckPermsProvider
 import org.bukkit.entity.Player
@@ -84,6 +89,10 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var worldRuntimePolicy: ChanponWorldRuntimePolicy
     private lateinit var worldWorkPermissionPolicy: ChanponWorldWorkPermissionPolicy
     private lateinit var commandExtension: ChanponCommandExtension
+    private lateinit var worldCreationGuard: ChanponWorldCreationGuard
+    private lateinit var worldPlayerStatePolicy: ChanponWorldPlayerStatePolicy
+    private lateinit var globalStorage: ChanponGlobalStorage
+    private lateinit var adminCommand: ChanponAdminCommand
     private lateinit var spawnWorldService: ChanponSpawnWorldService
     private lateinit var toolController: ToolPermissionController
     private lateinit var spawnProtectionService: SpawnWorldProtectionService
@@ -97,7 +106,7 @@ class MWMChanponPlugin : JavaPlugin() {
         }
 
         val chanponStorage = ChanponWorldStorage(dataFolder)
-        val globalStorage = ChanponGlobalStorage(dataFolder)
+        globalStorage = ChanponGlobalStorage(dataFolder)
         spawnWorldService = ChanponSpawnWorldService(this, globalStorage)
         val luckPerms = LuckPermsProvider.get()
         spawnProtectionService = SpawnWorldProtectionService()
@@ -141,12 +150,14 @@ class MWMChanponPlugin : JavaPlugin() {
         productionToggleExtension = ProductionToggleExtension(
             this,
             chanponStorage,
+            globalStorage,
             submittedProtectionService,
             toolController
         )
         submissionAdminMenu = SubmissionAdminMenu(
             this,
             chanponStorage,
+            globalStorage,
             submittedProtectionService,
             toolController
         )
@@ -168,6 +179,10 @@ class MWMChanponPlugin : JavaPlugin() {
         worldPublishPolicy = ChanponWorldPublishPolicy(chanponStorage)
         worldRuntimePolicy = ChanponWorldRuntimePolicy()
         commandExtension = ChanponCommandExtension(this, globalStorage)
+        worldCreationGuard = ChanponWorldCreationGuard(globalStorage)
+        worldPlayerStatePolicy = ChanponWorldPlayerStatePolicy(globalStorage)
+        MyWorldManagerApi.registerWorldCreationGuard(worldCreationGuard)
+        MyWorldManagerApi.registerWorldPlayerStatePolicy(worldPlayerStatePolicy)
         MyWorldManagerApi.registerWorldDeleteGuard(productionWorldGuard)
         MyWorldManagerApi.registerMenuExtension(productionToggleExtension)
         MyWorldManagerApi.registerAdminWorldListProvider(chanponAdminWorldListMenu)
@@ -184,6 +199,15 @@ class MWMChanponPlugin : JavaPlugin() {
         MyWorldManagerApi.registerWorldRuntimePolicy(worldRuntimePolicy)
         MyWorldManagerApi.registerAdminMenuProvider(chanponAdminMenu)
         MyWorldManagerApi.registerCommandPolicy(commandExtension)
+        adminCommand = ChanponAdminCommand(
+            chanponAdminMenu,
+            archiveService,
+            AdminWizardForm(this)
+        )
+        getCommand("chanpon-mwm")?.let { command ->
+            command.setExecutor(adminCommand)
+            command.tabCompleter = adminCommand
+        }
         server.pluginManager.registerEvents(productionToggleExtension, this)
         server.pluginManager.registerEvents(submissionAdminMenu, this)
         server.pluginManager.registerEvents(chanponAdminMenu, this)
@@ -297,6 +321,12 @@ class MWMChanponPlugin : JavaPlugin() {
         if (::commandExtension.isInitialized) {
             MyWorldManagerApi.unregisterCommandPolicy(commandExtension)
         }
+        if (::worldCreationGuard.isInitialized) {
+            MyWorldManagerApi.unregisterWorldCreationGuard(worldCreationGuard)
+        }
+        if (::worldPlayerStatePolicy.isInitialized) {
+            MyWorldManagerApi.unregisterWorldPlayerStatePolicy(worldPlayerStatePolicy)
+        }
         if (::automationService.isInitialized) {
             automationService.stop()
         }
@@ -305,6 +335,12 @@ class MWMChanponPlugin : JavaPlugin() {
         }
         runCatching { CCSystem.getAPI().getMenuNavigationService().unregisterOwner(MENU_OWNER) }
         logger.info("MWM-Chanpon addon has been disabled.")
+    }
+
+    fun setPhase(phase: ChanponPhase) {
+        globalStorage.setPhase(phase)
+        // フェーズ変更を保存した直後に、現在オンラインの全プレイヤーへ状態を反映する。
+        MyWorldManagerApi.syncOnlineWorldPlayerStates()
     }
 
     fun getMessage(player: Player?, key: String, vararg placeholders: Pair<String, Any>): String {

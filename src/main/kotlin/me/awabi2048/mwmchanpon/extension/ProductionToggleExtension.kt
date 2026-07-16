@@ -10,6 +10,8 @@ import java.util.concurrent.ConcurrentHashMap
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
+import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
+import me.awabi2048.mwmchanpon.storage.ChanponPhase
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.SubmissionState
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
@@ -43,6 +45,7 @@ import org.bukkit.plugin.java.JavaPlugin
 class ProductionToggleExtension(
     private val plugin: MWMChanponPlugin,
     private val storage: ChanponWorldStorage,
+    private val globalStorage: ChanponGlobalStorage,
     private val protectionService: SubmittedWorldProtectionService,
     private val toolPermissionController: ToolPermissionController
 ) : MenuExtension, Listener {
@@ -61,12 +64,14 @@ class ProductionToggleExtension(
         when (context.menuType) {
             "creation_confirm" -> {
                 val session = context.get<WorldCreationSession>("session") ?: return
+                if (globalStorage.getPhase() != ChanponPhase.PRODUCTION_ALLOWED) return
                 if (ownerHasProductionWorld(player.uniqueId, null)) return
                 val enabled = session.extras[EXTRA_KEY] as? Boolean ?: false
                 inventory.setItem(plugin.config.getInt("production.menu_slot", 40), createCreationItem(enabled))
             }
             "world_settings" -> {
                 if (context.get<Boolean>("isProtected") == true) return
+                if (globalStorage.getPhase() != ChanponPhase.PRODUCTION_ALLOWED) return
                 val worldData = context.get<WorldData>("worldData") ?: return
                 if (plugin.isSubmissionClosed()) {
                     inventory.setItem(WORLD_MENU_SLOT, createDecorationItem(Material.GRAY_STAINED_GLASS_PANE))
@@ -98,6 +103,8 @@ class ProductionToggleExtension(
         storage.initializeSubmissionState(event.worldUuid)
         val enabled = pendingProduction.remove(event.ownerUuid to event.worldName) ?: return
         if (enabled) {
+            val owner = Bukkit.getPlayer(event.ownerUuid)
+            if (owner == null || !canUseProduction(owner)) return
             if (ownerHasProductionWorld(event.ownerUuid, event.worldUuid)) return
             storage.setProductionWorld(event.worldUuid, true)
             applyForcedTags(event.worldUuid)
@@ -119,6 +126,7 @@ class ProductionToggleExtension(
     ): Boolean {
         if (ItemTag.getString(item, "chanpon_action") != ACTION_TOGGLE_PRODUCTION) return false
         val session = context.get<WorldCreationSession>("session") ?: return false
+        if (!canUseProduction(player)) return true
         val next = !(session.extras[EXTRA_KEY] as? Boolean ?: false)
         if (next && ownerHasProductionWorld(player.uniqueId, null)) {
             player.sendMessage(i18n(player, "message.production_limit"))
@@ -140,6 +148,7 @@ class ProductionToggleExtension(
         val worldData = context.get<WorldData>("worldData") ?: return false
         when (ItemTag.getString(item, "chanpon_action")) {
             ACTION_SET_PRODUCTION -> {
+                if (!canUseProduction(player)) return true
                 mwm().soundManager.playClickSound(player, item, "world_settings")
                 if (ownerHasProductionWorld(worldData.owner, worldData.uuid)) {
                     player.sendMessage(i18n(player, "message.production_limit"))
@@ -256,6 +265,7 @@ class ProductionToggleExtension(
     private fun executeConfirmedAction(player: Player, worldUuid: UUID, action: ConfirmationAction) {
         when (action) {
             ConfirmationAction.SET_PRODUCTION -> {
+                if (!canUseProduction(player)) return
                 val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
                 if (worldData != null && ownerHasProductionWorld(worldData.owner, worldUuid)) {
                     player.sendMessage(i18n(player, "message.production_limit"))
@@ -335,17 +345,30 @@ class ProductionToggleExtension(
             .any { it.owner == ownerUuid && it.uuid != excludingWorldUuid && storage.isProductionWorld(it.uuid) }
     }
 
+    private fun canUseProduction(player: Player): Boolean {
+        val decision = MyWorldManagerApi.checkWorldCreation(
+            me.awabi2048.myworldmanager.api.extension.WorldCreationRequest(
+                actor = player,
+                player = player,
+                operation = me.awabi2048.myworldmanager.api.extension.WorldCreationOperation.PRODUCTION,
+                type = null
+            )
+        )
+        if (!decision.allowed) decision.denialMessage?.let(player::sendMessage)
+        return decision.allowed
+    }
+
     private fun createCreationItem(enabled: Boolean): ItemStack {
         val item = ItemStack(if (enabled) Material.YELLOW_WOOL else Material.GRAY_WOOL)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(null, "creation.display"))
-            meta.lore(lore(listOf(
-                i18n(null, "creation.lore.description"),
-                i18n(null, "creation.lore.delete_guard"),
-                i18n(
-                    null,
-                    "creation.lore.state",
-                    mapOf("state" to i18n(null, if (enabled) "common.on" else "common.off"))
+            meta.lore(structuredLore(listOf(
+                GuiLoreLine.Text(i18n(null, "creation.lore.description")),
+                GuiLoreLine.Warning(i18n(null, "creation.lore.delete_guard")),
+                GuiLoreLine.Data(
+                    i18n(null, "creation.lore.state"),
+                    i18n(null, if (enabled) "common.on" else "common.off"),
+                    if (enabled) "§e" else "§7"
                 )
             )))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
@@ -387,7 +410,7 @@ class ProductionToggleExtension(
             }
         )
         item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "state.${state.i18nKey}"))
+            meta.displayName(i18nComponent(player, "submission.display"))
             meta.lore(createSubmissionLore(player, state))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
@@ -403,13 +426,24 @@ class ProductionToggleExtension(
             SubmissionState.SUBMITTED -> "submission.lore.submitted"
             SubmissionState.COMPLETED -> "submission.lore.completed"
         }
+        val stateLine = GuiLoreLine.Data(
+            i18n(player, "progress.label"),
+            i18n(player, "state.${state.i18nKey}"),
+            when (state) {
+                SubmissionState.UNSUBMITTED -> "§6"
+                SubmissionState.SUBMITTED -> "§a"
+                SubmissionState.COMPLETED -> "§b"
+            }
+        )
         return when (state) {
             SubmissionState.UNSUBMITTED -> structuredLore(listOf(
+                stateLine,
                 GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "$key.action")),
                 GuiLoreLine.Warning(i18n(player, "$key.warning"))
             ))
             SubmissionState.SUBMITTED,
             SubmissionState.COMPLETED -> structuredLore(listOf(
+                stateLine,
                 GuiLoreLine.Text(i18n(player, "$key.description")),
                 GuiLoreLine.Warning(i18n(player, "$key.warning"))
             ))
@@ -420,7 +454,7 @@ class ProductionToggleExtension(
         val item = ItemStack(Material.BARRIER)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "error.display"))
-            meta.lore(lore(i18nList(player, "error.lore")))
+            meta.lore(ChanponLore.build(i18nList(player, "error.lore").map(GuiLoreLine::Text)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
@@ -433,7 +467,7 @@ class ProductionToggleExtension(
         val item = ItemStack(action.material)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "confirm.${action.key}.display"))
-            meta.lore(lore(i18nList(player, "confirm.${action.key}.lore")))
+            meta.lore(ChanponLore.build(i18nList(player, "confirm.${action.key}.lore").map(GuiLoreLine::Text)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
@@ -458,10 +492,6 @@ class ProductionToggleExtension(
 
     private fun createDecorationItem(material: Material): ItemStack {
         return ChanponGuiElements.decoration(material)
-    }
-
-    private fun lore(lines: List<String>): List<Component> {
-        return ChanponLore.build(lines)
     }
 
     private fun structuredLore(lines: List<GuiLoreLine>): List<Component> {

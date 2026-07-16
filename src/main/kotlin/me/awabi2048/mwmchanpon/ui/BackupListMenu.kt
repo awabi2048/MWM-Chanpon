@@ -321,7 +321,7 @@ class BackupListMenu(
         val item = ItemStack(Material.BOOK)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "backup_list.info.display"))
-            meta.lore(lore(i18nList(player, "backup_list.info.lore", mapOf("count" to count, "page" to page, "pages" to pages))))
+            meta.lore(ChanponLore.build(i18nList(player, "backup_list.info.lore", mapOf("count" to count, "page" to page, "pages" to pages)).map(GuiLoreLine::Text)))
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
         return item
@@ -331,7 +331,7 @@ class BackupListMenu(
         val item = ItemStack(material)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "$key.display"))
-            meta.lore(lore(i18nList(player, "$key.lore")))
+            meta.lore(ChanponLore.build(i18nList(player, "$key.lore").map(GuiLoreLine::Text)))
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
         return item
@@ -357,7 +357,6 @@ class BackupListMenu(
         CCSystem.getAPI().getI18nComponent(player, "chanpon.backup.$key", placeholders)
     private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
-    private fun lore(lines: List<String>) = ChanponLore.build(lines)
     private fun structuredBlocks(blocks: List<GuiLoreBlock>): List<Component> =
         CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(blocks))
 

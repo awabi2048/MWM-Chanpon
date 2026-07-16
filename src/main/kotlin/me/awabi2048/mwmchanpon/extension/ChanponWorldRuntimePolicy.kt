@@ -1,7 +1,7 @@
 package me.awabi2048.mwmchanpon.extension
 
 import me.awabi2048.myworldmanager.api.extension.WorldRuntimePolicy
-import me.awabi2048.myworldmanager.session.WorldCreationType
+import me.awabi2048.myworldmanager.api.extension.WorldCreationType
 
 class ChanponWorldRuntimePolicy : WorldRuntimePolicy {
     override fun getId(): String = "mwmchanpon.world_runtime"

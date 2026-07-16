@@ -128,7 +128,7 @@ class WorldDataExportMenu(
         val item = ItemStack(Material.BOOK)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "export_menu.info.display"))
-            meta.lore(lore(i18nList(player, "export_menu.info.lore", mapOf("count" to count, "page" to page, "pages" to pages))))
+            meta.lore(ChanponLore.build(i18nList(player, "export_menu.info.lore", mapOf("count" to count, "page" to page, "pages" to pages)).map(GuiLoreLine::Text)))
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
         return item
@@ -171,7 +171,6 @@ class WorldDataExportMenu(
     private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
 
-    private fun lore(lines: List<String>) = ChanponLore.build(lines)
     private fun structuredBlocks(blocks: List<GuiLoreBlock>): List<Component> =
         CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(blocks))
 

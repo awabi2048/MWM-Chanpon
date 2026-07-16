@@ -18,6 +18,8 @@ import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.PlayerWorldMenuProvider
 import me.awabi2048.myworldmanager.api.extension.PlayerWorldMenuRequest
+import me.awabi2048.myworldmanager.api.extension.WorldCreationOperation
+import me.awabi2048.myworldmanager.api.extension.WorldCreationRequest
 import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.session.SettingsAction
 import me.awabi2048.myworldmanager.util.GuiLoreActions
@@ -208,45 +210,24 @@ class ChanponPlayerWorldMenuProvider(
                 lang.getComponent(player, "gui.common.world_item_name", mapOf("world" to world.name))
                     .decoration(TextDecoration.ITALIC, false)
             )
-            val description = if (world.description.isNotBlank()) {
-                lang.getMessage(player, "gui.common.world_desc", mapOf("description" to world.description))
-            } else {
-                ""
-            }
             val ownerName = Bukkit.getOfflinePlayer(world.owner).name ?: lang.getMessage(player, "general.unknown")
-            val ownerLine = lang.getMessage(player, "gui.player_world.world_item.owner", mapOf("owner" to ownerName))
-            val publishLine = lang.getMessage(
-                player,
-                "gui.player_world.world_item.publish",
-                mapOf("level" to visibilityName(player, storage.getVisibility(world.uuid)), "status_color" to "")
-            )
             val progressLine = SubmissionProgressDisplay.loreLine(player, storage, world.uuid)
-            val tagLine = if (world.tags.isNotEmpty()) {
-                val tagNames = world.tags.joinToString(", ") { mwm.worldTagManager.getDisplayName(player, it) }
-                lang.getMessage(player, "gui.player_world.world_item.tag", mapOf("tags" to tagNames))
-            } else {
-                ""
-            }
-            val expiresAtLine = if (world.isArchived) {
-                lang.getMessage(player, "gui.player_world.world_item.expired")
-            } else {
-                ""
-            }
+            val tagNames = world.tags.joinToString(", ") { mwm.worldTagManager.getDisplayName(player, it) }
             val warpAction = lang.getMessage(player, "gui.player_world.world_item.warp")
             val settingsAction = lang.getMessage(player, "gui.player_world.world_item.settings")
             val isCurrentWorld = isCurrentWorld(player, world)
             // Chanpon changes domain values only; MWM and CC-System retain the shared block layout contract.
             meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(buildList {
-                if (description.isNotBlank()) add(GuiLoreBlock(listOf(GuiLoreLine.Raw(description))))
+                if (world.description.isNotBlank()) add(GuiLoreBlock(listOf(GuiLoreLine.Text(world.description))))
                 add(GuiLoreBlock(
                     buildList {
-                        add(GuiLoreLine.Raw(ownerLine))
-                        add(GuiLoreLine.Raw(publishLine))
+                        add(GuiLoreLine.Data(CCSystem.getAPI().getI18nString(player, "gui_data.owner"), ownerName, "§f"))
+                        add(GuiLoreLine.Data(CCSystem.getAPI().getI18nString(player, "gui_data.visibility"), visibilityName(player, storage.getVisibility(world.uuid)), "§e"))
                         progressLine?.let(::add)
-                        tagLine.takeIf(String::isNotBlank)?.let { add(GuiLoreLine.Raw(it)) }
+                        tagNames.takeIf(String::isNotBlank)?.let { add(GuiLoreLine.Data(CCSystem.getAPI().getI18nString(player, "gui_data.tags"), it, "§f")) }
                     }
                 ))
-                if (expiresAtLine.isNotBlank()) add(GuiLoreBlock(listOf(GuiLoreLine.Raw(expiresAtLine))))
+                if (world.isArchived) add(GuiLoreBlock(listOf(GuiLoreLine.Danger(lang.getMessage(player, "gui.player_world.world_item.expired")))))
                 add(GuiLoreBlock(buildList {
                     if (isCurrentWorld) {
                         add(GuiLoreActions.singleClick(lang, player, settingsAction))
@@ -299,7 +280,7 @@ class ChanponPlayerWorldMenuProvider(
         val item = ItemStack(Material.BARRIER)
         item.editMeta { meta ->
             meta.displayName(mwm().languageManager.getComponent(player, reason.displayKey))
-            meta.lore(ChanponLore.build(mwm().languageManager.getMessageList(player, reason.loreKey)))
+            meta.lore(ChanponLore.build(mwm().languageManager.getMessageList(player, reason.loreKey).map(GuiLoreLine::Text)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
@@ -418,9 +399,11 @@ class ChanponPlayerWorldMenuProvider(
     private fun creationBlockReason(player: Player, currentCreateCount: Int, maxCreateCount: Int): CreationBlockReason? {
         // 作成権限不足は Chanpon 側の作成導線でも MWM 本体と同じ理由表示に揃える。
         if (!hasCreatePermission(player)) return CreationBlockReason.NO_PERMISSION
+        val creationDecision = MyWorldManagerApi.checkWorldCreation(
+            WorldCreationRequest(player, player, WorldCreationOperation.NORMAL, null)
+        )
+        if (!creationDecision.allowed) return CreationBlockReason.POLICY_DENIED
         if (canBypassWorldLimits(player)) return null
-        // MWM本体の作成停止フラグを唯一の運用フラグとして扱う。
-        if (!MyWorldManagerApi.isWorldCreationEnabled()) return CreationBlockReason.PERIOD_DISABLED
         if (currentCreateCount >= maxCreateCount) return CreationBlockReason.NO_SLOT
         return null
     }
@@ -446,9 +429,9 @@ class ChanponPlayerWorldMenuProvider(
     private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)
 
     private enum class CreationBlockReason(val displayKey: String, val loreKey: String) {
-        PERIOD_DISABLED(
-            "gui.player_world.creation_unavailable.period_disabled.display",
-            "gui.player_world.creation_unavailable.period_disabled.lore"
+        POLICY_DENIED(
+            "gui.player_world.creation_unavailable.policy_denied.display",
+            "gui.player_world.creation_unavailable.policy_denied.lore"
         ),
         NO_SLOT(
             "gui.player_world.creation_unavailable.no_slot.display",
