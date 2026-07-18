@@ -1,6 +1,8 @@
 package me.awabi2048.mwmchanpon
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.MenuTargetPolicy
+import com.awabi2048.ccsystem.api.gui.PublicMenuDefinition
 import me.awabi2048.mwmchanpon.backup.BackupService
 import me.awabi2048.mwmchanpon.bridge.CoreApiBridge
 import me.awabi2048.mwmchanpon.extension.ChanponCommandExtension
@@ -100,7 +102,26 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var easyVoidWorldCreationService: EasyVoidWorldCreationService
 
     override fun onEnable() {
-        saveDefaultConfig()
+        CCSystem.getAPI().getConfigSchemaService().register(
+            "mwm-chanpon",
+            listOf(
+                com.awabi2048.ccsystem.api.config.ManagedConfigSpec(
+                    owner = "mwm-chanpon",
+                    sourcePlugin = this,
+                    resourcePath = "config.yml",
+                    targetPath = dataFolder.resolve("config.yml").toPath(),
+                    currentVersion = 1,
+                    classification = com.awabi2048.ccsystem.api.config.ConfigClassification.MANAGED_CONFIG,
+                    migrations = emptyMap(),
+                    validator = com.awabi2048.ccsystem.api.config.ConfigValidator {},
+                    reloadAction = { reloadConfig() }
+                )
+            )
+        )
+        check(CCSystem.getAPI().getConfigSchemaService().prepare("mwm-chanpon").successful) {
+            "MWM-Chanpon Config preparation failed"
+        }
+        reloadConfig()
         CCSystem.getAPI().getMenuNavigationService().registerMenuMatcher(MENU_OWNER) { inventory ->
             inventory.holder?.javaClass?.name?.startsWith("me.awabi2048.mwmchanpon") == true
         }
@@ -162,6 +183,20 @@ class MWMChanponPlugin : JavaPlugin() {
             toolController
         )
         chanponAdminMenu = ChanponAdminMenu(this, globalStorage, spawnProtectionService, submissionAdminMenu, worldDataManagementMenu, automationSettingsMenu, worldDataExportMenu)
+        CCSystem.getAPI().getMenuCommandService().unregisterOwner("mwm-chanpon")
+        CCSystem.getAPI().getMenuCommandService().register(
+            PublicMenuDefinition(
+                owner = "mwm-chanpon",
+                id = "admin",
+                permission = "mwmchanpon.admin",
+                targetPolicy = MenuTargetPolicy.SELF_ONLY,
+                argumentKeys = emptySet(),
+                opener = { player, _ ->
+                    chanponAdminMenu.open(player)
+                    true
+                }
+            )
+        )
         submissionAdminMenu.setParentMenuOpener(chanponAdminMenu::open)
         worldDataManagementMenu.setParentMenuOpener(chanponAdminMenu::open)
         worldDataExportMenu.setParentMenuOpener(chanponAdminMenu::open)
@@ -264,6 +299,8 @@ class MWMChanponPlugin : JavaPlugin() {
     }
 
     override fun onDisable() {
+        runCatching { CCSystem.getAPI().getConfigSchemaService().unregister("mwm-chanpon") }
+        runCatching { CCSystem.getAPI().getMenuCommandService().unregisterOwner("mwm-chanpon") }
         runCatching {
             CCSystem.getAPI().getMenuNavigationService().closeOwnedMenus(MENU_OWNER, server.onlinePlayers)
         }

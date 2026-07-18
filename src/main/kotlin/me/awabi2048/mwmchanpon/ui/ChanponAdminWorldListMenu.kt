@@ -353,7 +353,8 @@ class ChanponAdminWorldListMenu(
     private fun worldDirectory(worldData: WorldData): String = worldData.customWorldName ?: "my_world.${worldData.uuid}"
 
     private fun worldFolder(worldData: WorldData): java.io.File {
-        return java.io.File(Bukkit.getWorldContainer(), worldDirectory(worldData))
+        return MyWorldManagerApi.getWorldService()?.getWorldDirectory(worldData)
+            ?: java.io.File(plugin.dataFolder, "unavailable")
     }
 
     private fun folderSize(file: java.io.File): Long {

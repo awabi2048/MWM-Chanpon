@@ -51,7 +51,7 @@ class WorldDataExportService(
     private fun exportWorlds(worlds: List<WorldData>, label: String): CompletableFuture<WorldDataExportResult> {
         val core = MyWorldManagerApi.getWorldService()
             ?: return CompletableFuture.completedFuture(WorldDataExportResult(false, null, "core api unavailable"))
-        val levelDataDir = File(Bukkit.getWorldContainer(), "level/data")
+        val levelDataDir = File(core.getMainWorldDataDirectory(), "data")
         if (!levelDataDir.isDirectory) {
             return CompletableFuture.completedFuture(WorldDataExportResult(false, null, "level data directory is missing"))
         }

@@ -56,3 +56,4 @@ backup:
       scheduled: 14
       restore_point: 5
       pre_rollback: 10
+config_version: 1

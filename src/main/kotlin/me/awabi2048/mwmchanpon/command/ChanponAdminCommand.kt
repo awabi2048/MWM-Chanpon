@@ -29,8 +29,12 @@ class ChanponAdminCommand(
             sender.sendMessage(message(null, "chanpon.phase.command.player_only"))
             return true
         }
-        adminMenu.open(sender)
-        return true
+        return CCSystem.getAPI().getMenuCommandService().open(
+            sender,
+            sender,
+            "mwm-chanpon:admin",
+            emptyMap()
+        )
     }
 
     private fun handleSubCommand(sender: CommandSender, args: Array<out String>): Boolean {

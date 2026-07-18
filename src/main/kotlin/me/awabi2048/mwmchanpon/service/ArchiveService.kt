@@ -191,6 +191,9 @@ class ArchiveService(
                     throw IllegalStateException("manifest_missing")
                 }
                 val manifest = YamlConfiguration.loadConfiguration(manifestFile)
+                if (manifest.getInt("schema_version", 0) != ARCHIVE_SCHEMA_VERSION) {
+                    throw IllegalStateException("archive_schema_unsupported")
+                }
                 val worldEntries = manifest.getMapList("worlds")
                 if (worldEntries.isEmpty()) {
                     throw IllegalStateException("archive_empty")
@@ -199,6 +202,8 @@ class ArchiveService(
                     val uuid = runCatching { UUID.fromString(entry["uuid"]?.toString()) }.getOrNull()
                         ?: return@mapNotNull null
                     val worldData = readWorldData(tempDir, uuid) ?: return@mapNotNull null
+                    val manifestWorldKey = entry["world_key"]?.toString() ?: return@mapNotNull null
+                    if (worldData.worldKey != manifestWorldKey) return@mapNotNull null
                     ImportedWorld(uuid, worldData)
                 }
                 if (imports.size != worldEntries.size) {
@@ -210,7 +215,7 @@ class ArchiveService(
                         throw IllegalStateException("world_uuid_conflict:${imported.uuid}")
                     }
                     val folderName = worldService.getWorldFolderName(imported.worldData)
-                    if (File(Bukkit.getWorldContainer(), folderName).exists()) {
+                    if (worldService.getWorldCreationDirectory(imported.worldData).exists()) {
                         throw IllegalStateException("world_folder_conflict:$folderName")
                     }
                 }
@@ -218,7 +223,7 @@ class ArchiveService(
                 imports.forEachIndexed { index, imported ->
                     val prefix = tempDir.resolve("worlds/${imported.uuid}")
                     val sourceDir = prefix.resolve("world").toFile()
-                    val targetDir = File(Bukkit.getWorldContainer(), worldService.getWorldFolderName(imported.worldData))
+                    val targetDir = worldService.getWorldCreationDirectory(imported.worldData)
                     if (sourceDir.isDirectory) {
                         sourceDir.copyRecursively(targetDir, overwrite = false)
                     }
@@ -297,7 +302,7 @@ class ArchiveService(
                         syncBossBar(bossBar, executor, progressOffset + index, progressOffset + worlds.size)
                     }
                 }
-                Files.move(temp.toPath(), output.toPath())
+                moveAtomicallyOrReplace(temp.toPath(), output.toPath())
                 plugin.logger.info("Archive created: $output (${output.length()} bytes)")
                 future.complete(Unit)
             } catch (ex: Exception) {
@@ -400,6 +405,7 @@ class ArchiveService(
     private fun manifestYaml(archiveName: String, worlds: List<WorldData>): String {
         val yaml = YamlConfiguration()
         yaml.set("name", archiveName)
+        yaml.set("schema_version", ARCHIVE_SCHEMA_VERSION)
         yaml.set("created_at", LocalDateTime.now().toString())
         yaml.set("world_count", worlds.size)
         yaml.set(
@@ -407,11 +413,20 @@ class ArchiveService(
             worlds.map {
                 mapOf(
                     "uuid" to it.uuid.toString(),
-                    "name" to it.name
+                    "name" to it.name,
+                    "world_key" to it.worldKey
                 )
             }
         )
         return yaml.saveToString()
+    }
+
+    private fun moveAtomicallyOrReplace(source: Path, target: Path) {
+        try {
+            Files.move(source, target, java.nio.file.StandardCopyOption.ATOMIC_MOVE)
+        } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+            Files.move(source, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        }
     }
 
     private fun addDirectoryToZip(zip: ZipOutputStream, source: Path, rootName: String) {
@@ -456,11 +471,11 @@ class ArchiveService(
                 linkedMapOf(
                     "id" to portal.id.toString(),
                     "world_uuid" to portal.worldUuid?.toString(),
-                    "world_name" to portal.worldName,
+                    "world_key" to portal.worldKey,
                     "x" to portal.x,
                     "y" to portal.y,
                     "z" to portal.z,
-                    "target_world_name" to portal.targetWorldName,
+                    "target_world_key" to portal.targetWorldKey,
                     "show_text" to portal.showText,
                     "particle_color_rgb" to portal.particleColorRgb,
                     "owner_uuid" to portal.ownerUuid.toString(),
@@ -483,14 +498,14 @@ class ArchiveService(
         val list = yaml.getMapList("portals")
         return list.mapNotNull {
             val id = runCatching { UUID.fromString(it["id"]?.toString()) }.getOrNull() ?: return@mapNotNull null
-            val worldName = it["world_name"]?.toString() ?: ""
+            val worldName = it["world_key"]?.toString() ?: ""
             val x = (it["x"] as? Number)?.toInt() ?: 0
             val y = (it["y"] as? Number)?.toInt() ?: 0
             val z = (it["z"] as? Number)?.toInt() ?: 0
             val worldUuid = it["world_uuid"]?.toString()?.let { raw ->
                 runCatching { UUID.fromString(raw) }.getOrNull()
             }
-            val targetWorldName = it["target_world_name"]?.toString()
+            val targetWorldName = it["target_world_key"]?.toString()
             val showText = it["show_text"] as? Boolean ?: true
             val ownerUuid = it["owner_uuid"]?.toString()?.let { raw ->
                 runCatching { UUID.fromString(raw) }.getOrNull()
@@ -541,6 +556,10 @@ class ArchiveService(
         val file: File?,
         val error: String?
     )
+
+    companion object {
+        private const val ARCHIVE_SCHEMA_VERSION = 2
+    }
 }
 
 data class ArchiveResult(
