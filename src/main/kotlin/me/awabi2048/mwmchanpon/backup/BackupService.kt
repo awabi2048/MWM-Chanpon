@@ -369,11 +369,15 @@ class BackupService(
                 try {
                     val source = File(backupDir(entry.id), "worlds/$worldUuid")
                     val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
-                    val targetWorldDir = worldData?.let { core.getWorldDirectory(it) } ?: File(Bukkit.getWorldContainer(), "my_world.$worldUuid")
+                    val targetWorldDir = worldData?.let { core.getWorldDirectory(it) }
+                        ?: error("world data missing: $worldUuid")
                     val backupWorldZip = File(source, "world.zip")
                     if (!backupWorldZip.isFile) error("backup world zip missing: $worldUuid")
 
-                    val tempWorldDir = File(targetWorldDir.parentFile ?: Bukkit.getWorldContainer(), "${targetWorldDir.name}.restore-${UUID.randomUUID()}")
+                    val tempWorldDir = File(
+                        targetWorldDir.parentFile ?: error("world directory parent missing: $targetWorldDir"),
+                        "${targetWorldDir.name}.restore-${UUID.randomUUID()}"
+                    )
                     try {
                         extractWorldZip(backupWorldZip.toPath(), tempWorldDir.toPath())
                         if (targetWorldDir.exists()) targetWorldDir.deleteRecursively()
@@ -650,12 +654,12 @@ class BackupService(
 
     private fun portalToMap(portal: ApiPortalSnapshot): Map<String, Any?> = linkedMapOf(
         "id" to portal.id.toString(),
-        "world_name" to portal.worldName,
+        "world_key" to portal.worldKey,
         "x" to portal.x,
         "y" to portal.y,
         "z" to portal.z,
         "world_uuid" to portal.worldUuid?.toString(),
-        "target_world_name" to portal.targetWorldName,
+        "target_world_key" to portal.targetWorldKey,
         "show_text" to portal.showText,
         "particle_color_rgb" to portal.particleColorRgb,
         "owner_uuid" to portal.ownerUuid.toString(),
@@ -674,12 +678,12 @@ class BackupService(
         return runCatching {
             ApiPortalSnapshot(
                 UUID.fromString(map["id"] as String),
-                map["world_name"] as String,
+                map["world_key"] as String,
                 (map["x"] as Number).toInt(),
                 (map["y"] as Number).toInt(),
                 (map["z"] as Number).toInt(),
                 (map["world_uuid"] as? String)?.let(UUID::fromString),
-                map["target_world_name"] as? String,
+                map["target_world_key"] as? String,
                 map["show_text"] as? Boolean ?: true,
                 (map["particle_color_rgb"] as Number).toInt(),
                 UUID.fromString(map["owner_uuid"] as String),

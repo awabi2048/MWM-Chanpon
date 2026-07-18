@@ -175,13 +175,17 @@ class EasyVoidWorldCreationService(
 
             val uuid = generateUniqueWorldUuid(mwm)
             val folderName = "my_world.$uuid"
-            if (Bukkit.getWorld(folderName) != null || mwm.worldService.resolveWorldDirectory(folderName).exists()) {
+            val apiWorldService = me.awabi2048.myworldmanager.api.MyWorldManagerApi.getWorldService()
+                ?: error("MyWorldManager world service is unavailable")
+            if (Bukkit.getWorld(org.bukkit.NamespacedKey.minecraft(folderName)) != null ||
+                apiWorldService.getWorldCreationDirectory(folderName).exists()
+            ) {
                 player.sendMessage(mwm.languageManager.getMessage(player, "error.world_already_exists"))
                 return
             }
 
             player.sendMessage(mwm.languageManager.getMessage(player, "messages.world_creation_started", mapOf("world" to worldName)))
-            val creator = WorldCreator(folderName)
+            val creator = WorldCreator(org.bukkit.NamespacedKey.minecraft(folderName))
                 .environment(World.Environment.NORMAL)
                 .type(WorldType.FLAT)
                 .generator(EASY_VOID_GENERATOR)
