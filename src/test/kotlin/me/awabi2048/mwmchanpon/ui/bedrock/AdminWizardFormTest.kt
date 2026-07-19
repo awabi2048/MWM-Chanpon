@@ -21,7 +21,9 @@ class AdminWizardFormTest {
             Path.of("src/main/kotlin/me/awabi2048/mwmchanpon/ui/bedrock/AdminWizardForm.kt")
         )
 
-        assertTrue(source.contains("repository.isUsable(template.id)"))
+        assertTrue(source.contains("repository.validationIssue(template.id)"))
+        assertTrue(source.contains("ApiTemplateValidationIssue.MISSING_DIRECTORY"))
+        assertTrue(source.contains("ApiTemplateValidationIssue.MISSING_ORIGIN"))
         assertTrue(source.contains("service.previewTemplate(player, template.id)"))
         assertTrue(source.contains("service.createFromTemplate(template.id"))
     }

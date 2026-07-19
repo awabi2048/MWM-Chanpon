@@ -5,6 +5,7 @@ import me.awabi2048.mwmchanpon.bridge.CoreApiBridge
 import com.awabi2048.ccsystem.CCSystem
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.service.ApiBedrockFormService
+import me.awabi2048.myworldmanager.api.service.ApiTemplateValidationIssue
 import me.awabi2048.myworldmanager.model.TemplateData
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import org.bukkit.Bukkit
@@ -76,13 +77,25 @@ class AdminWizardForm(
     ): Boolean {
         val template = session.template ?: return fail(player, session.request)
         val repository = core.getTemplateRepository() ?: return fail(player, session.request)
-        val usable = repository.isUsable(template.id)
+        val validationIssue = repository.validationIssue(template.id)
+        val usable = validationIssue == null
         val spawn = template.originLocation?.let {
             "(${it.blockX}, ${it.blockY}, ${it.blockZ})"
         } ?: text(player, "chanpon.admin_wizard.unset")
+        val validationReason = when (validationIssue) {
+            ApiTemplateValidationIssue.MISSING_DIRECTORY ->
+                text(player, "chanpon.admin_wizard.validation.missing_directory")
+            ApiTemplateValidationIssue.MISSING_ORIGIN ->
+                text(player, "chanpon.admin_wizard.validation.missing_origin")
+            null -> null
+        }
         val content = text(
             player,
-            "chanpon.admin_wizard.detail_content",
+            if (usable) {
+                "chanpon.admin_wizard.detail_content_available"
+            } else {
+                "chanpon.admin_wizard.detail_content_unavailable"
+            },
             "description" to template.description.joinToString("\n").ifBlank {
                 text(player, "chanpon.admin_wizard.no_description")
             },
@@ -94,7 +107,8 @@ class AdminWizardForm(
                 } else {
                     "chanpon.admin_wizard.status_unavailable"
                 }
-            )
+            ),
+            "reason" to validationReason.orEmpty()
         )
         val buttons = buildList {
             if (usable) {
