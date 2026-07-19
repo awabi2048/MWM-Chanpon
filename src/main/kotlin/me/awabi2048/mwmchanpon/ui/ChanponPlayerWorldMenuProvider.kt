@@ -8,9 +8,11 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.service.EasyVoidWorldCreationService
-import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
@@ -20,6 +22,7 @@ import me.awabi2048.myworldmanager.api.extension.PlayerWorldMenuProvider
 import me.awabi2048.myworldmanager.api.extension.PlayerWorldMenuRequest
 import me.awabi2048.myworldmanager.api.extension.WorldCreationOperation
 import me.awabi2048.myworldmanager.api.extension.WorldCreationRequest
+import me.awabi2048.myworldmanager.api.service.WorldPointBillingMode
 import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.session.SettingsAction
 import me.awabi2048.myworldmanager.util.GuiLoreActions
@@ -44,7 +47,6 @@ import org.bukkit.plugin.java.JavaPlugin
 
 class ChanponPlayerWorldMenuProvider(
     private val plugin: MWMChanponPlugin,
-    private val globalStorage: ChanponGlobalStorage,
     private val storage: ChanponWorldStorage,
     private val easyVoidCreationService: EasyVoidWorldCreationService
 ) : PlayerWorldMenuProvider, Listener {
@@ -58,11 +60,6 @@ class ChanponPlayerWorldMenuProvider(
         val targetPlayerUuid = request.targetPlayerUuid ?: player.uniqueId
         val targetPlayerName = request.targetPlayerName ?: player.name
         val isOwnMenu = targetPlayerUuid == player.uniqueId
-        if (globalStorage.isArchiveLocked() && !player.hasPermission("mwmchanpon.admin")) {
-            player.sendMessage(i18n(player, "message.archive_locked"))
-            return true
-        }
-
         val session = mwm.playerWorldSessionManager.getSession(player.uniqueId)
         session.showBackButton = request.showBackButton
         val worlds = mwm.playerWorldGui.getPlayerWorlds(targetPlayerUuid)
@@ -74,6 +71,7 @@ class ChanponPlayerWorldMenuProvider(
         val holder = Holder(page, request.showBackButton, targetPlayerUuid, targetPlayerName)
         val inventory = Bukkit.createInventory(holder, pageLayout.layout.size, title)
         holder.inv = inventory
+        val footerStart = inventory.size - 9
 
         mwm.settingsSessionManager.updateSessionAction(
             player,
@@ -91,8 +89,7 @@ class ChanponPlayerWorldMenuProvider(
         }
 
         val currentCreateCount = worlds.count { it.owner == targetPlayerUuid }
-        val configuredMaxCreateCount = mwm.config.getInt("creation.max_create_count_default", 3)
-        val maxCreateCount = MyWorldManagerApi.getWorldRuntimePolicy().getMaxCreateCountDefault(configuredMaxCreateCount)
+        val maxCreateCount = plugin.config.getInt("creation.max_worlds_per_player", 50)
         val creationBlockReason = creationBlockReason(player, currentCreateCount, maxCreateCount)
         if (isOwnMenu && creationBlockReason == null && hasCreatePermission(player)) {
             inventory.setItem(pageLayout.layout.actionSlot - 2, createCreationButton(player))
@@ -102,6 +99,7 @@ class ChanponPlayerWorldMenuProvider(
         inventory.setItem(pageLayout.layout.actionSlot, createPlayerInfoItem(player, targetPlayerUuid, targetPlayerName))
         if (isOwnMenu) {
             inventory.setItem(pageLayout.layout.actionSlot + 2, createUserSettingsButton(player))
+            inventory.setItem(footerStart + 7, createPendingButton(player))
         }
 
         if (page > 0) {
@@ -111,7 +109,7 @@ class ChanponPlayerWorldMenuProvider(
             inventory.setItem(pageLayout.layout.backSlot, createReturnItem(player))
         }
         if (page + 1 < pageLayout.totalPages) {
-            inventory.setItem(pageLayout.layout.nextPageSlot, createPageItem(player, page + 1, true))
+            inventory.setItem(footerStart + 8, createPageItem(player, page + 1, true))
         }
 
         mwm.soundManager.playMenuOpenSound(player, "player_world")
@@ -149,6 +147,7 @@ class ChanponPlayerWorldMenuProvider(
                 }
                 val session = mwm.creationSessionManager.startSession(player.uniqueId)
                 session.isDialogMode = true
+                session.billingMode = WorldPointBillingMode.NONE
                 player.closeInventory()
                 player.sendMessage(mwm.languageManager.getMessage(player, "messages.wizard_start"))
                 mwm.creationGui.openTypeSelection(player)
@@ -158,6 +157,17 @@ class ChanponPlayerWorldMenuProvider(
                 mwm.soundManager.playClickSound(player, item, "player_world")
                 mwm.menuRouteHistory.pushPlayerWorld(player, holder.page, holder.showBackButton)
                 mwm.userSettingsGui.open(player, true)
+            }
+            ItemTag.TYPE_GUI_PENDING_BUTTON -> {
+                if (holder.targetPlayerUuid != player.uniqueId) return
+                mwm.soundManager.playClickSound(player, item, "player_world")
+                mwm.pendingInteractionGui.open(
+                    player = player,
+                    page = 0,
+                    returnPage = holder.page,
+                    showBackButton = holder.showBackButton,
+                    fromBedrockMenu = false
+                )
             }
             ItemTag.TYPE_GUI_WORLD_ITEM -> handleWorldClick(player, holder, item, event)
         }
@@ -318,6 +328,53 @@ class ChanponPlayerWorldMenuProvider(
         return item
     }
 
+    private fun createPendingButton(player: Player): ItemStack {
+        val mwm = mwm()
+        val lang = mwm.languageManager
+        val pendingCount = mwm.pendingDecisionManager.getPendingCount(player.uniqueId)
+        val latestPendingText = mwm.pendingDecisionManager
+            .getLatestPendingCreatedAt(player.uniqueId)
+            ?.let {
+                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+                    .withZone(ZoneId.systemDefault())
+                    .format(Instant.ofEpochMilli(it))
+            }
+            ?: lang.getMessage(player, "gui.player_world.pending_button.none")
+        val item = ItemStack(Material.WRITABLE_BOOK)
+        item.editMeta { meta ->
+            meta.displayName(lang.getComponent(player, "gui.player_world.pending_button.display"))
+            meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(listOf(
+                GuiLoreBlock(
+                    lang.getMessageList(player, "gui.player_world.pending_button.description")
+                        .map(GuiLoreLine::Text)
+                ),
+                GuiLoreBlock(listOf(
+                    GuiLoreLine.Data(
+                        lang.getMessage(player, "gui.player_world.pending_button.count_label"),
+                        pendingCount,
+                        if (pendingCount > 0) "§e" else "§7"
+                    ),
+                    GuiLoreLine.Data(
+                        lang.getMessage(player, "gui.player_world.pending_button.latest_label"),
+                        latestPendingText,
+                        "§b"
+                    )
+                )),
+                GuiLoreBlock(listOf(
+                    GuiLoreActions.singleClick(
+                        lang,
+                        player,
+                        lang.getMessage(player, "gui.player_world.pending_button.action")
+                    )
+                ))
+            ))))
+            meta.setEnchantmentGlintOverride(pendingCount > 0)
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
+        }
+        ItemTag.tagItem(item, ItemTag.TYPE_GUI_PENDING_BUTTON)
+        return item
+    }
+
     private fun createPageItem(player: Player, targetPage: Int, next: Boolean): ItemStack {
         val mwm = mwm()
         val item = ItemStack(Material.ARROW)
@@ -391,7 +448,7 @@ class ChanponPlayerWorldMenuProvider(
             player.hasPermission("craftercrossing.test")
 
     private fun hasCreatePermission(player: Player): Boolean =
-        player.hasPermission("myworldmanager.command.mwm.create") ||
+        player.hasPermission("myworldmanager.world.create") ||
             player.hasPermission("myworldmanager.admin") ||
             player.hasPermission("mwmchanpon.admin") ||
             player.hasPermission("craftercrossing.test")

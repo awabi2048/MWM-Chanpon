@@ -29,8 +29,6 @@ class LuckPermsToolPermissionService(
             .whenComplete { _, error ->
                 if (error != null) {
                     logger.warning("Failed to apply active tool permissions for $playerUuid: ${error.message}")
-                } else {
-                    logger.fine("Applied active tool permissions for $playerUuid")
                 }
             }
     }
@@ -52,8 +50,6 @@ class LuckPermsToolPermissionService(
             .whenComplete { _, error ->
                 if (error != null) {
                     logger.warning("Failed to clear active tool permissions for $playerUuid: ${error.message}")
-                } else {
-                    logger.fine("Cleared active tool permissions for $playerUuid")
                 }
             }
     }
@@ -77,8 +73,6 @@ class LuckPermsToolPermissionService(
             .whenComplete { _, error ->
                 if (error != null) {
                     logger.warning("Failed to remove tool permissions for $playerUuid in $worldName: ${error.message}")
-                } else {
-                    logger.fine("Removed tool permissions for $playerUuid in $worldName")
                 }
             }
     }

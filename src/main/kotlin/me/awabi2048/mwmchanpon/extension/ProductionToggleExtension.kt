@@ -20,7 +20,6 @@ import me.awabi2048.mwmchanpon.ui.ChanponLore
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.event.MwmWorldCreatedEvent
-import me.awabi2048.myworldmanager.api.extension.CreationConfirmationLayout
 import me.awabi2048.myworldmanager.api.extension.MenuExtension
 import me.awabi2048.myworldmanager.api.extension.MenuExtensionContext
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsInventoryHolder
@@ -53,22 +52,8 @@ class ProductionToggleExtension(
 
     override fun getId(): String = EXTENSION_ID
 
-    override fun onPrepare(context: MenuExtensionContext) {
-        if (context.menuType != "creation_confirm") return
-        // Chanpon は中央のフッター枠を本番ワールド設定に使うため、MWM のスポーン設定を7枠目へ送る。
-        // 作成確認の中央行は「ディメンション / 本番用設定 / スポーン位置」の3点を横並びにする。
-        context.get<CreationConfirmationLayout>("layout")?.spawnLocationSlot = 41
-    }
-
     override fun onRender(inventory: Inventory, player: Player, context: MenuExtensionContext) {
         when (context.menuType) {
-            "creation_confirm" -> {
-                val session = context.get<WorldCreationSession>("session") ?: return
-                if (globalStorage.getPhase() != ChanponPhase.PRODUCTION_ALLOWED) return
-                if (ownerHasProductionWorld(player.uniqueId, null)) return
-                val enabled = session.extras[EXTRA_KEY] as? Boolean ?: false
-                inventory.setItem(plugin.config.getInt("production.menu_slot", 40), createCreationItem(enabled))
-            }
             "world_settings" -> {
                 if (context.get<Boolean>("isProtected") == true) return
                 if (globalStorage.getPhase() != ChanponPhase.PRODUCTION_ALLOWED) return
@@ -92,7 +77,6 @@ class ProductionToggleExtension(
         val item = event.currentItem ?: return false
         if (ItemTag.getExtensionId(item) != getId()) return false
         return when (context.menuType) {
-            "creation_confirm" -> handleCreationConfirmClick(event, player, context, item)
             "world_settings" -> handleWorldSettingsClick(event, player, context, item)
             else -> false
         }
@@ -118,25 +102,18 @@ class ProductionToggleExtension(
             .forEach { applyForcedTags(it.uuid) }
     }
 
-    private fun handleCreationConfirmClick(
-        event: InventoryClickEvent,
-        player: Player,
-        context: MenuExtensionContext,
-        item: ItemStack
-    ): Boolean {
-        if (ItemTag.getString(item, "chanpon_action") != ACTION_TOGGLE_PRODUCTION) return false
-        val session = context.get<WorldCreationSession>("session") ?: return false
-        if (!canUseProduction(player)) return true
+    fun toggleCreationSelection(player: Player, session: WorldCreationSession): ItemStack {
+        if (!canUseProduction(player)) {
+            return createCreationItem(session.extras[EXTRA_KEY] as? Boolean ?: false)
+        }
         val next = !(session.extras[EXTRA_KEY] as? Boolean ?: false)
         if (next && ownerHasProductionWorld(player.uniqueId, null)) {
             player.sendMessage(i18n(player, "message.production_limit"))
-            return true
+            return createCreationItem(false)
         }
         session.extras[EXTRA_KEY] = next
-        val worldName = session.worldName ?: return true
-        pendingProduction[player.uniqueId to worldName] = next
-        event.inventory.setItem(event.slot, createCreationItem(next))
-        return true
+        session.worldName?.let { pendingProduction[player.uniqueId to it] = next }
+        return createCreationItem(next)
     }
 
     private fun handleWorldSettingsClick(
@@ -358,7 +335,7 @@ class ProductionToggleExtension(
         return decision.allowed
     }
 
-    private fun createCreationItem(enabled: Boolean): ItemStack {
+    fun createCreationItem(enabled: Boolean): ItemStack {
         val item = ItemStack(if (enabled) Material.YELLOW_WOOL else Material.GRAY_WOOL)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(null, "creation.display"))
@@ -513,8 +490,8 @@ class ProductionToggleExtension(
     private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)
 
     companion object {
-        private const val EXTENSION_ID = "chanpon.production_toggle"
-        private const val EXTRA_KEY = "chanpon.production"
+        const val EXTENSION_ID = "chanpon.production_toggle"
+        const val EXTRA_KEY = "chanpon.production"
         private const val WORLD_MENU_SLOT = 51
         private const val CRITICAL_MENU_SLOT = 33
         private const val ACTION_TOGGLE_PRODUCTION = "toggle_production"

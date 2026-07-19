@@ -32,7 +32,9 @@ import me.awabi2048.mwmchanpon.protection.WorldBuildPermissionService
 import me.awabi2048.mwmchanpon.service.BackupAutomationService
 import me.awabi2048.mwmchanpon.service.ChanponSpawnWorldService
 import me.awabi2048.mwmchanpon.service.EasyVoidWorldCreationService
+import me.awabi2048.mwmchanpon.service.ArchiveOperationGuard
 import me.awabi2048.mwmchanpon.service.ManualRollbackService
+import me.awabi2048.mwmchanpon.service.PublishLevelSynchronizer
 import me.awabi2048.mwmchanpon.service.WorldDataExportService
 import me.awabi2048.mwmchanpon.service.ArchiveService
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
@@ -46,6 +48,7 @@ import me.awabi2048.mwmchanpon.ui.AutomationSettingsMenu
 import me.awabi2048.mwmchanpon.ui.BackupListMenu
 import me.awabi2048.mwmchanpon.ui.ChanponAdminMenu
 import me.awabi2048.mwmchanpon.ui.ChanponAdminWorldListMenu
+import me.awabi2048.mwmchanpon.ui.ChanponCreationConfirmationMenuProvider
 import me.awabi2048.mwmchanpon.ui.ChanponEnvironmentGui
 import me.awabi2048.mwmchanpon.ui.ChanponPlayerWorldMenuProvider
 import me.awabi2048.mwmchanpon.ui.ChanponWorldSettingsMenuProvider
@@ -63,6 +66,7 @@ import org.bukkit.plugin.java.JavaPlugin
 class MWMChanponPlugin : JavaPlugin() {
     private val coreApiBridge = CoreApiBridge()
     private lateinit var productionToggleExtension: ProductionToggleExtension
+    private lateinit var creationConfirmationMenuProvider: ChanponCreationConfirmationMenuProvider
     private lateinit var productionWorldGuard: ProductionWorldGuard
     private lateinit var submittedProtectionService: SubmittedWorldProtectionService
     private lateinit var submittedWorldMenuProvider: SubmittedWorldMenuProvider
@@ -100,6 +104,7 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var spawnProtectionService: SpawnWorldProtectionService
     private lateinit var buildPermissionService: WorldBuildPermissionService
     private lateinit var easyVoidWorldCreationService: EasyVoidWorldCreationService
+    private lateinit var publishLevelSynchronizer: PublishLevelSynchronizer
 
     override fun onEnable() {
         CCSystem.getAPI().getConfigSchemaService().register(
@@ -110,10 +115,23 @@ class MWMChanponPlugin : JavaPlugin() {
                     sourcePlugin = this,
                     resourcePath = "config.yml",
                     targetPath = dataFolder.resolve("config.yml").toPath(),
-                    currentVersion = 1,
+                    currentVersion = 2,
                     classification = com.awabi2048.ccsystem.api.config.ConfigClassification.MANAGED_CONFIG,
-                    migrations = emptyMap(),
-                    validator = com.awabi2048.ccsystem.api.config.ConfigValidator {},
+                    migrations = mapOf(
+                        1 to com.awabi2048.ccsystem.api.config.ConfigMigration { config ->
+                            if (!config.contains("creation.max_worlds_per_player")) {
+                                config.set("creation.max_worlds_per_player", 50)
+                            }
+                        }
+                    ),
+                    validator = com.awabi2048.ccsystem.api.config.ConfigValidator { config ->
+                        require(config.getInt("creation.max_worlds_per_player", 50) >= 1) {
+                            "creation.max_worlds_per_player must be at least 1"
+                        }
+                        require(config.getInt("world_expansion.max_level", 3) >= 0) {
+                            "world_expansion.max_level must not be negative"
+                        }
+                    },
                     reloadAction = { reloadConfig() }
                 )
             )
@@ -127,6 +145,8 @@ class MWMChanponPlugin : JavaPlugin() {
         }
 
         val chanponStorage = ChanponWorldStorage(dataFolder)
+        publishLevelSynchronizer = PublishLevelSynchronizer()
+        chanponStorage.setVisibilitySyncHandler(publishLevelSynchronizer::sync)
         globalStorage = ChanponGlobalStorage(dataFolder)
         spawnWorldService = ChanponSpawnWorldService(this, globalStorage)
         val luckPerms = LuckPermsProvider.get()
@@ -164,6 +184,7 @@ class MWMChanponPlugin : JavaPlugin() {
         backupService.setPostRestoreHandler { restoredWorlds ->
             val repository = MyWorldManagerApi.getWorldRepository() ?: return@setPostRestoreHandler
             restoredWorlds.mapNotNull(repository::findByUuid).forEach { worldData ->
+                publishLevelSynchronizer.sync(worldData.uuid)
                 submittedProtectionService.sync(worldData)
                 toolController.syncWorld(worldData)
             }
@@ -175,6 +196,7 @@ class MWMChanponPlugin : JavaPlugin() {
             submittedProtectionService,
             toolController
         )
+        creationConfirmationMenuProvider = ChanponCreationConfirmationMenuProvider(productionToggleExtension)
         submissionAdminMenu = SubmissionAdminMenu(
             this,
             chanponStorage,
@@ -207,19 +229,21 @@ class MWMChanponPlugin : JavaPlugin() {
         environmentGui = ChanponEnvironmentGui(this, chanponStorage, submittedProtectionService, buildPermissionService)
         chanponWorldSettingsMenuProvider = ChanponWorldSettingsMenuProvider(this, chanponStorage, submittedProtectionService, environmentGui)
         easyVoidWorldCreationService = EasyVoidWorldCreationService(this)
-        playerWorldMenuProvider = ChanponPlayerWorldMenuProvider(this, globalStorage, chanponStorage, easyVoidWorldCreationService)
-        worldAccessPolicy = ChanponWorldAccessPolicy(globalStorage, chanponStorage)
+        val archiveOperationGuard = ArchiveOperationGuard(globalStorage)
+        playerWorldMenuProvider = ChanponPlayerWorldMenuProvider(this, chanponStorage, easyVoidWorldCreationService)
+        worldAccessPolicy = ChanponWorldAccessPolicy(archiveOperationGuard, chanponStorage)
         worldMenuAccessProvider = ChanponWorldMenuAccessProvider(chanponStorage)
         worldPortalPolicy = ChanponWorldPortalPolicy(chanponStorage)
         worldPublishPolicy = ChanponWorldPublishPolicy(chanponStorage)
         worldRuntimePolicy = ChanponWorldRuntimePolicy()
-        commandExtension = ChanponCommandExtension(this, globalStorage)
-        worldCreationGuard = ChanponWorldCreationGuard(globalStorage)
+        commandExtension = ChanponCommandExtension(archiveOperationGuard)
+        worldCreationGuard = ChanponWorldCreationGuard(this, globalStorage)
         worldPlayerStatePolicy = ChanponWorldPlayerStatePolicy(globalStorage)
         MyWorldManagerApi.registerWorldCreationGuard(worldCreationGuard)
         MyWorldManagerApi.registerWorldPlayerStatePolicy(worldPlayerStatePolicy)
         MyWorldManagerApi.registerWorldDeleteGuard(productionWorldGuard)
         MyWorldManagerApi.registerMenuExtension(productionToggleExtension)
+        MyWorldManagerApi.registerCreationConfirmationMenuProvider(creationConfirmationMenuProvider)
         MyWorldManagerApi.registerAdminWorldListProvider(chanponAdminWorldListMenu)
         MyWorldManagerApi.registerWorldSettingsMenuProvider(submittedWorldMenuProvider)
         MyWorldManagerApi.registerWorldSettingsMenuProvider(chanponWorldSettingsMenuProvider)
@@ -244,6 +268,7 @@ class MWMChanponPlugin : JavaPlugin() {
             command.tabCompleter = adminCommand
         }
         server.pluginManager.registerEvents(productionToggleExtension, this)
+        server.pluginManager.registerEvents(creationConfirmationMenuProvider, this)
         server.pluginManager.registerEvents(submissionAdminMenu, this)
         server.pluginManager.registerEvents(chanponAdminMenu, this)
         server.pluginManager.registerEvents(worldDataManagementMenu, this)
@@ -257,6 +282,7 @@ class MWMChanponPlugin : JavaPlugin() {
         server.pluginManager.registerEvents(easyVoidWorldCreationService, this)
         server.pluginManager.registerEvents(playerWorldMenuProvider, this)
         server.pluginManager.registerEvents(worldMenuAccessProvider, this)
+        server.pluginManager.registerEvents(publishLevelSynchronizer, this)
         server.pluginManager.registerEvents(SubmittedWorldProtectionListener(submittedProtectionService), this)
         server.pluginManager.registerEvents(SpawnWorldProtectionListener(globalStorage, spawnProtectionService), this)
 
@@ -280,6 +306,7 @@ class MWMChanponPlugin : JavaPlugin() {
 
         server.scheduler.runTask(this, Runnable {
             MyWorldManagerApi.getWorldRepository()?.findAll()?.let {
+                publishLevelSynchronizer.syncAll()
                 submittedProtectionService.syncAll(it)
                 it.forEach(toolController::syncWorld)
             }
@@ -306,6 +333,9 @@ class MWMChanponPlugin : JavaPlugin() {
         }
         if (::productionToggleExtension.isInitialized) {
             MyWorldManagerApi.unregisterMenuExtension(productionToggleExtension)
+        }
+        if (::creationConfirmationMenuProvider.isInitialized) {
+            MyWorldManagerApi.unregisterCreationConfirmationMenuProvider(creationConfirmationMenuProvider)
         }
         if (::chanponAdminWorldListMenu.isInitialized) {
             MyWorldManagerApi.unregisterAdminWorldListProvider(chanponAdminWorldListMenu)

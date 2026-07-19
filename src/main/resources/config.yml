@@ -6,6 +6,9 @@ production:
   menu_slot: 40
   forced_tags: []
 
+creation:
+  max_worlds_per_player: 50
+
 world_expansion:
   max_level: 3
 
@@ -56,4 +59,4 @@ backup:
       scheduled: 14
       restore_point: 5
       pre_rollback: 10
-config_version: 1
+config_version: 2

@@ -96,16 +96,16 @@ class ChanponEnvironmentGui(
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
         if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
         when (ItemTag.getString(item, ACTION_KEY)) {
-            ACTION_WEATHER -> cycleWeather(player, worldData, reverse = event.isRightClick)
+            ACTION_WEATHER -> cycleWeather(player, worldData, reverse = event.isLeftClick)
             ACTION_TIME -> {
                 if (event.isShiftClick && event.isLeftClick) {
                     showCustomTimeDialog(player, worldData)
                 } else {
-                    cycleTime(player, worldData, reverse = event.isRightClick)
+                    cycleTime(player, worldData, reverse = event.isLeftClick)
                 }
             }
-            ACTION_GRAVITY -> cycleGravity(player, worldData, reverse = event.isRightClick)
-            ACTION_SCALE -> cycleScale(player, worldData, reverse = event.isRightClick)
+            ACTION_GRAVITY -> cycleGravity(player, worldData, reverse = event.isLeftClick)
+            ACTION_SCALE -> cycleScale(player, worldData, reverse = event.isLeftClick)
             ACTION_FLIGHT -> toggleFlight(player, worldData)
             ACTION_PROTECTION -> {
                 val mode = storage.getProtectionMode(worldData.uuid)
@@ -116,7 +116,7 @@ class ChanponEnvironmentGui(
                         storage.getProtectionPassword(worldData.uuid).orEmpty()
                     )
                 } else {
-                    cycleProtection(player, worldData, reverse = event.isRightClick)
+                    cycleProtection(player, worldData, reverse = event.isLeftClick)
                 }
             }
         }

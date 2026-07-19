@@ -111,7 +111,7 @@ class ChanponAdminWorldListMenu(
             ItemTag.TYPE_GUI_NAV_PREV, ItemTag.TYPE_GUI_NAV_NEXT -> {
                 open(player, ItemTag.getTargetPage(item) ?: holder.page, holder.visibilityFilter, holder.sortType, holder.fromAdminMenu)
             }
-            ItemTag.TYPE_GUI_EXTENSION -> handleControl(player, holder, item, event.click.isRightClick)
+            ItemTag.TYPE_GUI_EXTENSION -> handleControl(player, holder, item, event.click.isLeftClick)
             ItemTag.TYPE_GUI_WORLD_ITEM, ItemTag.TYPE_GUI_ADMIN_CURRENT_WORLD_INFO -> handleWorldClick(player, item, event.click)
         }
     }
@@ -233,8 +233,7 @@ class ChanponAdminWorldListMenu(
             meta.displayName(i18nComponent(player, "$key.display"))
             meta.lore(structuredLore(listOf(
                 GuiLoreLine.Data(i18n(player, "$key.label"), current, "§e"),
-                GuiLoreActions.cycle(mwm().languageManager, player)
-            )))
+            ) + GuiLoreActions.cyclePreviousNext(mwm().languageManager, player)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)

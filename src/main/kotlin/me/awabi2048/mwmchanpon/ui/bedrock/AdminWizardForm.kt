@@ -5,6 +5,7 @@ import me.awabi2048.mwmchanpon.bridge.CoreApiBridge
 import com.awabi2048.ccsystem.CCSystem
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.service.ApiBedrockFormService
+import me.awabi2048.myworldmanager.api.service.ApiTemplateValidationIssue
 import me.awabi2048.myworldmanager.model.TemplateData
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import org.bukkit.Bukkit
@@ -61,7 +62,90 @@ class AdminWizardForm(
                 val current = sessions[player.uniqueId] ?: return@sendSimpleForm
                 val selected = current.templates.getOrNull(index) ?: return@sendSimpleForm
                 current.template = selected
-                openNameInput(player, current, forms)
+                openTemplateDetail(player, current, forms)
+            },
+            onClosed = { cancel(player) }
+        )
+        if (!opened) fail(player, session.request)
+        return opened
+    }
+
+    private fun openTemplateDetail(
+        player: Player,
+        session: Session,
+        forms: ApiBedrockFormService
+    ): Boolean {
+        val template = session.template ?: return fail(player, session.request)
+        val repository = core.getTemplateRepository() ?: return fail(player, session.request)
+        val validationIssue = repository.validationIssue(template.id)
+        val usable = validationIssue == null
+        val spawn = template.originLocation?.let {
+            "(${it.blockX}, ${it.blockY}, ${it.blockZ})"
+        } ?: text(player, "chanpon.admin_wizard.unset")
+        val validationReason = when (validationIssue) {
+            ApiTemplateValidationIssue.MISSING_DIRECTORY ->
+                text(player, "chanpon.admin_wizard.validation.missing_directory")
+            ApiTemplateValidationIssue.MISSING_ORIGIN ->
+                text(player, "chanpon.admin_wizard.validation.missing_origin")
+            null -> null
+        }
+        val content = text(
+            player,
+            if (usable) {
+                "chanpon.admin_wizard.detail_content_available"
+            } else {
+                "chanpon.admin_wizard.detail_content_unavailable"
+            },
+            "description" to template.description.joinToString("\n").ifBlank {
+                text(player, "chanpon.admin_wizard.no_description")
+            },
+            "spawn" to spawn,
+            "status" to text(
+                player,
+                if (usable) {
+                    "chanpon.admin_wizard.status_available"
+                } else {
+                    "chanpon.admin_wizard.status_unavailable"
+                }
+            ),
+            "reason" to validationReason.orEmpty()
+        )
+        val buttons = buildList {
+            if (usable) {
+                add(text(player, "chanpon.admin_wizard.use_template"))
+                add(text(player, "chanpon.admin_wizard.preview"))
+            }
+            add(text(player, "chanpon.admin_wizard.back"))
+        }
+        val opened = forms.sendSimpleForm(
+            player = player,
+            title = template.name,
+            content = content,
+            buttons = buttons,
+            onSelect = { index ->
+                if (!usable) {
+                    openTemplateSelection(player, session, forms)
+                    return@sendSimpleForm
+                }
+                when (index) {
+                    0 -> openNameInput(player, session, forms)
+                    1 -> {
+                        val service = core.getWorldService() ?: run {
+                            fail(player, session.request)
+                            return@sendSimpleForm
+                        }
+                        val started = service.previewTemplate(player, template.id) {
+                            val current = sessions[player.uniqueId] ?: return@previewTemplate
+                            val currentForms = MyWorldManagerApi.getBedrockFormService()
+                                ?: return@previewTemplate
+                            openTemplateDetail(player, current, currentForms)
+                        }
+                        if (!started) {
+                            openTemplateDetail(player, session, forms)
+                        }
+                    }
+                    else -> openTemplateSelection(player, session, forms)
+                }
             },
             onClosed = { cancel(player) }
         )
@@ -111,7 +195,13 @@ class AdminWizardForm(
                 "chanpon.admin_wizard.confirm_content",
                 "owner" to session.request.ownerName,
                 "template" to template.name,
-                "world" to name
+                "world" to name,
+                "spawn" to (
+                    template.originLocation?.let {
+                        "(${it.blockX}, ${it.blockY}, ${it.blockZ})"
+                    } ?: text(player, "chanpon.admin_wizard.unset")
+                ),
+                "cost" to 0
             ),
             buttons = listOf(
                 text(player, "chanpon.admin_wizard.create"),
@@ -135,7 +225,13 @@ class AdminWizardForm(
             fail(player, session.request)
             return
         }
-        service.createFromTemplate(template.id, session.request.ownerUuid, name, 0).whenComplete { success, error ->
+        service.createFromTemplate(
+            template.id,
+            session.request.ownerUuid,
+            name,
+            0,
+            me.awabi2048.myworldmanager.api.service.WorldPointBillingMode.NONE
+        ).whenComplete { success, error ->
             Bukkit.getScheduler().runTask(plugin, Runnable {
                 if (error != null || success != true) {
                     player.sendMessage(CCSystem.getAPI().getI18nComponent(player, "chanpon.admin_wizard.create_failed"))
