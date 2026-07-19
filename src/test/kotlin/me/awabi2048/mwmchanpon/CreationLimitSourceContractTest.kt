@@ -25,6 +25,10 @@ class CreationLimitSourceContractTest {
         assertTrue(guard.contains("creation.max_worlds_per_player"))
         assertTrue(playerMenu.contains("myworldmanager.world.create"))
         assertTrue(easyCreation.contains("myworldmanager.world.create"))
+        assertTrue(easyCreation.contains("createManagedWorld("))
+        assertFalse(easyCreation.contains("Bukkit.createWorld"))
+        assertFalse(easyCreation.contains("worldConfigRepository.save"))
+        assertFalse(easyCreation.contains("MwmWorldCreatedEvent("))
         assertFalse(playerMenu.contains("player.hasPermission(\"myworldmanager.command.mwm.create\")"))
     }
 }

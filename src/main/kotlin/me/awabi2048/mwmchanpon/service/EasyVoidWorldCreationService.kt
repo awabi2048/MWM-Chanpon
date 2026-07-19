@@ -10,10 +10,6 @@ import io.papermc.paper.registry.data.dialog.action.DialogAction
 import io.papermc.paper.registry.data.dialog.body.DialogBody
 import io.papermc.paper.registry.data.dialog.input.DialogInput
 import io.papermc.paper.registry.data.dialog.type.DialogType
-import java.io.File
-import java.time.LocalDate
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
@@ -21,21 +17,17 @@ import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.WorldCreationOperation
 import me.awabi2048.myworldmanager.api.extension.WorldCreationRequest
-import me.awabi2048.myworldmanager.api.event.MwmWorldCreatedEvent
-import me.awabi2048.myworldmanager.model.PublishLevel
-import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.api.extension.WorldCreationType
+import me.awabi2048.myworldmanager.api.service.ManagedWorldCreationRequest
+import me.awabi2048.myworldmanager.api.service.ManagedWorldSpawn
 import me.awabi2048.myworldmanager.util.WorldNameValidation
-import me.awabi2048.myworldmanager.util.WorldWarpId
 import net.kyori.adventure.key.Key
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
-import org.bukkit.Bukkit
 import org.bukkit.HeightMap
 import org.bukkit.Location
 import org.bukkit.Material
 import org.bukkit.World
-import org.bukkit.WorldCreator
 import org.bukkit.WorldType
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
@@ -45,13 +37,12 @@ import org.bukkit.generator.WorldInfo
 import org.bukkit.plugin.java.JavaPlugin
 
 /**
- * MWM本体の作成種別へ戻さず、Chanpon専用の固定フローとしてかんたん作成を完結させる。
+ * Chanpon専用の入力とVoid仕様だけを所有し、作成確定はMWM共通パイプラインへ委譲する。
  */
 class EasyVoidWorldCreationService(
     private val plugin: MWMChanponPlugin
 ) : Listener {
     private val pendingNames = ConcurrentHashMap<UUID, String>()
-    private val creatingPlayers = ConcurrentHashMap.newKeySet<UUID>()
 
     fun start(player: Player) {
         if (!canCreate(player)) return
@@ -161,104 +152,29 @@ class EasyVoidWorldCreationService(
 
     private fun create(player: Player, worldName: String) {
         if (!canCreate(player)) return
-        if (!creatingPlayers.add(player.uniqueId)) {
-            player.sendMessage(mwm().languageManager.getMessage(player, "error.world_creation_in_progress"))
+        val worldService = MyWorldManagerApi.getWorldService()
+        if (worldService == null) {
+            player.sendMessage(mwm().languageManager.getMessage(player, "error.internal_error"))
             return
         }
-
-        try {
-            val mwm = mwm()
-            if (mwm.worldConfigRepository.findByOwnerAndDisplayName(player.uniqueId, worldName) != null) {
-                player.sendMessage(mwm.languageManager.getMessage(player, "messages.world_name_duplicate"))
-                return
-            }
-
-            val uuid = generateUniqueWorldUuid(mwm)
-            val folderName = "my_world.$uuid"
-            val apiWorldService = me.awabi2048.myworldmanager.api.MyWorldManagerApi.getWorldService()
-                ?: error("MyWorldManager world service is unavailable")
-            if (Bukkit.getWorld(org.bukkit.NamespacedKey.minecraft(folderName)) != null ||
-                apiWorldService.getWorldCreationDirectory(folderName).exists()
-            ) {
-                player.sendMessage(mwm.languageManager.getMessage(player, "error.world_already_exists"))
-                return
-            }
-
-            player.sendMessage(mwm.languageManager.getMessage(player, "messages.world_creation_started", mapOf("world" to worldName)))
-            val creator = WorldCreator(org.bukkit.NamespacedKey.minecraft(folderName))
-                .environment(World.Environment.NORMAL)
-                .type(WorldType.FLAT)
-                .generator(EASY_VOID_GENERATOR)
-                .generateStructures(false)
-            val world = Bukkit.createWorld(creator)
-            if (world == null) {
-                player.sendMessage(mwm.languageManager.getMessage(player, "error.world_creation_failed"))
-                return
-            }
-
-            val spawn = Location(world, 0.0, SPAWN_Y.toDouble(), 0.0)
-            world.setSpawnLocation(spawn.blockX, spawn.blockY, spawn.blockZ)
-            placePlatform(world)
-            applyInitialBorder(mwm, world)
-
-            val createdAt = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-            val expireDate = LocalDate.now()
-                .plusDays(mwm.config.getLong("default_expiration.initial_days", 30))
-                .toString()
-            val worldData = WorldData(
-                uuid = uuid,
-                name = worldName,
-                description = "My World",
-                icon = Material.GRASS_BLOCK,
-                sourceWorld = SOURCE_WORLD,
-                expireDate = expireDate,
-                owner = player.uniqueId,
-                publishLevel = PublishLevel.PRIVATE,
-                spawnPosMember = world.spawnLocation,
-                borderCenterPos = world.spawnLocation,
-                cumulativePoints = 0,
-                customWorldName = folderName,
-                createdAt = createdAt
+        worldService.createManagedWorld(
+            ManagedWorldCreationRequest(
+                ownerUuid = player.uniqueId,
+                worldName = worldName,
+                sourceId = SOURCE_WORLD,
+                type = WorldCreationType.RANDOM,
+                environment = World.Environment.NORMAL,
+                worldType = WorldType.FLAT,
+                generator = EASY_VOID_GENERATOR,
+                generateStructures = false,
+                initialSpawn = ManagedWorldSpawn(0, SPAWN_Y, 0),
+                initializeWorld = ::placePlatform
             )
-            mwm.worldConfigRepository.save(worldData)
-            Bukkit.getPluginManager().callEvent(
-                MwmWorldCreatedEvent(
-                    worldUuid = uuid,
-                    worldName = worldName,
-                    ownerUuid = player.uniqueId,
-                    ownerName = player.name,
-                    templateName = SOURCE_WORLD,
-                    createdAt = createdAt
-                )
-            )
-            player.sendMessage(mwm.languageManager.getMessage(player, "messages.world_creation_success", mapOf("world" to worldName)))
-            CCSystem.getAPI().getMenuNavigationService().clear(player)
-            mwm.worldService.teleportToWorld(player, uuid)
-            mwm.macroManager.execute(
-                "on_world_create",
-                mapOf("owner" to player.name, "world_uuid" to uuid.toString(), "world_name" to worldName, "template_name" to SOURCE_WORLD)
-            )
-        } catch (ex: Exception) {
-            plugin.logger.severe("Failed to create easy void world '$worldName': ${ex.message}")
-            player.sendMessage(mwm().languageManager.getMessage(player, "error.internal_error"))
-        } finally {
-            creatingPlayers.remove(player.uniqueId)
-        }
-    }
-
-    private fun generateUniqueWorldUuid(mwm: MyWorldManager): UUID {
-        val usedWarpIds = mwm.worldConfigRepository.findAll().mapTo(mutableSetOf()) { WorldWarpId.of(it.uuid) }
-        repeat(100) {
-            val uuid = UUID.randomUUID()
-            val folderName = "my_world.$uuid"
-            if (WorldWarpId.of(uuid) !in usedWarpIds &&
-                Bukkit.getWorld(folderName) == null &&
-                !mwm.worldService.resolveWorldDirectory(folderName).exists()
-            ) {
-                return uuid
+        ).thenAccept { success ->
+            if (success) {
+                CCSystem.getAPI().getMenuNavigationService().clear(player)
             }
         }
-        error("Unable to allocate unique MyWorld warp id after 100 attempts")
     }
 
     private fun canCreate(player: Player): Boolean {
@@ -280,12 +196,6 @@ class EasyVoidWorldCreationService(
         )
         if (!decision.allowed) decision.denialMessage?.let(player::sendMessage)
         return decision.allowed
-    }
-
-    private fun applyInitialBorder(mwm: MyWorldManager, world: World) {
-        val center = world.spawnLocation
-        world.worldBorder.center = center
-        world.worldBorder.size = mwm.config.getDouble("expansion.initial_size", 100.0)
     }
 
     private fun placePlatform(world: World) {
