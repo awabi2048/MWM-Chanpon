@@ -46,6 +46,7 @@ import me.awabi2048.mwmchanpon.ui.AutomationSettingsMenu
 import me.awabi2048.mwmchanpon.ui.BackupListMenu
 import me.awabi2048.mwmchanpon.ui.ChanponAdminMenu
 import me.awabi2048.mwmchanpon.ui.ChanponAdminWorldListMenu
+import me.awabi2048.mwmchanpon.ui.ChanponCreationConfirmationMenuProvider
 import me.awabi2048.mwmchanpon.ui.ChanponEnvironmentGui
 import me.awabi2048.mwmchanpon.ui.ChanponPlayerWorldMenuProvider
 import me.awabi2048.mwmchanpon.ui.ChanponWorldSettingsMenuProvider
@@ -63,6 +64,7 @@ import org.bukkit.plugin.java.JavaPlugin
 class MWMChanponPlugin : JavaPlugin() {
     private val coreApiBridge = CoreApiBridge()
     private lateinit var productionToggleExtension: ProductionToggleExtension
+    private lateinit var creationConfirmationMenuProvider: ChanponCreationConfirmationMenuProvider
     private lateinit var productionWorldGuard: ProductionWorldGuard
     private lateinit var submittedProtectionService: SubmittedWorldProtectionService
     private lateinit var submittedWorldMenuProvider: SubmittedWorldMenuProvider
@@ -175,6 +177,7 @@ class MWMChanponPlugin : JavaPlugin() {
             submittedProtectionService,
             toolController
         )
+        creationConfirmationMenuProvider = ChanponCreationConfirmationMenuProvider(productionToggleExtension)
         submissionAdminMenu = SubmissionAdminMenu(
             this,
             chanponStorage,
@@ -220,6 +223,7 @@ class MWMChanponPlugin : JavaPlugin() {
         MyWorldManagerApi.registerWorldPlayerStatePolicy(worldPlayerStatePolicy)
         MyWorldManagerApi.registerWorldDeleteGuard(productionWorldGuard)
         MyWorldManagerApi.registerMenuExtension(productionToggleExtension)
+        MyWorldManagerApi.registerCreationConfirmationMenuProvider(creationConfirmationMenuProvider)
         MyWorldManagerApi.registerAdminWorldListProvider(chanponAdminWorldListMenu)
         MyWorldManagerApi.registerWorldSettingsMenuProvider(submittedWorldMenuProvider)
         MyWorldManagerApi.registerWorldSettingsMenuProvider(chanponWorldSettingsMenuProvider)
@@ -244,6 +248,7 @@ class MWMChanponPlugin : JavaPlugin() {
             command.tabCompleter = adminCommand
         }
         server.pluginManager.registerEvents(productionToggleExtension, this)
+        server.pluginManager.registerEvents(creationConfirmationMenuProvider, this)
         server.pluginManager.registerEvents(submissionAdminMenu, this)
         server.pluginManager.registerEvents(chanponAdminMenu, this)
         server.pluginManager.registerEvents(worldDataManagementMenu, this)
@@ -306,6 +311,9 @@ class MWMChanponPlugin : JavaPlugin() {
         }
         if (::productionToggleExtension.isInitialized) {
             MyWorldManagerApi.unregisterMenuExtension(productionToggleExtension)
+        }
+        if (::creationConfirmationMenuProvider.isInitialized) {
+            MyWorldManagerApi.unregisterCreationConfirmationMenuProvider(creationConfirmationMenuProvider)
         }
         if (::chanponAdminWorldListMenu.isInitialized) {
             MyWorldManagerApi.unregisterAdminWorldListProvider(chanponAdminWorldListMenu)
