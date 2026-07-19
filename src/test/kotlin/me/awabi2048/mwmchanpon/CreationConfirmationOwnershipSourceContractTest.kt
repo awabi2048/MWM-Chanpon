@@ -19,6 +19,12 @@ class CreationConfirmationOwnershipSourceContractTest {
         val extension = Files.readString(
             Path.of("src/main/kotlin/me/awabi2048/mwmchanpon/extension/ProductionToggleExtension.kt")
         )
+        val playerMenu = Files.readString(
+            Path.of("src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponPlayerWorldMenuProvider.kt")
+        )
+        val easyCreation = Files.readString(
+            Path.of("src/main/kotlin/me/awabi2048/mwmchanpon/service/EasyVoidWorldCreationService.kt")
+        )
 
         assertTrue(plugin.contains("registerCreationConfirmationMenuProvider(creationConfirmationMenuProvider)"))
         assertTrue(plugin.contains("unregisterCreationConfirmationMenuProvider(creationConfirmationMenuProvider)"))
@@ -28,5 +34,7 @@ class CreationConfirmationOwnershipSourceContractTest {
         assertFalse(provider.contains("isWorldPointEconomyEnabled"))
         assertFalse(extension.contains("\"creation_confirm\""))
         assertFalse(extension.contains("CreationConfirmationLayout"))
+        assertTrue(playerMenu.contains("session.billingMode = WorldPointBillingMode.NONE"))
+        assertTrue(easyCreation.contains("billingMode = WorldPointBillingMode.NONE"))
     }
 }

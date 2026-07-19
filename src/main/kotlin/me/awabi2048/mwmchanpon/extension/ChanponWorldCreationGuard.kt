@@ -34,20 +34,23 @@ class ChanponWorldCreationGuard(
         }
 
         val player = request.player
+        val targetUuid = request.targetUuid ?: player?.uniqueId
         if (request.operation == WorldCreationOperation.NORMAL &&
-            player != null &&
-            !canBypassWorldLimits(player)
+            targetUuid != null &&
+            (player == null || !canBypassWorldLimits(player))
         ) {
             val repository = MyWorldManagerApi.getWorldRepository()
-            val ownerCount = repository?.findByOwner(player.uniqueId)?.size ?: 0
+            val ownerCount = repository?.findByOwner(targetUuid)?.size ?: 0
             val maxWorlds = plugin.config.getInt("creation.max_worlds_per_player", 50)
             if (ownerCount >= maxWorlds) {
                 return WorldCreationDecision.deny(
-                    CCSystem.getAPI().getI18nComponent(
-                        player,
+                    request.actor?.let {
+                        CCSystem.getAPI().getI18nComponent(
+                        it as? org.bukkit.entity.Player,
                         "myworld.gui.creation.limit_reached",
                         mapOf("current" to ownerCount, "max" to maxWorlds)
-                    )
+                        )
+                    }
                 )
             }
         }

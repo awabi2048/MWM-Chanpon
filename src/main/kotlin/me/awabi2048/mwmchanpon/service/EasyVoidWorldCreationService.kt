@@ -20,6 +20,7 @@ import me.awabi2048.myworldmanager.api.extension.WorldCreationRequest
 import me.awabi2048.myworldmanager.api.extension.WorldCreationType
 import me.awabi2048.myworldmanager.api.service.ManagedWorldCreationRequest
 import me.awabi2048.myworldmanager.api.service.ManagedWorldSpawn
+import me.awabi2048.myworldmanager.api.service.WorldPointBillingMode
 import me.awabi2048.myworldmanager.util.WorldNameValidation
 import net.kyori.adventure.key.Key
 import net.kyori.adventure.text.Component
@@ -168,6 +169,8 @@ class EasyVoidWorldCreationService(
                 generator = EASY_VOID_GENERATOR,
                 generateStructures = false,
                 initialSpawn = ManagedWorldSpawn(0, SPAWN_Y, 0),
+                cost = 0,
+                billingMode = WorldPointBillingMode.NONE,
                 initializeWorld = ::placePlatform
             )
         ).thenAccept { success ->

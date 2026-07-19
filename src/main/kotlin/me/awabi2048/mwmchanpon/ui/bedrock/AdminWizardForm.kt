@@ -225,7 +225,13 @@ class AdminWizardForm(
             fail(player, session.request)
             return
         }
-        service.createFromTemplate(template.id, session.request.ownerUuid, name, 0).whenComplete { success, error ->
+        service.createFromTemplate(
+            template.id,
+            session.request.ownerUuid,
+            name,
+            0,
+            me.awabi2048.myworldmanager.api.service.WorldPointBillingMode.NONE
+        ).whenComplete { success, error ->
             Bukkit.getScheduler().runTask(plugin, Runnable {
                 if (error != null || success != true) {
                     player.sendMessage(CCSystem.getAPI().getI18nComponent(player, "chanpon.admin_wizard.create_failed"))

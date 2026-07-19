@@ -22,6 +22,7 @@ import me.awabi2048.myworldmanager.api.extension.PlayerWorldMenuProvider
 import me.awabi2048.myworldmanager.api.extension.PlayerWorldMenuRequest
 import me.awabi2048.myworldmanager.api.extension.WorldCreationOperation
 import me.awabi2048.myworldmanager.api.extension.WorldCreationRequest
+import me.awabi2048.myworldmanager.api.service.WorldPointBillingMode
 import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.session.SettingsAction
 import me.awabi2048.myworldmanager.util.GuiLoreActions
@@ -146,6 +147,7 @@ class ChanponPlayerWorldMenuProvider(
                 }
                 val session = mwm.creationSessionManager.startSession(player.uniqueId)
                 session.isDialogMode = true
+                session.billingMode = WorldPointBillingMode.NONE
                 player.closeInventory()
                 player.sendMessage(mwm.languageManager.getMessage(player, "messages.wizard_start"))
                 mwm.creationGui.openTypeSelection(player)

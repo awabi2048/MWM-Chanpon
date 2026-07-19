@@ -25,6 +25,7 @@ class AdminWizardFormTest {
         assertTrue(source.contains("ApiTemplateValidationIssue.MISSING_DIRECTORY"))
         assertTrue(source.contains("ApiTemplateValidationIssue.MISSING_ORIGIN"))
         assertTrue(source.contains("service.previewTemplate(player, template.id)"))
-        assertTrue(source.contains("service.createFromTemplate(template.id"))
+        assertTrue(source.contains("service.createFromTemplate("))
+        assertTrue(source.contains("WorldPointBillingMode.NONE"))
     }
 }

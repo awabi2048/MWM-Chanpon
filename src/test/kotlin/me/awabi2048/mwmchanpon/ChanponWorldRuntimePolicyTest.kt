@@ -1,7 +1,6 @@
 package me.awabi2048.mwmchanpon
 
 import me.awabi2048.mwmchanpon.extension.ChanponWorldRuntimePolicy
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Test
 
@@ -12,7 +11,10 @@ class ChanponWorldRuntimePolicyTest {
 
         assertFalse(policy.isWorldPointEconomyEnabled())
         assertFalse(policy.isWorldSlotSystemEnabled())
-        assertEquals(7, policy.getMaxCreateCountDefault(7))
-        assertEquals(12, policy.getMaxWorldSlotLimit(12))
+        val methodNames = policy.javaClass.methods.map { it.name }.toSet()
+        assertFalse("getCreationCost" in methodNames)
+        assertFalse("getExpansionCost" in methodNames)
+        assertFalse("getEnvironmentCost" in methodNames)
+        assertFalse("getPortalWorldGatePointCostPerBlock" in methodNames)
     }
 }

@@ -128,6 +128,9 @@ class MWMChanponPlugin : JavaPlugin() {
                         require(config.getInt("creation.max_worlds_per_player", 50) >= 1) {
                             "creation.max_worlds_per_player must be at least 1"
                         }
+                        require(config.getInt("world_expansion.max_level", 3) >= 0) {
+                            "world_expansion.max_level must not be negative"
+                        }
                     },
                     reloadAction = { reloadConfig() }
                 )
