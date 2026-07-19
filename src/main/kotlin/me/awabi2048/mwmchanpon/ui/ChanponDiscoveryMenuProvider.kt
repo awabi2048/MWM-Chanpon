@@ -5,7 +5,6 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
-import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import me.awabi2048.myworldmanager.MyWorldManager
@@ -34,7 +33,6 @@ import org.bukkit.plugin.java.JavaPlugin
 
 class ChanponDiscoveryMenuProvider(
     private val plugin: MWMChanponPlugin,
-    private val globalStorage: ChanponGlobalStorage,
     private val storage: ChanponWorldStorage
 ) : DiscoveryMenuProvider, Listener {
     private val legacy = LegacyComponentSerializer.legacySection()
@@ -44,11 +42,6 @@ class ChanponDiscoveryMenuProvider(
     override fun open(player: Player, request: DiscoveryMenuRequest): Boolean {
         val mwm = mwm()
         if (mwm.playerPlatformResolver.isBedrock(player)) return false
-        if (globalStorage.isArchiveLocked() && !player.hasPermission("mwmchanpon.admin")) {
-            player.sendMessage(CCSystem.getAPI().getI18nString(player, "chanpon.backup.message.archive_locked"))
-            return true
-        }
-
         val holder = Holder()
         val layout = ChanponGuiElements.settingsLayout()
         val inventory = Bukkit.createInventory(

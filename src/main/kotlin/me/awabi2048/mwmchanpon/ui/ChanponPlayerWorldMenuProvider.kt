@@ -13,7 +13,6 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.service.EasyVoidWorldCreationService
-import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
@@ -47,7 +46,6 @@ import org.bukkit.plugin.java.JavaPlugin
 
 class ChanponPlayerWorldMenuProvider(
     private val plugin: MWMChanponPlugin,
-    private val globalStorage: ChanponGlobalStorage,
     private val storage: ChanponWorldStorage,
     private val easyVoidCreationService: EasyVoidWorldCreationService
 ) : PlayerWorldMenuProvider, Listener {
@@ -61,11 +59,6 @@ class ChanponPlayerWorldMenuProvider(
         val targetPlayerUuid = request.targetPlayerUuid ?: player.uniqueId
         val targetPlayerName = request.targetPlayerName ?: player.name
         val isOwnMenu = targetPlayerUuid == player.uniqueId
-        if (globalStorage.isArchiveLocked() && !player.hasPermission("mwmchanpon.admin")) {
-            player.sendMessage(i18n(player, "message.archive_locked"))
-            return true
-        }
-
         val session = mwm.playerWorldSessionManager.getSession(player.uniqueId)
         session.showBackButton = request.showBackButton
         val worlds = mwm.playerWorldGui.getPlayerWorlds(targetPlayerUuid)

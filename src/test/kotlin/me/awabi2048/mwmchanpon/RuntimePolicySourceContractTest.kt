@@ -11,7 +11,8 @@ class RuntimePolicySourceContractTest {
     fun `daily update remains available while MWM expiration archive is disabled`() {
         val command = read("src/main/kotlin/me/awabi2048/mwmchanpon/extension/ChanponCommandExtension.kt")
         val runtime = read("src/main/kotlin/me/awabi2048/mwmchanpon/extension/ChanponWorldRuntimePolicy.kt")
-        assertFalse(command.contains("\"update-day\" ->"))
+        assertTrue(command.contains("\"reload\", \"update-day\", \"give\", \"stats\" -> ChanponOperation.EDIT"))
+        assertFalse(command.contains("\"update-day\" -> false"))
         assertTrue(runtime.contains("isExpirationArchiveEnabled(): Boolean = false"))
     }
 

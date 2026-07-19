@@ -1,11 +1,12 @@
 package me.awabi2048.mwmchanpon.extension
 
-import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
+import me.awabi2048.mwmchanpon.service.ArchiveOperationGuard
+import me.awabi2048.mwmchanpon.service.ChanponOperation
 import me.awabi2048.myworldmanager.api.extension.CommandPolicy
 import org.bukkit.command.CommandSender
 
 class ChanponCommandExtension(
-    private val globalStorage: ChanponGlobalStorage
+    private val archiveOperationGuard: ArchiveOperationGuard
 ) : CommandPolicy {
     override fun getId(): String = "mwmchanpon.command"
 
@@ -14,7 +15,7 @@ class ChanponCommandExtension(
         subCommand: String,
         args: List<String>
     ): Boolean {
-        if (isArchiveLockedFor(sender)) return false
+        if (!archiveOperationGuard.canPerform(sender, operationFor(subCommand, args))) return false
         return when (subCommand.lowercase()) {
             "stats" -> false
             "give" -> !isWorldSeedGive(args)
@@ -27,7 +28,7 @@ class ChanponCommandExtension(
         subCommand: String,
         args: List<String>
     ): Boolean {
-        if (isArchiveLockedFor(sender)) return false
+        if (!archiveOperationGuard.canPerform(sender, operationFor(subCommand, args))) return false
         return when (subCommand.lowercase()) {
             "stats" -> false
             else -> true
@@ -42,6 +43,16 @@ class ChanponCommandExtension(
         return args.size >= 3 && args[2].equals("world_seed", ignoreCase = true)
     }
 
-    private fun isArchiveLockedFor(sender: CommandSender): Boolean =
-        globalStorage.isArchiveLocked() && !sender.hasPermission("mwmchanpon.admin")
+    private fun operationFor(subCommand: String, args: List<String>): ChanponOperation =
+        when (subCommand.lowercase()) {
+            "list" -> ChanponOperation.READ
+            "migration" -> if (args.getOrNull(1).equals("status", ignoreCase = true)) {
+                ChanponOperation.DIAGNOSE
+            } else {
+                ChanponOperation.EDIT
+            }
+            "create" -> ChanponOperation.CREATE
+            "reload", "update-day", "give", "stats" -> ChanponOperation.EDIT
+            else -> ChanponOperation.EDIT
+        }
 }

@@ -32,6 +32,7 @@ import me.awabi2048.mwmchanpon.protection.WorldBuildPermissionService
 import me.awabi2048.mwmchanpon.service.BackupAutomationService
 import me.awabi2048.mwmchanpon.service.ChanponSpawnWorldService
 import me.awabi2048.mwmchanpon.service.EasyVoidWorldCreationService
+import me.awabi2048.mwmchanpon.service.ArchiveOperationGuard
 import me.awabi2048.mwmchanpon.service.ManualRollbackService
 import me.awabi2048.mwmchanpon.service.PublishLevelSynchronizer
 import me.awabi2048.mwmchanpon.service.WorldDataExportService
@@ -225,13 +226,14 @@ class MWMChanponPlugin : JavaPlugin() {
         environmentGui = ChanponEnvironmentGui(this, chanponStorage, submittedProtectionService, buildPermissionService)
         chanponWorldSettingsMenuProvider = ChanponWorldSettingsMenuProvider(this, chanponStorage, submittedProtectionService, environmentGui)
         easyVoidWorldCreationService = EasyVoidWorldCreationService(this)
-        playerWorldMenuProvider = ChanponPlayerWorldMenuProvider(this, globalStorage, chanponStorage, easyVoidWorldCreationService)
-        worldAccessPolicy = ChanponWorldAccessPolicy(globalStorage, chanponStorage)
+        val archiveOperationGuard = ArchiveOperationGuard(globalStorage)
+        playerWorldMenuProvider = ChanponPlayerWorldMenuProvider(this, chanponStorage, easyVoidWorldCreationService)
+        worldAccessPolicy = ChanponWorldAccessPolicy(archiveOperationGuard, chanponStorage)
         worldMenuAccessProvider = ChanponWorldMenuAccessProvider(chanponStorage)
         worldPortalPolicy = ChanponWorldPortalPolicy(chanponStorage)
         worldPublishPolicy = ChanponWorldPublishPolicy(chanponStorage)
         worldRuntimePolicy = ChanponWorldRuntimePolicy()
-        commandExtension = ChanponCommandExtension(globalStorage)
+        commandExtension = ChanponCommandExtension(archiveOperationGuard)
         worldCreationGuard = ChanponWorldCreationGuard(this, globalStorage)
         worldPlayerStatePolicy = ChanponWorldPlayerStatePolicy(globalStorage)
         MyWorldManagerApi.registerWorldCreationGuard(worldCreationGuard)
