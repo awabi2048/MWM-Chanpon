@@ -301,7 +301,7 @@ class ChanponWorldSettingsMenuProvider(
             }
             ItemTag.TYPE_GUI_SETTING_PUBLISH -> {
                 mwm.soundManager.playClickSound(player, item, "world_settings")
-                val nextVisibility = nextVisibility(storage.getVisibility(worldUuid), event.isRightClick)
+                val nextVisibility = nextVisibility(storage.getVisibility(worldUuid), event.isLeftClick)
                 storage.setVisibility(worldUuid, nextVisibility)
                 open(player, worldData, currentRequest(player))
             }
@@ -754,7 +754,7 @@ class ChanponWorldSettingsMenuProvider(
                     add(GuiLoreLine.Option(displayName, selected, selectedColor, "\u00A77"))
                 }
                 add(GuiLoreLine.Spacer)
-                add(GuiLoreActions.cycle(mwm().languageManager, player))
+                addAll(GuiLoreActions.cyclePreviousNext(mwm().languageManager, player))
             }, GuiLoreFrame.BOTH)
         )
         return componentItem(Material.OAK_SIGN, i18n(player, "publish.title"), lore, ItemTag.TYPE_GUI_SETTING_PUBLISH)

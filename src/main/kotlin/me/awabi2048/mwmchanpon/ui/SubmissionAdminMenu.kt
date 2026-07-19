@@ -108,7 +108,7 @@ class SubmissionAdminMenu(
                 val page = ItemTag.getTargetPage(item) ?: holder.page
                 open(player, page, holder.progressFilter, holder.sortType)
             }
-            TYPE_MENU_CONTROL -> handleControlItem(player, holder, item, event.click.isRightClick)
+            TYPE_MENU_CONTROL -> handleControlItem(player, holder, item, event.click.isLeftClick)
             ItemTag.TYPE_GUI_WORLD_ITEM -> handleWorldItem(player, holder, item, event.click)
         }
     }
@@ -568,7 +568,7 @@ class SubmissionAdminMenu(
                     add(GuiLoreLine.Option(i18n(player, optionKey), selected, "\u00A7f", "\u00A77"))
                 }
                 add(GuiLoreLine.Spacer)
-                add(GuiLoreActions.cycle(mwm().languageManager, player))
+                addAll(GuiLoreActions.cyclePreviousNext(mwm().languageManager, player))
             }, GuiLoreFrame.BOTH)
         )
         item.editMeta { meta ->
