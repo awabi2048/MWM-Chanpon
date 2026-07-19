@@ -8,6 +8,9 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.service.EasyVoidWorldCreationService
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
@@ -74,6 +77,7 @@ class ChanponPlayerWorldMenuProvider(
         val holder = Holder(page, request.showBackButton, targetPlayerUuid, targetPlayerName)
         val inventory = Bukkit.createInventory(holder, pageLayout.layout.size, title)
         holder.inv = inventory
+        val footerStart = inventory.size - 9
 
         mwm.settingsSessionManager.updateSessionAction(
             player,
@@ -102,6 +106,7 @@ class ChanponPlayerWorldMenuProvider(
         inventory.setItem(pageLayout.layout.actionSlot, createPlayerInfoItem(player, targetPlayerUuid, targetPlayerName))
         if (isOwnMenu) {
             inventory.setItem(pageLayout.layout.actionSlot + 2, createUserSettingsButton(player))
+            inventory.setItem(footerStart + 7, createPendingButton(player))
         }
 
         if (page > 0) {
@@ -111,7 +116,7 @@ class ChanponPlayerWorldMenuProvider(
             inventory.setItem(pageLayout.layout.backSlot, createReturnItem(player))
         }
         if (page + 1 < pageLayout.totalPages) {
-            inventory.setItem(pageLayout.layout.nextPageSlot, createPageItem(player, page + 1, true))
+            inventory.setItem(footerStart + 8, createPageItem(player, page + 1, true))
         }
 
         mwm.soundManager.playMenuOpenSound(player, "player_world")
@@ -158,6 +163,17 @@ class ChanponPlayerWorldMenuProvider(
                 mwm.soundManager.playClickSound(player, item, "player_world")
                 mwm.menuRouteHistory.pushPlayerWorld(player, holder.page, holder.showBackButton)
                 mwm.userSettingsGui.open(player, true)
+            }
+            ItemTag.TYPE_GUI_PENDING_BUTTON -> {
+                if (holder.targetPlayerUuid != player.uniqueId) return
+                mwm.soundManager.playClickSound(player, item, "player_world")
+                mwm.pendingInteractionGui.open(
+                    player = player,
+                    page = 0,
+                    returnPage = holder.page,
+                    showBackButton = holder.showBackButton,
+                    fromBedrockMenu = false
+                )
             }
             ItemTag.TYPE_GUI_WORLD_ITEM -> handleWorldClick(player, holder, item, event)
         }
@@ -315,6 +331,53 @@ class ChanponPlayerWorldMenuProvider(
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
+        return item
+    }
+
+    private fun createPendingButton(player: Player): ItemStack {
+        val mwm = mwm()
+        val lang = mwm.languageManager
+        val pendingCount = mwm.pendingDecisionManager.getPendingCount(player.uniqueId)
+        val latestPendingText = mwm.pendingDecisionManager
+            .getLatestPendingCreatedAt(player.uniqueId)
+            ?.let {
+                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+                    .withZone(ZoneId.systemDefault())
+                    .format(Instant.ofEpochMilli(it))
+            }
+            ?: lang.getMessage(player, "gui.player_world.pending_button.none")
+        val item = ItemStack(Material.WRITABLE_BOOK)
+        item.editMeta { meta ->
+            meta.displayName(lang.getComponent(player, "gui.player_world.pending_button.display"))
+            meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(listOf(
+                GuiLoreBlock(
+                    lang.getMessageList(player, "gui.player_world.pending_button.description")
+                        .map(GuiLoreLine::Text)
+                ),
+                GuiLoreBlock(listOf(
+                    GuiLoreLine.Data(
+                        lang.getMessage(player, "gui.player_world.pending_button.count_label"),
+                        pendingCount,
+                        if (pendingCount > 0) "§e" else "§7"
+                    ),
+                    GuiLoreLine.Data(
+                        lang.getMessage(player, "gui.player_world.pending_button.latest_label"),
+                        latestPendingText,
+                        "§b"
+                    )
+                )),
+                GuiLoreBlock(listOf(
+                    GuiLoreActions.singleClick(
+                        lang,
+                        player,
+                        lang.getMessage(player, "gui.player_world.pending_button.action")
+                    )
+                ))
+            ))))
+            meta.setEnchantmentGlintOverride(pendingCount > 0)
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
+        }
+        ItemTag.tagItem(item, ItemTag.TYPE_GUI_PENDING_BUTTON)
         return item
     }
 
