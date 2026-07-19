@@ -95,8 +95,7 @@ class ChanponPlayerWorldMenuProvider(
         }
 
         val currentCreateCount = worlds.count { it.owner == targetPlayerUuid }
-        val configuredMaxCreateCount = mwm.config.getInt("creation.max_create_count_default", 3)
-        val maxCreateCount = MyWorldManagerApi.getWorldRuntimePolicy().getMaxCreateCountDefault(configuredMaxCreateCount)
+        val maxCreateCount = plugin.config.getInt("creation.max_worlds_per_player", 50)
         val creationBlockReason = creationBlockReason(player, currentCreateCount, maxCreateCount)
         if (isOwnMenu && creationBlockReason == null && hasCreatePermission(player)) {
             inventory.setItem(pageLayout.layout.actionSlot - 2, createCreationButton(player))
@@ -454,7 +453,7 @@ class ChanponPlayerWorldMenuProvider(
             player.hasPermission("craftercrossing.test")
 
     private fun hasCreatePermission(player: Player): Boolean =
-        player.hasPermission("myworldmanager.command.mwm.create") ||
+        player.hasPermission("myworldmanager.world.create") ||
             player.hasPermission("myworldmanager.admin") ||
             player.hasPermission("mwmchanpon.admin") ||
             player.hasPermission("craftercrossing.test")

@@ -112,10 +112,20 @@ class MWMChanponPlugin : JavaPlugin() {
                     sourcePlugin = this,
                     resourcePath = "config.yml",
                     targetPath = dataFolder.resolve("config.yml").toPath(),
-                    currentVersion = 1,
+                    currentVersion = 2,
                     classification = com.awabi2048.ccsystem.api.config.ConfigClassification.MANAGED_CONFIG,
-                    migrations = emptyMap(),
-                    validator = com.awabi2048.ccsystem.api.config.ConfigValidator {},
+                    migrations = mapOf(
+                        1 to com.awabi2048.ccsystem.api.config.ConfigMigration { config ->
+                            if (!config.contains("creation.max_worlds_per_player")) {
+                                config.set("creation.max_worlds_per_player", 50)
+                            }
+                        }
+                    ),
+                    validator = com.awabi2048.ccsystem.api.config.ConfigValidator { config ->
+                        require(config.getInt("creation.max_worlds_per_player", 50) >= 1) {
+                            "creation.max_worlds_per_player must be at least 1"
+                        }
+                    },
                     reloadAction = { reloadConfig() }
                 )
             )
@@ -217,7 +227,7 @@ class MWMChanponPlugin : JavaPlugin() {
         worldPublishPolicy = ChanponWorldPublishPolicy(chanponStorage)
         worldRuntimePolicy = ChanponWorldRuntimePolicy()
         commandExtension = ChanponCommandExtension(this, globalStorage)
-        worldCreationGuard = ChanponWorldCreationGuard(globalStorage)
+        worldCreationGuard = ChanponWorldCreationGuard(this, globalStorage)
         worldPlayerStatePolicy = ChanponWorldPlayerStatePolicy(globalStorage)
         MyWorldManagerApi.registerWorldCreationGuard(worldCreationGuard)
         MyWorldManagerApi.registerWorldPlayerStatePolicy(worldPlayerStatePolicy)

@@ -262,6 +262,14 @@ class EasyVoidWorldCreationService(
     }
 
     private fun canCreate(player: Player): Boolean {
+        if (!player.hasPermission("myworldmanager.world.create") &&
+            !player.hasPermission("myworldmanager.admin") &&
+            !player.hasPermission("mwmchanpon.admin") &&
+            !player.hasPermission("craftercrossing.test")
+        ) {
+            player.sendMessage(mwm().languageManager.getMessage(player, "no_permission"))
+            return false
+        }
         val decision = MyWorldManagerApi.checkWorldCreation(
             WorldCreationRequest(
                 actor = player,
