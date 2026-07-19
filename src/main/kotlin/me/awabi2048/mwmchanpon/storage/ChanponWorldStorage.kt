@@ -41,12 +41,17 @@ enum class ChanponWorldProtectionMode(val storageValue: String, val i18nKey: Str
 
 class ChanponWorldStorage(dataFolder: File) {
     private val worldsDir = File(dataFolder, "my_worlds")
+    private var visibilitySyncHandler: ((UUID) -> Unit)? = null
 
     init {
         worldsDir.mkdirs()
     }
 
     fun worldFile(worldUuid: UUID): File = File(worldsDir, "${worldUuid}.yml")
+
+    fun setVisibilitySyncHandler(handler: (UUID) -> Unit) {
+        visibilitySyncHandler = handler
+    }
 
     fun isProductionWorld(worldUuid: UUID): Boolean {
         val config = load(worldUuid) ?: return false
@@ -91,6 +96,7 @@ class ChanponWorldStorage(dataFolder: File) {
         config.set("development_set_at", null)
         config.set("visibility_set_at", LocalDateTime.now().toString())
         config.save(worldFile(worldUuid))
+        visibilitySyncHandler?.invoke(worldUuid)
     }
 
     fun getProtectionMode(worldUuid: UUID): ChanponWorldProtectionMode {

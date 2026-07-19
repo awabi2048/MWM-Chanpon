@@ -10,6 +10,8 @@ class ChanponWorldRuntimePolicy : WorldRuntimePolicy {
 
     override fun isWorldSlotSystemEnabled(): Boolean = false
 
+    override fun isExpirationArchiveEnabled(): Boolean = false
+
     override fun getCreationCost(type: WorldCreationType, configuredCost: Int): Int = 0
 
     override fun getMaxCreateCountDefault(configuredLimit: Int): Int = configuredLimit

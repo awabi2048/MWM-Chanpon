@@ -71,7 +71,9 @@ class ChanponWorldMenuAccessProvider(
             player = player,
             worldUuid = worldData.uuid,
             addedByUuid = worldData.owner,
-            source = MwmMemberAddSource.PASSWORD
+            source = MwmMemberAddSource.EXTERNAL,
+            providerId = "mwm-chanpon",
+            detail = "password"
         )
         player.sendMessage(i18n(player, "protection.password_success"))
         openWorldSettings(player, worldData, request.showBackButton)

@@ -1,12 +1,10 @@
 package me.awabi2048.mwmchanpon.extension
 
-import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.myworldmanager.api.extension.CommandPolicy
 import org.bukkit.command.CommandSender
 
 class ChanponCommandExtension(
-    private val plugin: MWMChanponPlugin,
     private val globalStorage: ChanponGlobalStorage
 ) : CommandPolicy {
     override fun getId(): String = "mwmchanpon.command"
@@ -19,7 +17,6 @@ class ChanponCommandExtension(
         if (isArchiveLockedFor(sender)) return false
         return when (subCommand.lowercase()) {
             "stats" -> false
-            "update-day" -> archiveEnabled()
             "give" -> !isWorldSeedGive(args)
             else -> true
         }
@@ -33,7 +30,6 @@ class ChanponCommandExtension(
         if (isArchiveLockedFor(sender)) return false
         return when (subCommand.lowercase()) {
             "stats" -> false
-            "update-day" -> archiveEnabled()
             else -> true
         }
     }
@@ -45,8 +41,6 @@ class ChanponCommandExtension(
     private fun isWorldSeedGive(args: List<String>): Boolean {
         return args.size >= 3 && args[2].equals("world_seed", ignoreCase = true)
     }
-
-    private fun archiveEnabled(): Boolean = plugin.config.getBoolean("archive.enabled", false)
 
     private fun isArchiveLockedFor(sender: CommandSender): Boolean =
         globalStorage.isArchiveLocked() && !sender.hasPermission("mwmchanpon.admin")
