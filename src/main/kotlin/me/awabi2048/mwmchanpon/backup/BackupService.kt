@@ -22,13 +22,14 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import kotlin.io.path.isDirectory
+import me.awabi2048.myworldmanager.api.service.WorldOperation
+import me.awabi2048.myworldmanager.api.service.WorldOperationLease
 
 class BackupService(
     private val plugin: MWMChanponPlugin,
     private val storage: ChanponWorldStorage
 ) {
     private val rootDir = File(plugin.dataFolder, "backups")
-    private val operationLocks = ConcurrentHashMap.newKeySet<UUID>()
     private val activeBackupIds = ConcurrentHashMap.newKeySet<String>()
     private val createdFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
     private var postRestoreHandler: (List<UUID>) -> Unit = {}
@@ -153,9 +154,11 @@ class BackupService(
                 restoreFailure(entry, requestedWorlds, "no production worlds")
             )
         }
-        val locked = targets.filter { operationLocks.add(it) }
-        if (locked.size != targets.size) {
-            locked.forEach(operationLocks::remove)
+        val leases = targets.mapNotNull {
+            MyWorldManagerApi.tryAcquireWorldOperation(it, WorldOperation.RESTORE)
+        }
+        if (leases.size != targets.size) {
+            leases.forEach(WorldOperationLease::close)
             activeBackupIds.remove(entry.id)
             return CompletableFuture.completedFuture(
                 restoreFailure(entry, targets, "world is locked")
@@ -165,7 +168,7 @@ class BackupService(
         val future = CompletableFuture<RestoreOperationResult>()
         val core = MyWorldManagerApi.getWorldService()
         if (core == null) {
-            targets.forEach(operationLocks::remove)
+            leases.forEach(WorldOperationLease::close)
             activeBackupIds.remove(entry.id)
             future.complete(restoreFailure(entry, targets, "core api unavailable"))
             return future
@@ -173,12 +176,12 @@ class BackupService(
 
         val evacuatedPlayers = evacuatePlayers(targets)
         if (evacuatedPlayers == null) {
-            targets.forEach(operationLocks::remove)
+            leases.forEach(WorldOperationLease::close)
             activeBackupIds.remove(entry.id)
             future.complete(restoreFailure(entry, targets, "spawn world is not configured or unavailable"))
             return future
         }
-        unloadSequential(targets, save = true).thenCompose { unloaded ->
+        unloadSequential(targets, save = true, leases.associateBy { it.worldUuid }).thenCompose { unloaded ->
             if (!unloaded) {
                 CompletableFuture.completedFuture(
                     RestoreOperationResult(BackupOperationStatus.FAILED, emptyList(), targets, null, "failed to unload worlds")
@@ -221,7 +224,7 @@ class BackupService(
                     }
             }
         }.whenComplete { result, throwable ->
-            targets.forEach(operationLocks::remove)
+            leases.forEach(WorldOperationLease::close)
             activeBackupIds.remove(entry.id)
             if (throwable != null) {
                 val failedResult =
@@ -316,15 +319,19 @@ class BackupService(
                 BackupOperationResult(BackupOperationStatus.FAILED, null, "no production worlds")
             )
         }
-        val locked = if (acquireLocks) targets.filter { operationLocks.add(it) } else emptyList()
-        if (acquireLocks && locked.size != targets.size) {
-            locked.forEach(operationLocks::remove)
+        val leases = if (acquireLocks) {
+            targets.mapNotNull { MyWorldManagerApi.tryAcquireWorldOperation(it, WorldOperation.BACKUP) }
+        } else {
+            emptyList()
+        }
+        if (acquireLocks && leases.size != targets.size) {
+            leases.forEach(WorldOperationLease::close)
             return CompletableFuture.completedFuture(
                 BackupOperationResult(BackupOperationStatus.FAILED, null, "world is locked")
             )
         }
         runCatching { saveLoadedWorlds(targets) }.getOrElse { ex ->
-            locked.forEach(operationLocks::remove)
+            leases.forEach(WorldOperationLease::close)
             return CompletableFuture.completedFuture(
                 BackupOperationResult(BackupOperationStatus.FAILED, null, ex.message ?: "failed to save worlds")
             )
@@ -347,7 +354,7 @@ class BackupService(
                 dir.deleteRecursively()
                 future.complete(BackupOperationResult(BackupOperationStatus.FAILED, null, ex.message ?: "backup failed"))
             } finally {
-                locked.forEach(operationLocks::remove)
+                leases.forEach(WorldOperationLease::close)
             }
         })
         return future
@@ -445,12 +452,20 @@ class BackupService(
         return future
     }
 
-    private fun unloadSequential(worldUuids: List<UUID>, save: Boolean): CompletableFuture<Boolean> {
+    private fun unloadSequential(
+        worldUuids: List<UUID>,
+        save: Boolean,
+        leases: Map<UUID, WorldOperationLease>
+    ): CompletableFuture<Boolean> {
         val core = MyWorldManagerApi.getWorldService() ?: return CompletableFuture.completedFuture(false)
         var chain = CompletableFuture.completedFuture(true)
         worldUuids.forEach { uuid ->
             chain = chain.thenCompose { ok ->
-                if (!ok) CompletableFuture.completedFuture(false) else core.unloadWorldForMaintenance(uuid, save)
+                if (!ok) {
+                    CompletableFuture.completedFuture(false)
+                } else {
+                    core.unloadWorldForMaintenance(uuid, save, leases[uuid])
+                }
             }
         }
         return chain
