@@ -2,6 +2,7 @@ package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiCycle
+import com.awabi2048.ccsystem.api.gui.GuiCycleDirection
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
@@ -301,7 +302,10 @@ class ChanponWorldSettingsMenuProvider(
             }
             ItemTag.TYPE_GUI_SETTING_PUBLISH -> {
                 mwm.soundManager.playClickSound(player, item, "world_settings")
-                val nextVisibility = nextVisibility(storage.getVisibility(worldUuid), event.isLeftClick)
+                val nextVisibility = cycleVisibility(
+                    storage.getVisibility(worldUuid),
+                    GuiCycle.direction(event.click) ?: return
+                )
                 storage.setVisibility(worldUuid, nextVisibility)
                 open(player, worldData, currentRequest(player))
             }
@@ -1121,7 +1125,10 @@ class ChanponWorldSettingsMenuProvider(
         return i18n(player, "visibility.${visibility.storageValue}")
     }
 
-    private fun nextVisibility(current: ChanponWorldVisibility, reverse: Boolean): ChanponWorldVisibility {
+    private fun cycleVisibility(
+        current: ChanponWorldVisibility,
+        direction: GuiCycleDirection
+    ): ChanponWorldVisibility {
         return GuiCycle.select(
             current,
             listOf(
@@ -1129,7 +1136,7 @@ class ChanponWorldSettingsMenuProvider(
             ChanponWorldVisibility.DEVELOPMENT,
             ChanponWorldVisibility.PRIVATE
             ),
-            reverse
+            direction
         )
     }
 

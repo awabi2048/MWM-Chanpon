@@ -2,6 +2,7 @@ package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiCycle
+import com.awabi2048.ccsystem.api.gui.GuiCycleDirection
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
@@ -111,16 +112,26 @@ class ChanponAdminWorldListMenu(
             ItemTag.TYPE_GUI_NAV_PREV, ItemTag.TYPE_GUI_NAV_NEXT -> {
                 open(player, ItemTag.getTargetPage(item) ?: holder.page, holder.visibilityFilter, holder.sortType, holder.fromAdminMenu)
             }
-            ItemTag.TYPE_GUI_EXTENSION -> handleControl(player, holder, item, event.click.isLeftClick)
+            ItemTag.TYPE_GUI_EXTENSION -> handleControl(
+                player,
+                holder,
+                item,
+                GuiCycle.direction(event.click) ?: return
+            )
             ItemTag.TYPE_GUI_WORLD_ITEM, ItemTag.TYPE_GUI_ADMIN_CURRENT_WORLD_INFO -> handleWorldClick(player, item, event.click)
         }
     }
 
-    private fun handleControl(player: Player, holder: ChanponAdminWorldListHolder, item: ItemStack, reverse: Boolean) {
+    private fun handleControl(
+        player: Player,
+        holder: ChanponAdminWorldListHolder,
+        item: ItemStack,
+        direction: GuiCycleDirection
+    ) {
         if (ItemTag.getExtensionId(item) != PROVIDER_ID) return
         when (ItemTag.getString(item, ACTION_KEY)) {
-            ACTION_VISIBILITY_FILTER -> open(player, 0, GuiCycle.select(holder.visibilityFilter, VisibilityFilter.entries, reverse), holder.sortType, holder.fromAdminMenu)
-            ACTION_SORT -> open(player, 0, holder.visibilityFilter, GuiCycle.select(holder.sortType, SortType.entries, reverse), holder.fromAdminMenu)
+            ACTION_VISIBILITY_FILTER -> open(player, 0, GuiCycle.select(holder.visibilityFilter, VisibilityFilter.entries, direction), holder.sortType, holder.fromAdminMenu)
+            ACTION_SORT -> open(player, 0, holder.visibilityFilter, GuiCycle.select(holder.sortType, SortType.entries, direction), holder.fromAdminMenu)
         }
     }
 
