@@ -91,7 +91,7 @@ class ChanponAdminMenu(
                     val phase = GuiCycle.select(
                         globalStorage.getPhase(),
                         ChanponPhase.entries.toList(),
-                        reverse = event.isLeftClick
+                        GuiCycle.direction(event.click) ?: return
                     )
                     plugin.setPhase(phase)
                     open(player)

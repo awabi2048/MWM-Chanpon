@@ -2,6 +2,7 @@ package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiCycle
+import com.awabi2048.ccsystem.api.gui.GuiCycleDirection
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
@@ -108,24 +109,34 @@ class SubmissionAdminMenu(
                 val page = ItemTag.getTargetPage(item) ?: holder.page
                 open(player, page, holder.progressFilter, holder.sortType)
             }
-            TYPE_MENU_CONTROL -> handleControlItem(player, holder, item, event.click.isLeftClick)
+            TYPE_MENU_CONTROL -> handleControlItem(
+                player,
+                holder,
+                item,
+                GuiCycle.direction(event.click) ?: return
+            )
             ItemTag.TYPE_GUI_WORLD_ITEM -> handleWorldItem(player, holder, item, event.click)
         }
     }
 
-    private fun handleControlItem(player: Player, holder: SubmissionAdminMenuHolder, item: ItemStack, reverse: Boolean) {
+    private fun handleControlItem(
+        player: Player,
+        holder: SubmissionAdminMenuHolder,
+        item: ItemStack,
+        direction: GuiCycleDirection
+    ) {
         when (ItemTag.getString(item, ACTION_KEY)) {
             ACTION_PROGRESS_FILTER -> open(
                 player,
                 0,
-                GuiCycle.select(holder.progressFilter, ProgressFilter.entries, reverse),
+                GuiCycle.select(holder.progressFilter, ProgressFilter.entries, direction),
                 holder.sortType
             )
             ACTION_SORT -> open(
                 player,
                 0,
                 holder.progressFilter,
-                GuiCycle.select(holder.sortType, SortType.entries, reverse)
+                GuiCycle.select(holder.sortType, SortType.entries, direction)
             )
             ACTION_CLOSE_SUBMISSIONS -> {
                 if (plugin.isSubmissionClosed()) {

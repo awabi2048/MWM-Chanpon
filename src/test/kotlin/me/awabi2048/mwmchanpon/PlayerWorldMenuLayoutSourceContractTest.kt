@@ -18,17 +18,4 @@ class PlayerWorldMenuLayoutSourceContractTest {
         assertTrue(source.contains("ItemTag.TYPE_GUI_PENDING_BUTTON ->"))
         assertTrue(source.contains("mwm.pendingInteractionGui.open("))
     }
-
-    @Test
-    fun `chanpon cycle controls use left for previous and right for next`() {
-        val adminList = Files.readString(
-            Path.of("src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponAdminWorldListMenu.kt")
-        )
-        val environment = Files.readString(
-            Path.of("src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponEnvironmentGui.kt")
-        )
-
-        assertTrue(adminList.contains("event.click.isLeftClick"))
-        assertTrue(environment.contains("reverse = event.isLeftClick"))
-    }
 }

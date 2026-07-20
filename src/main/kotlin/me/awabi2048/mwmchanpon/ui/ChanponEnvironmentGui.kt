@@ -2,6 +2,7 @@ package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiCycle
+import com.awabi2048.ccsystem.api.gui.GuiCycleDirection
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
@@ -96,16 +97,16 @@ class ChanponEnvironmentGui(
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
         if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
         when (ItemTag.getString(item, ACTION_KEY)) {
-            ACTION_WEATHER -> cycleWeather(player, worldData, reverse = event.isLeftClick)
+            ACTION_WEATHER -> cycleWeather(player, worldData, GuiCycle.direction(event.click) ?: return)
             ACTION_TIME -> {
                 if (event.isShiftClick && event.isLeftClick) {
                     showCustomTimeDialog(player, worldData)
                 } else {
-                    cycleTime(player, worldData, reverse = event.isLeftClick)
+                    cycleTime(player, worldData, GuiCycle.direction(event.click) ?: return)
                 }
             }
-            ACTION_GRAVITY -> cycleGravity(player, worldData, reverse = event.isLeftClick)
-            ACTION_SCALE -> cycleScale(player, worldData, reverse = event.isLeftClick)
+            ACTION_GRAVITY -> cycleGravity(player, worldData, GuiCycle.direction(event.click) ?: return)
+            ACTION_SCALE -> cycleScale(player, worldData, GuiCycle.direction(event.click) ?: return)
             ACTION_FLIGHT -> toggleFlight(player, worldData)
             ACTION_PROTECTION -> {
                 val mode = storage.getProtectionMode(worldData.uuid)
@@ -116,7 +117,7 @@ class ChanponEnvironmentGui(
                         storage.getProtectionPassword(worldData.uuid).orEmpty()
                     )
                 } else {
-                    cycleProtection(player, worldData, reverse = event.isLeftClick)
+                    cycleProtection(player, worldData, GuiCycle.direction(event.click) ?: return)
                 }
             }
         }
@@ -193,34 +194,34 @@ class ChanponEnvironmentGui(
         open(player, worldData)
     }
 
-    private fun cycleWeather(player: Player, worldData: WorldData, reverse: Boolean) {
-        val next = GuiCycle.selectNullable(worldData.fixedWeather, WEATHER_VALUES, reverse)
+    private fun cycleWeather(player: Player, worldData: WorldData, direction: GuiCycleDirection) {
+        val next = GuiCycle.selectNullable(worldData.fixedWeather, WEATHER_VALUES, direction)
         worldData.fixedWeather = next
         MyWorldManagerApi.getWorldRepository()?.save(worldData)
         applyWeather(worldData.uuid, next)
         open(player, worldData)
     }
 
-    private fun cycleTime(player: Player, worldData: WorldData, reverse: Boolean) {
+    private fun cycleTime(player: Player, worldData: WorldData, direction: GuiCycleDirection) {
         // カスタム時刻は固定候補リスト外の有効値なので、循環時は未設定位置から再開する。
         val current = worldData.fixedTime.takeIf { it in TIME_VALUES }
-        val next = GuiCycle.selectNullable(current, TIME_VALUES, reverse)
+        val next = GuiCycle.selectNullable(current, TIME_VALUES, direction)
         worldData.fixedTime = next
         MyWorldManagerApi.getWorldRepository()?.save(worldData)
         applyTime(worldData.uuid, next)
         open(player, worldData)
     }
 
-    private fun cycleGravity(player: Player, worldData: WorldData, reverse: Boolean) {
-        val next = GuiCycle.select(worldData.gravityValue ?: DEFAULT_GRAVITY, GRAVITY_VALUES, reverse)
+    private fun cycleGravity(player: Player, worldData: WorldData, direction: GuiCycleDirection) {
+        val next = GuiCycle.select(worldData.gravityValue ?: DEFAULT_GRAVITY, GRAVITY_VALUES, direction)
         worldData.gravityValue = next
         MyWorldManagerApi.getWorldRepository()?.save(worldData)
         applyGravityToWorld(worldData.uuid, next)
         open(player, worldData)
     }
 
-    private fun cycleScale(player: Player, worldData: WorldData, reverse: Boolean) {
-        val next = GuiCycle.select(worldData.fixedScale ?: DEFAULT_SCALE, SCALE_VALUES, reverse)
+    private fun cycleScale(player: Player, worldData: WorldData, direction: GuiCycleDirection) {
+        val next = GuiCycle.select(worldData.fixedScale ?: DEFAULT_SCALE, SCALE_VALUES, direction)
         worldData.fixedScale = next
         MyWorldManagerApi.getWorldRepository()?.save(worldData)
         applyScaleToWorld(worldData.uuid, next)
@@ -234,9 +235,9 @@ class ChanponEnvironmentGui(
         open(player, worldData)
     }
 
-    private fun cycleProtection(player: Player, worldData: WorldData, reverse: Boolean) {
+    private fun cycleProtection(player: Player, worldData: WorldData, direction: GuiCycleDirection) {
         val current = storage.getProtectionMode(worldData.uuid)
-        val next = GuiCycle.select(current, PROTECTION_VALUES, reverse)
+        val next = GuiCycle.select(current, PROTECTION_VALUES, direction)
         storage.setProtectionMode(worldData.uuid, next)
         buildPermissionService.sync(worldData)
         open(player, worldData)
