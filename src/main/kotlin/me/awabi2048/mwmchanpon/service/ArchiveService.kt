@@ -300,7 +300,7 @@ class ArchiveService(
                         syncBossBar(bossBar, executor, progressOffset + index, progressOffset + worlds.size)
                     }
                 }
-                moveAtomicallyOrReplace(temp.toPath(), output.toPath())
+                AtomicFilePublisher.publish(temp.toPath(), output.toPath())
                 plugin.logger.info("Archive created: $output (${output.length()} bytes)")
                 future.complete(Unit)
             } catch (ex: Exception) {
@@ -396,14 +396,6 @@ class ArchiveService(
             }
         )
         return yaml.saveToString()
-    }
-
-    private fun moveAtomicallyOrReplace(source: Path, target: Path) {
-        try {
-            Files.move(source, target, java.nio.file.StandardCopyOption.ATOMIC_MOVE)
-        } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
-            Files.move(source, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
-        }
     }
 
     private fun addDirectoryToZip(zip: ZipOutputStream, source: Path, rootName: String) {
