@@ -21,16 +21,29 @@ class ArchiveOperationGuard(
     private val globalStorage: ChanponGlobalStorage
 ) {
     fun canPerform(sender: CommandSender, operation: ChanponOperation): Boolean {
-        if (!globalStorage.isArchiveLocked()) return true
+        return ArchiveOperationPolicy.canPerform(
+            globalStorage.isArchiveLocked(),
+            operation,
+            sender.hasPermission("myworldmanager.admin"),
+            sender.hasPermission("mwmchanpon.admin")
+        )
+    }
+}
+
+internal object ArchiveOperationPolicy {
+    fun canPerform(
+        archiveLocked: Boolean,
+        operation: ChanponOperation,
+        coreAdmin: Boolean,
+        chanponAdmin: Boolean
+    ): Boolean {
+        if (!archiveLocked) return true
         return when (operation) {
             ChanponOperation.READ -> true
             ChanponOperation.EVACUATE,
-            ChanponOperation.DIAGNOSE ->
-                sender.hasPermission("myworldmanager.admin") ||
-                    sender.hasPermission("mwmchanpon.admin")
+            ChanponOperation.DIAGNOSE -> coreAdmin || chanponAdmin
             ChanponOperation.RESTORE,
-            ChanponOperation.ARCHIVE ->
-                sender.hasPermission("mwmchanpon.admin")
+            ChanponOperation.ARCHIVE -> chanponAdmin
             ChanponOperation.CREATE,
             ChanponOperation.EDIT,
             ChanponOperation.WARP,

@@ -1,7 +1,6 @@
 package me.awabi2048.mwmchanpon.service
 
 import java.io.File
-import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
@@ -10,7 +9,6 @@ import java.util.Comparator
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import java.util.zip.ZipEntry
-import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
@@ -185,40 +183,25 @@ class ArchiveService(
         Bukkit.getScheduler().runTaskAsynchronously(plugin, Runnable {
             val tempDir = Files.createTempDirectory("mwmchan_${archiveName}_")
             try {
-                extractZipSafely(zipFile, tempDir)
-                val manifestFile = tempDir.resolve("manifest.yml").toFile()
-                if (!manifestFile.exists()) {
-                    throw IllegalStateException("manifest_missing")
+                ZipArchiveExtractor.extract(zipFile, tempDir)
+                val manifestWorlds = ArchiveManifest.read(
+                    tempDir.resolve("manifest.yml").toFile(),
+                    ARCHIVE_SCHEMA_VERSION
+                )
+                val imports = ArchiveImportValidator.resolve(manifestWorlds) { uuid ->
+                    readWorldData(tempDir, uuid)
                 }
-                val manifest = YamlConfiguration.loadConfiguration(manifestFile)
-                if (manifest.getInt("schema_version", 0) != ARCHIVE_SCHEMA_VERSION) {
-                    throw IllegalStateException("archive_schema_unsupported")
-                }
-                val worldEntries = manifest.getMapList("worlds")
-                if (worldEntries.isEmpty()) {
-                    throw IllegalStateException("archive_empty")
-                }
-                val imports = worldEntries.mapNotNull { entry ->
-                    val uuid = runCatching { UUID.fromString(entry["uuid"]?.toString()) }.getOrNull()
-                        ?: return@mapNotNull null
-                    val worldData = readWorldData(tempDir, uuid) ?: return@mapNotNull null
-                    val manifestWorldKey = entry["world_key"]?.toString() ?: return@mapNotNull null
-                    if (worldData.worldKey != manifestWorldKey) return@mapNotNull null
-                    ImportedWorld(uuid, worldData)
-                }
-                if (imports.size != worldEntries.size) {
-                    throw IllegalStateException("archive_world_data_missing")
-                }
-
-                imports.forEach { imported ->
-                    if (repository.findByUuid(imported.uuid) != null) {
-                        throw IllegalStateException("world_uuid_conflict:${imported.uuid}")
+                ArchiveImportValidator.validateConflicts(
+                    imports,
+                    uuidExists = { repository.findByUuid(it) != null },
+                    folder = { worldData ->
+                        val folderName = worldService.getWorldFolderName(worldData)
+                        ImportFolder(
+                            folderName,
+                            worldService.getWorldCreationDirectory(worldData).exists()
+                        )
                     }
-                    val folderName = worldService.getWorldFolderName(imported.worldData)
-                    if (worldService.getWorldCreationDirectory(imported.worldData).exists()) {
-                        throw IllegalStateException("world_folder_conflict:$folderName")
-                    }
-                }
+                )
 
                 imports.forEachIndexed { index, imported ->
                     val prefix = tempDir.resolve("worlds/${imported.uuid}")
@@ -302,7 +285,7 @@ class ArchiveService(
                         syncBossBar(bossBar, executor, progressOffset + index, progressOffset + worlds.size)
                     }
                 }
-                moveAtomicallyOrReplace(temp.toPath(), output.toPath())
+                AtomicFilePublisher.publish(temp.toPath(), output.toPath())
                 plugin.logger.info("Archive created: $output (${output.length()} bytes)")
                 future.complete(Unit)
             } catch (ex: Exception) {
@@ -360,27 +343,6 @@ class ArchiveService(
         return null
     }
 
-    private fun extractZipSafely(zipFile: File, tempDir: Path) {
-        val root = tempDir.toAbsolutePath().normalize()
-        ZipInputStream(FileInputStream(zipFile)).use { zis ->
-            var entry = zis.nextEntry
-            while (entry != null) {
-                val target = root.resolve(entry.name).normalize()
-                if (!target.startsWith(root)) {
-                    throw IllegalStateException("archive_entry_outside_root:${entry.name}")
-                }
-                if (entry.isDirectory) {
-                    Files.createDirectories(target)
-                } else {
-                    Files.createDirectories(target.parent)
-                    FileOutputStream(target.toFile()).use { fos -> zis.copyTo(fos) }
-                }
-                zis.closeEntry()
-                entry = zis.nextEntry
-            }
-        }
-    }
-
     private fun readWorldData(tempDir: Path, uuid: UUID): WorldData? {
         val file = tempDir.resolve("worlds/$uuid/mwm_data.yml").toFile()
         if (!file.exists()) return null
@@ -419,14 +381,6 @@ class ArchiveService(
             }
         )
         return yaml.saveToString()
-    }
-
-    private fun moveAtomicallyOrReplace(source: Path, target: Path) {
-        try {
-            Files.move(source, target, java.nio.file.StandardCopyOption.ATOMIC_MOVE)
-        } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
-            Files.move(source, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
-        }
     }
 
     private fun addDirectoryToZip(zip: ZipOutputStream, source: Path, rootName: String) {
@@ -546,11 +500,6 @@ class ArchiveService(
             }
         })
     }
-
-    private data class ImportedWorld(
-        val uuid: UUID,
-        val worldData: WorldData
-    )
 
     private data class ArchiveLookup(
         val file: File?,
