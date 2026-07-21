@@ -184,27 +184,16 @@ class ArchiveService(
             val tempDir = Files.createTempDirectory("mwmchan_${archiveName}_")
             try {
                 ZipArchiveExtractor.extract(zipFile, tempDir)
-                val manifestFile = tempDir.resolve("manifest.yml").toFile()
-                if (!manifestFile.exists()) {
-                    throw IllegalStateException("manifest_missing")
+                val manifestWorlds = ArchiveManifest.read(
+                    tempDir.resolve("manifest.yml").toFile(),
+                    ARCHIVE_SCHEMA_VERSION
+                )
+                val imports = manifestWorlds.mapNotNull { entry ->
+                    val worldData = readWorldData(tempDir, entry.uuid) ?: return@mapNotNull null
+                    if (worldData.worldKey != entry.worldKey) return@mapNotNull null
+                    ImportedWorld(entry.uuid, worldData)
                 }
-                val manifest = YamlConfiguration.loadConfiguration(manifestFile)
-                if (manifest.getInt("schema_version", 0) != ARCHIVE_SCHEMA_VERSION) {
-                    throw IllegalStateException("archive_schema_unsupported")
-                }
-                val worldEntries = manifest.getMapList("worlds")
-                if (worldEntries.isEmpty()) {
-                    throw IllegalStateException("archive_empty")
-                }
-                val imports = worldEntries.mapNotNull { entry ->
-                    val uuid = runCatching { UUID.fromString(entry["uuid"]?.toString()) }.getOrNull()
-                        ?: return@mapNotNull null
-                    val worldData = readWorldData(tempDir, uuid) ?: return@mapNotNull null
-                    val manifestWorldKey = entry["world_key"]?.toString() ?: return@mapNotNull null
-                    if (worldData.worldKey != manifestWorldKey) return@mapNotNull null
-                    ImportedWorld(uuid, worldData)
-                }
-                if (imports.size != worldEntries.size) {
+                if (imports.size != manifestWorlds.size) {
                     throw IllegalStateException("archive_world_data_missing")
                 }
 

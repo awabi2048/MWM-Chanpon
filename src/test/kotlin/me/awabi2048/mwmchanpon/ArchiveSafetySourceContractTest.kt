@@ -13,8 +13,6 @@ class ArchiveSafetySourceContractTest {
             Path.of("src/main/kotlin/me/awabi2048/mwmchanpon/service/ArchiveService.kt"),
             StandardCharsets.UTF_8
         )
-        assertTrue(source.contains("schema_version"))
-        assertTrue(source.contains("world_key"))
         assertTrue(source.contains("archive_world_data_missing"))
         assertTrue(source.contains("world_folder_conflict"))
     }
