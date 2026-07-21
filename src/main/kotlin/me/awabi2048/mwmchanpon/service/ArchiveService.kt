@@ -1,7 +1,6 @@
 package me.awabi2048.mwmchanpon.service
 
 import java.io.File
-import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
@@ -10,7 +9,6 @@ import java.util.Comparator
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import java.util.zip.ZipEntry
-import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
@@ -185,7 +183,7 @@ class ArchiveService(
         Bukkit.getScheduler().runTaskAsynchronously(plugin, Runnable {
             val tempDir = Files.createTempDirectory("mwmchan_${archiveName}_")
             try {
-                extractZipSafely(zipFile, tempDir)
+                ZipArchiveExtractor.extract(zipFile, tempDir)
                 val manifestFile = tempDir.resolve("manifest.yml").toFile()
                 if (!manifestFile.exists()) {
                     throw IllegalStateException("manifest_missing")
@@ -358,27 +356,6 @@ class ArchiveService(
         val invalid = charArrayOf('\\', '/', ':', '*', '?', '"', '<', '>', '|')
         if (archiveName.any { it in invalid }) return "archive_name_invalid"
         return null
-    }
-
-    private fun extractZipSafely(zipFile: File, tempDir: Path) {
-        val root = tempDir.toAbsolutePath().normalize()
-        ZipInputStream(FileInputStream(zipFile)).use { zis ->
-            var entry = zis.nextEntry
-            while (entry != null) {
-                val target = root.resolve(entry.name).normalize()
-                if (!target.startsWith(root)) {
-                    throw IllegalStateException("archive_entry_outside_root:${entry.name}")
-                }
-                if (entry.isDirectory) {
-                    Files.createDirectories(target)
-                } else {
-                    Files.createDirectories(target.parent)
-                    FileOutputStream(target.toFile()).use { fos -> zis.copyTo(fos) }
-                }
-                zis.closeEntry()
-                entry = zis.nextEntry
-            }
-        }
     }
 
     private fun readWorldData(tempDir: Path, uuid: UUID): WorldData? {
