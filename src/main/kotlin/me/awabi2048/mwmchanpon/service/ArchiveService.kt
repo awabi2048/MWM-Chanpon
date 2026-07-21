@@ -188,24 +188,20 @@ class ArchiveService(
                     tempDir.resolve("manifest.yml").toFile(),
                     ARCHIVE_SCHEMA_VERSION
                 )
-                val imports = manifestWorlds.mapNotNull { entry ->
-                    val worldData = readWorldData(tempDir, entry.uuid) ?: return@mapNotNull null
-                    if (worldData.worldKey != entry.worldKey) return@mapNotNull null
-                    ImportedWorld(entry.uuid, worldData)
+                val imports = ArchiveImportValidator.resolve(manifestWorlds) { uuid ->
+                    readWorldData(tempDir, uuid)
                 }
-                if (imports.size != manifestWorlds.size) {
-                    throw IllegalStateException("archive_world_data_missing")
-                }
-
-                imports.forEach { imported ->
-                    if (repository.findByUuid(imported.uuid) != null) {
-                        throw IllegalStateException("world_uuid_conflict:${imported.uuid}")
+                ArchiveImportValidator.validateConflicts(
+                    imports,
+                    uuidExists = { repository.findByUuid(it) != null },
+                    folder = { worldData ->
+                        val folderName = worldService.getWorldFolderName(worldData)
+                        ImportFolder(
+                            folderName,
+                            worldService.getWorldCreationDirectory(worldData).exists()
+                        )
                     }
-                    val folderName = worldService.getWorldFolderName(imported.worldData)
-                    if (worldService.getWorldCreationDirectory(imported.worldData).exists()) {
-                        throw IllegalStateException("world_folder_conflict:$folderName")
-                    }
-                }
+                )
 
                 imports.forEachIndexed { index, imported ->
                     val prefix = tempDir.resolve("worlds/${imported.uuid}")
@@ -504,11 +500,6 @@ class ArchiveService(
             }
         })
     }
-
-    private data class ImportedWorld(
-        val uuid: UUID,
-        val worldData: WorldData
-    )
 
     private data class ArchiveLookup(
         val file: File?,
