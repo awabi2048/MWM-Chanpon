@@ -68,6 +68,6 @@ internal class WorldSettingsAccessGuard(
     }
 
     private fun denySound(player: Player) {
-        player.playSound(player.location, Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f)
+        ManagedMenuPresenter.rejected(player)
     }
 }

@@ -1,4 +1,5 @@
 package me.awabi2048.mwmchanpon.ui
+import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
@@ -82,7 +83,7 @@ class BackupListMenu(
             inv.setItem(layout.itemSlots[index], backupItem(player, backup))
         }
         fill(inv)
-        player.openInventory(inv)
+        ManagedMenuPresenter.open(player, inv)
     }
 
     @EventHandler
@@ -95,7 +96,7 @@ class BackupListMenu(
         when (ItemTag.getType(item)) {
             ItemTag.TYPE_GUI_RETURN -> {
                 if (!mwm().menuRouteHistory.openPrevious(player)) {
-                    parentMenuOpener?.invoke(player) ?: player.closeInventory()
+                    parentMenuOpener?.invoke(player) ?: ManagedMenuPresenter.close(player)
                 }
             }
             ItemTag.TYPE_GUI_NAV_PREV, ItemTag.TYPE_GUI_NAV_NEXT -> open(player, holder.mode, holder.worldUuid, ItemTag.getTargetPage(item) ?: holder.page)
@@ -119,7 +120,7 @@ class BackupListMenu(
         when (ItemTag.getType(event.currentItem ?: return)) {
             ItemTag.TYPE_GUI_CANCEL -> open(player, holder.source.mode, holder.source.worldUuid, holder.source.page)
             ItemTag.TYPE_GUI_CONFIRM -> {
-                player.closeInventory()
+                ManagedMenuPresenter.close(player)
                 if (automationService?.isManualOperationBlocked(player) == true) {
                     player.sendMessage(i18nComponent(player, "message.manual_operation_blocked"))
                     return
@@ -265,7 +266,7 @@ class BackupListMenu(
             button(player, false)
         )
         fill(inv)
-        player.openInventory(inv)
+        ManagedMenuPresenter.open(player, inv)
     }
 
     private fun openDeleteConfirm(player: Player, backup: BackupEntry, stage: Int, source: Holder) {
@@ -281,7 +282,7 @@ class BackupListMenu(
             button(player, false)
         )
         fill(inv)
-        player.openInventory(inv)
+        ManagedMenuPresenter.open(player, inv)
     }
 
     private fun materialFor(kind: BackupKind): Material = when (kind) {

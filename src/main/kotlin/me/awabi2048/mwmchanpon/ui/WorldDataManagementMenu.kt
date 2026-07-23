@@ -1,4 +1,5 @@
 package me.awabi2048.mwmchanpon.ui
+import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
@@ -64,7 +65,7 @@ class WorldDataManagementMenu(
         inv.setItem(51, controlItem(player, Material.RECOVERY_COMPASS, "world_data.bulk_rollback", ACTION_BULK_ROLLBACK))
         inv.setItem(53, controlItem(player, Material.ENDER_CHEST, "world_data.annual_archive", ACTION_ANNUAL_ARCHIVE))
         fill(inv)
-        player.openInventory(inv)
+        ManagedMenuPresenter.open(player, inv)
     }
 
     @EventHandler
@@ -77,7 +78,7 @@ class WorldDataManagementMenu(
         when (ItemTag.getType(item)) {
             ItemTag.TYPE_GUI_RETURN -> {
                 if (!mwm().menuRouteHistory.openPrevious(player)) {
-                    parentMenuOpener?.invoke(player) ?: player.closeInventory()
+                    parentMenuOpener?.invoke(player) ?: ManagedMenuPresenter.close(player)
                 }
             }
             ItemTag.TYPE_GUI_NAV_PREV, ItemTag.TYPE_GUI_NAV_NEXT -> open(player, ItemTag.getTargetPage(item) ?: holder.page)
@@ -93,7 +94,7 @@ class WorldDataManagementMenu(
                 ACTION_BULK_BACKUP -> openBulkBackupConfirm(player, holder.page)
                 ACTION_BULK_ROLLBACK -> openBulkRollbackConfirm(player, holder.page)
                 ACTION_ANNUAL_ARCHIVE -> {
-                    player.closeInventory()
+                    ManagedMenuPresenter.close(player)
                     AnnualArchiveFlow(plugin, archiveService).start(player)
                 }
             }
@@ -109,7 +110,7 @@ class WorldDataManagementMenu(
         when (ItemTag.getType(event.currentItem ?: return)) {
             ItemTag.TYPE_GUI_CANCEL -> open(player, holder.page)
             ItemTag.TYPE_GUI_CONFIRM -> {
-                player.closeInventory()
+                ManagedMenuPresenter.close(player)
                 val future = if (holder.worldUuid == null) {
                     backupService.createAllBackup(productionWorlds().map { it.uuid }, BackupKind.ADMIN_MANUAL, player.uniqueId, player.name, "admin_bulk")
                 } else {
@@ -167,7 +168,7 @@ class WorldDataManagementMenu(
             button(player, false)
         )
         fill(inv)
-        player.openInventory(inv)
+        ManagedMenuPresenter.open(player, inv)
     }
 
     private fun openConfirm(player: Player, worldUuid: UUID?, page: Int, key: String) {
@@ -183,7 +184,7 @@ class WorldDataManagementMenu(
             button(player, false)
         )
         fill(inv)
-        player.openInventory(inv)
+        ManagedMenuPresenter.open(player, inv)
     }
 
     private fun productionWorlds(): List<WorldData> {

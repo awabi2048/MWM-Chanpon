@@ -1,4 +1,5 @@
 package me.awabi2048.mwmchanpon.ui
+import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
 
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import com.awabi2048.ccsystem.CCSystem
@@ -57,7 +58,7 @@ class SubmittedWorldMenuProvider(
         )
 
         fillBody(inventory)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
         return true
     }
 
@@ -93,7 +94,7 @@ class SubmittedWorldMenuProvider(
             else -> {
                 mwm.soundManager.playClickSound(player, item, null)
                 mwm.settingsSessionManager.endSession(player)
-                player.closeInventory()
+                ManagedMenuPresenter.close(player)
             }
         }
     }

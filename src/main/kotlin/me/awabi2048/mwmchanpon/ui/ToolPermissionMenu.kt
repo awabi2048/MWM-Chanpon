@@ -1,4 +1,5 @@
 package me.awabi2048.mwmchanpon.ui
+import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
@@ -59,7 +60,7 @@ class ToolPermissionMenu(
         ItemTag.tagItem(back, ItemTag.TYPE_GUI_RETURN)
         inventory.setItem(40, back)
 
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     private fun createToolItem(worldData: WorldData, targetPlayerUuid: UUID, definition: ToolPermissionDefinition): ItemStack {

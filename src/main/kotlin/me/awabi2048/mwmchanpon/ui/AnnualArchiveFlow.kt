@@ -1,5 +1,7 @@
 package me.awabi2048.mwmchanpon.ui
 
+import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
+
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import com.awabi2048.ccsystem.CCSystem
 import io.papermc.paper.event.player.AsyncChatEvent
@@ -68,7 +70,8 @@ class AnnualArchiveFlow(
                     }
                     session.archiveName = message
                     session.step = ArchiveStep.CONFIRM_NAME
-                    player.openInventory(
+                    ManagedMenuPresenter.open(
+                        player,
                         confirmationInventory(
                             player,
                             ArchiveConfirmationAction.NAME,
@@ -89,7 +92,8 @@ class AnnualArchiveFlow(
                         return@Runnable
                     }
                     session.step = ArchiveStep.CONFIRM_FINAL
-                    player.openInventory(
+                    ManagedMenuPresenter.open(
+                        player,
                         confirmationInventory(
                             player,
                             ArchiveConfirmationAction.EXECUTE,
@@ -116,14 +120,14 @@ class AnnualArchiveFlow(
 
         when (event.rawSlot) {
             CONFIRM_SLOT -> {
-                player.closeInventory()
+                ManagedMenuPresenter.close(player)
                 when (holder.action) {
                     ArchiveConfirmationAction.NAME -> proceedNameConfirm(player)
                     ArchiveConfirmationAction.EXECUTE -> executeArchive(player)
                 }
             }
             CANCEL_SLOT -> {
-                player.closeInventory()
+                ManagedMenuPresenter.close(player)
                 cancel(player)
             }
         }

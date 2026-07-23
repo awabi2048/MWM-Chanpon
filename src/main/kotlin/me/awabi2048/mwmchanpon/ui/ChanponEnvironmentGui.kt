@@ -1,4 +1,5 @@
 package me.awabi2048.mwmchanpon.ui
+import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiCycle
@@ -76,7 +77,7 @@ class ChanponEnvironmentGui(
         inventory.setItem(40, backItem(player))
 
         fill(inventory)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     @EventHandler(priority = EventPriority.LOWEST)
@@ -347,7 +348,7 @@ class ChanponEnvironmentGui(
         inventory.setItem(16, weatherOptionItem(player, "THUNDER", worldData.fixedWeather))
         inventory.setItem(22, backToMainItem(player))
         fill(inventory)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     private fun handleWeatherClick(event: InventoryClickEvent, player: Player, worldUuid: UUID, item: ItemStack) {
@@ -384,7 +385,7 @@ class ChanponEnvironmentGui(
         inventory.setItem(15, timeOptionItem(player, 18000L, "night", worldData.fixedTime))
         inventory.setItem(22, backToMainItem(player))
         fill(inventory)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     private fun handleTimeClick(event: InventoryClickEvent, player: Player, worldUuid: UUID, item: ItemStack) {
@@ -421,7 +422,7 @@ class ChanponEnvironmentGui(
         inventory.setItem(16, gravityOptionItem(player, 0.01, "moon", worldData.gravityValue))
         inventory.setItem(22, backToMainItem(player))
         fill(inventory)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     private fun handleGravityClick(event: InventoryClickEvent, player: Player, worldUuid: UUID, item: ItemStack) {
@@ -458,7 +459,7 @@ class ChanponEnvironmentGui(
         inventory.setItem(16, scaleOptionItem(player, 2.0, "giant", worldData.fixedScale))
         inventory.setItem(22, backToMainItem(player))
         fill(inventory)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     private fun handleScaleClick(event: InventoryClickEvent, player: Player, worldUuid: UUID, item: ItemStack) {

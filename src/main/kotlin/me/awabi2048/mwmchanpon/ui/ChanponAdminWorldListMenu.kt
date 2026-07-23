@@ -1,4 +1,5 @@
 package me.awabi2048.mwmchanpon.ui
+import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiCycle
@@ -96,7 +97,7 @@ class ChanponAdminWorldListMenu(
         if (safePage > 0) inventory.setItem(52, navItem(player, false, safePage - 1))
         if (safePage < totalPages - 1) inventory.setItem(53, navItem(player, true, safePage + 1))
 
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     @EventHandler
@@ -306,7 +307,7 @@ class ChanponAdminWorldListMenu(
     }
 
     private fun warp(player: Player, worldData: WorldData) {
-        player.closeInventory()
+        ManagedMenuPresenter.close(player)
         MyWorldManagerApi.getWorldService()?.teleportToWorld(player, worldData.uuid)
     }
 
@@ -314,7 +315,7 @@ class ChanponAdminWorldListMenu(
         val mwm = mwm()
         val folderName = worldDirectory(worldData)
         if (!worldData.isArchived && Bukkit.getWorld(folderName) == null) {
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
             player.sendMessage(mwm.languageManager.getMessage(player, "messages.world_loading"))
             Bukkit.getScheduler().runTask(mwm, Runnable {
                 if (!player.isOnline) return@Runnable

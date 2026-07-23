@@ -1,4 +1,5 @@
 package me.awabi2048.mwmchanpon.ui
+import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
@@ -69,7 +70,7 @@ class ChanponAdminMenu(
             inventory.setItem(42, spawnWorldItem(player, worldUuid))
         }
         fill(inventory)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     @EventHandler
@@ -136,7 +137,7 @@ class ChanponAdminMenu(
             confirmButton(player, false)
         )
         fill(inventory)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     private fun openChild(player: Player, opener: () -> Unit) {

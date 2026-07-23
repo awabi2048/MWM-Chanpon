@@ -1,4 +1,5 @@
 package me.awabi2048.mwmchanpon.ui
+import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
@@ -65,7 +66,7 @@ class ChanponDiscoveryMenuProvider(
 
         fill(inventory)
         mwm.soundManager.playMenuOpenSound(player, "discovery")
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
         return true
     }
 
@@ -82,7 +83,7 @@ class ChanponDiscoveryMenuProvider(
                 val mwm = mwm()
                 mwm.soundManager.playClickSound(player, item, "discovery")
                 if (!mwm.menuRouteHistory.openPrevious(player)) {
-                    player.closeInventory()
+                    ManagedMenuPresenter.close(player)
                 }
             }
             ItemTag.TYPE_GUI_WORLD_ITEM -> {
@@ -94,7 +95,7 @@ class ChanponDiscoveryMenuProvider(
                     return
                 }
                 mwm().soundManager.playClickSound(player, item, "discovery")
-                player.closeInventory()
+                ManagedMenuPresenter.close(player)
                 // Chanponからは公開APIだけを通し、MWM本体側のロード通知とワープ処理に揃える。
                 MyWorldManagerApi.getWorldService()?.teleportToWorld(player, worldUuid)
                 player.sendMessage(mwm().languageManager.getMessage(player, "messages.warp_success", mapOf("world" to worldData.name)))

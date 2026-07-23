@@ -1,4 +1,5 @@
 package me.awabi2048.mwmchanpon.ui
+import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiCycle
@@ -129,7 +130,7 @@ class ChanponWorldSettingsMenuProvider(
 
         fill(inventory)
         renderExtensions(inventory, player, worldData, request.showBackButton, isOwner, isModerator, isProtected)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
         mwm.logWorldSettingsDebug(
             "chanpon_open=inventory player=${player.name}/${player.uniqueId} world=${worldData.uuid} " +
                 "holder=${holder.javaClass.name} size=${inventory.size} protected=$isProtected"
@@ -344,7 +345,7 @@ class ChanponWorldSettingsMenuProvider(
             ItemTag.TYPE_GUI_RETURN -> {
                 mwm.soundManager.playClickSound(player, item, "world_settings")
                 if (!mwm.menuRouteHistory.openPrevious(player)) {
-                    player.closeInventory()
+                    ManagedMenuPresenter.close(player)
                 }
             }
             ItemTag.TYPE_GUI_EXTENSION -> {
@@ -486,7 +487,7 @@ class ChanponWorldSettingsMenuProvider(
                     openDeleteConfirm(player, worldData, true)
                     return
                 }
-                player.closeInventory()
+                ManagedMenuPresenter.close(player)
                 mwm().worldService.deleteWorld(holder.worldUuid, player).thenAccept { success ->
                     Bukkit.getScheduler().runTask(plugin, Runnable {
                         player.sendMessage(i18nComponent(player, if (success) "critical.deleted" else "critical.delete_failed"))
@@ -512,7 +513,7 @@ class ChanponWorldSettingsMenuProvider(
             inventory.setItem(42, stepBackItem(player, worldData))
         }
         fill(inventory)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     private fun openModifiedWarning(player: Player, worldData: WorldData, action: ConfirmAction) {
@@ -528,7 +529,7 @@ class ChanponWorldSettingsMenuProvider(
             warningButton(player, false)
         )
         fill(inventory)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     private fun openConfirm(player: Player, worldData: WorldData, action: ConfirmAction, direction: BlockFace?) {
@@ -544,7 +545,7 @@ class ChanponWorldSettingsMenuProvider(
             confirmButton(player, false)
         )
         fill(inventory)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     private fun openCriticalMenu(player: Player, worldData: WorldData) {
@@ -559,7 +560,7 @@ class ChanponWorldSettingsMenuProvider(
         inventory.setItem(36, returnItem(player))
         inventory.setItem(22, deleteWorldItem(player))
         fill(inventory)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     private fun openConfirmByPlatform(player: Player, worldData: WorldData, action: ConfirmAction, direction: BlockFace?) {
@@ -610,7 +611,7 @@ class ChanponWorldSettingsMenuProvider(
         when {
             success && action == ConfirmAction.EXPAND -> {
                 mwm().settingsSessionManager.endSession(player)
-                player.closeInventory()
+                ManagedMenuPresenter.close(player)
             }
             success -> openExpansionMenu(player, latest)
             else -> open(player, latest, currentRequest(player))
@@ -649,7 +650,7 @@ class ChanponWorldSettingsMenuProvider(
             confirmButton(player, false)
         )
         fill(inventory)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     private fun pushSettingsRoute(player: Player, worldData: WorldData) {
