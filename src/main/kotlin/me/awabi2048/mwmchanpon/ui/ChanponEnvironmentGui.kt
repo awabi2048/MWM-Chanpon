@@ -103,6 +103,7 @@ class ChanponEnvironmentGui(
             ACTION_WEATHER -> cycleWeather(player, worldData, GuiCycle.direction(event.click) ?: return)
             ACTION_TIME -> {
                 if (event.isShiftClick && event.isLeftClick) {
+                    ManagedMenuPresenter.success(player, ChanponEnvironmentFeedback.OPEN_DIALOG)
                     showCustomTimeDialog(player, worldData)
                 } else {
                     cycleTime(player, worldData, GuiCycle.direction(event.click) ?: return)
@@ -115,6 +116,7 @@ class ChanponEnvironmentGui(
             ACTION_PROTECTION -> {
                 val mode = storage.getProtectionMode(worldData.uuid)
                 if (event.isShiftClick && event.isLeftClick && mode == ChanponWorldProtectionMode.PASSWORD) {
+                    ManagedMenuPresenter.success(player, ChanponEnvironmentFeedback.OPEN_DIALOG)
                     showProtectionPasswordDialog(
                         player,
                         worldData,
@@ -126,6 +128,7 @@ class ChanponEnvironmentGui(
             }
         }
         if (ItemTag.isType(item, ItemTag.TYPE_GUI_RETURN)) {
+            ManagedMenuPresenter.success(player, ChanponEnvironmentFeedback.BACK)
             if (!mwm().menuRouteHistory.openPrevious(player)) {
                 mwm().settingsSessionManager.getSession(player)?.let { session ->
                     val worldSettings = JavaPlugin.getPlugin(MyWorldManager::class.java).worldSettingsGui
@@ -203,6 +206,7 @@ class ChanponEnvironmentGui(
         worldData.fixedWeather = next
         MyWorldManagerApi.getWorldRepository()?.save(worldData)
         applyWeather(worldData.uuid, next)
+        ManagedMenuPresenter.success(player, ChanponEnvironmentFeedback.SETTING_CHANGED)
         open(player, worldData)
     }
 
@@ -213,6 +217,7 @@ class ChanponEnvironmentGui(
         worldData.fixedTime = next
         MyWorldManagerApi.getWorldRepository()?.save(worldData)
         applyTime(worldData.uuid, next)
+        ManagedMenuPresenter.success(player, ChanponEnvironmentFeedback.SETTING_CHANGED)
         open(player, worldData)
     }
 
@@ -221,6 +226,7 @@ class ChanponEnvironmentGui(
         worldData.gravityValue = next
         MyWorldManagerApi.getWorldRepository()?.save(worldData)
         applyGravityToWorld(worldData.uuid, next)
+        ManagedMenuPresenter.success(player, ChanponEnvironmentFeedback.SETTING_CHANGED)
         open(player, worldData)
     }
 
@@ -229,6 +235,7 @@ class ChanponEnvironmentGui(
         worldData.fixedScale = next
         MyWorldManagerApi.getWorldRepository()?.save(worldData)
         applyScaleToWorld(worldData.uuid, next)
+        ManagedMenuPresenter.success(player, ChanponEnvironmentFeedback.SETTING_CHANGED)
         open(player, worldData)
     }
 
@@ -236,11 +243,13 @@ class ChanponEnvironmentGui(
         worldData.allowFlight = !worldData.allowFlight
         MyWorldManagerApi.getWorldRepository()?.save(worldData)
         applyFlightToWorld(worldData.uuid, worldData.allowFlight)
+        ManagedMenuPresenter.success(player, ChanponEnvironmentFeedback.SETTING_CHANGED)
         open(player, worldData)
     }
 
     private fun toggleFreecam(player: Player, worldData: WorldData) {
         storage.setFreecamAllowed(worldData.uuid, !storage.isFreecamAllowed(worldData.uuid))
+        ManagedMenuPresenter.success(player, ChanponEnvironmentFeedback.SETTING_CHANGED)
         open(player, worldData)
     }
 
@@ -249,6 +258,7 @@ class ChanponEnvironmentGui(
         val next = GuiCycle.select(current, PROTECTION_VALUES, direction)
         storage.setProtectionMode(worldData.uuid, next)
         buildPermissionService.sync(worldData)
+        ManagedMenuPresenter.success(player, ChanponEnvironmentFeedback.SETTING_CHANGED)
         open(player, worldData)
     }
 
