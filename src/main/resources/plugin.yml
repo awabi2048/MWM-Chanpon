@@ -9,6 +9,7 @@ depend:
   - WorldGuard
 softdepend:
   - floodgate
+  - Chanpon-Utilities
 
 commands:
   chanpon-mwm:

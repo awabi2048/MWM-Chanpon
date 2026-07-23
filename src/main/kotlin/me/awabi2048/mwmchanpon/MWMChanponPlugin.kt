@@ -20,6 +20,7 @@ import me.awabi2048.mwmchanpon.extension.ProductionWorldGuard
 import me.awabi2048.mwmchanpon.extension.ToolPermissionMenuExtension
 import me.awabi2048.mwmchanpon.extension.WorldBackupMenuExtension
 import me.awabi2048.mwmchanpon.listener.MemberPermissionSyncListener
+import me.awabi2048.mwmchanpon.listener.FreecamWorldPolicyListener
 import me.awabi2048.mwmchanpon.listener.PlayerJoinListener
 import me.awabi2048.mwmchanpon.listener.SubmittedWorldProtectionListener
 import me.awabi2048.mwmchanpon.listener.SpawnWorldProtectionListener
@@ -278,6 +279,9 @@ class MWMChanponPlugin : JavaPlugin() {
         server.pluginManager.registerEvents(submittedWorldMenuProvider, this)
         server.pluginManager.registerEvents(chanponWorldSettingsMenuProvider, this)
         server.pluginManager.registerEvents(environmentGui, this)
+        if (server.pluginManager.isPluginEnabled("Chanpon-Utilities")) {
+            server.pluginManager.registerEvents(FreecamWorldPolicyListener(chanponStorage), this)
+        }
         server.pluginManager.registerEvents(easyVoidWorldCreationService, this)
         server.pluginManager.registerEvents(playerWorldMenuProvider, this)
         server.pluginManager.registerEvents(worldMenuAccessProvider, this)
