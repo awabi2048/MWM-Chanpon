@@ -1,4 +1,5 @@
 package me.awabi2048.mwmchanpon.ui
+import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
@@ -82,7 +83,7 @@ class BackupListMenu(
             inv.setItem(layout.itemSlots[index], backupItem(player, backup))
         }
         fill(inv)
-        player.openInventory(inv)
+        ManagedMenuPresenter.open(player, inv)
     }
 
     @EventHandler
@@ -265,7 +266,7 @@ class BackupListMenu(
             button(player, false)
         )
         fill(inv)
-        player.openInventory(inv)
+        ManagedMenuPresenter.open(player, inv)
     }
 
     private fun openDeleteConfirm(player: Player, backup: BackupEntry, stage: Int, source: Holder) {
@@ -281,7 +282,7 @@ class BackupListMenu(
             button(player, false)
         )
         fill(inv)
-        player.openInventory(inv)
+        ManagedMenuPresenter.open(player, inv)
     }
 
     private fun materialFor(kind: BackupKind): Material = when (kind) {

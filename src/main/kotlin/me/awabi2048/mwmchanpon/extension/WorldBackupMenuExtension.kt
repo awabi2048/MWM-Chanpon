@@ -1,4 +1,5 @@
 package me.awabi2048.mwmchanpon.extension
+import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
@@ -100,7 +101,7 @@ class WorldBackupMenuExtension(
         }
         inv.setItem(47, backupControlItem(player, worldUuid))
         fill(inv)
-        player.openInventory(inv)
+        ManagedMenuPresenter.open(player, inv)
     }
 
     @EventHandler
@@ -328,7 +329,7 @@ class WorldBackupMenuExtension(
             button(player, false)
         )
         fill(inv)
-        player.openInventory(inv)
+        ManagedMenuPresenter.open(player, inv)
     }
 
     private fun openRestoreConfirm(player: Player, backup: BackupEntry, source: Holder) {
@@ -344,7 +345,7 @@ class WorldBackupMenuExtension(
             button(player, false)
         )
         fill(inv)
-        player.openInventory(inv)
+        ManagedMenuPresenter.open(player, inv)
     }
 
     private fun entryItem(player: Player, worldUuid: UUID): ItemStack {

@@ -1,4 +1,5 @@
 package me.awabi2048.mwmchanpon.ui
+import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
 
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import com.awabi2048.ccsystem.CCSystem
@@ -45,7 +46,7 @@ class AutomationSettingsMenu(
             inv.setItem(40, controlItem(player, Material.END_CRYSTAL, "automation.restore_point", ACTION_RESTORE_POINT))
         }
         fill(inv)
-        player.openInventory(inv)
+        ManagedMenuPresenter.open(player, inv)
     }
 
     @EventHandler
@@ -136,7 +137,7 @@ class AutomationSettingsMenu(
             button(player, false)
         )
         fill(inv)
-        player.openInventory(inv)
+        ManagedMenuPresenter.open(player, inv)
     }
 
     private fun openRestorePointConfirm(player: Player) {
@@ -152,7 +153,7 @@ class AutomationSettingsMenu(
             button(player, false)
         )
         fill(inv)
-        player.openInventory(inv)
+        ManagedMenuPresenter.open(player, inv)
     }
 
     private fun applyFrame(inv: Inventory) {

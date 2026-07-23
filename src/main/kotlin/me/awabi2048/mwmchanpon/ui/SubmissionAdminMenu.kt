@@ -1,4 +1,5 @@
 package me.awabi2048.mwmchanpon.ui
+import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiCycle
@@ -88,7 +89,7 @@ class SubmissionAdminMenu(
         inventory.setItem(51, sortItem(player, sortType))
         inventory.setItem(52, closeSubmissionItem(player))
 
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     @EventHandler
@@ -318,7 +319,7 @@ class SubmissionAdminMenu(
             confirmButton(player, true),
             confirmButton(player, false)
         )
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     private fun openProductionToggleConfirmation(player: Player, worldData: WorldData, source: SubmissionAdminMenuHolder) {
@@ -336,7 +337,7 @@ class SubmissionAdminMenu(
             confirmButton(player, true),
             confirmButton(player, false)
         )
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     private fun openCompleteUnsubmittedConfirmation(player: Player, worldData: WorldData, source: SubmissionAdminMenuHolder) {
@@ -351,7 +352,7 @@ class SubmissionAdminMenu(
             confirmButton(player, true),
             confirmButton(player, false)
         )
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     @EventHandler

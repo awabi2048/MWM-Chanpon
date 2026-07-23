@@ -1,4 +1,5 @@
 package me.awabi2048.mwmchanpon.extension
+import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
 
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import com.awabi2048.ccsystem.CCSystem
@@ -212,7 +213,7 @@ class ProductionToggleExtension(
             createConfirmationButton(player, true),
             createConfirmationButton(player, false)
         )
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     private fun returnToWorldSettings(player: Player, worldUuid: UUID, request: WorldSettingsMenuRequest) {

@@ -1,4 +1,5 @@
 package me.awabi2048.mwmchanpon.ui
+import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
@@ -65,7 +66,7 @@ class ChanponDiscoveryMenuProvider(
 
         fill(inventory)
         mwm.soundManager.playMenuOpenSound(player, "discovery")
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
         return true
     }
 

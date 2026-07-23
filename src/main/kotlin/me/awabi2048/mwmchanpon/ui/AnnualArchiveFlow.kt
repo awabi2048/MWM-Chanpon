@@ -68,7 +68,8 @@ class AnnualArchiveFlow(
                     }
                     session.archiveName = message
                     session.step = ArchiveStep.CONFIRM_NAME
-                    player.openInventory(
+                    ManagedMenuPresenter.open(
+                        player,
                         confirmationInventory(
                             player,
                             ArchiveConfirmationAction.NAME,
@@ -89,7 +90,8 @@ class AnnualArchiveFlow(
                         return@Runnable
                     }
                     session.step = ArchiveStep.CONFIRM_FINAL
-                    player.openInventory(
+                    ManagedMenuPresenter.open(
+                        player,
                         confirmationInventory(
                             player,
                             ArchiveConfirmationAction.EXECUTE,

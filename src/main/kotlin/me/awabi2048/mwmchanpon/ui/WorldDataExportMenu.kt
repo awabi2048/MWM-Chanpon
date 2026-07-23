@@ -1,4 +1,5 @@
 package me.awabi2048.mwmchanpon.ui
+import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
@@ -54,7 +55,7 @@ class WorldDataExportMenu(
         }
         inv.setItem(51, bulkExportItem(player))
         fill(inv)
-        player.openInventory(inv)
+        ManagedMenuPresenter.open(player, inv)
     }
 
     @EventHandler

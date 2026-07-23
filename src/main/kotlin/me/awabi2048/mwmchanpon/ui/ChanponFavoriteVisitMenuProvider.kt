@@ -1,4 +1,5 @@
 package me.awabi2048.mwmchanpon.ui
+import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
 
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import com.awabi2048.ccsystem.CCSystem
@@ -67,7 +68,7 @@ class ChanponFavoriteVisitMenuProvider(
         }
 
         fill(inventory)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
         return true
     }
 
@@ -187,7 +188,7 @@ class ChanponFavoriteVisitMenuProvider(
         if (showBackButton || returnWorld != null) inventory.setItem(layout.backSlot, returnItem(player))
         inventory.setItem(layout.actionSlot, infoItem(player, worlds.size, safePage + 1, pageLayout.totalPages))
         fill(inventory)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     private fun worldListItem(player: Player, world: WorldData): ItemStack {
