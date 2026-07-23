@@ -184,6 +184,12 @@ class ChanponAdminMenu(
 
     private fun buildingPermissionItem(player: Player): ItemStack {
         val allowed = globalStorage.isBuildingAllowed()
+        val buildingAction = GuiLoreActions.single(
+            mwm().languageManager,
+            player,
+            mwm().languageManager.getMessage(player, "gui.settings.click.left"),
+            controlsI18n(player, if (allowed) "build.deny_action" else "build.allow_action")
+        )
         val item = CCSystem.getAPI().getGuiElementService().menuIcon(
             GuiMenuIconSpec(
                 material = if (allowed) Material.BRICKS else Material.BARRIER,
@@ -201,9 +207,9 @@ class ChanponAdminMenu(
                 dangers = emptyList(),
                 actions = listOf(
                     GuiMenuIconAction(
-                        operation = mwm().languageManager.getMessage(player, "gui.settings.click.left"),
-                        action = controlsI18n(player, if (allowed) "build.deny_action" else "build.allow_action"),
-                        resolvedText = null,
+                        operation = buildingAction.operation,
+                        action = buildingAction.action,
+                        resolvedText = buildingAction.resolvedText,
                         enabled = true
                     )
                 ),
@@ -218,6 +224,18 @@ class ChanponAdminMenu(
     private fun worldCreationAvailabilityItem(player: Player): ItemStack {
         val availability = globalStorage.getWorldCreationAvailability()
         val key = availability.name.lowercase()
+        val nextAction = GuiLoreActions.single(
+            mwm().languageManager,
+            player,
+            mwm().languageManager.getMessage(player, "gui.settings.click.left"),
+            controlsI18n(player, "creation.next_action")
+        )
+        val previousAction = GuiLoreActions.single(
+            mwm().languageManager,
+            player,
+            mwm().languageManager.getMessage(player, "gui.settings.click.right"),
+            controlsI18n(player, "creation.previous_action")
+        )
         val material = when (availability) {
             WorldCreationAvailability.DENIED -> Material.BARRIER
             WorldCreationAvailability.NON_PRODUCTION -> Material.CRAFTING_TABLE
@@ -247,15 +265,15 @@ class ChanponAdminMenu(
                 dangers = emptyList(),
                 actions = listOf(
                     GuiMenuIconAction(
-                        operation = mwm().languageManager.getMessage(player, "gui.settings.click.left"),
-                        action = controlsI18n(player, "creation.next_action"),
-                        resolvedText = null,
+                        operation = nextAction.operation,
+                        action = nextAction.action,
+                        resolvedText = nextAction.resolvedText,
                         enabled = true
                     ),
                     GuiMenuIconAction(
-                        operation = mwm().languageManager.getMessage(player, "gui.settings.click.right"),
-                        action = controlsI18n(player, "creation.previous_action"),
-                        resolvedText = null,
+                        operation = previousAction.operation,
+                        action = previousAction.action,
+                        resolvedText = previousAction.resolvedText,
                         enabled = true
                     )
                 ),
