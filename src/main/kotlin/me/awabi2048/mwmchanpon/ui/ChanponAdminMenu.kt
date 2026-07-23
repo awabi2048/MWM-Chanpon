@@ -64,11 +64,23 @@ class ChanponAdminMenu(
         inventory.setItem(21, menuItem(player, Material.CHEST, "admin.world_data", ACTION_WORLD_DATA))
         inventory.setItem(23, menuItem(player, Material.CLOCK, "admin.automation", ACTION_AUTOMATION))
         inventory.setItem(25, menuItem(player, Material.DISPENSER, "admin.export", ACTION_EXPORT))
-        inventory.setItem(37, buildingPermissionItem(player))
-        inventory.setItem(39, worldCreationAvailabilityItem(player))
-        inventory.setItem(41, switchToMwmItem(player))
+        inventory.setItem(
+            ChanponAdminMenuLayout.FOOTER_BUILDING_PERMISSION,
+            buildingPermissionItem(player)
+        )
+        inventory.setItem(
+            ChanponAdminMenuLayout.FOOTER_WORLD_CREATION,
+            worldCreationAvailabilityItem(player)
+        )
+        inventory.setItem(
+            ChanponAdminMenuLayout.FOOTER_MAIN_SWITCH,
+            switchToMwmItem(player)
+        )
         currentWorldUuid(player)?.let { worldUuid ->
-            inventory.setItem(43, spawnWorldItem(player, worldUuid))
+            inventory.setItem(
+                ChanponAdminMenuLayout.FOOTER_SPAWN_WORLD,
+                spawnWorldItem(player, worldUuid)
+            )
         }
         fill(inventory)
         ManagedMenuPresenter.open(player, inventory)
@@ -90,7 +102,7 @@ class ChanponAdminMenu(
                 ACTION_EXPORT -> openChild(player) { worldDataExportMenu.open(player) }
                 ACTION_SWITCH_MWM -> mwm().adminCommandGui.open(player)
                 ACTION_BUILDING_ALLOWED -> {
-                    if (!event.isLeftClick) return
+                    if (!event.isLeftClick && !event.isRightClick) return
                     plugin.setBuildingAllowed(!globalStorage.isBuildingAllowed())
                     open(player)
                 }
@@ -184,10 +196,9 @@ class ChanponAdminMenu(
 
     private fun buildingPermissionItem(player: Player): ItemStack {
         val allowed = globalStorage.isBuildingAllowed()
-        val buildingAction = GuiLoreActions.single(
+        val buildingAction = GuiLoreActions.singleClick(
             mwm().languageManager,
             player,
-            mwm().languageManager.getMessage(player, "gui.settings.click.left"),
             controlsI18n(player, if (allowed) "build.deny_action" else "build.allow_action")
         )
         val item = CCSystem.getAPI().getGuiElementService().menuIcon(
