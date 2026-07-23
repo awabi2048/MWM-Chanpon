@@ -3,7 +3,7 @@ package me.awabi2048.mwmchanpon.extension
 import com.awabi2048.ccsystem.CCSystem
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
-import me.awabi2048.mwmchanpon.storage.ChanponPhase
+import me.awabi2048.mwmchanpon.storage.WorldCreationAvailability
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.WorldCreationDecision
 import me.awabi2048.myworldmanager.api.extension.WorldCreationGuard
@@ -17,16 +17,16 @@ class ChanponWorldCreationGuard(
     override fun getId(): String = POLICY_ID
 
     override fun evaluate(request: WorldCreationRequest): WorldCreationDecision {
-        val phase = globalStorage.getPhase()
-        val phaseAllowed = when (request.operation) {
-            WorldCreationOperation.NORMAL -> phase != ChanponPhase.BUILD_LOCKED
-            WorldCreationOperation.PRODUCTION -> phase == ChanponPhase.PRODUCTION_ALLOWED
+        val availability = globalStorage.getWorldCreationAvailability()
+        val creationAllowed = when (request.operation) {
+            WorldCreationOperation.NORMAL -> availability != WorldCreationAvailability.DENIED
+            WorldCreationOperation.PRODUCTION -> availability == WorldCreationAvailability.PRODUCTION
         }
-        if (!phaseAllowed) {
+        if (!creationAllowed) {
             val key = if (request.operation == WorldCreationOperation.PRODUCTION) {
-                "chanpon.phase.production_denied"
+                "chanpon.controls.production_denied"
             } else {
-                "chanpon.phase.creation_denied"
+                "chanpon.controls.creation_denied"
             }
             return WorldCreationDecision.deny(
                 request.player?.let { CCSystem.getAPI().getI18nComponent(it, key) }

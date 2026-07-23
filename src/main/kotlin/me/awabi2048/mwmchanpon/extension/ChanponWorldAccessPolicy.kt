@@ -19,6 +19,7 @@ class ChanponWorldAccessPolicy(
     override fun canShowInDiscovery(viewer: Player, worldData: WorldData): Boolean =
         !worldData.isArchived &&
             worldData.sourceWorld != "CONVERT" &&
+            storage.isSubmissionCompleted(worldData.uuid) &&
             visibility(worldData) == ChanponWorldVisibility.PUBLIC
 
     override fun canShowInVisitWorldList(viewer: Player, worldData: WorldData): Boolean =

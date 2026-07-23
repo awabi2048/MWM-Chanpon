@@ -39,7 +39,6 @@ import me.awabi2048.mwmchanpon.service.WorldDataExportService
 import me.awabi2048.mwmchanpon.service.ArchiveService
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
-import me.awabi2048.mwmchanpon.storage.ChanponPhase
 import me.awabi2048.mwmchanpon.command.ChanponAdminCommand
 import me.awabi2048.mwmchanpon.tool.LuckPermsToolPermissionService
 import me.awabi2048.mwmchanpon.tool.ToolPermissionConfig
@@ -404,9 +403,8 @@ class MWMChanponPlugin : JavaPlugin() {
         logger.info("MWM-Chanpon addon has been disabled.")
     }
 
-    fun setPhase(phase: ChanponPhase) {
-        globalStorage.setPhase(phase)
-        // フェーズ変更を保存した直後に、現在オンラインの全プレイヤーへ状態を反映する。
+    fun setBuildingAllowed(allowed: Boolean) {
+        globalStorage.setBuildingAllowed(allowed)
         MyWorldManagerApi.syncOnlineWorldPlayerStates()
     }
 

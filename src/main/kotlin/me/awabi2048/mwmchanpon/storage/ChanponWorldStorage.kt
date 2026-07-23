@@ -156,6 +156,11 @@ class ChanponWorldStorage(dataFolder: File) {
             ?: error("Submission state is missing or invalid: $worldUuid")
     }
 
+    fun isSubmissionCompleted(worldUuid: UUID): Boolean {
+        val config = load(worldUuid) ?: return false
+        return SubmissionState.fromStorageValue(config.getString("submission.state")) == SubmissionState.COMPLETED
+    }
+
     @Synchronized
     fun setSubmissionState(
         worldUuid: UUID,

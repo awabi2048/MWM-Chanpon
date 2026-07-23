@@ -14,7 +14,7 @@ import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
-import me.awabi2048.mwmchanpon.storage.ChanponPhase
+import me.awabi2048.mwmchanpon.storage.WorldCreationAvailability
 import me.awabi2048.mwmchanpon.protection.SpawnWorldProtectionService
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
@@ -64,10 +64,11 @@ class ChanponAdminMenu(
         inventory.setItem(21, menuItem(player, Material.CHEST, "admin.world_data", ACTION_WORLD_DATA))
         inventory.setItem(23, menuItem(player, Material.CLOCK, "admin.automation", ACTION_AUTOMATION))
         inventory.setItem(25, menuItem(player, Material.DISPENSER, "admin.export", ACTION_EXPORT))
-        inventory.setItem(38, phaseItem(player))
-        inventory.setItem(40, switchToMwmItem(player))
+        inventory.setItem(37, buildingPermissionItem(player))
+        inventory.setItem(39, worldCreationAvailabilityItem(player))
+        inventory.setItem(41, switchToMwmItem(player))
         currentWorldUuid(player)?.let { worldUuid ->
-            inventory.setItem(42, spawnWorldItem(player, worldUuid))
+            inventory.setItem(43, spawnWorldItem(player, worldUuid))
         }
         fill(inventory)
         ManagedMenuPresenter.open(player, inventory)
@@ -88,13 +89,18 @@ class ChanponAdminMenu(
                 ACTION_AUTOMATION -> openChild(player) { automationSettingsMenu.open(player) }
                 ACTION_EXPORT -> openChild(player) { worldDataExportMenu.open(player) }
                 ACTION_SWITCH_MWM -> mwm().adminCommandGui.open(player)
-                ACTION_PHASE -> {
-                    val phase = GuiCycle.select(
-                        globalStorage.getPhase(),
-                        ChanponPhase.entries.toList(),
+                ACTION_BUILDING_ALLOWED -> {
+                    if (!event.isLeftClick) return
+                    plugin.setBuildingAllowed(!globalStorage.isBuildingAllowed())
+                    open(player)
+                }
+                ACTION_WORLD_CREATION -> {
+                    val availability = GuiCycle.select(
+                        globalStorage.getWorldCreationAvailability(),
+                        WorldCreationAvailability.entries.toList(),
                         GuiCycle.direction(event.click) ?: return
                     )
-                    plugin.setPhase(phase)
+                    globalStorage.setWorldCreationAvailability(availability)
                     open(player)
                 }
                 ACTION_SET_SPAWN_WORLD -> {
@@ -176,26 +182,63 @@ class ChanponAdminMenu(
         }
     }
 
-    private fun phaseItem(player: Player): ItemStack {
-        val phase = globalStorage.getPhase()
-        val phaseKey = phase.name.lowercase()
-        val material = when (phase) {
-            ChanponPhase.BUILD_LOCKED -> Material.REDSTONE_BLOCK
-            ChanponPhase.CREATION_ALLOWED -> Material.CRAFTING_TABLE
-            ChanponPhase.PRODUCTION_ALLOWED -> Material.NETHER_STAR
+    private fun buildingPermissionItem(player: Player): ItemStack {
+        val allowed = globalStorage.isBuildingAllowed()
+        val item = CCSystem.getAPI().getGuiElementService().menuIcon(
+            GuiMenuIconSpec(
+                material = if (allowed) Material.BRICKS else Material.BARRIER,
+                name = GuiNameSpec.Text(controlsI18n(player, "build.display"), GuiNameStyle.PRIMARY),
+                role = GuiElementRole.ACTION,
+                amount = 1,
+                description = listOf(controlsI18n(player, if (allowed) "build.allowed_description" else "build.denied_description")),
+                data = listOf(com.awabi2048.ccsystem.api.gui.GuiMenuIconData(
+                    controlsI18n(player, "build.current"),
+                    controlsI18n(player, if (allowed) "build.allowed" else "build.denied"),
+                    "§e"
+                )),
+                options = emptyList(),
+                warnings = emptyList(),
+                dangers = emptyList(),
+                actions = listOf(
+                    GuiMenuIconAction(
+                        operation = mwm().languageManager.getMessage(player, "gui.settings.click.left"),
+                        action = controlsI18n(player, if (allowed) "build.deny_action" else "build.allow_action"),
+                        resolvedText = null,
+                        enabled = true
+                    )
+                ),
+                glint = null
+            )
+        )
+        ItemTag.tagItem(item, TYPE_CONTROL)
+        ItemTag.setString(item, ACTION_KEY, ACTION_BUILDING_ALLOWED)
+        return item
+    }
+
+    private fun worldCreationAvailabilityItem(player: Player): ItemStack {
+        val availability = globalStorage.getWorldCreationAvailability()
+        val key = availability.name.lowercase()
+        val material = when (availability) {
+            WorldCreationAvailability.DENIED -> Material.BARRIER
+            WorldCreationAvailability.NON_PRODUCTION -> Material.CRAFTING_TABLE
+            WorldCreationAvailability.PRODUCTION -> Material.NETHER_STAR
         }
         val item = CCSystem.getAPI().getGuiElementService().menuIcon(
             GuiMenuIconSpec(
                 material = material,
-                name = GuiNameSpec.Text(phaseI18n(player, "selector.display"), GuiNameStyle.PRIMARY),
+                name = GuiNameSpec.Text(controlsI18n(player, "creation.display"), GuiNameStyle.PRIMARY),
                 role = GuiElementRole.ACTION,
                 amount = 1,
-                description = listOf(phaseI18n(player, "state.$phaseKey.description")),
-                data = listOf(com.awabi2048.ccsystem.api.gui.GuiMenuIconData(phaseI18n(player, "selector.current"), phaseI18n(player, "state.$phaseKey.display"), "§e")),
-                options = ChanponPhase.entries.map { option ->
+                description = listOf(controlsI18n(player, "creation.$key.description")),
+                data = listOf(com.awabi2048.ccsystem.api.gui.GuiMenuIconData(
+                    controlsI18n(player, "creation.current"),
+                    controlsI18n(player, "creation.$key.display"),
+                    "§e"
+                )),
+                options = WorldCreationAvailability.entries.map { option ->
                     GuiMenuIconOption(
-                        label = phaseI18n(player, "state.${option.name.lowercase()}.display"),
-                        selected = option == phase,
+                        label = controlsI18n(player, "creation.${option.name.lowercase()}.display"),
+                        selected = option == availability,
                         selectedColor = "§a",
                         inactiveColor = "§7"
                     )
@@ -205,13 +248,13 @@ class ChanponAdminMenu(
                 actions = listOf(
                     GuiMenuIconAction(
                         operation = mwm().languageManager.getMessage(player, "gui.settings.click.left"),
-                        action = phaseI18n(player, "state.next_action"),
+                        action = controlsI18n(player, "creation.next_action"),
                         resolvedText = null,
                         enabled = true
                     ),
                     GuiMenuIconAction(
                         operation = mwm().languageManager.getMessage(player, "gui.settings.click.right"),
-                        action = phaseI18n(player, "state.previous_action"),
+                        action = controlsI18n(player, "creation.previous_action"),
                         resolvedText = null,
                         enabled = true
                     )
@@ -220,7 +263,7 @@ class ChanponAdminMenu(
             )
         )
         ItemTag.tagItem(item, TYPE_CONTROL)
-        ItemTag.setString(item, ACTION_KEY, ACTION_PHASE)
+        ItemTag.setString(item, ACTION_KEY, ACTION_WORLD_CREATION)
         return item
     }
 
@@ -274,8 +317,8 @@ class ChanponAdminMenu(
     private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nString(player, "chanpon.backup.$key", placeholders)
 
-    private fun phaseI18n(player: Player?, key: String) =
-        CCSystem.getAPI().getI18nString(player, "chanpon.phase.$key")
+    private fun controlsI18n(player: Player?, key: String) =
+        CCSystem.getAPI().getI18nString(player, "chanpon.controls.$key")
 
     private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
@@ -304,7 +347,8 @@ class ChanponAdminMenu(
         private const val ACTION_AUTOMATION = "automation"
         private const val ACTION_EXPORT = "export"
         private const val ACTION_SWITCH_MWM = "switch_mwm"
-        private const val ACTION_PHASE = "phase"
+        private const val ACTION_BUILDING_ALLOWED = "building_allowed"
+        private const val ACTION_WORLD_CREATION = "world_creation"
         private const val ACTION_SET_SPAWN_WORLD = "set_spawn_world"
         private const val ACTION_NONE = "none"
         private const val ROUTE_ADMIN_MENU = "chanpon.admin_menu"

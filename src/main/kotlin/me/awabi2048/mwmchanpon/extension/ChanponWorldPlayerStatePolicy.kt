@@ -1,7 +1,6 @@
 package me.awabi2048.mwmchanpon.extension
 
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
-import me.awabi2048.mwmchanpon.storage.ChanponPhase
 import me.awabi2048.myworldmanager.api.extension.WorldPlayerStateDecision
 import me.awabi2048.myworldmanager.api.extension.WorldPlayerStatePolicy
 import me.awabi2048.myworldmanager.model.WorldData
@@ -19,7 +18,7 @@ class ChanponWorldPlayerStatePolicy(
         if (isAdmin(player)) {
             return WorldPlayerStateDecision(buildAllowed = true)
         }
-        if (globalStorage.getPhase() != ChanponPhase.BUILD_LOCKED) {
+        if (globalStorage.isBuildingAllowed()) {
             return WorldPlayerStateDecision(buildAllowed = true)
         }
         return WorldPlayerStateDecision(

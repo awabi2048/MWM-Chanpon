@@ -19,14 +19,14 @@ class ChanponAdminCommand(
 ) : CommandExecutor, TabCompleter {
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
         if (!sender.hasPermission("mwmchanpon.admin")) {
-            sender.sendMessage(message(sender, "chanpon.phase.command.no_permission"))
+            sender.sendMessage(message(sender, "chanpon.controls.command.no_permission"))
             return true
         }
         if (args.isNotEmpty()) {
             return handleSubCommand(sender, args)
         }
         if (sender !is Player) {
-            sender.sendMessage(message(null, "chanpon.phase.command.player_only"))
+            sender.sendMessage(message(null, "chanpon.controls.command.player_only"))
             return true
         }
         return CCSystem.getAPI().getMenuCommandService().open(
@@ -43,7 +43,7 @@ class ChanponAdminCommand(
             "unzip_archive" -> handleUnzipArchive(sender, args)
             "create_world" -> handleCreateWorld(sender, args)
             else -> {
-                sender.sendMessage(message(sender, "chanpon.phase.command.unknown_subcommand"))
+                sender.sendMessage(message(sender, "chanpon.controls.command.unknown_subcommand"))
                 true
             }
         }
@@ -51,42 +51,42 @@ class ChanponAdminCommand(
 
     private fun handleGetLinkedPortal(sender: CommandSender, args: Array<out String>): Boolean {
         if (sender !is Player) {
-            sender.sendMessage(message(null, "chanpon.phase.command.player_only"))
+            sender.sendMessage(message(null, "chanpon.controls.command.player_only"))
             return true
         }
         val targetName = args.getOrNull(1)
         if (targetName == null) {
-            sender.sendMessage(message(sender, "chanpon.phase.command.usage_get_linked_portal"))
+            sender.sendMessage(message(sender, "chanpon.controls.command.usage_get_linked_portal"))
             return true
         }
         val target = Bukkit.getPlayerExact(targetName)
         if (target == null) {
-            sender.sendMessage(message(sender, "chanpon.phase.command.player_not_found"))
+            sender.sendMessage(message(sender, "chanpon.controls.command.player_not_found"))
             return true
         }
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByWorldName(target.world.name)
         if (worldData == null) {
-            sender.sendMessage(message(sender, "chanpon.phase.command.target_not_in_world"))
+            sender.sendMessage(message(sender, "chanpon.controls.command.target_not_in_world"))
             return true
         }
         val portal = MyWorldManagerApi.getWorldService()?.createLinkedWorldPortalItem(sender, worldData.uuid)
         if (portal == null) {
-            sender.sendMessage(message(sender, "chanpon.phase.command.portal_failed"))
+            sender.sendMessage(message(sender, "chanpon.controls.command.portal_failed"))
             return true
         }
         sender.inventory.addItem(portal).values.forEach { sender.world.dropItemNaturally(sender.location, it) }
-        sender.sendMessage(message(sender, "chanpon.phase.command.portal_received"))
+        sender.sendMessage(message(sender, "chanpon.controls.command.portal_received"))
         return true
     }
 
     private fun handleUnzipArchive(sender: CommandSender, args: Array<out String>): Boolean {
         val archiveName = args.getOrNull(1)
         if (archiveName == null) {
-            sender.sendMessage(message(sender, "chanpon.phase.command.usage_unzip_archive"))
+            sender.sendMessage(message(sender, "chanpon.controls.command.usage_unzip_archive"))
             return true
         }
         val player = sender as? Player ?: run {
-            sender.sendMessage(message(null, "chanpon.phase.command.player_only"))
+            sender.sendMessage(message(null, "chanpon.controls.command.player_only"))
             return true
         }
         archiveService.unzipArchive(archiveName, player).thenAccept { result ->
@@ -94,9 +94,9 @@ class ChanponAdminCommand(
                 Bukkit.getPluginManager().getPlugin("MWMChanpon") ?: return@thenAccept,
                 Runnable {
                     if (result.success) {
-                        sender.sendMessage(message(sender, "chanpon.phase.command.archive_unzipped", "archive" to archiveName))
+                        sender.sendMessage(message(sender, "chanpon.controls.command.archive_unzipped", "archive" to archiveName))
                     } else {
-                        sender.sendMessage(message(sender, "chanpon.phase.command.archive_unzip_failed", "reason" to result.message))
+                        sender.sendMessage(message(sender, "chanpon.controls.command.archive_unzip_failed", "reason" to result.message))
                     }
                 }
             )
@@ -130,7 +130,7 @@ class ChanponAdminCommand(
 
     private fun handleCreateWorld(sender: CommandSender, args: Array<out String>): Boolean {
         val player = sender as? Player ?: run {
-            sender.sendMessage(message(null, "chanpon.phase.command.player_only"))
+            sender.sendMessage(message(null, "chanpon.controls.command.player_only"))
             return true
         }
         val ownerName = args.getOrNull(1)
@@ -140,7 +140,7 @@ class ChanponAdminCommand(
         }
         val owner = Bukkit.getPlayerExact(ownerName)
         if (owner == null) {
-            sender.sendMessage(message(player, "chanpon.phase.command.player_not_found"))
+            sender.sendMessage(message(player, "chanpon.controls.command.player_not_found"))
             return true
         }
         adminWizardForm.open(

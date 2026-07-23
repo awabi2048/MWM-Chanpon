@@ -55,20 +55,50 @@ class ChanponGlobalStorage(dataFolder: File) {
         config.save(settingsFile)
     }
 
-    fun getPhase(): ChanponPhase {
-        val config = settings()
-        val raw = config.getString("phase")
-        if (raw == null) {
-            config.set("phase", ChanponPhase.PRODUCTION_ALLOWED.name)
-            config.save(settingsFile)
-            return ChanponPhase.PRODUCTION_ALLOWED
-        }
-        return ChanponPhase.valueOf(raw)
+    fun isBuildingAllowed(): Boolean {
+        migrateLegacyPhase()
+        return settings().getBoolean("building_allowed", true)
     }
 
-    fun setPhase(phase: ChanponPhase) {
+    fun setBuildingAllowed(allowed: Boolean) {
+        migrateLegacyPhase()
         val config = settings()
-        config.set("phase", phase.name)
+        config.set("building_allowed", allowed)
+        config.save(settingsFile)
+    }
+
+    fun getWorldCreationAvailability(): WorldCreationAvailability {
+        migrateLegacyPhase()
+        val raw = settings().getString("world_creation_availability")
+        return runCatching { WorldCreationAvailability.valueOf(raw.orEmpty()) }
+            .getOrDefault(WorldCreationAvailability.PRODUCTION)
+    }
+
+    fun setWorldCreationAvailability(availability: WorldCreationAvailability) {
+        migrateLegacyPhase()
+        val config = settings()
+        config.set("world_creation_availability", availability.name)
+        config.save(settingsFile)
+    }
+
+    private fun migrateLegacyPhase() {
+        val config = settings()
+        if (config.contains("building_allowed") && config.contains("world_creation_availability")) return
+        when (config.getString("phase")) {
+            "BUILD_LOCKED" -> {
+                config.set("building_allowed", false)
+                config.set("world_creation_availability", WorldCreationAvailability.DENIED.name)
+            }
+            "CREATION_ALLOWED" -> {
+                config.set("building_allowed", true)
+                config.set("world_creation_availability", WorldCreationAvailability.NON_PRODUCTION.name)
+            }
+            else -> {
+                config.set("building_allowed", true)
+                config.set("world_creation_availability", WorldCreationAvailability.PRODUCTION.name)
+            }
+        }
+        config.set("phase", null)
         config.save(settingsFile)
     }
 

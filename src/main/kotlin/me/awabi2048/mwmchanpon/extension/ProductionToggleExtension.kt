@@ -12,7 +12,7 @@ import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
-import me.awabi2048.mwmchanpon.storage.ChanponPhase
+import me.awabi2048.mwmchanpon.storage.WorldCreationAvailability
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.SubmissionState
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
@@ -57,7 +57,7 @@ class ProductionToggleExtension(
         when (context.menuType) {
             "world_settings" -> {
                 if (context.get<Boolean>("isProtected") == true) return
-                if (globalStorage.getPhase() != ChanponPhase.PRODUCTION_ALLOWED) return
+                if (globalStorage.getWorldCreationAvailability() != WorldCreationAvailability.PRODUCTION) return
                 val worldData = context.get<WorldData>("worldData") ?: return
                 if (plugin.isSubmissionClosed()) {
                     inventory.setItem(WORLD_MENU_SLOT, createDecorationItem(Material.GRAY_STAINED_GLASS_PANE))
