@@ -96,7 +96,7 @@ class BackupListMenu(
         when (ItemTag.getType(item)) {
             ItemTag.TYPE_GUI_RETURN -> {
                 if (!mwm().menuRouteHistory.openPrevious(player)) {
-                    parentMenuOpener?.invoke(player) ?: player.closeInventory()
+                    parentMenuOpener?.invoke(player) ?: ManagedMenuPresenter.close(player)
                 }
             }
             ItemTag.TYPE_GUI_NAV_PREV, ItemTag.TYPE_GUI_NAV_NEXT -> open(player, holder.mode, holder.worldUuid, ItemTag.getTargetPage(item) ?: holder.page)
@@ -120,7 +120,7 @@ class BackupListMenu(
         when (ItemTag.getType(event.currentItem ?: return)) {
             ItemTag.TYPE_GUI_CANCEL -> open(player, holder.source.mode, holder.source.worldUuid, holder.source.page)
             ItemTag.TYPE_GUI_CONFIRM -> {
-                player.closeInventory()
+                ManagedMenuPresenter.close(player)
                 if (automationService?.isManualOperationBlocked(player) == true) {
                     player.sendMessage(i18nComponent(player, "message.manual_operation_blocked"))
                     return

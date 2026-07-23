@@ -345,7 +345,7 @@ class ChanponWorldSettingsMenuProvider(
             ItemTag.TYPE_GUI_RETURN -> {
                 mwm.soundManager.playClickSound(player, item, "world_settings")
                 if (!mwm.menuRouteHistory.openPrevious(player)) {
-                    player.closeInventory()
+                    ManagedMenuPresenter.close(player)
                 }
             }
             ItemTag.TYPE_GUI_EXTENSION -> {
@@ -487,7 +487,7 @@ class ChanponWorldSettingsMenuProvider(
                     openDeleteConfirm(player, worldData, true)
                     return
                 }
-                player.closeInventory()
+                ManagedMenuPresenter.close(player)
                 mwm().worldService.deleteWorld(holder.worldUuid, player).thenAccept { success ->
                     Bukkit.getScheduler().runTask(plugin, Runnable {
                         player.sendMessage(i18nComponent(player, if (success) "critical.deleted" else "critical.delete_failed"))
@@ -611,7 +611,7 @@ class ChanponWorldSettingsMenuProvider(
         when {
             success && action == ConfirmAction.EXPAND -> {
                 mwm().settingsSessionManager.endSession(player)
-                player.closeInventory()
+                ManagedMenuPresenter.close(player)
             }
             success -> openExpansionMenu(player, latest)
             else -> open(player, latest, currentRequest(player))

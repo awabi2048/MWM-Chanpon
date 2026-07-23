@@ -1,5 +1,7 @@
 package me.awabi2048.mwmchanpon.service
 
+import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
+
 import com.awabi2048.ccsystem.CCSystem
 import io.papermc.paper.connection.PlayerGameConnection
 import io.papermc.paper.dialog.Dialog
@@ -48,7 +50,7 @@ class EasyVoidWorldCreationService(
     fun start(player: Player) {
         if (!canCreate(player)) return
         pendingNames.remove(player.uniqueId)
-        player.closeInventory()
+        ManagedMenuPresenter.close(player)
         player.sendMessage(i18n(player, "start"))
         showNameDialog(player)
     }
@@ -74,7 +76,7 @@ class EasyVoidWorldCreationService(
     private fun cancelFlow(player: Player) {
         pendingNames.remove(player.uniqueId)
         if (!CCSystem.getAPI().getMenuNavigationService().openPrevious(player)) {
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
         }
     }
 

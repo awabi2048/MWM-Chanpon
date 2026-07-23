@@ -149,7 +149,7 @@ class ChanponPlayerWorldMenuProvider(
                 val session = mwm.creationSessionManager.startSession(player.uniqueId)
                 session.isDialogMode = true
                 session.billingMode = WorldPointBillingMode.NONE
-                player.closeInventory()
+                ManagedMenuPresenter.close(player)
                 player.sendMessage(mwm.languageManager.getMessage(player, "messages.wizard_start"))
                 mwm.creationGui.openTypeSelection(player)
             }
@@ -195,7 +195,7 @@ class ChanponPlayerWorldMenuProvider(
                 }
                 return
             }
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
             // MWM本体の具象サービスを直接呼ぶとKotlinランタイムのクラスローダー差で壊れるため、公開API境界だけを通す。
             MyWorldManagerApi.getWorldService()?.teleportToWorld(player, uuid)
             player.sendMessage(mwm.languageManager.getMessage(player, "messages.warp_success", mapOf("world" to worldData.name)))
@@ -403,7 +403,7 @@ class ChanponPlayerWorldMenuProvider(
         val mwm = mwm()
         mwm.soundManager.playClickSound(player, item, "player_world")
         if (!mwm.menuRouteHistory.openPrevious(player)) {
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
         }
     }
 

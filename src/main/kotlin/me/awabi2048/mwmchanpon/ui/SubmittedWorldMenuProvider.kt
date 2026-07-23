@@ -94,7 +94,7 @@ class SubmittedWorldMenuProvider(
             else -> {
                 mwm.soundManager.playClickSound(player, item, null)
                 mwm.settingsSessionManager.endSession(player)
-                player.closeInventory()
+                ManagedMenuPresenter.close(player)
             }
         }
     }

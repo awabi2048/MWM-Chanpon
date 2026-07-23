@@ -58,7 +58,7 @@ class AutomationSettingsMenu(
         val item = event.currentItem ?: return
         if (ItemTag.getType(item) == ItemTag.TYPE_GUI_RETURN) {
             if (!mwm().menuRouteHistory.openPrevious(player)) {
-                parentMenuOpener?.invoke(player) ?: player.closeInventory()
+                parentMenuOpener?.invoke(player) ?: ManagedMenuPresenter.close(player)
             }
             return
         }
@@ -93,7 +93,7 @@ class AutomationSettingsMenu(
         when (ItemTag.getType(event.currentItem ?: return)) {
             ItemTag.TYPE_GUI_CANCEL -> open(player)
             ItemTag.TYPE_GUI_CONFIRM -> {
-                player.closeInventory()
+                ManagedMenuPresenter.close(player)
                 backupService.createAllBackup(
                     automationService.productionWorldUuids(),
                     BackupKind.RESTORE_POINT,

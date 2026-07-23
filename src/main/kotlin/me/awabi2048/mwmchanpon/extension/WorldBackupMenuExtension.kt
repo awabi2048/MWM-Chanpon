@@ -112,7 +112,7 @@ class WorldBackupMenuExtension(
         if (event.clickedInventory != event.view.topInventory) return
         val item = event.currentItem ?: return
         if (ownedProductionWorld(player, holder.worldUuid) == null) {
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
             return
         }
         when (ItemTag.getType(item)) {
@@ -185,7 +185,7 @@ class WorldBackupMenuExtension(
             ItemTag.TYPE_GUI_CANCEL -> open(player, holder.source.worldUuid, holder.source.page)
             ItemTag.TYPE_GUI_CONFIRM -> {
                 if (ownedProductionWorld(player, holder.source.worldUuid) == null) {
-                    player.closeInventory()
+                    ManagedMenuPresenter.close(player)
                     return
                 }
                 if (automationService.isManualOperationBlocked(player)) {
@@ -199,7 +199,7 @@ class WorldBackupMenuExtension(
                     open(player, holder.source.worldUuid, holder.source.page)
                     return
                 }
-                player.closeInventory()
+                ManagedMenuPresenter.close(player)
                 backupService.createOwnerWorldBackup(holder.source.worldUuid, player.uniqueId, player.name, "owner_manual", holder.backupName)
                     .thenAccept { result ->
                         Bukkit.getScheduler().runTask(plugin, Runnable {
@@ -229,11 +229,11 @@ class WorldBackupMenuExtension(
             ItemTag.TYPE_GUI_CANCEL -> open(player, holder.source.worldUuid, holder.source.page)
             ItemTag.TYPE_GUI_CONFIRM -> {
                 if (ownedProductionWorld(player, holder.source.worldUuid) == null) {
-                    player.closeInventory()
+                    ManagedMenuPresenter.close(player)
                     return
                 }
                 val backup = backupService.listBackupsForWorld(holder.source.worldUuid).firstOrNull { it.id == holder.backupId } ?: return
-                player.closeInventory()
+                ManagedMenuPresenter.close(player)
                 if (automationService.isManualOperationBlocked(player)) {
                     player.sendMessage(i18nComponent(player, "message.manual_operation_blocked"))
                     return
@@ -492,7 +492,7 @@ class WorldBackupMenuExtension(
     private fun returnToWorldSettings(player: Player, worldUuid: UUID) {
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
         if (worldData == null) {
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
             return
         }
         val mwm = org.bukkit.plugin.java.JavaPlugin.getPlugin(MyWorldManager::class.java)

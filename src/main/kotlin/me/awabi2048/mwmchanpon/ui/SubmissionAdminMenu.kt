@@ -103,7 +103,7 @@ class SubmissionAdminMenu(
         when (ItemTag.getType(item)) {
             ItemTag.TYPE_GUI_RETURN -> {
                 if (!mwm().menuRouteHistory.openPrevious(player)) {
-                    parentMenuOpener?.invoke(player) ?: player.closeInventory()
+                    parentMenuOpener?.invoke(player) ?: ManagedMenuPresenter.close(player)
                 }
             }
             ItemTag.TYPE_GUI_NAV_PREV, ItemTag.TYPE_GUI_NAV_NEXT -> {
@@ -197,7 +197,7 @@ class SubmissionAdminMenu(
 
         if (!clickType.isLeftClick) return
         MyWorldManagerApi.getWorldService()?.teleportToWorld(player, worldData.uuid)
-        player.closeInventory()
+        ManagedMenuPresenter.close(player)
     }
 
     private fun markCompleted(player: Player, worldData: WorldData, holder: SubmissionAdminMenuHolder) {

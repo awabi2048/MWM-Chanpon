@@ -28,5 +28,9 @@ object ManagedMenuPresenter {
         )
     )
 
+    fun close(player: Player) {
+        CCSystem.getAPI().getMenuRuntimeService().close(player)
+    }
+
     private const val OWNER = "mwm-chanpon"
 }

@@ -140,7 +140,7 @@ class ChanponFavoriteVisitMenuProvider(
         val uuid = ItemTag.getWorldUuid(item) ?: return
         val worldData = mwm().worldConfigRepository.findByUuid(uuid) ?: return
         if (event.isLeftClick && !event.isShiftClick) {
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
             // ロードを伴うワープの通知・失敗処理はMWM本体の公開APIへ集約する。
             MyWorldManagerApi.getWorldService()?.teleportToWorld(player, uuid)
             return

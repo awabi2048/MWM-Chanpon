@@ -78,7 +78,7 @@ class WorldDataManagementMenu(
         when (ItemTag.getType(item)) {
             ItemTag.TYPE_GUI_RETURN -> {
                 if (!mwm().menuRouteHistory.openPrevious(player)) {
-                    parentMenuOpener?.invoke(player) ?: player.closeInventory()
+                    parentMenuOpener?.invoke(player) ?: ManagedMenuPresenter.close(player)
                 }
             }
             ItemTag.TYPE_GUI_NAV_PREV, ItemTag.TYPE_GUI_NAV_NEXT -> open(player, ItemTag.getTargetPage(item) ?: holder.page)
@@ -94,7 +94,7 @@ class WorldDataManagementMenu(
                 ACTION_BULK_BACKUP -> openBulkBackupConfirm(player, holder.page)
                 ACTION_BULK_ROLLBACK -> openBulkRollbackConfirm(player, holder.page)
                 ACTION_ANNUAL_ARCHIVE -> {
-                    player.closeInventory()
+                    ManagedMenuPresenter.close(player)
                     AnnualArchiveFlow(plugin, archiveService).start(player)
                 }
             }
@@ -110,7 +110,7 @@ class WorldDataManagementMenu(
         when (ItemTag.getType(event.currentItem ?: return)) {
             ItemTag.TYPE_GUI_CANCEL -> open(player, holder.page)
             ItemTag.TYPE_GUI_CONFIRM -> {
-                player.closeInventory()
+                ManagedMenuPresenter.close(player)
                 val future = if (holder.worldUuid == null) {
                     backupService.createAllBackup(productionWorlds().map { it.uuid }, BackupKind.ADMIN_MANUAL, player.uniqueId, player.name, "admin_bulk")
                 } else {

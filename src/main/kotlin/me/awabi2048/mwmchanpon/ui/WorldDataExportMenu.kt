@@ -68,13 +68,13 @@ class WorldDataExportMenu(
         when (ItemTag.getType(item)) {
             ItemTag.TYPE_GUI_RETURN -> {
                 if (!mwm().menuRouteHistory.openPrevious(player)) {
-                    parentMenuOpener?.invoke(player) ?: player.closeInventory()
+                    parentMenuOpener?.invoke(player) ?: ManagedMenuPresenter.close(player)
                 }
             }
             ItemTag.TYPE_GUI_NAV_PREV, ItemTag.TYPE_GUI_NAV_NEXT -> open(player, ItemTag.getTargetPage(item) ?: holder.page)
             ItemTag.TYPE_GUI_WORLD_ITEM -> {
                 val uuid = ItemTag.getWorldUuid(item) ?: return
-                player.closeInventory()
+                ManagedMenuPresenter.close(player)
                 exportService.exportWorld(uuid).thenAccept { result ->
                     Bukkit.getScheduler().runTask(plugin, Runnable {
                         player.sendMessage(resultMessage(player, result.success, result.file?.name))
@@ -82,7 +82,7 @@ class WorldDataExportMenu(
                 }
             }
             TYPE_CONTROL -> if (ItemTag.getString(item, ACTION_KEY) == ACTION_BULK_EXPORT) {
-                player.closeInventory()
+                ManagedMenuPresenter.close(player)
                 exportService.exportAll().thenAccept { result ->
                     Bukkit.getScheduler().runTask(plugin, Runnable {
                         player.sendMessage(resultMessage(player, result.success, result.file?.name))
