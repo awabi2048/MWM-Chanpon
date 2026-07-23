@@ -156,6 +156,22 @@ class ChanponWorldStorage(dataFolder: File) {
             ?: error("Submission state is missing or invalid: $worldUuid")
     }
 
+    fun isFreecamAllowed(worldUuid: UUID): Boolean {
+        return load(worldUuid)?.getBoolean("environment.freecam_allowed", true) ?: true
+    }
+
+    @Synchronized
+    fun setFreecamAllowed(worldUuid: UUID, allowed: Boolean) {
+        val config = loadOrCreate(worldUuid)
+        config.set("environment.freecam_allowed", allowed)
+        saveAtomic(worldUuid, config)
+    }
+
+    fun isSubmissionCompleted(worldUuid: UUID): Boolean {
+        val config = load(worldUuid) ?: return false
+        return SubmissionState.fromStorageValue(config.getString("submission.state")) == SubmissionState.COMPLETED
+    }
+
     @Synchronized
     fun setSubmissionState(
         worldUuid: UUID,

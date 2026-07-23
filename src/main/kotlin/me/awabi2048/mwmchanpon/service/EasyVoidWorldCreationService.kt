@@ -39,17 +39,26 @@ import org.bukkit.generator.ChunkGenerator
 import org.bukkit.generator.WorldInfo
 import org.bukkit.plugin.java.JavaPlugin
 
+object EasyPlatformMaterialPolicy {
+    val defaultMaterial: Material = Material.OBSIDIAN
+
+    fun resolve(input: String): Material? =
+        Material.matchMaterial(input.trim())?.takeIf { it.isBlock && it.isSolid && !it.isAir }
+}
+
 /**
  * Chanpon専用の入力とVoid仕様だけを所有し、作成確定はMWM共通パイプラインへ委譲する。
  */
 class EasyVoidWorldCreationService(
     private val plugin: MWMChanponPlugin
 ) : Listener {
-    private val pendingNames = ConcurrentHashMap<UUID, String>()
+    private data class PendingCreation(val worldName: String, val platformMaterial: Material)
+
+    private val pendingCreations = ConcurrentHashMap<UUID, PendingCreation>()
 
     fun start(player: Player) {
         if (!canCreate(player)) return
-        pendingNames.remove(player.uniqueId)
+        pendingCreations.remove(player.uniqueId)
         ManagedMenuPresenter.close(player)
         player.sendMessage(i18n(player, "start"))
         showNameDialog(player)
@@ -66,15 +75,22 @@ class EasyVoidWorldCreationService(
             NAME_SUBMIT -> handleNameSubmit(player, event)
             NAME_CANCEL -> cancelFlow(player)
             CONFIRM_CREATE -> {
-                val name = pendingNames.remove(player.uniqueId) ?: return
-                create(player, name)
+                val pending = pendingCreations.remove(player.uniqueId) ?: return
+                create(player, pending)
             }
-            CONFIRM_BACK -> showNameDialog(player, pendingNames[player.uniqueId].orEmpty())
+            CONFIRM_BACK -> {
+                val pending = pendingCreations[player.uniqueId]
+                showNameDialog(
+                    player,
+                    pending?.worldName.orEmpty(),
+                    pending?.platformMaterial ?: DEFAULT_PLATFORM_MATERIAL
+                )
+            }
         }
     }
 
     private fun cancelFlow(player: Player) {
-        pendingNames.remove(player.uniqueId)
+        pendingCreations.remove(player.uniqueId)
         if (!CCSystem.getAPI().getMenuNavigationService().openPrevious(player)) {
             ManagedMenuPresenter.close(player)
         }
@@ -82,30 +98,51 @@ class EasyVoidWorldCreationService(
 
     private fun handleNameSubmit(player: Player, event: PlayerCustomClickEvent) {
         val name = event.getDialogResponseView()?.getText(NAME_INPUT).orEmpty().trim()
+        val materialInput = event.getDialogResponseView()?.getText(PLATFORM_MATERIAL_INPUT).orEmpty().trim()
+        val platformMaterial = EasyPlatformMaterialPolicy.resolve(materialInput)
         if (name.isBlank()) {
-            showNameDialog(player, name, legacy("§c${i18n(player, "name_required")}"))
+            showNameDialog(
+                player,
+                name,
+                platformMaterial ?: DEFAULT_PLATFORM_MATERIAL,
+                legacy("§c${i18n(player, "name_required")}")
+            )
+            return
+        }
+        if (platformMaterial == null) {
+            showNameDialog(
+                player,
+                name,
+                DEFAULT_PLATFORM_MATERIAL,
+                legacy("§c${i18n(player, "platform_material_invalid")}")
+            )
             return
         }
 
         val mwm = mwm()
         when (val validation = mwm.worldValidator.validateName(name)) {
             is WorldNameValidation.Failure -> {
-                showNameDialog(player, name, mwm.languageManager.getComponent(player, validation.messageKey, validation.placeholders))
+                showNameDialog(player, name, platformMaterial, mwm.languageManager.getComponent(player, validation.messageKey, validation.placeholders))
                 return
             }
             WorldNameValidation.Ok -> Unit
         }
 
         if (mwm.worldConfigRepository.findByOwnerAndDisplayName(player.uniqueId, name) != null) {
-            showNameDialog(player, name, mwm.languageManager.getComponent(player, "messages.world_name_duplicate"))
+            showNameDialog(player, name, platformMaterial, mwm.languageManager.getComponent(player, "messages.world_name_duplicate"))
             return
         }
 
-        pendingNames[player.uniqueId] = name
-        showConfirmDialog(player, name)
+        pendingCreations[player.uniqueId] = PendingCreation(name, platformMaterial)
+        showConfirmDialog(player, name, platformMaterial)
     }
 
-    private fun showNameDialog(player: Player, initial: String = "", error: Component? = null) {
+    private fun showNameDialog(
+        player: Player,
+        initial: String = "",
+        platformMaterial: Material = DEFAULT_PLATFORM_MATERIAL,
+        error: Component? = null
+    ) {
         val body = buildList {
             add(DialogBody.plainMessage(component(player, "name_body")))
             if (error != null) add(DialogBody.plainMessage(error))
@@ -120,6 +157,10 @@ class EasyVoidWorldCreationService(
                                 DialogInput.text(NAME_INPUT, component(player, "name_label"))
                                     .initial(initial)
                                     .maxLength(32)
+                                    .build(),
+                                DialogInput.text(PLATFORM_MATERIAL_INPUT, component(player, "platform_material_label"))
+                                    .initial(platformMaterial.key.asString())
+                                    .maxLength(64)
                                     .build()
                             )
                         )
@@ -135,10 +176,10 @@ class EasyVoidWorldCreationService(
         player.showDialog(dialog)
     }
 
-    private fun showConfirmDialog(player: Player, name: String) {
+    private fun showConfirmDialog(player: Player, name: String, platformMaterial: Material) {
         val body = listOf(
             DialogBody.plainMessage(component(player, "confirm_body", "world" to name)),
-            DialogBody.plainMessage(component(player, "confirm_template"))
+            DialogBody.plainMessage(component(player, "confirm_template", "material" to platformMaterial.key.asString()))
         )
         val dialog = Dialog.create { builder ->
             builder.empty()
@@ -153,7 +194,7 @@ class EasyVoidWorldCreationService(
         player.showDialog(dialog)
     }
 
-    private fun create(player: Player, worldName: String) {
+    private fun create(player: Player, pending: PendingCreation) {
         if (!canCreate(player)) return
         val worldService = MyWorldManagerApi.getWorldService()
         if (worldService == null) {
@@ -163,7 +204,7 @@ class EasyVoidWorldCreationService(
         worldService.createManagedWorld(
             ManagedWorldCreationRequest(
                 ownerUuid = player.uniqueId,
-                worldName = worldName,
+                worldName = pending.worldName,
                 sourceId = SOURCE_WORLD,
                 type = WorldCreationType.RANDOM,
                 environment = World.Environment.NORMAL,
@@ -173,7 +214,7 @@ class EasyVoidWorldCreationService(
                 initialSpawn = ManagedWorldSpawn(0, SPAWN_Y, 0),
                 cost = 0,
                 billingMode = WorldPointBillingMode.NONE,
-                initializeWorld = ::placePlatform
+                initializeWorld = { world -> placePlatform(world, pending.platformMaterial) }
             )
         ).thenAccept { success ->
             if (success) {
@@ -203,10 +244,10 @@ class EasyVoidWorldCreationService(
         return decision.allowed
     }
 
-    private fun placePlatform(world: World) {
+    private fun placePlatform(world: World, platformMaterial: Material) {
         for (x in -2..1) {
             for (z in -2..1) {
-                world.getBlockAt(x, PLATFORM_Y, z).setType(Material.SCAFFOLDING, false)
+                world.getBlockAt(x, PLATFORM_Y, z).setType(platformMaterial, false)
             }
         }
     }
@@ -239,9 +280,11 @@ class EasyVoidWorldCreationService(
 
     private companion object {
         private const val NAME_INPUT = "easy_world_name"
+        private const val PLATFORM_MATERIAL_INPUT = "easy_platform_material"
         private const val SOURCE_WORLD = "chanpon:easy_void"
         private const val PLATFORM_Y = 64
         private const val SPAWN_Y = 65
+        private val DEFAULT_PLATFORM_MATERIAL = EasyPlatformMaterialPolicy.defaultMaterial
         private val NAME_SUBMIT = Key.key("mwmchanpon:easy_creation/name_submit")
         private val NAME_CANCEL = Key.key("mwmchanpon:easy_creation/name_cancel")
         private val CONFIRM_CREATE = Key.key("mwmchanpon:easy_creation/confirm_create")
