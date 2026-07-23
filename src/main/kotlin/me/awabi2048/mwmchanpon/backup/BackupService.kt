@@ -132,6 +132,44 @@ class BackupService(
         return restoreBackup(entry, entry.worldUuids)
     }
 
+    fun restorePreflightFailure(entry: BackupEntry, requestedWorlds: List<UUID> = entry.worldUuids): String? {
+        val core = MyWorldManagerApi.getWorldService()
+        val repository = MyWorldManagerApi.getWorldRepository()
+        val distinctTargets = requestedWorlds.distinct()
+        val targetStates = distinctTargets.map { worldUuid ->
+            val worldData = repository?.findByUuid(worldUuid)
+            val targetDirectory = if (core != null && worldData != null) {
+                core.getWorldDirectory(worldData)
+            } else {
+                null
+            }
+            val targetParent = targetDirectory?.parentFile
+            RestorePreflightTarget(
+                includedInBackup = worldUuid in entry.worldUuids,
+                productionWorld = storage.isProductionWorld(worldUuid),
+                worldDataAvailable = worldData != null,
+                archiveReadable =
+                    File(backupDir(entry.id), "worlds/$worldUuid/world.zip")
+                        .let { it.isFile && it.canRead() && it.length() > 0L },
+                targetDirectoryWritable =
+                    targetParent != null &&
+                        targetParent.isDirectory &&
+                        targetParent.canWrite()
+            )
+        }
+        val targetSet = distinctTargets.toSet()
+        val evacuationRequired = Bukkit.getOnlinePlayers().any { player ->
+            repository?.findByWorldName(player.world.name)?.uuid in targetSet
+        }
+        return RestorePreflightPolicy.failureReason(
+            backupLocked = entry.id in activeBackupIds,
+            coreAvailable = core != null && repository != null,
+            targets = targetStates,
+            evacuationRequired = evacuationRequired,
+            evacuationAvailable = MyWorldManagerApi.getEvacuationLocationOverride() != null
+        )
+    }
+
     fun restoreWorldBackup(entry: BackupEntry, worldUuid: UUID): CompletableFuture<RestoreOperationResult> {
         if (worldUuid !in entry.worldUuids) {
             return CompletableFuture.completedFuture(
@@ -142,6 +180,11 @@ class BackupService(
     }
 
     private fun restoreBackup(entry: BackupEntry, requestedWorlds: List<UUID>): CompletableFuture<RestoreOperationResult> {
+        restorePreflightFailure(entry, requestedWorlds)?.let { reason ->
+            return CompletableFuture.completedFuture(
+                restoreFailure(entry, requestedWorlds, reason)
+            )
+        }
         if (!activeBackupIds.add(entry.id)) {
             return CompletableFuture.completedFuture(
                 restoreFailure(entry, requestedWorlds, "backup is locked")

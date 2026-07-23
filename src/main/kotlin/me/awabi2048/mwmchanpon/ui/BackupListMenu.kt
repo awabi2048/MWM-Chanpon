@@ -120,7 +120,6 @@ class BackupListMenu(
         when (ItemTag.getType(event.currentItem ?: return)) {
             ItemTag.TYPE_GUI_CANCEL -> open(player, holder.source.mode, holder.source.worldUuid, holder.source.page)
             ItemTag.TYPE_GUI_CONFIRM -> {
-                ManagedMenuPresenter.close(player)
                 if (automationService?.isManualOperationBlocked(player) == true) {
                     player.sendMessage(i18nComponent(player, "message.manual_operation_blocked"))
                     return
@@ -132,6 +131,12 @@ class BackupListMenu(
                     player.sendMessage(i18nComponent(player, "message.rollback_cooldown", mapOf("remaining" to BackupDisplay.formatDuration(rollbackCooldown))))
                     return
                 }
+                val preflightFailure = backupService.restorePreflightFailure(backup, targetWorlds)
+                if (preflightFailure != null) {
+                    player.sendMessage(Component.text("要因: ${restoreReason(preflightFailure)}", NamedTextColor.RED))
+                    return
+                }
+                ManagedMenuPresenter.close(player)
                 val rollbackService = manualRollbackService
                 if (rollbackService == null) {
                     executeRestore(player, backup, holder.source)
@@ -192,6 +197,10 @@ class BackupListMenu(
         "world is locked" -> "対象ワールドは別のバックアップまたはロールバック処理中です。"
         "core api unavailable" -> "MyWorldManagerのAPIを取得できません。"
         "spawn world is not configured or unavailable" -> "退避先のスポーンワールドが未設定、または利用できません。"
+        "world is not a production world" -> "対象に本番用ワールドではないワールドが含まれています。"
+        "world data missing" -> "対象ワールドの管理データが見つかりません。"
+        "backup world archive is missing or unreadable" -> "バックアップのワールドデータが存在しないか、読み取れません。"
+        "world directory is not writable" -> "復元先のワールドディレクトリへ書き込めません。"
         "failed to unload worlds" -> "対象ワールドのアンロードに失敗しました。"
         "failed to create pre rollback backup" -> "ロールバック前の退避バックアップ作成に失敗しました。"
         "restore failed" -> "ワールドデータの復元に失敗しました。"
