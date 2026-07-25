@@ -4,10 +4,18 @@ import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
+import com.awabi2048.ccsystem.api.gui.InventoryMenuView
+import com.awabi2048.ccsystem.api.gui.MenuActionContext
+import com.awabi2048.ccsystem.api.gui.MenuActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuElement
+import com.awabi2048.ccsystem.api.gui.MenuRoute
+import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import java.util.UUID
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.service.WorldDataExportService
-import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.util.GuiLoreActions
 import me.awabi2048.myworldmanager.util.ItemTag
@@ -15,19 +23,44 @@ import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
-import org.bukkit.event.EventHandler
-import org.bukkit.event.Listener
-import org.bukkit.event.inventory.InventoryClickEvent
-import org.bukkit.inventory.Inventory
-import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 
 class WorldDataExportMenu(
     private val plugin: MWMChanponPlugin,
     private val exportService: WorldDataExportService
-) : Listener {
+) {
+    private val runtime = CCSystem.getAPI().getMenuRuntimeService()
     private var parentMenuOpener: ((Player) -> Unit)? = null
+
+    init {
+        runtime.register(
+            InventoryMenuDefinition(
+                owner = OWNER,
+                id = ROUTE_LIST,
+                renderer = { context -> renderList(context.player, context.route) },
+                actions = mapOf(
+                    ACTION_BACK to MenuActionHandler(::back),
+                    ACTION_PAGE to MenuActionHandler(::changePage),
+                    ACTION_TOGGLE to MenuActionHandler(::toggle),
+                    ACTION_SELECT_ALL to MenuActionHandler(::selectAll),
+                    ACTION_CLEAR_SELECTION to MenuActionHandler(::clear),
+                    ACTION_EXPORT_SELECTION to MenuActionHandler(::showConfirmation),
+                ),
+            ),
+        )
+        runtime.register(
+            InventoryMenuDefinition(
+                owner = OWNER,
+                id = ROUTE_CONFIRM,
+                renderer = { context -> renderConfirmation(context.player, context.route) },
+                actions = mapOf(
+                    ACTION_BACK to MenuActionHandler { MenuActionResult.Success(MenuUpdate.Back) },
+                    ACTION_CONFIRM to MenuActionHandler(::confirmExport),
+                ),
+            ),
+        )
+    }
 
     fun setParentMenuOpener(opener: (Player) -> Unit) {
         parentMenuOpener = opener
@@ -35,72 +68,93 @@ class WorldDataExportMenu(
 
     fun open(player: Player, page: Int = 0, selected: Set<UUID> = emptySet()) {
         if (!player.hasPermission("mwmchanpon.admin")) return
-        val worlds = exportService.productionWorlds()
-        val pages = if (worlds.isEmpty()) 1 else (worlds.size + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE
-        val safePage = page.coerceIn(0, pages - 1)
-        val exportableIds = worlds.mapTo(mutableSetOf()) { it.uuid }
-        val safeSelected = selected.intersect(exportableIds)
-        val holder = Holder(safePage, safeSelected)
-        val layout = ChanponGuiElements.pagedListLayout()
-        val inventory = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "export_menu.title"))
-        holder.inv = inventory
-        ChanponGuiElements.applyStandardFrame(inventory)
-        ChanponGuiElements.setPagedListNavigation(
-            inventory,
-            if (safePage > 0) navItem(player, false, safePage - 1) else null,
-            if (safePage < pages - 1) navItem(player, true, safePage + 1) else null,
-            backItem(player),
-            infoItem(player, worlds.size, safeSelected.size, safePage + 1, pages)
-        )
-        worlds.drop(safePage * ITEMS_PER_PAGE).take(ITEMS_PER_PAGE).forEachIndexed { index, world ->
-            inventory.setItem(layout.itemSlots[index], worldItem(player, world, world.uuid in safeSelected))
-        }
-        inventory.setItem(47, selectAllItem(player))
-        inventory.setItem(48, clearSelectionItem(player))
-        inventory.setItem(51, exportSelectionItem(player, safeSelected.size))
-        ChanponGuiElements.fill(inventory)
-        ManagedMenuPresenter.open(player, inventory)
+        runtime.open(player, listRoute(page, selected.toList()))
     }
 
-    @EventHandler
-    fun onClick(event: InventoryClickEvent) {
-        val player = event.whoClicked as? Player ?: return
-        val holder = event.view.topInventory.holder as? Holder ?: return
-        event.cancelWithDebug("WorldDataExportMenu.onClick: menu_click")
-        if (event.clickedInventory != event.view.topInventory) return
-        val item = event.currentItem ?: return
-        when (ItemTag.getType(item)) {
-            ItemTag.TYPE_GUI_RETURN -> {
-                if (!mwm().menuRouteHistory.openPrevious(player)) {
-                    parentMenuOpener?.invoke(player) ?: ManagedMenuPresenter.close(player)
-                }
-            }
-            ItemTag.TYPE_GUI_NAV_PREV, ItemTag.TYPE_GUI_NAV_NEXT ->
-                open(player, ItemTag.getTargetPage(item) ?: holder.page, holder.selected)
-            ItemTag.TYPE_GUI_WORLD_ITEM -> {
-                val uuid = ItemTag.getWorldUuid(item) ?: return
-                val updated = holder.selected.toMutableSet()
-                if (!updated.add(uuid)) updated.remove(uuid)
-                open(player, holder.page, updated)
-            }
-            TYPE_CONTROL -> when (ItemTag.getString(item, ACTION_KEY)) {
-                ACTION_SELECT_ALL -> open(
-                    player,
-                    holder.page,
-                    exportService.productionWorlds().mapTo(mutableSetOf()) { it.uuid }
-                )
-                ACTION_CLEAR_SELECTION -> open(player, holder.page, emptySet())
-                ACTION_EXPORT_SELECTION -> {
-                    if (holder.selected.isEmpty()) return
-                    ManagedMenuPresenter.close(player)
-                    exportService.exportStandaloneWorld(holder.selected.toList()).thenAccept { result ->
-                        Bukkit.getScheduler().runTask(plugin, Runnable {
-                            player.sendMessage(resultMessage(player, result.success, result.file?.name))
-                        })
-                    }
-                }
-            }
+    private fun renderList(player: Player, route: MenuRoute): InventoryMenuView {
+        val worlds = exportService.productionWorlds()
+        val pages = if (worlds.isEmpty()) 1 else (worlds.size + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE
+        val safePage = page(route).coerceIn(0, pages - 1)
+        val exportableIds = worlds.mapTo(mutableSetOf()) { it.uuid }
+        val safeSelected = selection(route).filter { it in exportableIds }
+        val layout = ChanponGuiElements.pagedListLayout()
+        val elements = mutableListOf<MenuElement>()
+        if (safePage > 0) elements += actionElement(45, navItem(player, false, safePage - 1), GuiElementRole.NAVIGATION, ACTION_PAGE, mapOf(PAGE to (safePage - 1).toString()))
+        elements += actionElement(49, backItem(player), GuiElementRole.BACK, ACTION_BACK)
+        elements += MenuElement(50, infoItem(player, worlds.size, safeSelected.size, safePage + 1, pages), GuiElementRole.CONTENT)
+        if (safePage < pages - 1) elements += actionElement(53, navItem(player, true, safePage + 1), GuiElementRole.NAVIGATION, ACTION_PAGE, mapOf(PAGE to (safePage + 1).toString()))
+        worlds.drop(safePage * ITEMS_PER_PAGE).take(ITEMS_PER_PAGE).forEachIndexed { index, world ->
+            elements += actionElement(
+                layout.itemSlots[index],
+                worldItem(player, world, world.uuid in safeSelected),
+                GuiElementRole.ACTION,
+                ACTION_TOGGLE,
+                mapOf(WORLD_UUID to world.uuid.toString()),
+            )
         }
+        elements += actionElement(47, selectAllItem(player), GuiElementRole.ACTION, ACTION_SELECT_ALL)
+        elements += actionElement(48, clearSelectionItem(player), GuiElementRole.ACTION, ACTION_CLEAR_SELECTION)
+        elements += actionElement(51, exportSelectionItem(player, safeSelected.size), GuiElementRole.CONFIRM, ACTION_EXPORT_SELECTION, enabled = safeSelected.isNotEmpty())
+        return InventoryMenuView(layout.size, i18nComponent(player, "export_menu.title"), elements)
+    }
+
+    private fun renderConfirmation(player: Player, route: MenuRoute): InventoryMenuView {
+        val selected = selection(route)
+        val worlds = exportService.productionWorlds().associateBy { it.uuid }
+        val selectedWorlds = selected.mapNotNull(worlds::get)
+        val primary = selectedWorlds.firstOrNull()
+        val fiscalYear = plugin.config.getInt("standalone_export.fiscal_year")
+        val fileName = runCatching {
+            me.awabi2048.mwmchanpon.service.StandaloneExportFileName.create(fiscalYear, selectedWorlds.map { it.name })
+        }.getOrDefault("-")
+        val elements = listOf(
+            MenuElement(13, confirmationInfoItem(player, primary?.name ?: "-", selectedWorlds.size, fileName), GuiElementRole.CONTENT),
+            actionElement(11, backItem(player), GuiElementRole.BACK, ACTION_BACK),
+            actionElement(15, confirmationExecuteItem(player), GuiElementRole.CONFIRM, ACTION_CONFIRM, enabled = primary != null),
+        )
+        return InventoryMenuView(27, i18nComponent(player, "export_menu.confirm.title"), elements)
+    }
+
+    private fun back(context: MenuActionContext): MenuActionResult {
+        if (parentMenuOpener != null) {
+            Bukkit.getScheduler().runTask(plugin, Runnable { parentMenuOpener?.invoke(context.player) })
+            return MenuActionResult.Success(MenuUpdate.Close)
+        }
+        return MenuActionResult.Success(MenuUpdate.Back)
+    }
+
+    private fun changePage(context: MenuActionContext) =
+        MenuActionResult.Success(MenuUpdate.Replace(listRoute(context.payload[PAGE]?.toIntOrNull() ?: 0, selection(context.route))))
+
+    private fun toggle(context: MenuActionContext): MenuActionResult {
+        val uuid = context.payload[WORLD_UUID]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+            ?: return MenuActionResult.Rejected()
+        val updated = selection(context.route).toMutableList()
+        if (!updated.remove(uuid)) updated += uuid
+        return MenuActionResult.Success(MenuUpdate.Replace(listRoute(page(context.route), updated)))
+    }
+
+    private fun selectAll(context: MenuActionContext) =
+        MenuActionResult.Success(MenuUpdate.Replace(listRoute(page(context.route), exportService.productionWorlds().map { it.uuid })))
+
+    private fun clear(context: MenuActionContext) =
+        MenuActionResult.Success(MenuUpdate.Replace(listRoute(page(context.route), emptyList())))
+
+    private fun showConfirmation(context: MenuActionContext): MenuActionResult {
+        val selected = selection(context.route)
+        if (selected.isEmpty()) return MenuActionResult.Rejected()
+        return MenuActionResult.Success(MenuUpdate.Navigate(confirmRoute(selected)))
+    }
+
+    private fun confirmExport(context: MenuActionContext): MenuActionResult {
+        val selected = selection(context.route)
+        if (selected.isEmpty()) return MenuActionResult.Rejected()
+        exportService.exportStandaloneWorld(selected).thenAccept { result ->
+            Bukkit.getScheduler().runTask(plugin, Runnable {
+                context.player.sendMessage(resultMessage(context.player, result.success, result.file?.name))
+            })
+        }
+        return MenuActionResult.Success(MenuUpdate.Close)
     }
 
     private fun worldItem(player: Player, world: WorldData, selected: Boolean): ItemStack {
@@ -206,6 +260,57 @@ class WorldDataExportMenu(
         return item
     }
 
+    private fun confirmationInfoItem(
+        player: Player,
+        primaryName: String,
+        selectedCount: Int,
+        fileName: String,
+    ): ItemStack {
+        val item = ItemStack(Material.BOOK)
+        item.editMeta { meta ->
+            meta.displayName(i18nComponent(player, "export_menu.confirm.info.display"))
+            meta.lore(
+                ChanponLore.build(
+                    listOf(
+                        GuiLoreLine.Data(i18n(player, "export_menu.confirm.info.primary_label"), primaryName, "ﾂｧf"),
+                        GuiLoreLine.Data(i18n(player, "export_menu.confirm.info.count_label"), selectedCount, "ﾂｧf"),
+                        GuiLoreLine.Data(i18n(player, "export_menu.confirm.info.file_label"), fileName, "ﾂｧf"),
+                        GuiLoreLine.Warning(i18n(player, "export_menu.confirm.info.warning")),
+                    ),
+                ),
+            )
+        }
+        return item
+    }
+
+    private fun confirmationExecuteItem(player: Player): ItemStack =
+        controlItem(player, Material.LIME_CONCRETE, "export_menu.confirm.execute", ACTION_CONFIRM)
+
+    private fun actionElement(
+        slot: Int,
+        item: ItemStack,
+        role: GuiElementRole,
+        actionId: String,
+        payload: Map<String, String> = emptyMap(),
+        enabled: Boolean = true,
+    ) = MenuElement(slot, item, role, actionId, payload, enabled)
+
+    private fun listRoute(page: Int, selected: List<UUID>) =
+        MenuRoute(OWNER, ROUTE_LIST, mapOf(PAGE to page.toString(), SELECTION to selected.joinToString(",")))
+
+    private fun confirmRoute(selected: List<UUID>) =
+        MenuRoute(OWNER, ROUTE_CONFIRM, mapOf(SELECTION to selected.joinToString(",")))
+
+    private fun page(route: MenuRoute): Int = route.payload[PAGE]?.toIntOrNull() ?: 0
+
+    private fun selection(route: MenuRoute): List<UUID> =
+        route.payload[SELECTION]
+            .orEmpty()
+            .split(',')
+            .filter(String::isNotBlank)
+            .mapNotNull { runCatching { UUID.fromString(it) }.getOrNull() }
+            .distinct()
+
     private fun infoItem(
         player: Player,
         count: Int,
@@ -265,17 +370,22 @@ class WorldDataExportMenu(
     private fun mwm(): me.awabi2048.myworldmanager.MyWorldManager =
         org.bukkit.plugin.java.JavaPlugin.getPlugin(me.awabi2048.myworldmanager.MyWorldManager::class.java)
 
-    private class Holder(val page: Int, val selected: Set<UUID>) : InventoryHolder {
-        lateinit var inv: Inventory
-        override fun getInventory(): Inventory = inv
-    }
-
     companion object {
+        private const val OWNER = "mwm-chanpon"
+        private const val ROUTE_LIST = "world_data_export"
+        private const val ROUTE_CONFIRM = "world_data_export_confirm"
+        private const val PAGE = "page"
+        private const val SELECTION = "selection"
+        private const val WORLD_UUID = "world_uuid"
         private const val ITEMS_PER_PAGE = 36
         private const val TYPE_CONTROL = "chanpon_export_control"
         private const val ACTION_KEY = "chanpon_action"
+        private const val ACTION_BACK = "back"
+        private const val ACTION_PAGE = "page"
+        private const val ACTION_TOGGLE = "toggle"
         private const val ACTION_SELECT_ALL = "select_all"
         private const val ACTION_CLEAR_SELECTION = "clear_selection"
         private const val ACTION_EXPORT_SELECTION = "export_selection"
+        private const val ACTION_CONFIRM = "confirm"
     }
 }

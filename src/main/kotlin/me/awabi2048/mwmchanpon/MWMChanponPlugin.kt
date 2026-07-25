@@ -283,7 +283,6 @@ class MWMChanponPlugin : JavaPlugin() {
         server.pluginManager.registerEvents(submissionAdminMenu, this)
         server.pluginManager.registerEvents(chanponAdminMenu, this)
         server.pluginManager.registerEvents(worldDataManagementMenu, this)
-        server.pluginManager.registerEvents(worldDataExportMenu, this)
         server.pluginManager.registerEvents(backupListMenu, this)
         server.pluginManager.registerEvents(automationSettingsMenu, this)
         server.pluginManager.registerEvents(chanponAdminWorldListMenu, this)
@@ -342,6 +341,7 @@ class MWMChanponPlugin : JavaPlugin() {
     override fun onDisable() {
         runCatching { CCSystem.getAPI().getConfigSchemaService().unregister("mwm-chanpon") }
         runCatching { CCSystem.getAPI().getMenuCommandService().unregisterOwner("mwm-chanpon") }
+        runCatching { CCSystem.getAPI().getMenuRuntimeService().unregisterOwner("mwm-chanpon") }
         runCatching {
             CCSystem.getAPI().getMenuNavigationService().closeOwnedMenus(MENU_OWNER, server.onlinePlayers)
         }
