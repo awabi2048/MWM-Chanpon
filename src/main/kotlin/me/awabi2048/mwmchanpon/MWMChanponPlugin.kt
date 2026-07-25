@@ -115,12 +115,17 @@ class MWMChanponPlugin : JavaPlugin() {
                     sourcePlugin = this,
                     resourcePath = "config.yml",
                     targetPath = dataFolder.resolve("config.yml").toPath(),
-                    currentVersion = 2,
+                    currentVersion = 3,
                     classification = com.awabi2048.ccsystem.api.config.ConfigClassification.MANAGED_CONFIG,
                     migrations = mapOf(
                         1 to com.awabi2048.ccsystem.api.config.ConfigMigration { config ->
                             if (!config.contains("creation.max_worlds_per_player")) {
                                 config.set("creation.max_worlds_per_player", 50)
+                            }
+                        },
+                        2 to com.awabi2048.ccsystem.api.config.ConfigMigration { config ->
+                            if (!config.contains("standalone_export.fiscal_year")) {
+                                config.set("standalone_export.fiscal_year", 2026)
                             }
                         }
                     ),
@@ -130,6 +135,12 @@ class MWMChanponPlugin : JavaPlugin() {
                         }
                         require(config.getInt("world_expansion.max_level", 3) >= 0) {
                             "world_expansion.max_level must not be negative"
+                        }
+                        require(config.isInt("standalone_export.fiscal_year")) {
+                            "standalone_export.fiscal_year must be an integer"
+                        }
+                        require(config.getInt("standalone_export.fiscal_year") in 2000..9999) {
+                            "standalone_export.fiscal_year must be between 2000 and 9999"
                         }
                     },
                     reloadAction = { reloadConfig() }

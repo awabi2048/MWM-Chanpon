@@ -93,7 +93,7 @@ class WorldDataExportMenu(
                 ACTION_EXPORT_SELECTION -> {
                     if (holder.selected.isEmpty()) return
                     ManagedMenuPresenter.close(player)
-                    exportService.exportStandaloneWorld(holder.selected).thenAccept { result ->
+                    exportService.exportStandaloneWorld(holder.selected.toList()).thenAccept { result ->
                         Bukkit.getScheduler().runTask(plugin, Runnable {
                             player.sendMessage(resultMessage(player, result.success, result.file?.name))
                         })

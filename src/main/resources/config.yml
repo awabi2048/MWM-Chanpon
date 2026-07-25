@@ -15,6 +15,9 @@ world_expansion:
 submission:
   closed: false
 
+standalone_export:
+  fiscal_year: 2026
+
 tool_permissions:
   menu_slot: 5
   tools:
@@ -59,4 +62,4 @@ backup:
       scheduled: 14
       restore_point: 5
       pre_rollback: 10
-config_version: 2
+config_version: 3
