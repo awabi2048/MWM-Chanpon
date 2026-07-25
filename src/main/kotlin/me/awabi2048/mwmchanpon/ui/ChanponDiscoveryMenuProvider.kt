@@ -91,7 +91,14 @@ class ChanponDiscoveryMenuProvider(
                 val worldUuid = ItemTag.getWorldUuid(item) ?: return
                 val worldData = mwm().worldConfigRepository.findByUuid(worldUuid) ?: return
                 if (!MyWorldManagerApi.getWorldAccessPolicy().canUseVisitEntry(player, worldData, false)) {
-                    player.sendMessage(mwm().languageManager.getMessage(player, "error.world_not_public"))
+                    player.sendMessage(
+                        me.awabi2048.myworldmanager.util.WorldAccessMessageResolver.visit(
+                            mwm().languageManager,
+                            player,
+                            worldData,
+                            false
+                        )
+                    )
                     return
                 }
                 mwm().soundManager.playClickSound(player, item, "discovery")

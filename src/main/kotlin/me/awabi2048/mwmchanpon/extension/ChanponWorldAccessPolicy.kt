@@ -42,6 +42,34 @@ class ChanponWorldAccessPolicy(
             canCreateWorld(targetPlayer)
     }
 
+    override fun inviteToWorldDeniedMessageKey(sender: Player, worldData: WorldData): String? =
+        if (!archiveOperationGuard.canPerform(sender, ChanponOperation.EDIT)) "messages.world_operation_locked" else null
+
+    override fun inviteTargetDeniedMessageKey(sender: Player, worldData: WorldData, target: OfflinePlayer): String? = when {
+        !archiveOperationGuard.canPerform(sender, ChanponOperation.EDIT) -> "messages.world_operation_locked"
+        target !is Player -> "messages.member_invite_target_offline"
+        !canCreateWorld(target) -> "messages.member_invite_target_cannot_create"
+        else -> null
+    }
+
+    override fun visitDeniedMessageKey(viewer: Player, worldData: WorldData, isMember: Boolean): String? = when {
+        !archiveOperationGuard.canPerform(viewer, ChanponOperation.WARP) -> "messages.world_operation_locked"
+        worldData.isArchived -> "messages.archive_access_denied"
+        else -> null
+    }
+
+    override fun sharedEntryDeniedMessageKey(player: Player, worldData: WorldData, isMember: Boolean): String? =
+        visitDeniedMessageKey(player, worldData, isMember)
+
+    override fun enterDeniedMessageKey(player: Player, worldData: WorldData, isMember: Boolean): String? = when {
+        !archiveOperationGuard.canPerform(player, ChanponOperation.WARP) -> "messages.world_operation_locked"
+        worldData.isArchived -> "messages.archive_access_denied"
+        else -> null
+    }
+
+    override fun meetDeniedMessageKey(viewer: Player, target: Player, worldData: WorldData, isMember: Boolean): String? =
+        if (!archiveOperationGuard.canPerform(viewer, ChanponOperation.WARP)) "messages.world_operation_locked" else null
+
     override fun canEnterWorld(player: Player, worldData: WorldData, isMember: Boolean): Boolean {
         if (!archiveOperationGuard.canPerform(player, ChanponOperation.WARP)) return false
         if (worldData.isArchived) return false
