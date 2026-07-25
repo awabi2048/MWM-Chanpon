@@ -62,6 +62,13 @@ class WorldDataExportService(
             )
         }
         val portalSnapshots = worlds.flatMap { core.getRelatedPortals(it.uuid) }.distinctBy { it.id }
+        val bootstrapWorldDirectory = Bukkit.getWorlds()
+            .asSequence()
+            .map { it.worldFolder.toPath() }
+            .firstOrNull { Files.isRegularFile(it.resolve("level.dat")) }
+            ?: return CompletableFuture.completedFuture(
+                WorldDataExportResult(false, null, "bootstrap level.dat is unavailable")
+            )
 
         val output = File(exportDir, "${LocalDateTime.now().format(formatter)}-standalone-${worlds.size}.zip")
         val future = CompletableFuture<WorldDataExportResult>()
@@ -71,7 +78,11 @@ class WorldDataExportService(
             try {
                 staging.mkdirs()
                 val primary = worlds.first()
-                copyPrimaryWorld(worldDirectories.getValue(primary.uuid), staging.toPath())
+                copyPrimaryWorld(
+                    worldDirectories.getValue(primary.uuid),
+                    bootstrapWorldDirectory,
+                    staging.toPath()
+                )
                 writeDimensions(staging.toPath(), worlds.drop(1), worldDirectories)
                 writePortalFunctions(
                     staging.toPath(),
@@ -122,10 +133,27 @@ class WorldDataExportService(
         }
     }
 
-    private fun copyPrimaryWorld(source: Path, target: Path) {
+    private fun copyPrimaryWorld(source: Path, bootstrapWorld: Path, target: Path) {
         require(Files.isDirectory(source)) { "primary world directory is missing: $source" }
         copyTree(source, target) { path ->
             path.fileName?.toString() !in ROOT_EXCLUDED_FILES
+        }
+        if (!Files.isRegularFile(target.resolve("level.dat"))) {
+            Files.copy(
+                bootstrapWorld.resolve("level.dat"),
+                target.resolve("level.dat"),
+                StandardCopyOption.REPLACE_EXISTING,
+                StandardCopyOption.COPY_ATTRIBUTES
+            )
+            val oldLevelData = bootstrapWorld.resolve("level.dat_old")
+            if (Files.isRegularFile(oldLevelData)) {
+                Files.copy(
+                    oldLevelData,
+                    target.resolve("level.dat_old"),
+                    StandardCopyOption.REPLACE_EXISTING,
+                    StandardCopyOption.COPY_ATTRIBUTES
+                )
+            }
         }
     }
 
