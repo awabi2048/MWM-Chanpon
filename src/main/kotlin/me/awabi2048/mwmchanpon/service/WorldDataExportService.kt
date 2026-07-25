@@ -110,7 +110,7 @@ class WorldDataExportService(
                     StandaloneLevelDatRewriter.rewrite(oldLevelData, oldLevelData, metadata)
                 }
                 writeDimensions(staging.toPath(), worlds.drop(1), worldDirectories)
-                writePortalFunctions(
+                writePortalCommandBlocks(
                     staging.toPath(),
                     primary,
                     worlds,
@@ -267,7 +267,7 @@ class WorldDataExportService(
         manifest.save(File(root, "mwm-export-manifest.yml"))
     }
 
-    private fun writePortalFunctions(
+    private fun writePortalCommandBlocks(
         root: Path,
         primary: WorldData,
         worlds: List<WorldData>,
@@ -283,36 +283,29 @@ class WorldDataExportService(
             }
         }
         val sourceWorldByKey = worldKeys.entries.associate { it.value to it.key }
-        val commands = portals.mapNotNull { portal ->
-            val sourceUuid = sourceWorldByKey[portal.worldKey] ?: return@mapNotNull null
-            val targetUuid = portal.worldUuid ?: return@mapNotNull null
-            val sourceDimension = dimensionByWorld[sourceUuid] ?: return@mapNotNull null
-            val targetDimension = dimensionByWorld[targetUuid] ?: return@mapNotNull null
-            val spawn = spawnCoordinates[targetUuid] ?: return@mapNotNull null
-            val minX = minOf(portal.minX ?: portal.x, portal.maxX ?: portal.x)
-            val minY = minOf(portal.minY ?: portal.y, portal.maxY ?: portal.y)
-            val minZ = minOf(portal.minZ ?: portal.z, portal.maxZ ?: portal.z)
-            val maxX = maxOf(portal.minX ?: portal.x, portal.maxX ?: portal.x)
-            val maxY = maxOf(portal.maxY ?: portal.y + 2, portal.minY ?: portal.y + 2)
-            val maxZ = maxOf(portal.minZ ?: portal.z, portal.maxZ ?: portal.z)
-            "execute in $sourceDimension as @a[x=$minX,y=$minY,z=$minZ,dx=${maxX - minX},dy=${maxY - minY},dz=${maxZ - minZ}] run execute in $targetDimension run tp @s ${spawn.x} ${spawn.y} ${spawn.z}"
+        portals.forEach { portal ->
+            val sourceUuid = sourceWorldByKey[portal.worldKey] ?: return@forEach
+            val targetUuid = portal.worldUuid ?: return@forEach
+            dimensionByWorld[sourceUuid] ?: return@forEach
+            val targetDimension = dimensionByWorld[targetUuid] ?: return@forEach
+            val spawn = spawnCoordinates[targetUuid] ?: return@forEach
+            val sourceRoot = if (sourceUuid == primary.uuid) {
+                root
+            } else {
+                root.resolve(
+                    "dimensions/${StandaloneWorldExportLayout.NAMESPACE}/${StandaloneWorldExportLayout.dimensionId(sourceUuid)}",
+                )
+            }
+            StandalonePortalRegionEditor.write(
+                sourceRoot,
+                StandalonePortalCommand(
+                    portal.x,
+                    portal.y,
+                    portal.z,
+                    "execute as @p at @s in $targetDimension run tp @s ${spawn.x} ${spawn.y} ${spawn.z}",
+                ),
+            )
         }
-        if (commands.isEmpty()) return
-
-        val packRoot = root.resolve("datapacks/mwm-standalone-export")
-        Files.createDirectories(packRoot)
-        Files.writeString(packRoot.resolve("pack.mcmeta"), StandaloneWorldExportLayout.packMetadata())
-        val tickFunction = packRoot.resolve(
-            "data/${StandaloneWorldExportLayout.NAMESPACE}/function/portal_tick.mcfunction"
-        )
-        Files.createDirectories(tickFunction.parent)
-        Files.writeString(tickFunction, commands.joinToString(System.lineSeparator(), postfix = System.lineSeparator()))
-        val tickTag = packRoot.resolve("data/minecraft/tags/function/tick.json")
-        Files.createDirectories(tickTag.parent)
-        Files.writeString(
-            tickTag,
-            """{"values":["${StandaloneWorldExportLayout.NAMESPACE}:portal_tick"]}"""
-        )
     }
 
     private fun copyTree(source: Path, target: Path, include: (Path) -> Boolean = { true }) {

@@ -19,6 +19,10 @@
 
     <repositories>
         <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
+        <repository>
             <id>papermc</id>
             <url>https://repo.papermc.io/repository/maven-public/</url>
         </repository>
@@ -33,6 +37,11 @@
     </repositories>
 
     <dependencies>
+        <dependency>
+            <groupId>com.github.Querz</groupId>
+            <artifactId>NBT</artifactId>
+            <version>6.1</version>
+        </dependency>
         <dependency>
             <groupId>me.awabi2048</groupId>
             <artifactId>chanpon-utilities</artifactId>
