@@ -1,19 +1,24 @@
 package me.awabi2048.mwmchanpon.extension
-import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
+import com.awabi2048.ccsystem.api.gui.InventoryMenuView
+import com.awabi2048.ccsystem.api.gui.MenuActionContext
+import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
 import com.awabi2048.ccsystem.api.gui.MenuDialogButton
 import com.awabi2048.ccsystem.api.gui.MenuDialogHandler
 import com.awabi2048.ccsystem.api.gui.MenuDialogInput
 import com.awabi2048.ccsystem.api.gui.MenuDialogRequest
+import com.awabi2048.ccsystem.api.gui.MenuElement
+import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import me.awabi2048.mwmchanpon.backup.BackupEntry
 import me.awabi2048.mwmchanpon.backup.BackupDisplay
-import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import me.awabi2048.mwmchanpon.backup.BackupOperationStatus
 import me.awabi2048.mwmchanpon.backup.BackupService
 import me.awabi2048.mwmchanpon.backup.RestoreOperationResult
@@ -23,7 +28,6 @@ import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.ui.ChanponLore
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
-import me.awabi2048.myworldmanager.api.extension.WorldSettingsInventoryHolder
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsMenuRequest
 import me.awabi2048.myworldmanager.api.extension.MenuExtension
 import me.awabi2048.myworldmanager.api.extension.MenuExtensionContext
@@ -35,8 +39,6 @@ import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
-import org.bukkit.event.EventHandler
-import org.bukkit.event.Listener
 import org.bukkit.event.inventory.InventoryClickEvent
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemFlag
@@ -51,7 +53,24 @@ class WorldBackupMenuExtension(
     private val backupService: BackupService,
     private val automationService: BackupAutomationService,
     private val manualRollbackService: ManualRollbackService
-) : MenuExtension, Listener {
+) : MenuExtension {
+    private val runtime = CCSystem.getAPI().getMenuRuntimeService()
+
+    init {
+        runtime.register(
+            InventoryMenuDefinition(
+                owner = RUNTIME_OWNER,
+                id = ROUTE_OWNER_BACKUPS,
+                renderer = { context -> render(context.player, source(context.route)) },
+                actions = mapOf(
+                    ACTION_RUNTIME_BACK to MenuActionHandler(::back),
+                    ACTION_RUNTIME_PAGE to MenuActionHandler(::changePage),
+                    ACTION_RUNTIME_RESTORE to MenuActionHandler(::selectBackup),
+                    ACTION_RUNTIME_CREATE to MenuActionHandler(::createBackup),
+                ),
+            ),
+        )
+    }
 
     override fun getId(): String = EXTENSION_ID
 
@@ -73,73 +92,116 @@ class WorldBackupMenuExtension(
     }
 
     fun open(player: Player, worldUuid: UUID, page: Int = 0) {
-        val world = ownedProductionWorld(player, worldUuid) ?: return
-        val backups = backupService.listBackupsForWorld(worldUuid)
-        val pages = if (backups.isEmpty()) 1 else (backups.size + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE
-        val safePage = page.coerceIn(0, pages - 1)
-        val holder = Holder(worldUuid, safePage, currentRequest(player))
-        val layout = me.awabi2048.mwmchanpon.ui.ChanponGuiElements.pagedListLayout()
-        val inv = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "owner_backup.title"))
-        holder.inv = inv
-        applyFrame(inv)
-        me.awabi2048.mwmchanpon.ui.ChanponGuiElements.setPagedListNavigation(
-            inv,
-            if (safePage > 0) navItem(player, false, safePage - 1) else null,
-            if (safePage < pages - 1) navItem(player, true, safePage + 1) else null,
-            backItem(player),
-            infoItem(player, world, backups.size, safePage + 1, pages)
-        )
-        backups.drop(safePage * ITEMS_PER_PAGE).take(ITEMS_PER_PAGE).forEachIndexed { index, backup ->
-            inv.setItem(layout.itemSlots[index], backupItem(player, backup))
-        }
-        inv.setItem(47, backupControlItem(player, worldUuid))
-        fill(inv)
-        ManagedMenuPresenter.open(player, inv)
+        if (ownedProductionWorld(player, worldUuid) == null) return
+        runtime.open(player, route(worldUuid, page, currentRequest(player)))
     }
 
-    @EventHandler
-    fun onMenuClick(event: InventoryClickEvent) {
-        val player = event.whoClicked as? Player ?: return
-        val holder = event.view.topInventory.holder as? Holder ?: return
-        event.cancelWithDebug("WorldBackupMenuExtension.onMenuClick: menu_click")
-        if (event.clickedInventory != event.view.topInventory) return
-        val item = event.currentItem ?: return
-        if (ownedProductionWorld(player, holder.worldUuid) == null) {
-            ManagedMenuPresenter.close(player)
-            return
+    private fun render(player: Player, source: Holder): InventoryMenuView {
+        val world = ownedProductionWorld(player, source.worldUuid)
+            ?: return InventoryMenuView(9, i18nComponent(player, "owner_backup.title"), emptyList())
+        val backups = backupService.listBackupsForWorld(source.worldUuid)
+        val pages = if (backups.isEmpty()) 1 else (backups.size + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE
+        val safePage = source.page.coerceIn(0, pages - 1)
+        val layout = me.awabi2048.mwmchanpon.ui.ChanponGuiElements.pagedListLayout()
+        val elements = mutableListOf<MenuElement>()
+        if (safePage > 0) {
+            elements += MenuElement(
+                layout.previousPageSlot,
+                navItem(player, false, safePage - 1),
+                GuiElementRole.NAVIGATION,
+                ACTION_RUNTIME_PAGE,
+                payload(source.copy(page = safePage - 1)),
+            )
         }
-        when (ItemTag.getType(item)) {
-            ItemTag.TYPE_GUI_RETURN -> {
-                mwm().soundManager.playClickSound(player, item, "world_settings")
-                returnToWorldSettings(player, holder.worldUuid)
-            }
-            ItemTag.TYPE_GUI_NAV_PREV, ItemTag.TYPE_GUI_NAV_NEXT -> {
-                mwm().soundManager.playClickSound(player, item, "world_settings")
-                open(player, holder.worldUuid, ItemTag.getTargetPage(item) ?: holder.page)
-            }
-            TYPE_BACKUP_ITEM -> {
-                val backup = findBackup(item) ?: return
-                if (event.click.isLeftClick) {
-                    mwm().soundManager.playClickSound(player, item, "world_settings")
-                    openRestoreConfirm(player, backup, holder)
-                }
-            }
-            TYPE_CONTROL -> if (ItemTag.getString(item, ACTION_KEY) == ACTION_BACKUP) {
-                mwm().soundManager.playClickSound(player, item, "world_settings")
-                if (automationService.isManualOperationBlocked(player)) {
-                    player.sendMessage(i18nComponent(player, "message.manual_operation_blocked"))
-                    open(player, holder.worldUuid, holder.page)
-                    return
-                }
-                val remaining = backupService.ownerBackupCooldownRemainingSeconds(holder.worldUuid)
-                if (remaining > 0) {
-                    player.sendMessage(i18nComponent(player, "message.owner_backup_cooldown", mapOf("remaining" to BackupDisplay.formatDuration(remaining))))
-                    open(player, holder.worldUuid, holder.page)
-                } else {
-                    openBackupNameInput(player, holder)
-                }
-            }
+        if (safePage < pages - 1) {
+            elements += MenuElement(
+                layout.nextPageSlot,
+                navItem(player, true, safePage + 1),
+                GuiElementRole.NAVIGATION,
+                ACTION_RUNTIME_PAGE,
+                payload(source.copy(page = safePage + 1)),
+            )
         }
+        elements += MenuElement(
+            layout.backSlot,
+            backItem(player),
+            GuiElementRole.BACK,
+            ACTION_RUNTIME_BACK,
+            payload(source),
+        )
+        elements += MenuElement(
+            layout.infoSlot,
+            infoItem(player, world, backups.size, safePage + 1, pages),
+            GuiElementRole.CONTENT,
+        )
+        backups.drop(safePage * ITEMS_PER_PAGE).take(ITEMS_PER_PAGE).forEachIndexed { index, backup ->
+            elements += MenuElement(
+                layout.itemSlots[index],
+                backupItem(player, backup),
+                GuiElementRole.ACTION,
+                ACTION_RUNTIME_RESTORE,
+                payload(source.copy(page = safePage)) + (BACKUP_ID_KEY to backup.id),
+            )
+        }
+        elements += MenuElement(
+            47,
+            backupControlItem(player, source.worldUuid),
+            GuiElementRole.ACTION,
+            ACTION_RUNTIME_CREATE,
+            payload(source.copy(page = safePage)),
+        )
+        return InventoryMenuView(
+            layout.size,
+            i18nComponent(player, "owner_backup.title"),
+            elements,
+        )
+    }
+
+    private fun back(context: MenuActionContext): MenuActionResult {
+        val source = source(context.payload)
+        Bukkit.getScheduler().runTask(plugin, Runnable {
+            returnToWorldSettings(context.player, source.worldUuid, source.request)
+        })
+        return MenuActionResult.Success(MenuUpdate.Close)
+    }
+
+    private fun changePage(context: MenuActionContext): MenuActionResult {
+        val source = source(context.payload)
+        return MenuActionResult.Success(
+            MenuUpdate.Replace(route(source.worldUuid, source.page, source.request)),
+        )
+    }
+
+    private fun selectBackup(context: MenuActionContext): MenuActionResult {
+        if (!context.click.isLeftClick) return MenuActionResult.Ignored
+        val source = source(context.payload)
+        val backupId = context.payload[BACKUP_ID_KEY] ?: return MenuActionResult.Rejected()
+        val backup = backupService.listBackupsForWorld(source.worldUuid)
+            .firstOrNull { it.id == backupId }
+            ?: return MenuActionResult.Rejected()
+        openRestoreConfirm(context.player, backup, source)
+        return MenuActionResult.Success(MenuUpdate.Close)
+    }
+
+    private fun createBackup(context: MenuActionContext): MenuActionResult {
+        val source = source(context.payload)
+        if (automationService.isManualOperationBlocked(context.player)) {
+            context.player.sendMessage(i18nComponent(context.player, "message.manual_operation_blocked"))
+            return MenuActionResult.Rejected()
+        }
+        val remaining = backupService.ownerBackupCooldownRemainingSeconds(source.worldUuid)
+        if (remaining > 0) {
+            context.player.sendMessage(
+                i18nComponent(
+                    context.player,
+                    "message.owner_backup_cooldown",
+                    mapOf("remaining" to BackupDisplay.formatDuration(remaining)),
+                ),
+            )
+            return MenuActionResult.Rejected()
+        }
+        openBackupNameInput(context.player, source)
+        return MenuActionResult.Success(MenuUpdate.Close)
     }
 
     private fun executeOwnerBackup(player: Player, source: Holder, backupName: String) {
@@ -418,25 +480,6 @@ class WorldBackupMenuExtension(
         return item
     }
 
-    private fun centerItem(player: Player, material: Material, key: String, placeholders: Map<String, Any> = emptyMap()): ItemStack {
-        val item = ItemStack(material)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "$key.display", placeholders))
-            meta.lore(ChanponLore.build(i18nList(player, "$key.lore", placeholders).map(GuiLoreLine::Text)))
-        }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
-        return item
-    }
-
-    private fun button(player: Player, confirm: Boolean): ItemStack {
-        val item = me.awabi2048.mwmchanpon.ui.ChanponGuiElements.confirm(
-            i18n(player, if (confirm) "confirm.button.confirm" else "confirm.button.cancel"),
-            confirm
-        )
-        ItemTag.tagItem(item, if (confirm) ItemTag.TYPE_GUI_CONFIRM else ItemTag.TYPE_GUI_CANCEL)
-        return item
-    }
-
     private fun navItem(player: Player, next: Boolean, page: Int): ItemStack {
         val item = me.awabi2048.mwmchanpon.ui.ChanponGuiElements.navigation(
             i18n(player, if (next) "common.next" else "common.prev"),
@@ -453,21 +496,8 @@ class WorldBackupMenuExtension(
         return item
     }
 
-    private fun applyFrame(inv: Inventory) {
-        me.awabi2048.mwmchanpon.ui.ChanponGuiElements.applyStandardFrame(inv)
-    }
-
-    private fun fill(inv: Inventory) {
-        me.awabi2048.mwmchanpon.ui.ChanponGuiElements.fill(inv)
-    }
-
     private fun decoration(material: Material): ItemStack {
         return me.awabi2048.mwmchanpon.ui.ChanponGuiElements.decoration(material)
-    }
-
-    private fun findBackup(item: ItemStack): BackupEntry? {
-        val id = ItemTag.getString(item, BACKUP_ID_KEY) ?: return null
-        return backupService.listBackups().firstOrNull { it.id == id }
     }
 
     private fun ownedProductionWorld(player: Player, worldUuid: UUID): WorldData? {
@@ -487,32 +517,60 @@ class WorldBackupMenuExtension(
         else -> Material.RECOVERY_COMPASS
     }
 
-    private fun returnToWorldSettings(player: Player, worldUuid: UUID) {
+    private fun returnToWorldSettings(
+        player: Player,
+        worldUuid: UUID,
+        request: WorldSettingsMenuRequest,
+    ) {
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
         if (worldData == null) {
-            ManagedMenuPresenter.close(player)
+            runtime.close(player)
             return
         }
         val mwm = org.bukkit.plugin.java.JavaPlugin.getPlugin(MyWorldManager::class.java)
         mwm.worldSettingsGui.open(
             player,
             worldData,
-            holderRequest(player)?.showBackButton,
-            holderRequest(player)?.isPlayerWorldFlow,
-            holderRequest(player)?.parentShowBackButton
+            request.showBackButton,
+            request.isPlayerWorldFlow,
+            request.parentShowBackButton,
         )
     }
 
-    private fun holderRequest(player: Player): WorldSettingsMenuRequest? {
-        return when (val holder = player.openInventory.topInventory.holder) {
-            is Holder -> holder.request
-            else -> null
-        }
+    private fun route(worldUuid: UUID, page: Int, request: WorldSettingsMenuRequest): MenuRoute {
+        return MenuRoute(
+            RUNTIME_OWNER,
+            ROUTE_OWNER_BACKUPS,
+            payload(Holder(worldUuid, page, request)),
+        )
+    }
+
+    private fun payload(source: Holder): Map<String, String> = mapOf(
+        PAYLOAD_WORLD_UUID to source.worldUuid.toString(),
+        PAYLOAD_PAGE to source.page.toString(),
+        PAYLOAD_SHOW_BACK to source.request.showBackButton.toString(),
+        PAYLOAD_PLAYER_FLOW to source.request.isPlayerWorldFlow?.toString().orEmpty(),
+        PAYLOAD_PARENT_BACK to source.request.parentShowBackButton?.toString().orEmpty(),
+    )
+
+    private fun source(route: MenuRoute): Holder = source(route.payload)
+
+    private fun source(payload: Map<String, String>): Holder {
+        val worldUuid = payload[PAYLOAD_WORLD_UUID]
+            ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+            ?: UUID(0L, 0L)
+        return Holder(
+            worldUuid,
+            payload[PAYLOAD_PAGE]?.toIntOrNull() ?: 0,
+            WorldSettingsMenuRequest(
+                payload[PAYLOAD_SHOW_BACK].toBoolean(),
+                payload[PAYLOAD_PLAYER_FLOW]?.takeIf(String::isNotEmpty)?.toBoolean(),
+                payload[PAYLOAD_PARENT_BACK]?.takeIf(String::isNotEmpty)?.toBoolean(),
+            ),
+        )
     }
 
     private fun currentRequest(player: Player): WorldSettingsMenuRequest {
-        val holderRequest = holderRequest(player)
-        if (holderRequest != null) return holderRequest
         val session = org.bukkit.plugin.java.JavaPlugin.getPlugin(MyWorldManager::class.java)
             .settingsSessionManager
             .getSession(player)
@@ -533,10 +591,7 @@ class WorldBackupMenuExtension(
         CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(blocks))
     private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)
 
-    data class Holder(val worldUuid: UUID, val page: Int, val request: WorldSettingsMenuRequest) : WorldSettingsInventoryHolder {
-        lateinit var inv: Inventory
-        override fun getInventory(): Inventory = inv
-    }
+    data class Holder(val worldUuid: UUID, val page: Int, val request: WorldSettingsMenuRequest)
 
     companion object {
         private const val ITEMS_PER_PAGE = 36
@@ -548,5 +603,16 @@ class WorldBackupMenuExtension(
         private const val ACTION_BACKUP = "backup"
         private const val WORLD_MENU_SLOT = 52
         private const val MAX_BACKUP_NAME_LENGTH = 32
+        private const val RUNTIME_OWNER = "mwm-chanpon"
+        private const val ROUTE_OWNER_BACKUPS = "owner-backups"
+        private const val ACTION_RUNTIME_BACK = "back"
+        private const val ACTION_RUNTIME_PAGE = "page"
+        private const val ACTION_RUNTIME_RESTORE = "restore"
+        private const val ACTION_RUNTIME_CREATE = "create"
+        private const val PAYLOAD_WORLD_UUID = "world_uuid"
+        private const val PAYLOAD_PAGE = "page"
+        private const val PAYLOAD_SHOW_BACK = "show_back"
+        private const val PAYLOAD_PLAYER_FLOW = "player_flow"
+        private const val PAYLOAD_PARENT_BACK = "parent_back"
     }
 }
