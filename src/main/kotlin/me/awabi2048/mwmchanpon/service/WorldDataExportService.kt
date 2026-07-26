@@ -66,15 +66,19 @@ class WorldDataExportService(
             )
         }
         val portalSnapshots = worlds.flatMap { core.getRelatedPortals(it.uuid) }.distinctBy { it.id }
-        val serverMainWorld = Bukkit.getWorlds().firstOrNull()
-        serverMainWorld?.save()
-        val serverMainWorldDirectory = serverMainWorld
-            ?.worldFolder
-            ?.toPath()
-            ?.takeIf { Files.isRegularFile(it.resolve("level.dat")) }
-            ?: return CompletableFuture.completedFuture(
-                WorldDataExportResult(false, null, "server main world level.dat is unavailable")
+        val serverMainWorldSource = runCatching {
+            ServerMainWorldDirectory.resolve(Bukkit.getWorldContainer().toPath())
+        }.getOrElse { error ->
+            return CompletableFuture.completedFuture(
+                WorldDataExportResult(false, null, error.message ?: "server main world level.dat is unavailable")
             )
+        }
+        Bukkit.getWorlds()
+            .firstOrNull {
+                it.worldFolder.toPath().toAbsolutePath().normalize() == serverMainWorldSource.path
+            }
+            ?.save()
+        val serverMainWorldDirectory = serverMainWorldSource.path
 
         val fiscalYear = plugin.config.getInt("standalone_export.fiscal_year")
         val output = File(exportDir, StandaloneExportFileName.create(fiscalYear, worlds.map { it.name }))
@@ -127,7 +131,7 @@ class WorldDataExportService(
                     primary,
                     worlds,
                     portalSnapshots,
-                    serverMainWorld.name,
+                    serverMainWorldSource.levelName,
                 )
                 zipWorld(staging.toPath(), temporaryZip.toPath())
                 try {
