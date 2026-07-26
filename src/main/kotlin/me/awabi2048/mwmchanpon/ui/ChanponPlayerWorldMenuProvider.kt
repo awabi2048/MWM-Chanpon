@@ -218,7 +218,7 @@ class ChanponPlayerWorldMenuProvider(
             return MenuActionResult.Rejected()
         }
         if (context.click.isRightClick && !context.click.isShiftClick) {
-            startEasyCreation(player)
+            startEasyCreation(player, context.route)
             return MenuActionResult.Success(MenuUpdate.None)
         }
         val session = mwm.creationSessionManager.startSession(player.uniqueId)
@@ -365,9 +365,9 @@ class ChanponPlayerWorldMenuProvider(
         return item
     }
 
-    private fun startEasyCreation(player: Player) {
+    private fun startEasyCreation(player: Player, returnRoute: MenuRoute) {
         // Dialogへ移る前の位置をCC-Systemのパンくずへ積み、キャンセル時に同じ一覧を再生成する。
-        easyVoidCreationService.start(player)
+        easyVoidCreationService.start(player, returnRoute)
     }
 
     private fun createCreationUnavailableButton(player: Player, reason: CreationBlockReason): ItemStack {

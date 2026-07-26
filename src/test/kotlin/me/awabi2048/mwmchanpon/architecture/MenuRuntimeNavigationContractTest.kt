@@ -36,7 +36,7 @@ class MenuRuntimeNavigationContractTest {
     fun `creation transitions leave the newly opened surface active`() {
         val source = uiRoot.resolve("ChanponPlayerWorldMenuProvider.kt").readText()
         val body = functionBody(source, "createWorld")
-        assertTrue("startEasyCreation(player)" in body)
+        assertTrue("startEasyCreation(player, context.route)" in body)
         assertTrue("MenuUpdate.None" in body)
         assertFalse("runTask" in body)
     }
@@ -49,6 +49,19 @@ class MenuRuntimeNavigationContractTest {
         assertTrue("showProtectionPasswordDialog(" in body)
         assertTrue(body.split("MenuUpdate.None").size >= 3)
         assertFalse("MenuUpdate.Close" in body)
+    }
+
+    @Test
+    fun `easy creation returns to its source and confirms in inventory runtime`() {
+        val source = Path.of(
+            "src/main/kotlin/me/awabi2048/mwmchanpon/service/EasyVoidWorldCreationService.kt",
+        ).readText()
+        assertTrue("returnRoutes[player.uniqueId] = returnRoute" in source)
+        assertTrue("runtime.replace(player, returnRoute)" in source)
+        assertTrue("InventoryMenuDefinition(" in source)
+        assertTrue("id = CONFIRM_ROUTE" in source)
+        assertFalse("CONFIRM_DIALOG" in source)
+        assertFalse("showConfirmDialog" in source)
     }
 
     private fun functionBody(source: String, name: String): String {

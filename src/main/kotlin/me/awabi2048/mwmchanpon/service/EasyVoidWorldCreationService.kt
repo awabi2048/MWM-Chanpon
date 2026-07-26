@@ -1,15 +1,25 @@
 package me.awabi2048.mwmchanpon.service
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
+import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuDialogButton
 import com.awabi2048.ccsystem.api.gui.MenuDialogHandler
 import com.awabi2048.ccsystem.api.gui.MenuDialogInput
 import com.awabi2048.ccsystem.api.gui.MenuDialogRequest
+import com.awabi2048.ccsystem.api.gui.MenuElement
+import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
+import me.awabi2048.mwmchanpon.ui.ChanponGuiElements
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.WorldCreationOperation
@@ -19,6 +29,8 @@ import me.awabi2048.myworldmanager.api.service.ManagedWorldCreationRequest
 import me.awabi2048.myworldmanager.api.service.ManagedWorldSpawn
 import me.awabi2048.myworldmanager.api.service.WorldPointBillingMode
 import me.awabi2048.myworldmanager.util.WorldNameValidation
+import me.awabi2048.myworldmanager.util.GuiItemFactory
+import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import org.bukkit.HeightMap
@@ -47,18 +59,38 @@ class EasyVoidWorldCreationService(
     private data class PendingCreation(val worldName: String, val platformMaterial: Material)
 
     private val pendingCreations = ConcurrentHashMap<UUID, PendingCreation>()
+    private val returnRoutes = ConcurrentHashMap<UUID, MenuRoute>()
+    private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
-    fun start(player: Player) {
+    init {
+        runtime.register(
+            InventoryMenuDefinition(
+                owner = OWNER,
+                id = CONFIRM_ROUTE,
+                renderer = { context -> renderConfirmation(context.player) },
+                actions = mapOf(
+                    ACTION_CREATE to MenuActionHandler { context -> confirmCreation(context.player) },
+                    ACTION_BACK to MenuActionHandler { context -> returnToNameInput(context.player) },
+                ),
+            ),
+        )
+    }
+
+    fun start(player: Player, returnRoute: MenuRoute) {
         if (!canCreate(player)) return
         pendingCreations.remove(player.uniqueId)
-        CCSystem.getAPI().getMenuRuntimeService().close(player)
+        returnRoutes[player.uniqueId] = returnRoute
         player.sendMessage(i18n(player, "start"))
         showNameDialog(player)
     }
 
     private fun cancelFlow(player: Player): MenuActionResult {
         pendingCreations.remove(player.uniqueId)
-        return MenuActionResult.Success(MenuUpdate.Back)
+        val returnRoute = returnRoutes.remove(player.uniqueId)
+        if (returnRoute != null) {
+            runtime.replace(player, returnRoute)
+        }
+        return MenuActionResult.Success(MenuUpdate.None)
     }
 
     private fun handleNameSubmit(
@@ -103,7 +135,7 @@ class EasyVoidWorldCreationService(
         }
 
         pendingCreations[player.uniqueId] = PendingCreation(name, platformMaterial)
-        showConfirmDialog(player, name, platformMaterial)
+        runtime.navigate(player, MenuRoute(OWNER, CONFIRM_ROUTE))
         return MenuActionResult.Success(MenuUpdate.None)
     }
 
@@ -150,38 +182,67 @@ class EasyVoidWorldCreationService(
         )
     }
 
-    private fun showConfirmDialog(player: Player, name: String, platformMaterial: Material) {
-        CCSystem.getAPI().getMenuDialogService().show(
-            player,
-            MenuDialogRequest(
-                owner = OWNER,
-                id = CONFIRM_DIALOG,
-                title = component(player, "confirm_title"),
-                body = listOf(
-                    component(player, "confirm_body", "world" to name),
-                    component(player, "confirm_template", "material" to platformMaterial.key.asString()),
+    private fun renderConfirmation(player: Player): InventoryMenuView {
+        val pending = pendingCreations[player.uniqueId]
+        val layout = ChanponGuiElements.confirmationLayout()
+        if (pending == null) {
+            return InventoryMenuView(layout.size, component(player, "confirm_title"), emptyList())
+        }
+        val preview = GuiItemFactory.item(
+            Material.OBSIDIAN,
+            i18n(player, "confirm_title"),
+            GuiLoreSpec.Rich(
+                listOf(
+                    GuiLoreLine.Text(i18n(player, "confirm_body", "world" to pending.worldName)),
+                    GuiLoreLine.Text(
+                        i18n(
+                            player,
+                            "confirm_template",
+                            "material" to pending.platformMaterial.key.asString(),
+                        ),
+                    ),
                 ),
-                confirm = MenuDialogButton(
-                    component(player, "create"),
-                    MenuDialogHandler { actor, _ ->
-                        pendingCreations.remove(actor.uniqueId)?.let { create(actor, it) }
-                        MenuActionResult.Success(MenuUpdate.Close)
-                    },
+                GuiLoreFrame.BOTH,
+            ),
+            ItemTag.TYPE_GUI_INFO,
+        )
+        return InventoryMenuView(
+            layout.size,
+            component(player, "confirm_title"),
+            listOf(
+                MenuElement(layout.previewSlot, preview, GuiElementRole.CONTENT),
+                MenuElement(
+                    layout.confirmSlot,
+                    ChanponGuiElements.confirm(i18n(player, "create"), true),
+                    GuiElementRole.CONFIRM,
+                    ACTION_CREATE,
                 ),
-                cancel = MenuDialogButton(
-                    component(player, "back"),
-                    MenuDialogHandler { actor, _ ->
-                        val pending = pendingCreations[actor.uniqueId]
-                        showNameDialog(
-                            actor,
-                            pending?.worldName.orEmpty(),
-                            pending?.platformMaterial ?: DEFAULT_PLATFORM_MATERIAL,
-                        )
-                        MenuActionResult.Success(MenuUpdate.None)
-                    },
+                MenuElement(
+                    layout.cancelSlot,
+                    ChanponGuiElements.confirm(i18n(player, "back"), false),
+                    GuiElementRole.CANCEL,
+                    ACTION_BACK,
                 ),
             ),
         )
+    }
+
+    private fun confirmCreation(player: Player): MenuActionResult {
+        val pending = pendingCreations.remove(player.uniqueId)
+            ?: return MenuActionResult.Rejected()
+        returnRoutes.remove(player.uniqueId)
+        create(player, pending)
+        return MenuActionResult.Success(MenuUpdate.Close)
+    }
+
+    private fun returnToNameInput(player: Player): MenuActionResult {
+        val pending = pendingCreations[player.uniqueId]
+        showNameDialog(
+            player,
+            pending?.worldName.orEmpty(),
+            pending?.platformMaterial ?: DEFAULT_PLATFORM_MATERIAL,
+        )
+        return MenuActionResult.Success(MenuUpdate.None)
     }
 
     private fun create(player: Player, pending: PendingCreation) {
@@ -277,7 +338,9 @@ class EasyVoidWorldCreationService(
         private val DEFAULT_PLATFORM_MATERIAL = EasyPlatformMaterialPolicy.defaultMaterial
         private const val OWNER = "mwm-chanpon"
         private const val NAME_DIALOG = "easy-creation-name"
-        private const val CONFIRM_DIALOG = "easy-creation-confirm"
+        private const val CONFIRM_ROUTE = "easy-creation-confirm"
+        private const val ACTION_CREATE = "create"
+        private const val ACTION_BACK = "back"
         private val EASY_VOID_GENERATOR = EasyVoidGenerator
     }
 }
