@@ -1,5 +1,4 @@
 package me.awabi2048.mwmchanpon.ui
-import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
@@ -9,13 +8,20 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
+import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
+import com.awabi2048.ccsystem.api.gui.InventoryMenuView
+import com.awabi2048.ccsystem.api.gui.MenuActionContext
+import com.awabi2048.ccsystem.api.gui.MenuActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuElement
+import com.awabi2048.ccsystem.api.gui.MenuRoute
+import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.service.EasyVoidWorldCreationService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
-import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
@@ -35,12 +41,6 @@ import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
-import org.bukkit.event.EventHandler
-import org.bukkit.event.EventPriority
-import org.bukkit.event.Listener
-import org.bukkit.event.inventory.InventoryClickEvent
-import org.bukkit.inventory.Inventory
-import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.meta.SkullMeta
@@ -50,8 +50,27 @@ class ChanponPlayerWorldMenuProvider(
     private val plugin: MWMChanponPlugin,
     private val storage: ChanponWorldStorage,
     private val easyVoidCreationService: EasyVoidWorldCreationService
-) : PlayerWorldMenuProvider, Listener {
+) : PlayerWorldMenuProvider {
     private val legacy = LegacyComponentSerializer.legacySection()
+    private val runtime = CCSystem.getAPI().getMenuRuntimeService()
+
+    init {
+        runtime.register(
+            InventoryMenuDefinition(
+                owner = RUNTIME_OWNER,
+                id = ROUTE_PLAYER_WORLDS,
+                renderer = { context -> render(context.player, source(context.route)) },
+                actions = mapOf(
+                    ACTION_PAGE to MenuActionHandler(::changePage),
+                    ACTION_BACK to MenuActionHandler { MenuActionResult.Success(MenuUpdate.Back) },
+                    ACTION_CREATE to MenuActionHandler(::createWorld),
+                    ACTION_SETTINGS to MenuActionHandler(::openUserSettings),
+                    ACTION_PENDING to MenuActionHandler(::openPending),
+                    ACTION_WORLD to MenuActionHandler(::selectWorld),
+                ),
+            ),
+        )
+    }
 
     override fun getId(): String = PROVIDER_ID
 
@@ -60,19 +79,35 @@ class ChanponPlayerWorldMenuProvider(
         if (mwm.playerPlatformResolver.isBedrock(player)) return false
         val targetPlayerUuid = request.targetPlayerUuid ?: player.uniqueId
         val targetPlayerName = request.targetPlayerName ?: player.name
+        runtime.open(
+            player,
+            route(
+                Source(
+                    request.page,
+                    request.showBackButton,
+                    targetPlayerUuid,
+                    targetPlayerName,
+                ),
+            ),
+        )
+        clearGuiTransitionLater(player)
+        return true
+    }
+
+    private fun render(player: Player, source: Source): InventoryMenuView {
+        val mwm = mwm()
+        val targetPlayerUuid = source.targetPlayerUuid
+        val targetPlayerName = source.targetPlayerName
         val isOwnMenu = targetPlayerUuid == player.uniqueId
         val session = mwm.playerWorldSessionManager.getSession(player.uniqueId)
-        session.showBackButton = request.showBackButton
+        session.showBackButton = source.showBackButton
         val worlds = mwm.playerWorldGui.getPlayerWorlds(targetPlayerUuid)
-        val pageLayout = CCSystem.getAPI().getGuiLayoutService().sevenColumnPage(worlds.size, request.page)
+        val pageLayout = CCSystem.getAPI().getGuiLayoutService().sevenColumnPage(worlds.size, source.page)
         val page = pageLayout.page
         session.currentPage = page
         val pageWorlds = worlds.drop(pageLayout.startIndex).take(pageLayout.itemCount)
-        val title = inventoryTitle(mwm.languageManager.getMessage(player, "gui.player_world.title"))
-        val holder = Holder(page, request.showBackButton, targetPlayerUuid, targetPlayerName)
-        val inventory = Bukkit.createInventory(holder, pageLayout.layout.size, title)
-        holder.inv = inventory
-        val footerStart = inventory.size - 9
+        val currentSource = source.copy(page = page)
+        val footerStart = pageLayout.layout.size - 9
 
         mwm.settingsSessionManager.updateSessionAction(
             player,
@@ -84,132 +119,183 @@ class ChanponPlayerWorldMenuProvider(
             null
         )
 
-        applyFrame(inventory)
+        val elements = mutableListOf<MenuElement>()
         pageWorlds.forEachIndexed { index, worldData ->
-            inventory.setItem(pageLayout.layout.itemSlots[index], createWorldItem(player, worldData))
+            elements += MenuElement(
+                pageLayout.layout.itemSlots[index],
+                createWorldItem(player, worldData),
+                GuiElementRole.ACTION,
+                ACTION_WORLD,
+                payload(currentSource) + (PAYLOAD_WORLD_UUID to worldData.uuid.toString()),
+            )
         }
 
         val currentCreateCount = worlds.count { it.owner == targetPlayerUuid }
         val maxCreateCount = plugin.config.getInt("creation.max_worlds_per_player", 50)
         val creationBlockReason = creationBlockReason(player, currentCreateCount, maxCreateCount)
         if (isOwnMenu && creationBlockReason == null && hasCreatePermission(player)) {
-            inventory.setItem(pageLayout.layout.actionSlot - 2, createCreationButton(player))
+            elements += MenuElement(
+                pageLayout.layout.actionSlot - 2,
+                createCreationButton(player),
+                GuiElementRole.ACTION,
+                ACTION_CREATE,
+                payload(currentSource),
+            )
         } else if (isOwnMenu && creationBlockReason != null) {
-            inventory.setItem(pageLayout.layout.actionSlot - 2, createCreationUnavailableButton(player, creationBlockReason))
+            elements += MenuElement(
+                pageLayout.layout.actionSlot - 2,
+                createCreationUnavailableButton(player, creationBlockReason),
+                GuiElementRole.CONTENT,
+            )
         }
-        inventory.setItem(pageLayout.layout.actionSlot, createPlayerInfoItem(player, targetPlayerUuid, targetPlayerName))
+        elements += MenuElement(
+            pageLayout.layout.actionSlot,
+            createPlayerInfoItem(player, targetPlayerUuid, targetPlayerName),
+            GuiElementRole.CONTENT,
+        )
         if (isOwnMenu) {
-            inventory.setItem(pageLayout.layout.actionSlot + 2, createUserSettingsButton(player))
-            inventory.setItem(footerStart + 7, createPendingButton(player))
+            elements += MenuElement(
+                pageLayout.layout.actionSlot + 2,
+                createUserSettingsButton(player),
+                GuiElementRole.ACTION,
+                ACTION_SETTINGS,
+                payload(currentSource),
+            )
+            elements += MenuElement(
+                footerStart + 7,
+                createPendingButton(player),
+                GuiElementRole.ACTION,
+                ACTION_PENDING,
+                payload(currentSource),
+            )
         }
 
         if (page > 0) {
-            inventory.setItem(pageLayout.layout.previousPageSlot, createPageItem(player, page - 1, false))
+            elements += MenuElement(
+                pageLayout.layout.previousPageSlot,
+                createPageItem(player, page - 1, false),
+                GuiElementRole.NAVIGATION,
+                ACTION_PAGE,
+                payload(currentSource.copy(page = page - 1)),
+            )
         }
-        if (request.showBackButton) {
-            inventory.setItem(pageLayout.layout.backSlot, createReturnItem(player))
+        if (source.showBackButton) {
+            elements += MenuElement(
+                pageLayout.layout.backSlot,
+                createReturnItem(player),
+                GuiElementRole.BACK,
+                ACTION_BACK,
+            )
         }
         if (page + 1 < pageLayout.totalPages) {
-            inventory.setItem(footerStart + 8, createPageItem(player, page + 1, true))
+            elements += MenuElement(
+                footerStart + 8,
+                createPageItem(player, page + 1, true),
+                GuiElementRole.NAVIGATION,
+                ACTION_PAGE,
+                payload(currentSource.copy(page = page + 1)),
+            )
         }
 
-        mwm.soundManager.playMenuOpenSound(player, "player_world")
-        ManagedMenuPresenter.open(player, inventory)
-        clearGuiTransitionLater(player)
-        return true
+        return InventoryMenuView(
+            pageLayout.layout.size,
+            inventoryTitle(mwm.languageManager.getMessage(player, "gui.player_world.title")),
+            elements,
+        )
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
-    fun onClick(event: InventoryClickEvent) {
-        val player = event.whoClicked as? Player ?: return
-        val holder = event.view.topInventory.holder as? Holder ?: return
-        event.cancelWithDebug("ChanponPlayerWorldMenuProvider.onClick: menu_click")
-        if (event.clickedInventory != event.view.topInventory) return
+    private fun changePage(context: MenuActionContext): MenuActionResult {
+        return MenuActionResult.Success(MenuUpdate.Replace(route(source(context.payload))))
+    }
 
-        val item = event.currentItem ?: return
+    private fun createWorld(context: MenuActionContext): MenuActionResult {
+        val player = context.player
+        val source = source(context.payload)
         val mwm = mwm()
-        when (ItemTag.getType(item)) {
-            ItemTag.TYPE_GUI_NAV_NEXT, ItemTag.TYPE_GUI_NAV_PREV -> {
-                val target = ItemTag.getTargetPage(item) ?: return
-                mwm.soundManager.playClickSound(player, item, "player_world")
-                open(player, PlayerWorldMenuRequest(target, holder.showBackButton, holder.targetPlayerUuid, holder.targetPlayerName))
-            }
-            ItemTag.TYPE_GUI_RETURN -> handleReturn(player, item)
-            ItemTag.TYPE_GUI_CREATION_BUTTON -> {
-                if (holder.targetPlayerUuid != player.uniqueId) return
-                if (!hasCreatePermission(player)) {
-                    player.sendMessage(i18n(player, "message.world_creation_no_permission"))
-                    return
-                }
-                mwm.soundManager.playClickSound(player, item, "player_world")
-                if (event.isRightClick && !event.isShiftClick) {
-                    startEasyCreation(player, holder)
-                    return
-                }
-                val session = mwm.creationSessionManager.startSession(player.uniqueId)
-                session.isDialogMode = true
-                session.billingMode = WorldPointBillingMode.NONE
-                ManagedMenuPresenter.close(player)
-                player.sendMessage(mwm.languageManager.getMessage(player, "messages.wizard_start"))
-                mwm.creationGui.openTypeSelection(player)
-            }
-            ItemTag.TYPE_GUI_USER_SETTINGS_BUTTON -> {
-                if (holder.targetPlayerUuid != player.uniqueId) return
-                mwm.soundManager.playClickSound(player, item, "player_world")
-                mwm.menuRouteHistory.pushPlayerWorld(player, holder.page, holder.showBackButton)
-                mwm.userSettingsGui.open(player, true)
-            }
-            ItemTag.TYPE_GUI_PENDING_BUTTON -> {
-                if (holder.targetPlayerUuid != player.uniqueId) return
-                mwm.soundManager.playClickSound(player, item, "player_world")
-                mwm.pendingInteractionGui.open(
-                    player = player,
-                    page = 0,
-                    returnPage = holder.page,
-                    showBackButton = holder.showBackButton,
-                    fromBedrockMenu = false
-                )
-            }
-            ItemTag.TYPE_GUI_WORLD_ITEM -> handleWorldClick(player, holder, item, event)
+        if (source.targetPlayerUuid != player.uniqueId) return MenuActionResult.Rejected()
+        if (!hasCreatePermission(player)) {
+            player.sendMessage(i18n(player, "message.world_creation_no_permission"))
+            return MenuActionResult.Rejected()
         }
+        if (context.click.isRightClick && !context.click.isShiftClick) {
+            startEasyCreation(player)
+            return MenuActionResult.Success(MenuUpdate.Close)
+        }
+        Bukkit.getScheduler().runTask(plugin, Runnable {
+            val session = mwm.creationSessionManager.startSession(player.uniqueId)
+            session.isDialogMode = true
+            session.billingMode = WorldPointBillingMode.NONE
+            player.sendMessage(mwm.languageManager.getMessage(player, "messages.wizard_start"))
+            mwm.creationGui.openTypeSelection(player)
+        })
+        return MenuActionResult.Success(MenuUpdate.Close)
     }
 
-    private fun handleWorldClick(player: Player, holder: Holder, item: ItemStack, event: InventoryClickEvent) {
+    private fun openUserSettings(context: MenuActionContext): MenuActionResult {
+        val source = source(context.payload)
+        if (source.targetPlayerUuid != context.player.uniqueId) return MenuActionResult.Rejected()
+        Bukkit.getScheduler().runTask(plugin, Runnable {
+            mwm().userSettingsGui.open(context.player, true)
+        })
+        return MenuActionResult.Success(MenuUpdate.Close)
+    }
+
+    private fun openPending(context: MenuActionContext): MenuActionResult {
+        val source = source(context.payload)
+        if (source.targetPlayerUuid != context.player.uniqueId) return MenuActionResult.Rejected()
+        Bukkit.getScheduler().runTask(plugin, Runnable {
+            mwm().pendingInteractionGui.open(
+                player = context.player,
+                page = 0,
+                returnPage = source.page,
+                showBackButton = source.showBackButton,
+                fromBedrockMenu = false,
+            )
+        })
+        return MenuActionResult.Success(MenuUpdate.Close)
+    }
+
+    private fun selectWorld(context: MenuActionContext): MenuActionResult {
+        val player = context.player
+        val source = source(context.payload)
         val mwm = mwm()
-        val uuid = ItemTag.getWorldUuid(item) ?: return
-        val worldData = mwm.worldConfigRepository.findByUuid(uuid) ?: return
-        if (holder.targetPlayerUuid == player.uniqueId && event.isShiftClick && event.isLeftClick) {
+        val uuid = context.payload[PAYLOAD_WORLD_UUID]
+            ?.let { runCatching { java.util.UUID.fromString(it) }.getOrNull() }
+            ?: return MenuActionResult.Rejected()
+        val worldData = mwm.worldConfigRepository.findByUuid(uuid)
+            ?: return MenuActionResult.Rejected()
+        if (source.targetPlayerUuid == player.uniqueId &&
+            context.click.isShiftClick &&
+            context.click.isLeftClick
+        ) {
             val stats = mwm.playerStatsRepository.findByUuid(player.uniqueId)
             stats.worldDisplayOrder.remove(uuid)
             stats.worldDisplayOrder.add(0, uuid)
             mwm.playerStatsRepository.save(stats)
-            mwm.soundManager.playClickSound(player, item, "player_world")
-            open(player, PlayerWorldMenuRequest(holder.page, holder.showBackButton, holder.targetPlayerUuid, holder.targetPlayerName))
-            return
+            return MenuActionResult.Success(MenuUpdate.Refresh)
         }
-        if (event.isLeftClick && !event.isShiftClick) {
-            if (worldData.isArchived) return
+        if (context.click.isLeftClick && !context.click.isShiftClick) {
+            if (worldData.isArchived) return MenuActionResult.Rejected()
             if (isCurrentWorld(player, worldData)) {
                 if (canOpenSettings(player, worldData)) {
-                    openWorldSettings(player, holder, item, worldData)
+                    openWorldSettings(player, source, worldData)
+                    return MenuActionResult.Success(MenuUpdate.Close)
                 }
-                return
+                return MenuActionResult.Rejected()
             }
-            ManagedMenuPresenter.close(player)
             // MWM本体の具象サービスを直接呼ぶとKotlinランタイムのクラスローダー差で壊れるため、公開API境界だけを通す。
             MyWorldManagerApi.getWorldService()?.teleportToWorld(player, uuid)
             player.sendMessage(mwm.languageManager.getMessage(player, "messages.warp_success", mapOf("world" to worldData.name)))
-            mwm.soundManager.playClickSound(player, item, "player_world")
-            return
+            return MenuActionResult.Success(MenuUpdate.Close)
         }
-        if (event.isRightClick && !event.isShiftClick && canOpenSettings(player, worldData)) {
-            openWorldSettings(player, holder, item, worldData)
+        if (context.click.isRightClick &&
+            !context.click.isShiftClick &&
+            canOpenSettings(player, worldData)
+        ) {
+            openWorldSettings(player, source, worldData)
+            return MenuActionResult.Success(MenuUpdate.Close)
         }
-    }
-
-    private fun applyFrame(inventory: Inventory) {
-        ChanponGuiElements.applyStandardFrame(inventory)
-        ChanponGuiElements.fill(inventory)
+        return MenuActionResult.Ignored
     }
 
     private fun createWorldItem(player: Player, world: WorldData): ItemStack {
@@ -281,9 +367,8 @@ class ChanponPlayerWorldMenuProvider(
         return item
     }
 
-    private fun startEasyCreation(player: Player, holder: Holder) {
+    private fun startEasyCreation(player: Player) {
         // Dialogへ移る前の位置をCC-Systemのパンくずへ積み、キャンセル時に同じ一覧を再生成する。
-        mwm().menuRouteHistory.pushPlayerWorld(player, holder.page, holder.showBackButton)
         easyVoidCreationService.start(player)
     }
 
@@ -399,18 +484,6 @@ class ChanponPlayerWorldMenuProvider(
         return item
     }
 
-    private fun handleReturn(player: Player, item: ItemStack) {
-        val mwm = mwm()
-        mwm.soundManager.playClickSound(player, item, "player_world")
-        if (!mwm.menuRouteHistory.openPrevious(player)) {
-            ManagedMenuPresenter.close(player)
-        }
-    }
-
-    private fun decoration(material: Material): ItemStack {
-        return ChanponGuiElements.decoration(material)
-    }
-
     private fun inventoryTitle(title: String): Component =
         Component.text(title, NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false)
 
@@ -427,17 +500,16 @@ class ChanponPlayerWorldMenuProvider(
         player.hasPermission("myworldmanager.admin") ||
             world.owner == player.uniqueId || world.moderators.contains(player.uniqueId) || world.members.contains(player.uniqueId)
 
-    private fun openWorldSettings(player: Player, holder: Holder, item: ItemStack, worldData: WorldData) {
-        val mwm = mwm()
-        mwm.soundManager.playClickSound(player, item, "player_world")
-        mwm.menuRouteHistory.pushPlayerWorld(player, holder.page, holder.showBackButton)
-        mwm.worldSettingsGui.open(
-            player,
-            worldData,
-            true,
-            true,
-            holder.showBackButton
-        )
+    private fun openWorldSettings(player: Player, source: Source, worldData: WorldData) {
+        Bukkit.getScheduler().runTask(plugin, Runnable {
+            mwm().worldSettingsGui.open(
+                player,
+                worldData,
+                true,
+                true,
+                source.showBackButton
+            )
+        })
     }
 
     private fun isCurrentWorld(player: Player, world: WorldData): Boolean =
@@ -501,17 +573,51 @@ class ChanponPlayerWorldMenuProvider(
         )
     }
 
-    private class Holder(
+    private data class Source(
         val page: Int,
         val showBackButton: Boolean,
         val targetPlayerUuid: java.util.UUID,
         val targetPlayerName: String?
-    ) : InventoryHolder {
-        lateinit var inv: Inventory
-        override fun getInventory(): Inventory = inv
+    )
+
+    private fun route(source: Source): MenuRoute =
+        MenuRoute(RUNTIME_OWNER, ROUTE_PLAYER_WORLDS, payload(source))
+
+    private fun source(route: MenuRoute): Source = source(route.payload)
+
+    private fun source(payload: Map<String, String>): Source {
+        val targetPlayerUuid = payload[PAYLOAD_TARGET_UUID]
+            ?.let { runCatching { java.util.UUID.fromString(it) }.getOrNull() }
+            ?: java.util.UUID(0L, 0L)
+        return Source(
+            page = payload[PAYLOAD_PAGE]?.toIntOrNull()?.coerceAtLeast(0) ?: 0,
+            showBackButton = payload[PAYLOAD_SHOW_BACK]?.toBooleanStrictOrNull() ?: false,
+            targetPlayerUuid = targetPlayerUuid,
+            targetPlayerName = payload[PAYLOAD_TARGET_NAME],
+        )
+    }
+
+    private fun payload(source: Source): Map<String, String> = buildMap {
+        put(PAYLOAD_PAGE, source.page.toString())
+        put(PAYLOAD_SHOW_BACK, source.showBackButton.toString())
+        put(PAYLOAD_TARGET_UUID, source.targetPlayerUuid.toString())
+        source.targetPlayerName?.let { put(PAYLOAD_TARGET_NAME, it) }
     }
 
     companion object {
         private const val PROVIDER_ID = "chanpon.player_world_menu"
+        private const val RUNTIME_OWNER = "mwm-chanpon"
+        private const val ROUTE_PLAYER_WORLDS = "player-worlds"
+        private const val ACTION_PAGE = "page"
+        private const val ACTION_BACK = "back"
+        private const val ACTION_CREATE = "create"
+        private const val ACTION_SETTINGS = "settings"
+        private const val ACTION_PENDING = "pending"
+        private const val ACTION_WORLD = "world"
+        private const val PAYLOAD_PAGE = "page"
+        private const val PAYLOAD_SHOW_BACK = "show_back"
+        private const val PAYLOAD_TARGET_UUID = "target_uuid"
+        private const val PAYLOAD_TARGET_NAME = "target_name"
+        private const val PAYLOAD_WORLD_UUID = "world_uuid"
     }
 }
