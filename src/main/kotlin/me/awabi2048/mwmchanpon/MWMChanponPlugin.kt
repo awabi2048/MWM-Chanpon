@@ -244,7 +244,7 @@ class MWMChanponPlugin : JavaPlugin() {
         automationSettingsMenu.setParentMenuOpener(chanponAdminMenu::open)
         backupListMenu.setParentMenuOpener(worldDataManagementMenu::reopenFromChild)
         chanponAdminWorldListMenu = ChanponAdminWorldListMenu(this, chanponStorage)
-        submittedWorldMenuProvider = SubmittedWorldMenuProvider(chanponStorage, submittedProtectionService)
+        submittedWorldMenuProvider = SubmittedWorldMenuProvider(this, chanponStorage, submittedProtectionService)
         environmentGui = ChanponEnvironmentGui(this, chanponStorage, submittedProtectionService, buildPermissionService)
         chanponWorldSettingsMenuProvider = ChanponWorldSettingsMenuProvider(this, chanponStorage, submittedProtectionService, environmentGui)
         easyVoidWorldCreationService = EasyVoidWorldCreationService(this)
@@ -288,7 +288,6 @@ class MWMChanponPlugin : JavaPlugin() {
         }
         server.pluginManager.registerEvents(productionToggleExtension, this)
         server.pluginManager.registerEvents(creationConfirmationMenuProvider, this)
-        server.pluginManager.registerEvents(submittedWorldMenuProvider, this)
         server.pluginManager.registerEvents(chanponWorldSettingsMenuProvider, this)
         server.pluginManager.registerEvents(environmentGui, this)
         if (server.pluginManager.isPluginEnabled("Chanpon-Utilities")) {

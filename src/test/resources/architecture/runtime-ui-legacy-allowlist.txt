@@ -2,7 +2,6 @@
 CREATE_INVENTORY|1|src/main/kotlin/me/awabi2048/mwmchanpon/extension/ProductionToggleExtension.kt
 CREATE_INVENTORY|1|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponDiscoveryMenuProvider.kt
 CREATE_INVENTORY|1|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponPlayerWorldMenuProvider.kt
-CREATE_INVENTORY|1|src/main/kotlin/me/awabi2048/mwmchanpon/ui/SubmittedWorldMenuProvider.kt
 CREATE_INVENTORY|2|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponFavoriteVisitMenuProvider.kt
 CREATE_INVENTORY|3|src/main/kotlin/me/awabi2048/mwmchanpon/extension/WorldBackupMenuExtension.kt
 CREATE_INVENTORY|5|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponEnvironmentGui.kt
@@ -15,7 +14,6 @@ INVENTORY_CLICK_EVENT|2|src/main/kotlin/me/awabi2048/mwmchanpon/extension/Linked
 INVENTORY_CLICK_EVENT|2|src/main/kotlin/me/awabi2048/mwmchanpon/extension/ToolPermissionMenuExtension.kt
 INVENTORY_CLICK_EVENT|2|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponCreationConfirmationMenuProvider.kt
 INVENTORY_CLICK_EVENT|2|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponDiscoveryMenuProvider.kt
-INVENTORY_CLICK_EVENT|2|src/main/kotlin/me/awabi2048/mwmchanpon/ui/SubmittedWorldMenuProvider.kt
 INVENTORY_CLICK_EVENT|3|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponPlayerWorldMenuProvider.kt
 INVENTORY_CLICK_EVENT|3|src/main/kotlin/me/awabi2048/mwmchanpon/util/CancelWithDebug.kt
 INVENTORY_CLICK_EVENT|4|src/main/kotlin/me/awabi2048/mwmchanpon/extension/ProductionToggleExtension.kt
@@ -27,5 +25,4 @@ MANUAL_CLICK_SOUND|13|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponWorldSet
 MANUAL_CLICK_SOUND|2|src/main/kotlin/me/awabi2048/mwmchanpon/extension/ProductionToggleExtension.kt
 MANUAL_CLICK_SOUND|2|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponDiscoveryMenuProvider.kt
 MANUAL_CLICK_SOUND|4|src/main/kotlin/me/awabi2048/mwmchanpon/extension/WorldBackupMenuExtension.kt
-MANUAL_CLICK_SOUND|4|src/main/kotlin/me/awabi2048/mwmchanpon/ui/SubmittedWorldMenuProvider.kt
 MANUAL_CLICK_SOUND|8|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponPlayerWorldMenuProvider.kt

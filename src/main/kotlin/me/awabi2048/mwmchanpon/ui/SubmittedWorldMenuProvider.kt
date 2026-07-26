@@ -1,36 +1,53 @@
 package me.awabi2048.mwmchanpon.ui
-import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
-
-import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
+import com.awabi2048.ccsystem.api.gui.InventoryMenuView
+import com.awabi2048.ccsystem.api.gui.MenuActionContext
+import com.awabi2048.ccsystem.api.gui.MenuActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuElement
+import com.awabi2048.ccsystem.api.gui.MenuRoute
+import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.protection.ProtectionReason
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.SubmissionState
 import me.awabi2048.myworldmanager.MyWorldManager
-import me.awabi2048.myworldmanager.api.extension.WorldSettingsInventoryHolder
+import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsMenuProvider
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsMenuRequest
 import me.awabi2048.myworldmanager.model.WorldData
-import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
-import org.bukkit.event.EventHandler
-import org.bukkit.event.Listener
-import org.bukkit.event.inventory.InventoryClickEvent
-import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
 
 class SubmittedWorldMenuProvider(
+    private val plugin: MWMChanponPlugin,
     private val storage: ChanponWorldStorage,
     private val protectionService: SubmittedWorldProtectionService
-) : WorldSettingsMenuProvider, Listener {
+) : WorldSettingsMenuProvider {
+    private val runtime = CCSystem.getAPI().getMenuRuntimeService()
+    private val requests = ConcurrentHashMap<UUID, WorldSettingsMenuRequest>()
+
+    init {
+        runtime.register(
+            InventoryMenuDefinition(
+                owner = OWNER,
+                id = ROUTE,
+                renderer = { context -> render(context.player, context.route) },
+                actions = mapOf(ACTION_BACK to MenuActionHandler(::handleReturn)),
+            ),
+        )
+    }
     override fun getId(): String = PROVIDER_ID
 
     override fun open(player: Player, worldData: WorldData, request: WorldSettingsMenuRequest): Boolean {
@@ -43,68 +60,61 @@ class SubmittedWorldMenuProvider(
             SubmissionState.UNSUBMITTED
         }
 
-        val holder = SubmittedWorldMenuHolder(worldData.uuid, request)
-        val layout = ChanponGuiElements.settingsLayout()
-        val inventory = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "submitted_menu.title"))
-        holder.inv = inventory
-        applyFrame(inventory)
-
-        inventory.setItem(22, createWorldItem(player, worldData, state, reasons))
-
-        ChanponGuiElements.setSettingsFooter(
-            inventory,
-            if (request.showBackButton) createReturnItem(player) else null,
-            null
+        requests[player.uniqueId] = request
+        runtime.open(
+            player,
+            MenuRoute(OWNER, ROUTE, mapOf(WORLD_UUID to worldData.uuid.toString())),
         )
-
-        fillBody(inventory)
-        ManagedMenuPresenter.open(player, inventory)
         return true
     }
 
-    @EventHandler
-    fun onClick(event: InventoryClickEvent) {
-        val player = event.whoClicked as? Player ?: return
-        val holder = event.view.topInventory.holder as? SubmittedWorldMenuHolder ?: return
-        event.cancelWithDebug("SubmittedWorldMenuProvider.onClick: menu_click")
-        if (event.clickedInventory != event.view.topInventory) return
-
-        val item = event.currentItem ?: return
-        when (ItemTag.getType(item)) {
-            ItemTag.TYPE_GUI_RETURN -> handleReturn(player, item, holder.request)
+    private fun render(player: Player, route: MenuRoute): InventoryMenuView {
+        val worldData = route.payload[WORLD_UUID]
+            ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+            ?.let { MyWorldManagerApi.getWorldRepository()?.findByUuid(it) }
+        val elements = mutableListOf<MenuElement>()
+        if (worldData != null) {
+            val state = runCatching { storage.getSubmissionState(worldData.uuid) }
+                .getOrDefault(SubmissionState.UNSUBMITTED)
+            elements += MenuElement(
+                22,
+                createWorldItem(player, worldData, state, protectionService.protectionReasons(worldData)),
+                GuiElementRole.CONTENT,
+            )
         }
+        if (requests[player.uniqueId]?.showBackButton == true) {
+            elements += MenuElement(36, createReturnItem(player), GuiElementRole.BACK, ACTION_BACK)
+        }
+        return InventoryMenuView(
+            ChanponGuiElements.settingsLayout().size,
+            i18nComponent(player, "submitted_menu.title"),
+            elements,
+        )
     }
 
-    private fun handleReturn(player: Player, item: ItemStack, request: WorldSettingsMenuRequest) {
+    private fun handleReturn(context: MenuActionContext): MenuActionResult {
+        val player = context.player
+        val request = requests.remove(player.uniqueId) ?: return MenuActionResult.Success(MenuUpdate.Close)
         val mwm = mwm()
         val session = mwm.settingsSessionManager.getSession(player)
-        if (mwm.menuRouteHistory.openPrevious(player)) {
-            mwm.soundManager.playClickSound(player, item, "world_settings")
-            return
-        }
-        when {
+        Bukkit.getScheduler().runTask(plugin, Runnable {
+            if (mwm.menuRouteHistory.openPrevious(player)) {
+                return@Runnable
+            }
+            when {
             session?.isAdminFlow == true -> {
-                mwm.soundManager.playAdminClickSound(player)
                 mwm.worldGui.open(player, null, true, false)
             }
             request.isPlayerWorldFlow == true -> {
-                mwm.soundManager.playClickSound(player, item, "world_settings")
                 mwm.playerWorldGui.open(player, 0, request.parentShowBackButton ?: false, player.uniqueId, player.name)
             }
             else -> {
-                mwm.soundManager.playClickSound(player, item, null)
                 mwm.settingsSessionManager.endSession(player)
-                ManagedMenuPresenter.close(player)
+                player.closeInventory()
             }
-        }
-    }
-
-    private fun applyFrame(inventory: Inventory) {
-        ChanponGuiElements.applyStandardFrame(inventory)
-    }
-
-    private fun fillBody(inventory: Inventory) {
-        ChanponGuiElements.fill(inventory)
+            }
+        })
+        return MenuActionResult.Success(MenuUpdate.Close)
     }
 
     private fun createWorldItem(
@@ -131,7 +141,6 @@ class SubmittedWorldMenuProvider(
             )))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
         return item
     }
 
@@ -151,7 +160,6 @@ class SubmittedWorldMenuProvider(
             meta.displayName(i18nComponent(player, "submitted_menu.back.display"))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_RETURN)
         return item
     }
 
@@ -169,15 +177,11 @@ class SubmittedWorldMenuProvider(
 
     private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)
 
-    private class SubmittedWorldMenuHolder(
-        val worldUuid: UUID,
-        val request: WorldSettingsMenuRequest
-    ) : WorldSettingsInventoryHolder {
-        lateinit var inv: Inventory
-        override fun getInventory(): Inventory = inv
-    }
-
     companion object {
         private const val PROVIDER_ID = "chanpon.submitted_world_menu"
+        private const val OWNER = "mwm-chanpon"
+        private const val ROUTE = "mwm-chanpon:submitted-world"
+        private const val ACTION_BACK = "back"
+        private const val WORLD_UUID = "world_uuid"
     }
 }
