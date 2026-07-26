@@ -73,7 +73,7 @@ class ChanponWorldSettingsMenuProvider(
     override fun getId(): String = PROVIDER_ID
 
     override fun open(player: Player, worldData: WorldData, request: WorldSettingsMenuRequest): Boolean {
-        runtime.open(player, route(Source(Screen.MAIN, worldData.uuid, request)))
+        runtime.navigate(player, route(Source(Screen.MAIN, worldData.uuid, request)))
         return true
     }
 
@@ -148,13 +148,31 @@ class ChanponWorldSettingsMenuProvider(
             items[25] = mwmItem(player, worldData, "member", Material.PLAYER_HEAD, ItemTag.TYPE_GUI_SETTING_MEMBER)
             items[32] = mwmItem(player, worldData, "environment", Material.GRASS_BLOCK, ItemTag.TYPE_GUI_SETTING_ENVIRONMENT, requireTargetWorld = true)
             items[33] = criticalItem(player, worldData)
+            if (mwm.portalRepository.findAll().any { it.worldKey == worldData.worldKey }) {
+                items[ChanponWorldSettingsLayout.PORTAL_MANAGEMENT_SLOT] = mwmItem(
+                    player,
+                    worldData,
+                    "portals",
+                    Material.END_PORTAL_FRAME,
+                    ItemTag.TYPE_GUI_SETTING_PORTALS,
+                )
+            }
         }
         items[4] = worldInfoItem(player, worldData)
         if (request.showBackButton) {
             items[if (isProtected) PROTECTED_BACK_SLOT else layout.infoSlot] = returnItem(player)
         }
 
-        items = renderExtensions(items, player, worldData, request.showBackButton, isOwner, isModerator, isProtected).toMutableMap()
+        items = renderExtensions(
+            items,
+            player,
+            worldData,
+            request.showBackButton,
+            isOwner,
+            isModerator,
+            isProtected,
+            inventorySize,
+        ).toMutableMap()
         mwm.logWorldSettingsDebug(
             "chanpon_open=inventory player=${player.name}/${player.uniqueId} world=${worldData.uuid} " +
                 "size=$inventorySize protected=$isProtected"
@@ -675,7 +693,7 @@ class ChanponWorldSettingsMenuProvider(
 
     private fun pushSettingsRoute(player: Player, worldData: WorldData) {
         val request = currentRequest(player)
-        mwm().menuRouteHistory.pushCustom(
+        mwm().mwmMenuRoutes.pushCustom(
             player,
             "chanpon.world_settings:${worldData.uuid}:$request"
         ) { target ->
@@ -692,7 +710,8 @@ class ChanponWorldSettingsMenuProvider(
         showBackButton: Boolean,
         isOwner: Boolean,
         isModerator: Boolean,
-        isProtected: Boolean = false
+        isProtected: Boolean = false,
+        inventorySize: Int,
     ): Map<Int, ItemStack> {
         val context = MenuExtensionContext(
             "world_settings",
@@ -702,7 +721,8 @@ class ChanponWorldSettingsMenuProvider(
                 "isOwner" to isOwner,
                 "isMember" to worldData.members.contains(player.uniqueId),
                 "isModerator" to isModerator,
-                "isProtected" to isProtected
+                "isProtected" to isProtected,
+                "inventorySize" to inventorySize,
             )
         )
         var items = sourceItems
@@ -901,6 +921,7 @@ class ChanponWorldSettingsMenuProvider(
             "member" -> "gui.settings.member.blocks.description"
             "environment" -> "gui.settings.environment.blocks.summary"
             "tour" -> "gui.tour.worldmenu.blocks.description"
+            "portals" -> "gui.settings.portals.blocks.summary"
             else -> return emptyList()
         }
         return mwm().languageManager.getMessageList(player, key).map(GuiLoreLine::Text)

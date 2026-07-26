@@ -237,7 +237,7 @@ class ChanponPlayerWorldMenuProvider(
         Bukkit.getScheduler().runTask(plugin, Runnable {
             mwm().userSettingsGui.open(context.player, true)
         })
-        return MenuActionResult.Success(MenuUpdate.Close)
+        return MenuActionResult.Success(MenuUpdate.None)
     }
 
     private fun openPending(context: MenuActionContext): MenuActionResult {
@@ -252,7 +252,7 @@ class ChanponPlayerWorldMenuProvider(
                 fromBedrockMenu = false,
             )
         })
-        return MenuActionResult.Success(MenuUpdate.Close)
+        return MenuActionResult.Success(MenuUpdate.None)
     }
 
     private fun selectWorld(context: MenuActionContext): MenuActionResult {
@@ -279,7 +279,7 @@ class ChanponPlayerWorldMenuProvider(
             if (isCurrentWorld(player, worldData)) {
                 if (canOpenSettings(player, worldData)) {
                     openWorldSettings(player, source, worldData)
-                    return MenuActionResult.Success(MenuUpdate.Close)
+                    return MenuActionResult.Success(MenuUpdate.None)
                 }
                 return MenuActionResult.Rejected()
             }
@@ -293,7 +293,7 @@ class ChanponPlayerWorldMenuProvider(
             canOpenSettings(player, worldData)
         ) {
             openWorldSettings(player, source, worldData)
-            return MenuActionResult.Success(MenuUpdate.Close)
+            return MenuActionResult.Success(MenuUpdate.None)
         }
         return MenuActionResult.Ignored
     }

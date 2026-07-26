@@ -2,6 +2,7 @@ package me.awabi2048.mwmchanpon.extension
 
 import com.awabi2048.ccsystem.CCSystem
 import me.awabi2048.mwmchanpon.ui.ChanponLore
+import me.awabi2048.mwmchanpon.ui.ChanponWorldSettingsLayout
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.MenuExtension
 import me.awabi2048.myworldmanager.api.extension.MenuExtensionContext
@@ -25,13 +26,8 @@ class LinkedPortalMenuExtension : MenuExtension {
         if (!isOwner && !isMember) return items
 
         val isProtected = context.get<Boolean>("isProtected") == true
-        if (isProtected) {
-            // 完成済み/提出済みのワールドでは、ポータル取得を中央寄せレイアウトの3点目（slot 23）に配置する。
-            return items + (23 to portalItem(player, worldData))
-        }
-
-        val footerStart = ((items.keys.maxOrNull() ?: 53) + 1) - 9
-        val slot = if (isOwner) footerStart + 1 else footerStart + 2
+        val inventorySize = context.get<Int>("inventorySize") ?: return items
+        val slot = ChanponWorldSettingsLayout.linkedPortalSlot(inventorySize, isOwner, isProtected)
         return items + (slot to portalItem(player, worldData))
     }
 

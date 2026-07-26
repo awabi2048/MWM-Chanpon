@@ -93,28 +93,8 @@ class SubmittedWorldMenuProvider(
     }
 
     private fun handleReturn(context: MenuActionContext): MenuActionResult {
-        val player = context.player
-        val request = requests.remove(player.uniqueId) ?: return MenuActionResult.Success(MenuUpdate.Close)
-        val mwm = mwm()
-        val session = mwm.settingsSessionManager.getSession(player)
-        Bukkit.getScheduler().runTask(plugin, Runnable {
-            if (mwm.menuRouteHistory.openPrevious(player)) {
-                return@Runnable
-            }
-            when {
-            session?.isAdminFlow == true -> {
-                mwm.worldGui.open(player, null, true, false)
-            }
-            request.isPlayerWorldFlow == true -> {
-                mwm.playerWorldGui.open(player, 0, request.parentShowBackButton ?: false, player.uniqueId, player.name)
-            }
-            else -> {
-                mwm.settingsSessionManager.endSession(player)
-                player.closeInventory()
-            }
-            }
-        })
-        return MenuActionResult.Success(MenuUpdate.Close)
+        requests.remove(context.player.uniqueId)
+        return MenuActionResult.Success(MenuUpdate.Back)
     }
 
     private fun createWorldItem(
