@@ -24,7 +24,6 @@ import me.awabi2048.mwmchanpon.listener.FreecamWorldPolicyListener
 import me.awabi2048.mwmchanpon.listener.PlayerJoinListener
 import me.awabi2048.mwmchanpon.listener.SubmittedWorldProtectionListener
 import me.awabi2048.mwmchanpon.listener.SpawnWorldProtectionListener
-import me.awabi2048.mwmchanpon.listener.ToolPermissionMenuListener
 import me.awabi2048.mwmchanpon.listener.ToolPermissionWorldListener
 import me.awabi2048.mwmchanpon.listener.WorldCleanupListener
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
@@ -302,7 +301,7 @@ class MWMChanponPlugin : JavaPlugin() {
         server.pluginManager.registerEvents(SubmittedWorldProtectionListener(submittedProtectionService), this)
         server.pluginManager.registerEvents(SpawnWorldProtectionListener(globalStorage, spawnProtectionService), this)
 
-        val toolMenu = ToolPermissionMenu(toolController, toolDefinitions)
+        val toolMenu = ToolPermissionMenu(this, toolController, toolDefinitions)
         toolPermissionExtension = ToolPermissionMenuExtension(toolMenu, toolController, toolDefinitions)
         worldBackupMenuExtension = WorldBackupMenuExtension(this, chanponStorage, backupService, automationService, manualRollbackService)
         linkedPortalMenuExtension = LinkedPortalMenuExtension()
@@ -310,10 +309,6 @@ class MWMChanponPlugin : JavaPlugin() {
         MyWorldManagerApi.registerMenuExtension(worldBackupMenuExtension)
         MyWorldManagerApi.registerMenuExtension(linkedPortalMenuExtension)
         productionToggleExtension.syncForcedTagsForProductionWorlds()
-        server.pluginManager.registerEvents(
-            ToolPermissionMenuListener(this, toolMenu, toolController, toolDefinitions),
-            this
-        )
         server.pluginManager.registerEvents(worldBackupMenuExtension, this)
         server.pluginManager.registerEvents(MemberPermissionSyncListener(toolController, chanponStorage), this)
         server.pluginManager.registerEvents(PlayerJoinListener(toolController, spawnWorldService), this)

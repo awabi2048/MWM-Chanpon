@@ -1,96 +1,182 @@
 package me.awabi2048.mwmchanpon.ui
-import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
+import com.awabi2048.ccsystem.api.gui.InventoryMenuView
+import com.awabi2048.ccsystem.api.gui.MenuActionContext
+import com.awabi2048.ccsystem.api.gui.MenuActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuElement
+import com.awabi2048.ccsystem.api.gui.MenuRoute
+import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.mwmchanpon.tool.ToolPermissionDefinition
+import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.model.WorldData
-import me.awabi2048.myworldmanager.util.ItemTag
-import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.format.TextDecoration
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.enchantments.Enchantment
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
+import org.bukkit.inventory.meta.SkullMeta
 
 class ToolPermissionMenu(
+    private val plugin: MWMChanponPlugin,
     private val controller: ToolPermissionController,
-    private val definitions: List<ToolPermissionDefinition>
+    private val definitions: List<ToolPermissionDefinition>,
 ) {
-    companion object {
-        const val EXTENSION_ID = "chanpon.tool_permissions"
+    private val runtime = CCSystem.getAPI().getMenuRuntimeService()
+    private val backActions = ConcurrentHashMap<UUID, () -> Unit>()
+
+    init {
+        runtime.register(
+            InventoryMenuDefinition(
+                owner = OWNER,
+                id = ROUTE,
+                renderer = { context -> render(context.player, context.route) },
+                actions = mapOf(
+                    ACTION_BACK to MenuActionHandler(::back),
+                    ACTION_TOGGLE to MenuActionHandler(::toggle),
+                ),
+            ),
+        )
     }
 
     fun open(player: Player, worldData: WorldData, targetPlayerUuid: UUID, onBack: () -> Unit) {
-        val holder = ToolPermissionMenuHolder(worldData.uuid, targetPlayerUuid, onBack)
-        val inventory = Bukkit.createInventory(
-            holder,
-            45,
-            LegacyComponentSerializer.legacySection().deserialize("§8ツール権限の編集")
+        backActions[player.uniqueId] = onBack
+        runtime.open(
+            player,
+            MenuRoute(
+                OWNER,
+                ROUTE,
+                mapOf(
+                    WORLD_UUID to worldData.uuid.toString(),
+                    TARGET_UUID to targetPlayerUuid.toString(),
+                ),
+            ),
         )
-        holder.bind(inventory)
-
-        ChanponGuiElements.applyStandardFrame(inventory)
-        ChanponGuiElements.fill(inventory)
-
-        val targetPlayer = Bukkit.getOfflinePlayer(targetPlayerUuid)
-        val head = ItemStack(Material.PLAYER_HEAD)
-        head.editMeta { meta ->
-            if (meta is org.bukkit.inventory.meta.SkullMeta) {
-                meta.owningPlayer = targetPlayer
-            }
-            meta.displayName(CCSystem.getAPI().getGuiElementService().name("§e${targetPlayer.name ?: "Unknown"}"))
-        }
-        inventory.setItem(4, head)
-
-        val toolSlots = listOf(20, 22, 24)
-        definitions.take(toolSlots.size).forEachIndexed { index, definition ->
-            inventory.setItem(toolSlots[index], createToolItem(worldData, targetPlayerUuid, definition))
-        }
-
-        val back = ItemStack(Material.REDSTONE)
-        back.editMeta { meta ->
-            meta.displayName(CCSystem.getAPI().getGuiElementService().name("§7戻る"))
-        }
-        ItemTag.tagItem(back, ItemTag.TYPE_GUI_RETURN)
-        inventory.setItem(40, back)
-
-        ManagedMenuPresenter.open(player, inventory)
     }
 
-    private fun createToolItem(worldData: WorldData, targetPlayerUuid: UUID, definition: ToolPermissionDefinition): ItemStack {
+    private fun render(player: Player, route: MenuRoute): InventoryMenuView {
+        val worldData = world(route)
+        val targetUuid = uuid(route.payload[TARGET_UUID])
+        val elements = mutableListOf<MenuElement>()
+        if (targetUuid != null) {
+            val targetPlayer = Bukkit.getOfflinePlayer(targetUuid)
+            val head = ItemStack(Material.PLAYER_HEAD)
+            head.editMeta { meta ->
+                if (meta is SkullMeta) meta.owningPlayer = targetPlayer
+                meta.displayName(
+                    CCSystem.getAPI().getGuiElementService()
+                        .name("§e${targetPlayer.name ?: "Unknown"}"),
+                )
+            }
+            elements += MenuElement(4, head, GuiElementRole.CONTENT)
+        }
+        if (worldData != null && targetUuid != null) {
+            listOf(20, 22, 24).zip(definitions).forEach { (slot, definition) ->
+                elements += MenuElement(
+                    slot,
+                    createToolItem(worldData, targetUuid, definition),
+                    GuiElementRole.ACTION,
+                    ACTION_TOGGLE,
+                    mapOf(TOOL_ID to definition.id),
+                )
+            }
+        }
+        elements += MenuElement(40, backItem(), GuiElementRole.BACK, ACTION_BACK)
+        return InventoryMenuView(
+            45,
+            CCSystem.getAPI().getGuiElementService().name("§8ツール権限の編集"),
+            elements,
+        )
+    }
+
+    private fun back(context: MenuActionContext): MenuActionResult {
+        val action = backActions.remove(context.player.uniqueId)
+            ?: return MenuActionResult.Success(MenuUpdate.Close)
+        Bukkit.getScheduler().runTask(plugin, Runnable(action))
+        return MenuActionResult.Success(MenuUpdate.Close)
+    }
+
+    private fun toggle(context: MenuActionContext): MenuActionResult {
+        val worldData = world(context.route) ?: return MenuActionResult.Rejected()
+        val targetUuid = uuid(context.route.payload[TARGET_UUID])
+            ?: return MenuActionResult.Rejected()
+        if (worldData.owner != context.player.uniqueId) {
+            context.player.sendMessage("§cオーナーのみ操作できます")
+            return MenuActionResult.Rejected()
+        }
+        val definition = context.payload[TOOL_ID]
+            ?.let { id -> definitions.firstOrNull { it.id == id } }
+            ?: return MenuActionResult.Rejected()
+        val next = !controller.isEnabled(worldData, targetUuid, definition.id)
+        controller.setEnabled(worldData, targetUuid, definition.id, next)
+        return MenuActionResult.Success(MenuUpdate.Refresh)
+    }
+
+    private fun createToolItem(
+        worldData: WorldData,
+        targetPlayerUuid: UUID,
+        definition: ToolPermissionDefinition,
+    ): ItemStack {
         val enabled = controller.isEnabled(worldData, targetPlayerUuid, definition.id)
         val item = ItemStack(definition.material)
         item.editMeta { meta ->
             meta.displayName(CCSystem.getAPI().getGuiElementService().name("§f${definition.displayName}"))
-            meta.lore(ChanponLore.build(listOf(
-                GuiLoreLine.Data(
-                    i18n("state_label"),
-                    i18n(if (enabled) "enabled" else "disabled"),
-                    if (enabled) "§a" else "§c"
+            meta.lore(
+                ChanponLore.build(
+                    listOf(
+                        GuiLoreLine.Data(
+                            i18n("state_label"),
+                            i18n(if (enabled) "enabled" else "disabled"),
+                            if (enabled) "§a" else "§c",
+                        ),
+                        GuiLoreLine.SingleAction(
+                            i18n("toggle_operation"),
+                            i18n("toggle_action"),
+                            i18n("toggle_resolved"),
+                        ),
+                    ),
                 ),
-                GuiLoreLine.SingleAction(
-                    i18n("toggle_operation"),
-                    i18n("toggle_action"),
-                    i18n("toggle_resolved")
-                )
-            )))
+            )
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         }
         if (enabled) item.addUnsafeEnchantment(Enchantment.UNBREAKING, 1)
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
-        ItemTag.setExtensionId(item, EXTENSION_ID)
-        ItemTag.setString(item, "chanpon_action", "toggle_tool")
-        ItemTag.setString(item, "chanpon_tool", definition.id)
         return item
     }
 
-    private fun i18n(key: String): String {
-        return CCSystem.getAPI().getI18nString(null, "chanpon.member_lore.permission_menu.$key")
+    private fun backItem(): ItemStack =
+        ItemStack(Material.REDSTONE).also { item ->
+            item.editMeta { meta ->
+                meta.displayName(CCSystem.getAPI().getGuiElementService().name("§7戻る"))
+            }
+        }
+
+    private fun world(route: MenuRoute): WorldData? =
+        uuid(route.payload[WORLD_UUID])
+            ?.let { MyWorldManagerApi.getWorldRepository()?.findByUuid(it) }
+
+    private fun uuid(value: String?): UUID? =
+        value?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+
+    private fun i18n(key: String): String =
+        CCSystem.getAPI().getI18nString(null, "chanpon.member_lore.permission_menu.$key")
+
+    companion object {
+        const val EXTENSION_ID = "chanpon.tool_permissions"
+        private const val OWNER = "mwm-chanpon"
+        private const val ROUTE = "mwm-chanpon:tool-permissions"
+        private const val ACTION_BACK = "back"
+        private const val ACTION_TOGGLE = "toggle"
+        private const val WORLD_UUID = "world_uuid"
+        private const val TARGET_UUID = "target_uuid"
+        private const val TOOL_ID = "tool_id"
     }
 }
