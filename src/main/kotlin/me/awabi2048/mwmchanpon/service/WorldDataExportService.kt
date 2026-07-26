@@ -174,44 +174,7 @@ class WorldDataExportService(
     }
 
     private fun copyPrimaryWorld(source: Path, serverMainWorld: Path, target: Path) {
-        require(Files.isDirectory(source)) { "primary world directory is missing: $source" }
-        copyTree(source, target) { path ->
-            val relative = source.relativize(path)
-            val first = relative.iterator().asSequence().firstOrNull()?.toString()
-            path.fileName?.toString() !in ROOT_EXCLUDED_FILES &&
-                first !in SERVER_MAIN_DATA_PATHS
-        }
-        SERVER_MAIN_DATA_PATHS.forEach { name ->
-            val sourcePath = serverMainWorld.resolve(name)
-            val targetPath = target.resolve(name)
-            if (Files.isDirectory(sourcePath)) {
-                copyTree(sourcePath, targetPath)
-            } else if (Files.isRegularFile(sourcePath)) {
-                Files.copy(
-                    sourcePath,
-                    targetPath,
-                    StandardCopyOption.REPLACE_EXISTING,
-                    StandardCopyOption.COPY_ATTRIBUTES,
-                )
-            }
-        }
-        if (!Files.isRegularFile(target.resolve("level.dat"))) {
-            Files.copy(
-                serverMainWorld.resolve("level.dat"),
-                target.resolve("level.dat"),
-                StandardCopyOption.REPLACE_EXISTING,
-                StandardCopyOption.COPY_ATTRIBUTES
-            )
-            val oldLevelData = serverMainWorld.resolve("level.dat_old")
-            if (Files.isRegularFile(oldLevelData)) {
-                Files.copy(
-                    oldLevelData,
-                    target.resolve("level.dat_old"),
-                    StandardCopyOption.REPLACE_EXISTING,
-                    StandardCopyOption.COPY_ATTRIBUTES
-                )
-            }
-        }
+        StandalonePrimaryWorldAssembler.copy(source, serverMainWorld, target)
     }
 
     private fun writeDimensions(
@@ -384,8 +347,6 @@ class WorldDataExportService(
     }
 
     companion object {
-        private val ROOT_EXCLUDED_FILES = setOf("session.lock", "uid.dat")
-        private val SERVER_MAIN_DATA_PATHS = setOf("level.dat", "level.dat_old", "data")
         private val DIMENSION_DIRECTORIES = listOf("region", "entities", "poi")
     }
 }
