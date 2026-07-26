@@ -1,6 +1,5 @@
 # Phase 1以降で削減する既存違反の完全な一時許可リスト。
 CREATE_INVENTORY|1|src/main/kotlin/me/awabi2048/mwmchanpon/extension/ProductionToggleExtension.kt
-CREATE_INVENTORY|1|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponAdminWorldListMenu.kt
 CREATE_INVENTORY|1|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponDiscoveryMenuProvider.kt
 CREATE_INVENTORY|1|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponPlayerWorldMenuProvider.kt
 CREATE_INVENTORY|1|src/main/kotlin/me/awabi2048/mwmchanpon/ui/SubmittedWorldMenuProvider.kt
@@ -16,7 +15,6 @@ DIALOG_CREATE|2|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponEnvironmentGui
 INVENTORY_CLICK_EVENT|2|src/main/kotlin/me/awabi2048/mwmchanpon/extension/LinkedPortalMenuExtension.kt
 INVENTORY_CLICK_EVENT|2|src/main/kotlin/me/awabi2048/mwmchanpon/extension/ToolPermissionMenuExtension.kt
 INVENTORY_CLICK_EVENT|2|src/main/kotlin/me/awabi2048/mwmchanpon/listener/ToolPermissionMenuListener.kt
-INVENTORY_CLICK_EVENT|2|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponAdminWorldListMenu.kt
 INVENTORY_CLICK_EVENT|2|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponCreationConfirmationMenuProvider.kt
 INVENTORY_CLICK_EVENT|2|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponDiscoveryMenuProvider.kt
 INVENTORY_CLICK_EVENT|2|src/main/kotlin/me/awabi2048/mwmchanpon/ui/SubmittedWorldMenuProvider.kt
