@@ -1,18 +1,24 @@
 package me.awabi2048.mwmchanpon.ui
-import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiCycle
-import com.awabi2048.ccsystem.api.gui.GuiCycleDirection
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
+import com.awabi2048.ccsystem.api.gui.InventoryMenuView
+import com.awabi2048.ccsystem.api.gui.MenuActionContext
+import com.awabi2048.ccsystem.api.gui.MenuActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuElement
+import com.awabi2048.ccsystem.api.gui.MenuRoute
+import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
-import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.storage.SubmissionState
@@ -20,18 +26,12 @@ import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.util.GuiLoreActions
-import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
 import org.bukkit.GameMode
 import org.bukkit.Material
 import org.bukkit.entity.Player
-import org.bukkit.event.EventHandler
-import org.bukkit.event.Listener
 import org.bukkit.event.inventory.ClickType
-import org.bukkit.event.inventory.InventoryClickEvent
-import org.bukkit.inventory.Inventory
-import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 
@@ -41,8 +41,53 @@ class SubmissionAdminMenu(
     private val globalStorage: ChanponGlobalStorage,
     private val protectionService: SubmittedWorldProtectionService,
     private val toolPermissionController: ToolPermissionController
-) : Listener {
+) {
+    private val runtime = CCSystem.getAPI().getMenuRuntimeService()
     private var parentMenuOpener: ((Player) -> Unit)? = null
+
+    init {
+        runtime.register(
+            InventoryMenuDefinition(
+                owner = OWNER,
+                id = ROUTE_LIST,
+                renderer = { context -> renderList(context.player, context.route) },
+                actions = mapOf(
+                    ACTION_BACK to MenuActionHandler(::back),
+                    ACTION_PAGE to MenuActionHandler(::changePage),
+                    ACTION_PROGRESS_FILTER to MenuActionHandler(::cycleProgressFilter),
+                    ACTION_SORT to MenuActionHandler(::cycleSort),
+                    ACTION_CLOSE_SUBMISSIONS to MenuActionHandler(::toggleSubmissionClosure),
+                    ACTION_WORLD to MenuActionHandler(::handleWorldAction),
+                ),
+            ),
+        )
+        runtime.register(
+            InventoryMenuDefinition(
+                owner = OWNER,
+                id = ROUTE_CLOSE_CONFIRM,
+                renderer = { context -> renderCloseSubmissionConfirmation(context.player) },
+                actions = confirmationActions(ACTION_CONFIRM_CLOSE, ::confirmCloseSubmissions),
+            ),
+        )
+        runtime.register(
+            InventoryMenuDefinition(
+                owner = OWNER,
+                id = ROUTE_PRODUCTION_CONFIRM,
+                renderer = { context ->
+                    renderProductionToggleConfirmation(context.player, context.route)
+                },
+                actions = confirmationActions(ACTION_CONFIRM_PRODUCTION, ::confirmProductionToggle),
+            ),
+        )
+        runtime.register(
+            InventoryMenuDefinition(
+                owner = OWNER,
+                id = ROUTE_COMPLETE_CONFIRM,
+                renderer = { context -> renderCompleteConfirmation(context.player) },
+                actions = confirmationActions(ACTION_CONFIRM_COMPLETE, ::confirmCompleteUnsubmitted),
+            ),
+        )
+    }
 
     fun setParentMenuOpener(opener: (Player) -> Unit) {
         parentMenuOpener = opener
@@ -59,154 +104,187 @@ class SubmissionAdminMenu(
             return
         }
         JavaPluginBridge.endCoreMenuSession(player)
+        runtime.open(player, listRoute(SubmissionViewState(page, progressFilter, sortType)))
+    }
 
-        val worlds = filteredWorlds(progressFilter, sortType)
+    private fun renderList(player: Player, route: MenuRoute): InventoryMenuView {
+        val requested = state(route)
+        val worlds = filteredWorlds(requested.progressFilter, requested.sortType)
         val totalPages = if (worlds.isEmpty()) 1 else (worlds.size + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE
-        val safePage = page.coerceIn(0, totalPages - 1)
-        val holder = SubmissionAdminMenuHolder(safePage, progressFilter, sortType)
+        val safePage = requested.page.coerceIn(0, totalPages - 1)
+        val current = requested.copy(page = safePage)
         val layout = ChanponGuiElements.pagedListLayout()
-        val inventory = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "admin_menu.title"))
-        holder.inv = inventory
-
-        ChanponGuiElements.applyStandardFrame(inventory)
-        ChanponGuiElements.fill(inventory)
-
-        ChanponGuiElements.setPagedListNavigation(
-            inventory,
-            if (safePage > 0) navItem(player, false, safePage - 1) else null,
-            if (safePage < totalPages - 1) navItem(player, true, safePage + 1) else null,
-            backItem(player),
-            statsItem(player)
-        )
-
+        val elements = mutableListOf<MenuElement>()
+        if (safePage > 0) {
+            elements += MenuElement(
+                layout.previousPageSlot,
+                navItem(player, false),
+                GuiElementRole.NAVIGATION,
+                ACTION_PAGE,
+                statePayload(current.copy(page = safePage - 1)),
+            )
+        }
+        if (safePage < totalPages - 1) {
+            elements += MenuElement(
+                layout.nextPageSlot,
+                navItem(player, true),
+                GuiElementRole.NAVIGATION,
+                ACTION_PAGE,
+                statePayload(current.copy(page = safePage + 1)),
+            )
+        }
+        elements += MenuElement(layout.backSlot, backItem(player), GuiElementRole.BACK, ACTION_BACK)
+        elements += MenuElement(layout.infoSlot, statsItem(player), GuiElementRole.CONTENT)
         worlds.drop(safePage * ITEMS_PER_PAGE)
             .take(ITEMS_PER_PAGE)
             .forEachIndexed { index, worldData ->
-                inventory.setItem(layout.itemSlots[index], worldItem(player, worldData))
+                elements += MenuElement(
+                    layout.itemSlots[index],
+                    worldItem(player, worldData),
+                    GuiElementRole.ACTION,
+                    ACTION_WORLD,
+                    statePayload(current) + (WORLD_UUID to worldData.uuid.toString()),
+                )
             }
-
-        inventory.setItem(47, progressFilterItem(player, progressFilter))
-        inventory.setItem(51, sortItem(player, sortType))
-        inventory.setItem(52, closeSubmissionItem(player))
-
-        ManagedMenuPresenter.open(player, inventory)
+        elements += MenuElement(
+            47,
+            progressFilterItem(player, current.progressFilter),
+            GuiElementRole.ACTION,
+            ACTION_PROGRESS_FILTER,
+        )
+        elements += MenuElement(
+            51,
+            sortItem(player, current.sortType),
+            GuiElementRole.ACTION,
+            ACTION_SORT,
+        )
+        elements += MenuElement(
+            52,
+            closeSubmissionItem(player),
+            GuiElementRole.ACTION,
+            ACTION_CLOSE_SUBMISSIONS,
+        )
+        return InventoryMenuView(
+            layout.size,
+            i18nComponent(player, "admin_menu.title"),
+            elements,
+        )
     }
 
-    @EventHandler
-    fun onClick(event: InventoryClickEvent) {
-        val player = event.whoClicked as? Player ?: return
-        val holder = event.view.topInventory.holder as? SubmissionAdminMenuHolder ?: return
-        event.cancelWithDebug("SubmissionAdminMenu.onClick: menu_click")
-        if (event.clickedInventory != event.view.topInventory) return
+    private fun back(context: MenuActionContext): MenuActionResult {
+        val opener = parentMenuOpener ?: return MenuActionResult.Success(MenuUpdate.Back)
+        Bukkit.getScheduler().runTask(plugin, Runnable { opener(context.player) })
+        return MenuActionResult.Success(MenuUpdate.Close)
+    }
 
-        val item = event.currentItem ?: return
-        when (ItemTag.getType(item)) {
-            ItemTag.TYPE_GUI_RETURN -> {
-                if (!mwm().menuRouteHistory.openPrevious(player)) {
-                    parentMenuOpener?.invoke(player) ?: ManagedMenuPresenter.close(player)
-                }
-            }
-            ItemTag.TYPE_GUI_NAV_PREV, ItemTag.TYPE_GUI_NAV_NEXT -> {
-                val page = ItemTag.getTargetPage(item) ?: holder.page
-                open(player, page, holder.progressFilter, holder.sortType)
-            }
-            TYPE_MENU_CONTROL -> handleControlItem(
-                player,
-                holder,
-                item,
-                GuiCycle.direction(event.click) ?: return
-            )
-            ItemTag.TYPE_GUI_WORLD_ITEM -> handleWorldItem(player, holder, item, event.click)
+    private fun changePage(context: MenuActionContext): MenuActionResult =
+        MenuActionResult.Success(MenuUpdate.Replace(listRoute(state(context.payload))))
+
+    private fun cycleProgressFilter(context: MenuActionContext): MenuActionResult {
+        val direction = GuiCycle.direction(context.click) ?: return MenuActionResult.Ignored
+        val current = state(context.route)
+        return MenuActionResult.Success(
+            MenuUpdate.Replace(
+                listRoute(
+                    current.copy(
+                        page = 0,
+                        progressFilter = GuiCycle.select(
+                            current.progressFilter,
+                            ProgressFilter.entries,
+                            direction,
+                        ),
+                    ),
+                ),
+            ),
+        )
+    }
+
+    private fun cycleSort(context: MenuActionContext): MenuActionResult {
+        val direction = GuiCycle.direction(context.click) ?: return MenuActionResult.Ignored
+        val current = state(context.route)
+        return MenuActionResult.Success(
+            MenuUpdate.Replace(
+                listRoute(
+                    current.copy(
+                        page = 0,
+                        sortType = GuiCycle.select(current.sortType, SortType.entries, direction),
+                    ),
+                ),
+            ),
+        )
+    }
+
+    private fun toggleSubmissionClosure(context: MenuActionContext): MenuActionResult {
+        if (plugin.isSubmissionClosed()) {
+            plugin.config.set("submission.closed", false)
+            plugin.saveConfig()
+            context.player.sendMessage(i18nComponent(context.player, "admin_menu.reopened_message"))
+            return MenuActionResult.Success(MenuUpdate.Refresh)
         }
+        return MenuActionResult.Success(
+            MenuUpdate.Navigate(
+                MenuRoute(OWNER, ROUTE_CLOSE_CONFIRM, statePayload(state(context.route))),
+            ),
+        )
     }
 
-    private fun handleControlItem(
+    private fun handleWorldAction(context: MenuActionContext): MenuActionResult {
+        val worldUuid = context.payload[WORLD_UUID]
+            ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+            ?: return MenuActionResult.Rejected()
+        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
+            ?: return MenuActionResult.Rejected()
+        val current = state(context.route)
+        if (context.click == ClickType.MIDDLE) {
+            if (!canToggleProduction(context.player)) return MenuActionResult.Rejected()
+            val enabling = !storage.isProductionWorld(worldUuid)
+            return MenuActionResult.Success(
+                MenuUpdate.Navigate(
+                    MenuRoute(
+                        OWNER,
+                        ROUTE_PRODUCTION_CONFIRM,
+                        statePayload(current) + mapOf(
+                            WORLD_UUID to worldUuid.toString(),
+                            ENABLING to enabling.toString(),
+                        ),
+                    ),
+                ),
+            )
+        }
+        if (context.click.isRightClick) {
+            if (context.player.gameMode != GameMode.CREATIVE) return MenuActionResult.Rejected()
+            return when (stateFor(worldData)) {
+                SubmissionState.COMPLETED ->
+                    unmarkCompleted(context.player, worldData, current)
+                SubmissionState.SUBMITTED ->
+                    markCompleted(context.player, worldData, current)
+                SubmissionState.UNSUBMITTED -> MenuActionResult.Success(
+                    MenuUpdate.Navigate(
+                        MenuRoute(
+                            OWNER,
+                            ROUTE_COMPLETE_CONFIRM,
+                            statePayload(current) + (WORLD_UUID to worldUuid.toString()),
+                        ),
+                    ),
+                )
+            }
+        }
+        if (!context.click.isLeftClick) return MenuActionResult.Ignored
+        MyWorldManagerApi.getWorldService()?.teleportToWorld(context.player, worldUuid)
+        return MenuActionResult.Success(MenuUpdate.Close)
+    }
+
+    private fun markCompleted(
         player: Player,
-        holder: SubmissionAdminMenuHolder,
-        item: ItemStack,
-        direction: GuiCycleDirection
-    ) {
-        when (ItemTag.getString(item, ACTION_KEY)) {
-            ACTION_PROGRESS_FILTER -> open(
-                player,
-                0,
-                GuiCycle.select(holder.progressFilter, ProgressFilter.entries, direction),
-                holder.sortType
-            )
-            ACTION_SORT -> open(
-                player,
-                0,
-                holder.progressFilter,
-                GuiCycle.select(holder.sortType, SortType.entries, direction)
-            )
-            ACTION_CLOSE_SUBMISSIONS -> {
-                if (plugin.isSubmissionClosed()) {
-                    plugin.config.set("submission.closed", false)
-                    plugin.saveConfig()
-                    player.sendMessage(i18nComponent(player, "admin_menu.reopened_message"))
-                    open(player, holder.page, holder.progressFilter, holder.sortType)
-                } else {
-                    openCloseSubmissionConfirmation(player, holder)
-                }
-            }
-        }
-    }
-
-    @EventHandler
-    fun onCloseSubmissionConfirmationClick(event: InventoryClickEvent) {
-        val player = event.whoClicked as? Player ?: return
-        val holder = event.view.topInventory.holder as? CloseSubmissionConfirmationHolder ?: return
-        event.cancelWithDebug("SubmissionAdminMenu.onCloseSubmissionConfirmationClick: confirm_click")
-        if (event.clickedInventory != event.view.topInventory) return
-
-        when (ItemTag.getType(event.currentItem ?: return)) {
-            ItemTag.TYPE_GUI_CONFIRM -> {
-                plugin.config.set("submission.closed", true)
-                plugin.saveConfig()
-                player.sendMessage(i18nComponent(player, "admin_menu.closed_message"))
-                open(player, holder.page, holder.progressFilter, holder.sortType)
-            }
-            ItemTag.TYPE_GUI_CANCEL -> open(player, holder.page, holder.progressFilter, holder.sortType)
-        }
-    }
-
-    private fun handleWorldItem(
-        player: Player,
-        holder: SubmissionAdminMenuHolder,
-        item: ItemStack,
-        clickType: ClickType
-    ) {
-        val worldUuid = ItemTag.getWorldUuid(item) ?: return
-        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
-
-        if (clickType == ClickType.MIDDLE) {
-            openProductionToggleConfirmation(player, worldData, holder)
-            return
-        }
-
-        if (clickType.isRightClick) {
-            if (player.gameMode != GameMode.CREATIVE) return
-            val state = stateFor(worldData)
-            when (state) {
-                SubmissionState.COMPLETED -> unmarkCompleted(player, worldData, holder)
-                SubmissionState.UNSUBMITTED -> openCompleteUnsubmittedConfirmation(player, worldData, holder)
-                SubmissionState.SUBMITTED -> markCompleted(player, worldData, holder)
-            }
-            return
-        }
-
-        if (!clickType.isLeftClick) return
-        MyWorldManagerApi.getWorldService()?.teleportToWorld(player, worldData.uuid)
-        ManagedMenuPresenter.close(player)
-    }
-
-    private fun markCompleted(player: Player, worldData: WorldData, holder: SubmissionAdminMenuHolder) {
+        worldData: WorldData,
+        source: SubmissionViewState,
+    ): MenuActionResult {
         val current = stateFor(worldData)
-        if (current == SubmissionState.COMPLETED) return
+        if (current == SubmissionState.COMPLETED) return MenuActionResult.Rejected()
 
         if (!storage.isProductionWorld(worldData.uuid)) {
             player.sendMessage(i18nComponent(player, "admin_menu.not_production"))
-            return
+            return MenuActionResult.Rejected()
         }
         storage.setSubmissionState(
             worldData.uuid,
@@ -218,12 +296,16 @@ class SubmissionAdminMenu(
         protectionService.sync(worldData)
         toolPermissionController.syncWorld(worldData)
         player.sendMessage(i18nComponent(player, "admin_menu.completed_message"))
-        open(player, holder.page, holder.progressFilter, holder.sortType)
+        return MenuActionResult.Success(MenuUpdate.Replace(listRoute(source)))
     }
 
-    private fun unmarkCompleted(player: Player, worldData: WorldData, holder: SubmissionAdminMenuHolder) {
+    private fun unmarkCompleted(
+        player: Player,
+        worldData: WorldData,
+        source: SubmissionViewState,
+    ): MenuActionResult {
         val current = stateFor(worldData)
-        if (current != SubmissionState.COMPLETED) return
+        if (current != SubmissionState.COMPLETED) return MenuActionResult.Rejected()
 
         storage.setSubmissionState(
             worldData.uuid,
@@ -235,7 +317,7 @@ class SubmissionAdminMenu(
         protectionService.sync(worldData)
         toolPermissionController.syncWorld(worldData)
         player.sendMessage(i18nComponent(player, "admin_menu.unmarked_message"))
-        open(player, holder.page, holder.progressFilter, holder.sortType)
+        return MenuActionResult.Success(MenuUpdate.Replace(listRoute(source)))
     }
 
     private fun filteredWorlds(
@@ -302,97 +384,125 @@ class SubmissionAdminMenu(
             )
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
         return item
     }
 
-    private fun openCloseSubmissionConfirmation(player: Player, source: SubmissionAdminMenuHolder) {
-        val holder = CloseSubmissionConfirmationHolder(source.page, source.progressFilter, source.sortType)
-        val layout = ChanponGuiElements.confirmationLayout()
-        val inventory = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "confirm.close_submissions.title"))
-        holder.inv = inventory
-
-        applyConfirmationFrame(inventory)
-        ChanponGuiElements.setConfirmationItems(
-            inventory,
+    private fun renderCloseSubmissionConfirmation(player: Player): InventoryMenuView =
+        confirmationView(
+            player,
+            "confirm.close_submissions.title",
             closeSubmissionConfirmationItem(player),
-            confirmButton(player, true),
-            confirmButton(player, false)
+            ACTION_CONFIRM_CLOSE,
         )
-        ManagedMenuPresenter.open(player, inventory)
-    }
 
-    private fun openProductionToggleConfirmation(player: Player, worldData: WorldData, source: SubmissionAdminMenuHolder) {
-        if (!canToggleProduction(player)) return
-        val enabling = !storage.isProductionWorld(worldData.uuid)
-        val holder = ProductionToggleConfirmationHolder(worldData.uuid, enabling, source.page, source.progressFilter, source.sortType)
+    private fun renderProductionToggleConfirmation(
+        player: Player,
+        route: MenuRoute,
+    ): InventoryMenuView {
+        val enabling = route.payload[ENABLING]?.toBooleanStrictOrNull()
+            ?: error("本番用ワールド切替方向がありません")
         val key = if (enabling) "confirm.set_production" else "confirm.unset_production"
-        val layout = ChanponGuiElements.confirmationLayout()
-        val inventory = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "$key.title"))
-        holder.inv = inventory
-        applyConfirmationFrame(inventory)
-        ChanponGuiElements.setConfirmationItems(
-            inventory,
+        return confirmationView(
+            player,
+            "$key.title",
             productionToggleConfirmationItem(player, key),
-            confirmButton(player, true),
-            confirmButton(player, false)
+            ACTION_CONFIRM_PRODUCTION,
         )
-        ManagedMenuPresenter.open(player, inventory)
     }
 
-    private fun openCompleteUnsubmittedConfirmation(player: Player, worldData: WorldData, source: SubmissionAdminMenuHolder) {
-        val holder = CompleteUnsubmittedConfirmationHolder(worldData.uuid, source.page, source.progressFilter, source.sortType)
-        val layout = ChanponGuiElements.confirmationLayout()
-        val inventory = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "confirm.complete_unsubmitted.title"))
-        holder.inv = inventory
-        applyConfirmationFrame(inventory)
-        ChanponGuiElements.setConfirmationItems(
-            inventory,
+    private fun renderCompleteConfirmation(player: Player): InventoryMenuView =
+        confirmationView(
+            player,
+            "confirm.complete_unsubmitted.title",
             completeUnsubmittedConfirmationItem(player),
-            confirmButton(player, true),
-            confirmButton(player, false)
+            ACTION_CONFIRM_COMPLETE,
         )
-        ManagedMenuPresenter.open(player, inventory)
+
+    private fun confirmationView(
+        player: Player,
+        titleKey: String,
+        preview: ItemStack,
+        confirmAction: String,
+    ): InventoryMenuView {
+        val layout = ChanponGuiElements.confirmationLayout()
+        return InventoryMenuView(
+            layout.size,
+            i18nComponent(player, titleKey),
+            listOf(
+                MenuElement(layout.previewSlot, preview, GuiElementRole.CONTENT),
+                MenuElement(
+                    layout.confirmSlot,
+                    confirmButton(player, true),
+                    GuiElementRole.CONFIRM,
+                    confirmAction,
+                ),
+                MenuElement(
+                    layout.cancelSlot,
+                    confirmButton(player, false),
+                    GuiElementRole.CANCEL,
+                    ACTION_CANCEL,
+                ),
+            ),
+        )
     }
 
-    @EventHandler
-    fun onProductionToggleConfirmationClick(event: InventoryClickEvent) {
-        val player = event.whoClicked as? Player ?: return
-        val holder = event.view.topInventory.holder as? ProductionToggleConfirmationHolder ?: return
-        event.cancelWithDebug("SubmissionAdminMenu.onProductionToggleConfirmationClick: confirm_click")
-        if (event.clickedInventory != event.view.topInventory) return
-        when (ItemTag.getType(event.currentItem ?: return)) {
-            ItemTag.TYPE_GUI_CANCEL -> open(player, holder.page, holder.progressFilter, holder.sortType)
-            ItemTag.TYPE_GUI_CONFIRM -> {
-                if (!canToggleProduction(player)) return
-                val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(holder.worldUuid) ?: return
-                if (holder.enabling && ownerHasProductionWorld(worldData.owner, worldData.uuid)) {
-                    player.sendMessage(i18nComponent(player, "admin_menu.production_limit"))
-                    open(player, holder.page, holder.progressFilter, holder.sortType)
-                    return
-                }
-                storage.setProductionWorld(worldData.uuid, holder.enabling)
-                if (holder.enabling) applyForcedTags(worldData)
-                protectionService.sync(worldData)
-                toolPermissionController.syncWorld(worldData)
-                player.sendMessage(i18nComponent(player, if (holder.enabling) "admin_menu.production_enabled" else "admin_menu.production_disabled"))
-                open(player, holder.page, holder.progressFilter, holder.sortType)
-            }
+    private fun confirmationActions(
+        confirmAction: String,
+        confirmHandler: (MenuActionContext) -> MenuActionResult,
+    ): Map<String, MenuActionHandler> = mapOf(
+        ACTION_CANCEL to MenuActionHandler { MenuActionResult.Success(MenuUpdate.Back) },
+        confirmAction to MenuActionHandler(confirmHandler),
+    )
+
+    private fun confirmCloseSubmissions(context: MenuActionContext): MenuActionResult {
+        plugin.config.set("submission.closed", true)
+        plugin.saveConfig()
+        context.player.sendMessage(i18nComponent(context.player, "admin_menu.closed_message"))
+        return MenuActionResult.Success(MenuUpdate.Back)
+    }
+
+    private fun confirmProductionToggle(context: MenuActionContext): MenuActionResult {
+        val player = context.player
+        if (!canToggleProduction(player)) return MenuActionResult.Rejected()
+        val worldUuid = context.route.payload[WORLD_UUID]
+            ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+            ?: return MenuActionResult.Rejected()
+        val enabling = context.route.payload[ENABLING]?.toBooleanStrictOrNull()
+            ?: return MenuActionResult.Rejected()
+        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
+            ?: return MenuActionResult.Rejected()
+        if (enabling && ownerHasProductionWorld(worldData.owner, worldUuid)) {
+            player.sendMessage(i18nComponent(player, "admin_menu.production_limit"))
+            return MenuActionResult.Rejected()
         }
+        storage.setProductionWorld(worldUuid, enabling)
+        if (enabling) applyForcedTags(worldData)
+        protectionService.sync(worldData)
+        toolPermissionController.syncWorld(worldData)
+        player.sendMessage(
+            i18nComponent(
+                player,
+                if (enabling) {
+                    "admin_menu.production_enabled"
+                } else {
+                    "admin_menu.production_disabled"
+                },
+            ),
+        )
+        return MenuActionResult.Success(MenuUpdate.Back)
     }
 
-    @EventHandler
-    fun onCompleteUnsubmittedConfirmationClick(event: InventoryClickEvent) {
-        val player = event.whoClicked as? Player ?: return
-        val holder = event.view.topInventory.holder as? CompleteUnsubmittedConfirmationHolder ?: return
-        event.cancelWithDebug("SubmissionAdminMenu.onCompleteUnsubmittedConfirmationClick: confirm_click")
-        if (event.clickedInventory != event.view.topInventory) return
-        when (ItemTag.getType(event.currentItem ?: return)) {
-            ItemTag.TYPE_GUI_CANCEL -> open(player, holder.page, holder.progressFilter, holder.sortType)
-            ItemTag.TYPE_GUI_CONFIRM -> {
-                val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(holder.worldUuid) ?: return
-                markCompleted(player, worldData, SubmissionAdminMenuHolder(holder.page, holder.progressFilter, holder.sortType))
-            }
+    private fun confirmCompleteUnsubmitted(context: MenuActionContext): MenuActionResult {
+        val worldUuid = context.route.payload[WORLD_UUID]
+            ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+            ?: return MenuActionResult.Rejected()
+        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
+            ?: return MenuActionResult.Rejected()
+        val result = markCompleted(context.player, worldData, state(context.route))
+        return if (result is MenuActionResult.Success) {
+            MenuActionResult.Success(MenuUpdate.Back)
+        } else {
+            result
         }
     }
 
@@ -404,8 +514,6 @@ class SubmissionAdminMenu(
             meta.lore(structuredLore(worldLore(player, worldData, state)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_WORLD_ITEM)
-        ItemTag.setWorldUuid(item, worldData.uuid)
         return item
     }
 
@@ -462,7 +570,6 @@ class SubmissionAdminMenu(
             meta.lore(ChanponLore.build(i18nList(player, "$key.lore").map(GuiLoreLine::Text)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
         return item
     }
 
@@ -473,7 +580,6 @@ class SubmissionAdminMenu(
             meta.lore(ChanponLore.build(i18nList(player, "confirm.complete_unsubmitted.lore").map(GuiLoreLine::Text)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
         return item
     }
 
@@ -521,14 +627,12 @@ class SubmissionAdminMenu(
         return Bukkit.getOfflinePlayer(uuid).name ?: fallback
     }
 
-    private fun navItem(player: Player, next: Boolean, targetPage: Int): ItemStack {
+    private fun navItem(player: Player, next: Boolean): ItemStack {
         val item = ItemStack(Material.ARROW)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, if (next) "admin_menu.next" else "admin_menu.prev"))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
-        ItemTag.tagItem(item, if (next) ItemTag.TYPE_GUI_NAV_NEXT else ItemTag.TYPE_GUI_NAV_PREV)
-        ItemTag.setTargetPage(item, targetPage)
         return item
     }
 
@@ -538,7 +642,6 @@ class SubmissionAdminMenu(
             meta.displayName(i18nComponent(player, "admin_menu.back.display"))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_RETURN)
         return item
     }
 
@@ -549,7 +652,6 @@ class SubmissionAdminMenu(
             "admin_menu.progress_filter.display",
             ProgressFilter.entries.map { it.key },
             filter.key,
-            ACTION_PROGRESS_FILTER
         )
     }
 
@@ -560,7 +662,6 @@ class SubmissionAdminMenu(
             "admin_menu.sort.display",
             SortType.entries.map { it.key },
             sortType.key,
-            ACTION_SORT
         )
     }
 
@@ -570,7 +671,6 @@ class SubmissionAdminMenu(
         displayKey: String,
         optionKeys: List<String>,
         selectedKey: String,
-        action: String
     ): ItemStack {
         val item = ItemStack(material)
         val lore = CCSystem.getAPI().getLoreService().render(
@@ -588,8 +688,6 @@ class SubmissionAdminMenu(
             meta.lore(lore)
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
-        ItemTag.tagItem(item, TYPE_MENU_CONTROL)
-        ItemTag.setString(item, ACTION_KEY, action)
         return item
     }
 
@@ -604,7 +702,6 @@ class SubmissionAdminMenu(
             if (plugin.isSubmissionClosed()) Material.BARRIER else Material.REDSTONE_BLOCK,
             "$key.display",
             "$key.lore",
-            ACTION_CLOSE_SUBMISSIONS
         )
     }
 
@@ -615,7 +712,6 @@ class SubmissionAdminMenu(
             meta.lore(ChanponLore.build(i18nList(player, "confirm.close_submissions.lore").map(GuiLoreLine::Text)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
         return item
     }
 
@@ -627,12 +723,7 @@ class SubmissionAdminMenu(
             meta.lore(ChanponLore.build(i18nList(player, "$key.lore").map(GuiLoreLine::Text)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
-        ItemTag.tagItem(item, if (confirm) ItemTag.TYPE_GUI_CONFIRM else ItemTag.TYPE_GUI_CANCEL)
         return item
-    }
-
-    private fun applyConfirmationFrame(inventory: Inventory) {
-        ChanponGuiElements.applyConfirmationFrame(inventory)
     }
 
     private fun extensionItem(
@@ -640,7 +731,6 @@ class SubmissionAdminMenu(
         material: Material,
         displayKey: String,
         loreKey: String,
-        action: String,
         placeholders: Map<String, Any> = emptyMap()
     ): ItemStack {
         val item = ItemStack(material)
@@ -649,8 +739,6 @@ class SubmissionAdminMenu(
             meta.lore(ChanponLore.build(i18nList(player, loreKey, placeholders).map(GuiLoreLine::Text)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
-        ItemTag.tagItem(item, TYPE_MENU_CONTROL)
-        ItemTag.setString(item, ACTION_KEY, action)
         return item
     }
 
@@ -690,44 +778,33 @@ class SubmissionAdminMenu(
         NAME_ASC("admin_menu.sort.name_asc")
     }
 
-    private class SubmissionAdminMenuHolder(
+    private data class SubmissionViewState(
         val page: Int,
         val progressFilter: ProgressFilter,
-        val sortType: SortType
-    ) : InventoryHolder {
-        lateinit var inv: Inventory
-        override fun getInventory(): Inventory = inv
-    }
+        val sortType: SortType,
+    )
 
-    private class CloseSubmissionConfirmationHolder(
-        val page: Int,
-        val progressFilter: ProgressFilter,
-        val sortType: SortType
-    ) : InventoryHolder {
-        lateinit var inv: Inventory
-        override fun getInventory(): Inventory = inv
-    }
+    private fun listRoute(state: SubmissionViewState): MenuRoute =
+        MenuRoute(OWNER, ROUTE_LIST, statePayload(state))
 
-    private class ProductionToggleConfirmationHolder(
-        val worldUuid: UUID,
-        val enabling: Boolean,
-        val page: Int,
-        val progressFilter: ProgressFilter,
-        val sortType: SortType
-    ) : InventoryHolder {
-        lateinit var inv: Inventory
-        override fun getInventory(): Inventory = inv
-    }
+    private fun state(route: MenuRoute): SubmissionViewState = state(route.payload)
 
-    private class CompleteUnsubmittedConfirmationHolder(
-        val worldUuid: UUID,
-        val page: Int,
-        val progressFilter: ProgressFilter,
-        val sortType: SortType
-    ) : InventoryHolder {
-        lateinit var inv: Inventory
-        override fun getInventory(): Inventory = inv
-    }
+    private fun state(payload: Map<String, String>): SubmissionViewState =
+        SubmissionViewState(
+            page = payload[PAGE]?.toIntOrNull() ?: 0,
+            progressFilter = payload[PROGRESS_FILTER]
+                ?.let { runCatching { ProgressFilter.valueOf(it) }.getOrNull() }
+                ?: ProgressFilter.ALL,
+            sortType = payload[SORT_TYPE]
+                ?.let { runCatching { SortType.valueOf(it) }.getOrNull() }
+                ?: SortType.CREATED_DESC,
+        )
+
+    private fun statePayload(state: SubmissionViewState): Map<String, String> = mapOf(
+        PAGE to state.page.toString(),
+        PROGRESS_FILTER to state.progressFilter.name,
+        SORT_TYPE to state.sortType.name,
+    )
 
     private object JavaPluginBridge {
         fun endCoreMenuSession(player: Player) {
@@ -738,11 +815,26 @@ class SubmissionAdminMenu(
 
     companion object {
         const val EXTENSION_ID = "chanpon.submission_admin_menu"
+        private const val OWNER = "mwm-chanpon"
+        private const val ROUTE_LIST = "submission-admin"
+        private const val ROUTE_CLOSE_CONFIRM = "submission-close-confirm"
+        private const val ROUTE_PRODUCTION_CONFIRM = "submission-production-confirm"
+        private const val ROUTE_COMPLETE_CONFIRM = "submission-complete-confirm"
         private const val ITEMS_PER_PAGE = 36
-        private const val TYPE_MENU_CONTROL = "chanpon_submission_admin_control"
-        private const val ACTION_KEY = "chanpon_action"
         private const val ACTION_PROGRESS_FILTER = "progress_filter"
         private const val ACTION_SORT = "sort"
         private const val ACTION_CLOSE_SUBMISSIONS = "close_submissions"
+        private const val ACTION_BACK = "back"
+        private const val ACTION_PAGE = "page"
+        private const val ACTION_WORLD = "world"
+        private const val ACTION_CANCEL = "cancel"
+        private const val ACTION_CONFIRM_CLOSE = "confirm-close"
+        private const val ACTION_CONFIRM_PRODUCTION = "confirm-production"
+        private const val ACTION_CONFIRM_COMPLETE = "confirm-complete"
+        private const val PAGE = "page"
+        private const val PROGRESS_FILTER = "progress-filter"
+        private const val SORT_TYPE = "sort-type"
+        private const val WORLD_UUID = "world-uuid"
+        private const val ENABLING = "enabling"
     }
 }
