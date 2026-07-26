@@ -233,6 +233,92 @@ class WorldBackupMenuExtension(
         }
     }
 
+    private fun executeOwnerBackup(player: Player, source: Holder, backupName: String) {
+        if (ownedProductionWorld(player, source.worldUuid) == null) return
+        if (automationService.isManualOperationBlocked(player)) {
+            player.sendMessage(i18nComponent(player, "message.manual_operation_blocked"))
+            open(player, source.worldUuid, source.page)
+            return
+        }
+        val remaining = backupService.ownerBackupCooldownRemainingSeconds(source.worldUuid)
+        if (remaining > 0) {
+            player.sendMessage(
+                i18nComponent(
+                    player,
+                    "message.owner_backup_cooldown",
+                    mapOf("remaining" to BackupDisplay.formatDuration(remaining)),
+                ),
+            )
+            open(player, source.worldUuid, source.page)
+            return
+        }
+        backupService.createOwnerWorldBackup(
+            source.worldUuid,
+            player.uniqueId,
+            player.name,
+            "owner_manual",
+            backupName,
+        ).thenAccept { result ->
+            Bukkit.getScheduler().runTask(plugin, Runnable {
+                if (result.status == BackupOperationStatus.SUCCESS) {
+                    player.sendMessage(i18nComponent(player, "message.backup_success"))
+                } else {
+                    val cooldown = result.message.removePrefix("cooldown:").toLongOrNull()
+                    if (cooldown != null) {
+                        player.sendMessage(
+                            i18nComponent(
+                                player,
+                                "message.owner_backup_cooldown",
+                                mapOf("remaining" to BackupDisplay.formatDuration(cooldown)),
+                            ),
+                        )
+                    } else {
+                        player.sendMessage(i18nComponent(player, "message.backup_failed"))
+                    }
+                }
+            })
+        }
+    }
+
+    private fun executeRestore(player: Player, backup: BackupEntry, source: Holder) {
+        if (ownedProductionWorld(player, source.worldUuid) == null) return
+        if (automationService.isManualOperationBlocked(player)) {
+            player.sendMessage(i18nComponent(player, "message.manual_operation_blocked"))
+            return
+        }
+        val rollbackCooldown =
+            backupService.manualRollbackCooldownRemainingSeconds(listOf(source.worldUuid))
+        if (rollbackCooldown > 0L) {
+            player.sendMessage(
+                i18nComponent(
+                    player,
+                    "message.rollback_cooldown",
+                    mapOf("remaining" to BackupDisplay.formatDuration(rollbackCooldown)),
+                ),
+            )
+            return
+        }
+        val preflightFailure = backupService.restorePreflightFailure(backup, listOf(source.worldUuid))
+        if (preflightFailure != null) {
+            player.sendMessage(
+                Component.text("理由: ${restoreReason(preflightFailure)}", NamedTextColor.RED),
+            )
+            return
+        }
+        manualRollbackService.schedule(
+            player,
+            { backupService.restoreWorldBackup(backup, source.worldUuid) },
+            { result ->
+                if (result.status == BackupOperationStatus.SUCCESS ||
+                    result.status == BackupOperationStatus.RECOVERED
+                ) {
+                    backupService.markManualRollbackExecuted(result.restoredWorlds)
+                }
+                sendRestoreResult(player, result)
+            },
+        )
+    }
+
     private fun sendRestoreResult(player: Player, result: RestoreOperationResult) {
         player.sendMessage(i18nComponent(player, "message.restore_${result.status.name.lowercase()}"))
         if (result.status == BackupOperationStatus.SUCCESS) return
@@ -294,35 +380,61 @@ class WorldBackupMenuExtension(
     }
 
     private fun openBackupConfirm(player: Player, source: Holder, backupName: String) {
-        val holder = BackupConfirmHolder(source.copy(), backupName)
-        val layout = me.awabi2048.mwmchanpon.ui.ChanponGuiElements.confirmationLayout()
-        val inv = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "confirm.owner_backup.title"))
-        holder.inv = inv
-        applyFrame(inv)
-        me.awabi2048.mwmchanpon.ui.ChanponGuiElements.setConfirmationItems(
-            inv,
-            centerItem(player, Material.CHEST, "confirm.owner_backup", mapOf("name" to backupName)),
-            button(player, true),
-            button(player, false)
+        val sourceSnapshot = source.copy()
+        CCSystem.getAPI().getMenuDialogService().show(
+            player,
+            MenuDialogRequest(
+                owner = "mwmchanpon",
+                id = "owner-backup-confirmation",
+                title = i18nComponent(player, "confirm.owner_backup.title"),
+                body = i18nList(
+                    player,
+                    "confirm.owner_backup.lore",
+                    mapOf("name" to backupName),
+                ).map(Component::text),
+                confirm = MenuDialogButton(
+                    Component.text(i18n(player, "confirm.button.confirm")),
+                    MenuDialogHandler { target, _ ->
+                        executeOwnerBackup(target, sourceSnapshot, backupName)
+                        MenuActionResult.Success(MenuUpdate.Close)
+                    },
+                ),
+                cancel = MenuDialogButton(
+                    Component.text(i18n(player, "confirm.button.cancel")),
+                    MenuDialogHandler { target, _ ->
+                        open(target, sourceSnapshot.worldUuid, sourceSnapshot.page)
+                        MenuActionResult.Success(MenuUpdate.Close)
+                    },
+                ),
+            ),
         )
-        fill(inv)
-        ManagedMenuPresenter.open(player, inv)
     }
 
     private fun openRestoreConfirm(player: Player, backup: BackupEntry, source: Holder) {
-        val holder = RestoreConfirmHolder(backup.id, source.copy())
-        val layout = me.awabi2048.mwmchanpon.ui.ChanponGuiElements.confirmationLayout()
-        val inv = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "confirm.restore.title"))
-        holder.inv = inv
-        applyFrame(inv)
-        me.awabi2048.mwmchanpon.ui.ChanponGuiElements.setConfirmationItems(
-            inv,
-            centerItem(player, Material.RECOVERY_COMPASS, "confirm.restore"),
-            button(player, true),
-            button(player, false)
+        val sourceSnapshot = source.copy()
+        CCSystem.getAPI().getMenuDialogService().show(
+            player,
+            MenuDialogRequest(
+                owner = "mwmchanpon",
+                id = "restore-confirmation",
+                title = i18nComponent(player, "confirm.restore.title"),
+                body = i18nList(player, "confirm.restore.lore").map(Component::text),
+                confirm = MenuDialogButton(
+                    Component.text(i18n(player, "confirm.button.confirm")),
+                    MenuDialogHandler { target, _ ->
+                        executeRestore(target, backup, sourceSnapshot)
+                        MenuActionResult.Success(MenuUpdate.Close)
+                    },
+                ),
+                cancel = MenuDialogButton(
+                    Component.text(i18n(player, "confirm.button.cancel")),
+                    MenuDialogHandler { target, _ ->
+                        open(target, sourceSnapshot.worldUuid, sourceSnapshot.page)
+                        MenuActionResult.Success(MenuUpdate.Close)
+                    },
+                ),
+            ),
         )
-        fill(inv)
-        ManagedMenuPresenter.open(player, inv)
     }
 
     private fun entryItem(player: Player, worldUuid: UUID): ItemStack {
