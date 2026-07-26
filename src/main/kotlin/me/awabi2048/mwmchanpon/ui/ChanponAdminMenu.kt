@@ -1,6 +1,4 @@
 package me.awabi2048.mwmchanpon.ui
-import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
-
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
@@ -12,24 +10,25 @@ import com.awabi2048.ccsystem.api.gui.GuiMenuIconOption
 import com.awabi2048.ccsystem.api.gui.GuiMenuIconSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
+import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
+import com.awabi2048.ccsystem.api.gui.InventoryMenuView
+import com.awabi2048.ccsystem.api.gui.MenuActionContext
+import com.awabi2048.ccsystem.api.gui.MenuActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuElement
+import com.awabi2048.ccsystem.api.gui.MenuRoute
+import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.storage.WorldCreationAvailability
 import me.awabi2048.mwmchanpon.protection.SpawnWorldProtectionService
-import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.AdminMenuProvider
 import me.awabi2048.myworldmanager.util.GuiLoreActions
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
-import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
-import org.bukkit.event.EventHandler
-import org.bukkit.event.Listener
-import org.bukkit.event.inventory.InventoryClickEvent
-import org.bukkit.inventory.Inventory
-import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 
@@ -41,137 +40,171 @@ class ChanponAdminMenu(
     private val worldDataManagementMenu: WorldDataManagementMenu,
     private val automationSettingsMenu: AutomationSettingsMenu,
     private val worldDataExportMenu: WorldDataExportMenu
-) : AdminMenuProvider, Listener {
+) : AdminMenuProvider {
+    private val runtime = CCSystem.getAPI().getMenuRuntimeService()
+
+    init {
+        runtime.register(
+            InventoryMenuDefinition(
+                OWNER,
+                ROUTE_MAIN,
+                renderer = { context -> renderMain(context.player) },
+                actions = mapOf(
+                    ACTION_SUBMISSION to MenuActionHandler { context ->
+                        openChild { submissionAdminMenu.open(context.player) }
+                    },
+                    ACTION_WORLD_DATA to MenuActionHandler { context ->
+                        openChild { worldDataManagementMenu.open(context.player) }
+                    },
+                    ACTION_AUTOMATION to MenuActionHandler { context ->
+                        openChild { automationSettingsMenu.open(context.player) }
+                    },
+                    ACTION_EXPORT to MenuActionHandler { context ->
+                        openChild { worldDataExportMenu.open(context.player) }
+                    },
+                    ACTION_SWITCH_MWM to MenuActionHandler { context ->
+                        mwm().adminCommandGui.open(context.player)
+                        MenuActionResult.Success(MenuUpdate.None)
+                    },
+                    ACTION_BUILDING_ALLOWED to MenuActionHandler(::toggleBuilding),
+                    ACTION_WORLD_CREATION to MenuActionHandler(::cycleWorldCreation),
+                    ACTION_SET_SPAWN_WORLD to MenuActionHandler(::showSpawnConfirmation),
+                ),
+            ),
+        )
+        runtime.register(
+            InventoryMenuDefinition(
+                OWNER,
+                ROUTE_SPAWN_CONFIRM,
+                renderer = { context -> renderSpawnConfirmation(context.player, context.route) },
+                actions = mapOf(
+                    ACTION_CONFIRM_SPAWN to MenuActionHandler(::confirmSpawn),
+                    ACTION_CANCEL_SPAWN to MenuActionHandler { MenuActionResult.Success(MenuUpdate.Back) },
+                ),
+            ),
+        )
+    }
     override fun getId(): String = PROVIDER_ID
 
     override fun getDisplayName(player: Player): String =
         i18n(player, "admin.provider_display")
 
     override fun open(player: Player) {
-        openInternal(player)
-    }
-
-    private fun openInternal(player: Player) {
         if (!player.hasPermission("mwmchanpon.admin")) {
             player.sendMessage(i18nComponent(player, "admin.no_permission"))
             return
         }
-        val holder = Holder()
-        val inventory = Bukkit.createInventory(holder, 45, i18nComponent(player, "admin.title"))
-        holder.inv = inventory
-        applyFrame(inventory)
-        inventory.setItem(19, menuItem(player, Material.LIME_BANNER, "admin.submission", ACTION_SUBMISSION))
-        inventory.setItem(21, menuItem(player, Material.CHEST, "admin.world_data", ACTION_WORLD_DATA))
-        inventory.setItem(23, menuItem(player, Material.CLOCK, "admin.automation", ACTION_AUTOMATION))
-        inventory.setItem(25, menuItem(player, Material.DISPENSER, "admin.export", ACTION_EXPORT))
-        inventory.setItem(
+        runtime.navigate(player, MenuRoute(OWNER, ROUTE_MAIN))
+    }
+
+    private fun renderMain(player: Player): InventoryMenuView {
+        val elements = mutableListOf(
+            MenuElement(19, menuItem(player, Material.LIME_BANNER, "admin.submission", ACTION_SUBMISSION), GuiElementRole.ACTION, ACTION_SUBMISSION),
+            MenuElement(21, menuItem(player, Material.CHEST, "admin.world_data", ACTION_WORLD_DATA), GuiElementRole.ACTION, ACTION_WORLD_DATA),
+            MenuElement(23, menuItem(player, Material.CLOCK, "admin.automation", ACTION_AUTOMATION), GuiElementRole.ACTION, ACTION_AUTOMATION),
+            MenuElement(25, menuItem(player, Material.DISPENSER, "admin.export", ACTION_EXPORT), GuiElementRole.ACTION, ACTION_EXPORT),
+            MenuElement(
             ChanponAdminMenuLayout.FOOTER_BUILDING_PERMISSION,
-            buildingPermissionItem(player)
-        )
-        inventory.setItem(
+            buildingPermissionItem(player),
+            GuiElementRole.ACTION,
+            ACTION_BUILDING_ALLOWED,
+            ),
+            MenuElement(
             ChanponAdminMenuLayout.FOOTER_WORLD_CREATION,
-            worldCreationAvailabilityItem(player)
-        )
-        inventory.setItem(
+            worldCreationAvailabilityItem(player),
+            GuiElementRole.ACTION,
+            ACTION_WORLD_CREATION,
+            ),
+            MenuElement(
             ChanponAdminMenuLayout.FOOTER_MAIN_SWITCH,
-            switchToMwmItem(player)
+            switchToMwmItem(player),
+            GuiElementRole.NAVIGATION,
+            ACTION_SWITCH_MWM,
+            ),
         )
         currentWorldUuid(player)?.let { worldUuid ->
-            inventory.setItem(
+            elements += MenuElement(
                 ChanponAdminMenuLayout.FOOTER_SPAWN_WORLD,
-                spawnWorldItem(player, worldUuid)
+                spawnWorldItem(player, worldUuid),
+                GuiElementRole.ACTION,
+                ACTION_SET_SPAWN_WORLD,
+                mapOf(WORLD_UUID to worldUuid.toString()),
             )
         }
-        fill(inventory)
-        ManagedMenuPresenter.open(player, inventory)
+        return InventoryMenuView(45, i18nComponent(player, "admin.title"), elements)
     }
 
-    @EventHandler
-    fun onClick(event: InventoryClickEvent) {
-        val player = event.whoClicked as? Player ?: return
-        val holder = event.view.topInventory.holder
-        if (holder !is Holder && holder !is SpawnConfirmHolder) return
-        event.cancelWithDebug("ChanponAdminMenu.onClick: menu_click")
-        if (event.clickedInventory != event.view.topInventory) return
-        val item = event.currentItem ?: return
-        when (holder) {
-            is Holder -> when (ItemTag.getString(item, ACTION_KEY)) {
-                ACTION_SUBMISSION -> openChild(player) { submissionAdminMenu.open(player) }
-                ACTION_WORLD_DATA -> openChild(player) { worldDataManagementMenu.open(player) }
-                ACTION_AUTOMATION -> openChild(player) { automationSettingsMenu.open(player) }
-                ACTION_EXPORT -> openChild(player) { worldDataExportMenu.open(player) }
-                ACTION_SWITCH_MWM -> mwm().adminCommandGui.open(player)
-                ACTION_BUILDING_ALLOWED -> {
-                    if (!event.isLeftClick && !event.isRightClick) return
-                    plugin.setBuildingAllowed(!globalStorage.isBuildingAllowed())
-                    open(player)
-                }
-                ACTION_WORLD_CREATION -> {
-                    val availability = GuiCycle.select(
-                        globalStorage.getWorldCreationAvailability(),
-                        WorldCreationAvailability.entries.toList(),
-                        GuiCycle.direction(event.click) ?: return
-                    )
-                    globalStorage.setWorldCreationAvailability(availability)
-                    open(player)
-                }
-                ACTION_SET_SPAWN_WORLD -> {
-                    val worldUuid = ItemTag.getWorldUuid(item) ?: return
-                    openSpawnConfirm(player, worldUuid)
-                }
-            }
-            is SpawnConfirmHolder -> when (ItemTag.getType(item)) {
-                ItemTag.TYPE_GUI_CONFIRM -> {
-                    globalStorage.setSpawnWorldUuid(holder.worldUuid)
-                    MyWorldManagerApi.getWorldRepository()?.findByUuid(holder.worldUuid)?.let { worldData ->
-                        if (!globalStorage.isSpawnPolicyInitialized(holder.worldUuid) && spawnProtection.applyDefaults(worldData)) {
-                            globalStorage.setSpawnPolicyInitialized(holder.worldUuid)
-                        }
-                    }
-                    player.sendMessage(i18nComponent(player, "spawn_world.set_success"))
-                    open(player)
-                }
-                ItemTag.TYPE_GUI_CANCEL -> open(player)
-            }
-        }
+    private fun toggleBuilding(context: MenuActionContext): MenuActionResult {
+        if (!context.click.isLeftClick && !context.click.isRightClick) return MenuActionResult.Ignored
+        plugin.setBuildingAllowed(!globalStorage.isBuildingAllowed())
+        return MenuActionResult.Success(MenuUpdate.Refresh)
     }
 
-    private fun openSpawnConfirm(player: Player, worldUuid: java.util.UUID) {
-        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
-        val holder = SpawnConfirmHolder(worldUuid)
+    private fun cycleWorldCreation(context: MenuActionContext): MenuActionResult {
+        val direction = GuiCycle.direction(context.click) ?: return MenuActionResult.Ignored
+        globalStorage.setWorldCreationAvailability(
+            GuiCycle.select(
+                globalStorage.getWorldCreationAvailability(),
+                WorldCreationAvailability.entries.toList(),
+                direction,
+            ),
+        )
+        return MenuActionResult.Success(MenuUpdate.Refresh)
+    }
+
+    private fun showSpawnConfirmation(context: MenuActionContext): MenuActionResult {
+        val worldUuid = context.payload[WORLD_UUID]
+            ?.let { runCatching { java.util.UUID.fromString(it) }.getOrNull() }
+            ?: return MenuActionResult.Rejected()
+        return MenuActionResult.Success(
+            MenuUpdate.Navigate(MenuRoute(OWNER, ROUTE_SPAWN_CONFIRM, mapOf(WORLD_UUID to worldUuid.toString()))),
+        )
+    }
+
+    private fun renderSpawnConfirmation(player: Player, route: MenuRoute): InventoryMenuView {
+        val worldUuid = route.payload[WORLD_UUID]
+            ?.let { runCatching { java.util.UUID.fromString(it) }.getOrNull() }
+            ?: error("スポーンワールドUUIDがありません")
+        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
+            ?: error("スポーンワールドが見つかりません: $worldUuid")
         val layout = ChanponGuiElements.confirmationLayout()
-        val inventory = Bukkit.createInventory(holder, layout.size, i18nComponent(player, "spawn_world.confirm.title"))
-        holder.inv = inventory
-        applyFrame(inventory)
-        ChanponGuiElements.setConfirmationItems(
-            inventory,
-            menuItem(player, Material.COMPASS, "spawn_world.confirm.center", ACTION_NONE).also {
+        return InventoryMenuView(
+            layout.size,
+            i18nComponent(player, "spawn_world.confirm.title"),
+            listOf(
+                MenuElement(layout.confirmSlot, confirmButton(player, true), GuiElementRole.CONFIRM, ACTION_CONFIRM_SPAWN),
+                MenuElement(
+                    layout.previewSlot,
+                    menuItem(player, Material.COMPASS, "spawn_world.confirm.center", ACTION_NONE).also {
                 it.editMeta { meta ->
                     meta.displayName(i18nComponent(player, "spawn_world.confirm.center.display", mapOf("world" to worldData.name)))
                     meta.lore(ChanponLore.build(i18nList(player, "spawn_world.confirm.center.lore", mapOf("world" to worldData.name)).map(GuiLoreLine::Text)))
                 }
             },
-            confirmButton(player, true),
-            confirmButton(player, false)
+                    GuiElementRole.CONTENT,
+                ),
+                MenuElement(layout.cancelSlot, confirmButton(player, false), GuiElementRole.CANCEL, ACTION_CANCEL_SPAWN),
+            ),
         )
-        fill(inventory)
-        ManagedMenuPresenter.open(player, inventory)
     }
 
-    private fun openChild(player: Player, opener: () -> Unit) {
-        mwm().menuRouteHistory.pushCustom(player, ROUTE_ADMIN_MENU) { target ->
-            open(target)
-            true
+    private fun confirmSpawn(context: MenuActionContext): MenuActionResult {
+        val worldUuid = context.route.payload[WORLD_UUID]
+            ?.let { runCatching { java.util.UUID.fromString(it) }.getOrNull() }
+            ?: return MenuActionResult.Rejected()
+        globalStorage.setSpawnWorldUuid(worldUuid)
+        MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)?.let { worldData ->
+            if (!globalStorage.isSpawnPolicyInitialized(worldUuid) && spawnProtection.applyDefaults(worldData)) {
+                globalStorage.setSpawnPolicyInitialized(worldUuid)
+            }
         }
+        context.player.sendMessage(i18nComponent(context.player, "spawn_world.set_success"))
+        return MenuActionResult.Success(MenuUpdate.Back)
+    }
+
+    private fun openChild(opener: () -> Unit): MenuActionResult {
         opener()
-    }
-
-    private fun applyFrame(inventory: Inventory) {
-        ChanponGuiElements.applyStandardFrame(inventory)
-    }
-
-    private fun fill(inventory: Inventory) {
-        ChanponGuiElements.fill(inventory)
+        return MenuActionResult.Success(MenuUpdate.None)
     }
 
     private fun menuItem(player: Player, material: Material, key: String, action: String): ItemStack {
@@ -358,17 +391,11 @@ class ChanponAdminMenu(
     private fun mwm(): me.awabi2048.myworldmanager.MyWorldManager =
         org.bukkit.plugin.java.JavaPlugin.getPlugin(me.awabi2048.myworldmanager.MyWorldManager::class.java)
 
-    private class Holder : InventoryHolder {
-        lateinit var inv: Inventory
-        override fun getInventory(): Inventory = inv
-    }
-
-    private class SpawnConfirmHolder(val worldUuid: java.util.UUID) : InventoryHolder {
-        lateinit var inv: Inventory
-        override fun getInventory(): Inventory = inv
-    }
-
     companion object {
+        private const val OWNER = "mwm-chanpon"
+        private const val ROUTE_MAIN = "admin"
+        private const val ROUTE_SPAWN_CONFIRM = "admin_spawn_confirm"
+        private const val WORLD_UUID = "world_uuid"
         private const val TYPE_CONTROL = "chanpon_admin_control"
         private const val ACTION_KEY = "chanpon_action"
         private const val ACTION_SUBMISSION = "submission"
@@ -380,7 +407,8 @@ class ChanponAdminMenu(
         private const val ACTION_WORLD_CREATION = "world_creation"
         private const val ACTION_SET_SPAWN_WORLD = "set_spawn_world"
         private const val ACTION_NONE = "none"
-        private const val ROUTE_ADMIN_MENU = "chanpon.admin_menu"
+        private const val ACTION_CONFIRM_SPAWN = "confirm_spawn"
+        private const val ACTION_CANCEL_SPAWN = "cancel_spawn"
         private const val PROVIDER_ID = "mwm-chanpon:admin_menu"
     }
 }
