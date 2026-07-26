@@ -283,7 +283,6 @@ class MWMChanponPlugin : JavaPlugin() {
         server.pluginManager.registerEvents(submissionAdminMenu, this)
         server.pluginManager.registerEvents(worldDataManagementMenu, this)
         server.pluginManager.registerEvents(backupListMenu, this)
-        server.pluginManager.registerEvents(automationSettingsMenu, this)
         server.pluginManager.registerEvents(chanponAdminWorldListMenu, this)
         server.pluginManager.registerEvents(submittedWorldMenuProvider, this)
         server.pluginManager.registerEvents(chanponWorldSettingsMenuProvider, this)
