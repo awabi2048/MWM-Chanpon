@@ -287,7 +287,6 @@ class MWMChanponPlugin : JavaPlugin() {
             command.tabCompleter = adminCommand
         }
         server.pluginManager.registerEvents(productionToggleExtension, this)
-        server.pluginManager.registerEvents(creationConfirmationMenuProvider, this)
         server.pluginManager.registerEvents(chanponWorldSettingsMenuProvider, this)
         if (server.pluginManager.isPluginEnabled("Chanpon-Utilities")) {
             server.pluginManager.registerEvents(FreecamWorldPolicyListener(chanponStorage), this)

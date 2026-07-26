@@ -1,45 +1,89 @@
 package me.awabi2048.mwmchanpon.ui
-import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
 
+import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
+import com.awabi2048.ccsystem.api.gui.InventoryMenuView
+import com.awabi2048.ccsystem.api.gui.MenuActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuElement
+import com.awabi2048.ccsystem.api.gui.MenuRoute
+import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import me.awabi2048.mwmchanpon.extension.ProductionToggleExtension
-import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.extension.CreationConfirmationMenuProvider
-import me.awabi2048.myworldmanager.gui.CreationGui
-import me.awabi2048.myworldmanager.gui.CreationGui.CreationMenuType
 import me.awabi2048.myworldmanager.session.WorldCreationSession
 import me.awabi2048.myworldmanager.session.WorldCreationType
 import me.awabi2048.myworldmanager.util.GuiHelper
 import me.awabi2048.myworldmanager.util.GuiItemFactory
 import me.awabi2048.myworldmanager.util.GuiLoreActions
 import me.awabi2048.myworldmanager.util.ItemTag
+import net.kyori.adventure.text.Component
 import org.bukkit.Material
 import org.bukkit.World
 import org.bukkit.entity.Player
-import org.bukkit.event.EventHandler
-import org.bukkit.event.Listener
-import org.bukkit.event.inventory.InventoryClickEvent
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
 
 class ChanponCreationConfirmationMenuProvider(
     private val productionToggle: ProductionToggleExtension
-) : CreationConfirmationMenuProvider, Listener {
+) : CreationConfirmationMenuProvider {
+    private val runtime = CCSystem.getAPI().getMenuRuntimeService()
+
+    init {
+        runtime.register(
+            InventoryMenuDefinition(
+                owner = RUNTIME_OWNER,
+                id = ROUTE_CONFIRMATION,
+                renderer = { context ->
+                    val session = mwm().creationSessionManager.getSession(context.player.uniqueId)
+                    if (session == null) {
+                        InventoryMenuView(9, Component.text("Creation"), emptyList())
+                    } else {
+                        render(context.player, session)
+                    }
+                },
+                actions = mapOf(
+                    ACTION_SELECT to MenuActionHandler { context ->
+                        val player = context.player
+                        val session = mwm().creationSessionManager.getSession(player.uniqueId)
+                            ?: return@MenuActionHandler MenuActionResult.Rejected()
+                        if (ItemTag.getExtensionId(context.item) == ProductionToggleExtension.EXTENSION_ID) {
+                            productionToggle.toggleCreationSelection(player, session)
+                            MenuActionResult.Success(MenuUpdate.Refresh)
+                        } else if (mwm().creationGuiListener.handleConfirmationClick(
+                                player,
+                                context.click,
+                                context.item,
+                            )
+                        ) {
+                            MenuActionResult.Success(MenuUpdate.None)
+                        } else {
+                            MenuActionResult.Ignored
+                        }
+                    },
+                ),
+            ),
+        )
+    }
 
     override fun getId(): String = PROVIDER_ID
 
     override fun open(player: Player, session: WorldCreationSession): Boolean {
+        runtime.open(player, MenuRoute(RUNTIME_OWNER, ROUTE_CONFIRMATION))
+        return true
+    }
+
+    private fun render(player: Player, session: WorldCreationSession): InventoryMenuView {
         val mwm = mwm()
         val lang = mwm.languageManager
-        val holder = CreationGui.CreationGuiHolder(CreationMenuType.CONFIRM)
         val title = GuiHelper.inventoryTitle(lang.getMessage(player, "gui.creation.title_confirm"))
-        val inventory = GuiHelper.createConfirmationInventory(holder, title)
-        holder.inv = inventory
-        GuiHelper.applyConfirmationFrame(inventory)
+        val layout = GuiHelper.confirmationLayout()
+        val elements = mutableListOf<MenuElement>()
 
         val cleanName = (session.worldName ?: lang.getMessage(player, "general.unknown"))
             .replace(Regex("\\s?\\(.*?\\)"), "")
@@ -89,76 +133,82 @@ class ChanponCreationConfirmationMenuProvider(
                 ))
             }
         }
-        GuiHelper.setConfirmationItems(
-            inventory,
+        elements += MenuElement(
+            layout.previewSlot,
             item(
                 Material.PAPER,
                 lang.getMessage(player, "gui.creation.confirm.name"),
                 ItemTag.TYPE_GUI_INFO,
                 GuiLoreSpec.Rich(infoLines, GuiLoreFrame.BOTH)
             ),
+            GuiElementRole.CONTENT,
+        )
+        elements += MenuElement(
+            layout.confirmSlot,
             item(
                 Material.LIME_CONCRETE,
                 lang.getMessage(player, "gui.common.confirm"),
                 ItemTag.TYPE_GUI_CONFIRM
             ),
+            GuiElementRole.CONFIRM,
+            ACTION_SELECT,
+        )
+        elements += MenuElement(
+            layout.cancelSlot,
             item(
                 Material.RED_CONCRETE,
                 lang.getMessage(player, "gui.common.cancel"),
                 ItemTag.TYPE_GUI_CANCEL
-            )
+            ),
+            GuiElementRole.CANCEL,
+            ACTION_SELECT,
         )
 
         when (session.creationType) {
             WorldCreationType.SEED -> {
-                inventory.setItem(39, dimensionItem(player, session))
-                inventory.setItem(40, productionToggle.createCreationItem(
-                    session.extras[ProductionToggleExtension.EXTRA_KEY] as? Boolean ?: false
-                ))
-                inventory.setItem(41, spawnItem(player, session))
+                elements += actionElement(39, dimensionItem(player, session))
+                elements += actionElement(
+                    40,
+                    productionToggle.createCreationItem(
+                        session.extras[ProductionToggleExtension.EXTRA_KEY] as? Boolean ?: false
+                    ),
+                )
+                elements += actionElement(41, spawnItem(player, session))
             }
             WorldCreationType.TEMPLATE -> {
-                inventory.setItem(38, item(
+                elements += actionElement(38, item(
                     Material.ENDER_EYE,
                     lang.getMessage(player, "gui.creation.template_detail.preview"),
                     ItemTag.TYPE_GUI_CREATION_TEMPLATE_PREVIEW
                 ))
-                inventory.setItem(39, item(
+                elements += actionElement(39, item(
                     Material.NAME_TAG,
                     lang.getMessage(player, "gui.creation.confirm.change_name"),
                     ItemTag.TYPE_GUI_BACK
                 ))
-                inventory.setItem(40, productionToggle.createCreationItem(
-                    session.extras[ProductionToggleExtension.EXTRA_KEY] as? Boolean ?: false
-                ))
-                inventory.setItem(41, item(
+                elements += actionElement(
+                    40,
+                    productionToggle.createCreationItem(
+                        session.extras[ProductionToggleExtension.EXTRA_KEY] as? Boolean ?: false
+                    ),
+                )
+                elements += actionElement(41, item(
                     Material.MAP,
                     lang.getMessage(player, "gui.creation.confirm.change_template"),
                     ItemTag.TYPE_GUI_CREATION_TEMPLATE_CHANGE
                 ))
             }
             WorldCreationType.RANDOM, null -> {
-                inventory.setItem(40, productionToggle.createCreationItem(
-                    session.extras[ProductionToggleExtension.EXTRA_KEY] as? Boolean ?: false
-                ))
+                elements += actionElement(
+                    40,
+                    productionToggle.createCreationItem(
+                        session.extras[ProductionToggleExtension.EXTRA_KEY] as? Boolean ?: false
+                    ),
+                )
             }
         }
 
-        mwm.soundManager.playMenuOpenSound(player, "creation")
-        ManagedMenuPresenter.open(player, inventory)
-        return true
-    }
-
-    @EventHandler(ignoreCancelled = false)
-    fun onClick(event: InventoryClickEvent) {
-        val player = event.whoClicked as? Player ?: return
-        if (event.view.topInventory.holder !is CreationGui.CreationGuiHolder) return
-        if (event.clickedInventory != event.view.topInventory) return
-        val clicked = event.currentItem ?: return
-        if (ItemTag.getExtensionId(clicked) != ProductionToggleExtension.EXTENSION_ID) return
-        event.cancelWithDebug("ChanponCreationConfirmationMenuProvider.onClick: production_toggle")
-        val session = mwm().creationSessionManager.getSession(player.uniqueId) ?: return
-        event.inventory.setItem(event.slot, productionToggle.toggleCreationSelection(player, session))
+        return InventoryMenuView(layout.size, title, elements)
     }
 
     private fun dimensionItem(player: Player, session: WorldCreationSession): ItemStack {
@@ -247,9 +297,15 @@ class ChanponCreationConfirmationMenuProvider(
         lore: GuiLoreSpec = GuiLoreSpec.None
     ): ItemStack = GuiItemFactory.item(material, name, lore, tag)
 
+    private fun actionElement(slot: Int, item: ItemStack): MenuElement =
+        MenuElement(slot, item, GuiElementRole.ACTION, ACTION_SELECT)
+
     private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)
 
     companion object {
         private const val PROVIDER_ID = "chanpon.creation_confirmation"
+        private const val RUNTIME_OWNER = "mwm-chanpon"
+        private const val ROUTE_CONFIRMATION = "creation-confirmation"
+        private const val ACTION_SELECT = "select"
     }
 }
