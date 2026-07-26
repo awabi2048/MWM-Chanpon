@@ -89,7 +89,7 @@ class ChanponAdminWorldListMenu(
     ) {
         val state = ListState(page, visibilityFilter, sortType, fromAdminMenu)
         sessions[player.uniqueId] = state
-        runtime.open(player, listRoute(state))
+        runtime.navigate(player, listRoute(state))
     }
 
     private fun renderList(player: Player, route: MenuRoute): InventoryMenuView {
@@ -166,10 +166,7 @@ class ChanponAdminWorldListMenu(
     }
 
     private fun back(context: MenuActionContext): MenuActionResult {
-        Bukkit.getScheduler().runTask(plugin, Runnable {
-            mwm().adminCommandGui.open(context.player)
-        })
-        return MenuActionResult.Success(MenuUpdate.Close)
+        return MenuActionResult.Success(MenuUpdate.Back)
     }
 
     private fun changePage(context: MenuActionContext): MenuActionResult =

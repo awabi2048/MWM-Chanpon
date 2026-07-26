@@ -238,11 +238,6 @@ class MWMChanponPlugin : JavaPlugin() {
                 }
             )
         )
-        submissionAdminMenu.setParentMenuOpener(chanponAdminMenu::open)
-        worldDataManagementMenu.setParentMenuOpener(chanponAdminMenu::open)
-        worldDataExportMenu.setParentMenuOpener(chanponAdminMenu::open)
-        automationSettingsMenu.setParentMenuOpener(chanponAdminMenu::open)
-        backupListMenu.setParentMenuOpener(worldDataManagementMenu::reopenFromChild)
         chanponAdminWorldListMenu = ChanponAdminWorldListMenu(this, chanponStorage)
         submittedWorldMenuProvider = SubmittedWorldMenuProvider(this, chanponStorage, submittedProtectionService)
         environmentGui = ChanponEnvironmentGui(this, chanponStorage, submittedProtectionService, buildPermissionService)

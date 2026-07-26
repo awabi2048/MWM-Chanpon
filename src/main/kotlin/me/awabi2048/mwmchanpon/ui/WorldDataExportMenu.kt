@@ -31,7 +31,6 @@ class WorldDataExportMenu(
     private val exportService: WorldDataExportService
 ) {
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
-    private var parentMenuOpener: ((Player) -> Unit)? = null
 
     init {
         runtime.register(
@@ -62,13 +61,9 @@ class WorldDataExportMenu(
         )
     }
 
-    fun setParentMenuOpener(opener: (Player) -> Unit) {
-        parentMenuOpener = opener
-    }
-
     fun open(player: Player, page: Int = 0, selected: Set<UUID> = emptySet()) {
         if (!player.hasPermission("mwmchanpon.admin")) return
-        runtime.open(player, listRoute(page, selected.toList()))
+        runtime.navigate(player, listRoute(page, selected.toList()))
     }
 
     private fun renderList(player: Player, route: MenuRoute): InventoryMenuView {
@@ -116,10 +111,6 @@ class WorldDataExportMenu(
     }
 
     private fun back(context: MenuActionContext): MenuActionResult {
-        if (parentMenuOpener != null) {
-            Bukkit.getScheduler().runTask(plugin, Runnable { parentMenuOpener?.invoke(context.player) })
-            return MenuActionResult.Success(MenuUpdate.Close)
-        }
         return MenuActionResult.Success(MenuUpdate.Back)
     }
 

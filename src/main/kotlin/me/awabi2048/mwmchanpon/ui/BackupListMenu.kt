@@ -38,7 +38,6 @@ class BackupListMenu(
     private val backupService: BackupService,
 ) {
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
-    private var parentMenuOpener: ((Player) -> Unit)? = null
     private var automationService: BackupAutomationService? = null
     private var manualRollbackService: ManualRollbackService? = null
 
@@ -86,10 +85,6 @@ class BackupListMenu(
         )
     }
 
-    fun setParentMenuOpener(opener: (Player) -> Unit) {
-        parentMenuOpener = opener
-    }
-
     fun setAutomationService(service: BackupAutomationService) {
         automationService = service
     }
@@ -107,7 +102,7 @@ class BackupListMenu(
     }
 
     private fun open(player: Player, mode: BackupListMode, worldUuid: UUID?, page: Int) {
-        runtime.open(player, listRoute(mode, worldUuid, page))
+        runtime.navigate(player, listRoute(mode, worldUuid, page))
     }
 
     private fun renderList(player: Player, route: MenuRoute): InventoryMenuView {
@@ -200,9 +195,7 @@ class BackupListMenu(
     }
 
     private fun back(context: MenuActionContext): MenuActionResult {
-        val opener = parentMenuOpener ?: return MenuActionResult.Success(MenuUpdate.Back)
-        Bukkit.getScheduler().runTask(plugin, Runnable { opener(context.player) })
-        return MenuActionResult.Success(MenuUpdate.Close)
+        return MenuActionResult.Success(MenuUpdate.Back)
     }
 
     private fun changePage(context: MenuActionContext): MenuActionResult {

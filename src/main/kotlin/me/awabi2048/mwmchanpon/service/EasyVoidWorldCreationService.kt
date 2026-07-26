@@ -58,8 +58,7 @@ class EasyVoidWorldCreationService(
 
     private fun cancelFlow(player: Player): MenuActionResult {
         pendingCreations.remove(player.uniqueId)
-        CCSystem.getAPI().getMenuNavigationService().openPrevious(player)
-        return MenuActionResult.Success(MenuUpdate.Close)
+        return MenuActionResult.Success(MenuUpdate.Back)
     }
 
     private fun handleNameSubmit(

@@ -43,7 +43,6 @@ class SubmissionAdminMenu(
     private val toolPermissionController: ToolPermissionController
 ) {
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
-    private var parentMenuOpener: ((Player) -> Unit)? = null
 
     init {
         runtime.register(
@@ -89,10 +88,6 @@ class SubmissionAdminMenu(
         )
     }
 
-    fun setParentMenuOpener(opener: (Player) -> Unit) {
-        parentMenuOpener = opener
-    }
-
     fun open(
         player: Player,
         page: Int = 0,
@@ -104,7 +99,7 @@ class SubmissionAdminMenu(
             return
         }
         JavaPluginBridge.endCoreMenuSession(player)
-        runtime.open(player, listRoute(SubmissionViewState(page, progressFilter, sortType)))
+        runtime.navigate(player, listRoute(SubmissionViewState(page, progressFilter, sortType)))
     }
 
     private fun renderList(player: Player, route: MenuRoute): InventoryMenuView {
@@ -172,9 +167,7 @@ class SubmissionAdminMenu(
     }
 
     private fun back(context: MenuActionContext): MenuActionResult {
-        val opener = parentMenuOpener ?: return MenuActionResult.Success(MenuUpdate.Back)
-        Bukkit.getScheduler().runTask(plugin, Runnable { opener(context.player) })
-        return MenuActionResult.Success(MenuUpdate.Close)
+        return MenuActionResult.Success(MenuUpdate.Back)
     }
 
     private fun changePage(context: MenuActionContext): MenuActionResult =

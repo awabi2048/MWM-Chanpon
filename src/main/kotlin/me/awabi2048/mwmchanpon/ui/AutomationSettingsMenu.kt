@@ -29,7 +29,6 @@ class AutomationSettingsMenu(
     private val onSettingsChanged: () -> Unit = {},
 ) {
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
-    private var parentMenuOpener: ((Player) -> Unit)? = null
 
     init {
         runtime.register(
@@ -85,13 +84,9 @@ class AutomationSettingsMenu(
         )
     }
 
-    fun setParentMenuOpener(opener: (Player) -> Unit) {
-        parentMenuOpener = opener
-    }
-
     fun open(player: Player) {
         if (!player.hasPermission("mwmchanpon.admin")) return
-        runtime.open(player, MenuRoute(OWNER, ROUTE_MAIN))
+        runtime.navigate(player, MenuRoute(OWNER, ROUTE_MAIN))
     }
 
     private fun renderMain(player: Player): InventoryMenuView {
@@ -196,9 +191,7 @@ class AutomationSettingsMenu(
     }
 
     private fun back(context: MenuActionContext): MenuActionResult {
-        val opener = parentMenuOpener ?: return MenuActionResult.Success(MenuUpdate.Back)
-        Bukkit.getScheduler().runTask(plugin, Runnable { opener(context.player) })
-        return MenuActionResult.Success(MenuUpdate.Close)
+        return MenuActionResult.Success(MenuUpdate.Back)
     }
 
     private fun showToggleConfirmation(

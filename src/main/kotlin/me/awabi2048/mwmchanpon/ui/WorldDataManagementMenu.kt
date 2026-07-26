@@ -38,7 +38,6 @@ class WorldDataManagementMenu(
 ) {
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
     private val childReturnPages = ConcurrentHashMap<UUID, Int>()
-    private var parentMenuOpener: ((Player) -> Unit)? = null
 
     init {
         runtime.register(
@@ -80,17 +79,13 @@ class WorldDataManagementMenu(
         )
     }
 
-    fun setParentMenuOpener(opener: (Player) -> Unit) {
-        parentMenuOpener = opener
-    }
-
     fun open(player: Player, page: Int = 0) {
         if (!player.hasPermission("mwmchanpon.admin")) return
-        runtime.open(player, listRoute(page))
+        runtime.navigate(player, listRoute(page))
     }
 
     fun reopenFromChild(player: Player) {
-        open(player, childReturnPages.remove(player.uniqueId) ?: 0)
+        runtime.replace(player, listRoute(childReturnPages.remove(player.uniqueId) ?: 0))
     }
 
     private fun renderList(player: Player, route: MenuRoute): InventoryMenuView {
@@ -212,9 +207,7 @@ class WorldDataManagementMenu(
     }
 
     private fun back(context: MenuActionContext): MenuActionResult {
-        val opener = parentMenuOpener ?: return MenuActionResult.Success(MenuUpdate.Back)
-        Bukkit.getScheduler().runTask(plugin, Runnable { opener(context.player) })
-        return MenuActionResult.Success(MenuUpdate.Close)
+        return MenuActionResult.Success(MenuUpdate.Back)
     }
 
     private fun changePage(context: MenuActionContext): MenuActionResult =

@@ -12,7 +12,6 @@ import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.mwmchanpon.tool.ToolPermissionDefinition
@@ -32,7 +31,6 @@ class ToolPermissionMenu(
     private val definitions: List<ToolPermissionDefinition>,
 ) {
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
-    private val backActions = ConcurrentHashMap<UUID, () -> Unit>()
 
     init {
         runtime.register(
@@ -48,9 +46,8 @@ class ToolPermissionMenu(
         )
     }
 
-    fun open(player: Player, worldData: WorldData, targetPlayerUuid: UUID, onBack: () -> Unit) {
-        backActions[player.uniqueId] = onBack
-        runtime.open(
+    fun open(player: Player, worldData: WorldData, targetPlayerUuid: UUID) {
+        runtime.navigate(
             player,
             MenuRoute(
                 OWNER,
@@ -99,10 +96,7 @@ class ToolPermissionMenu(
     }
 
     private fun back(context: MenuActionContext): MenuActionResult {
-        val action = backActions.remove(context.player.uniqueId)
-            ?: return MenuActionResult.Success(MenuUpdate.Close)
-        Bukkit.getScheduler().runTask(plugin, Runnable(action))
-        return MenuActionResult.Success(MenuUpdate.Close)
+        return MenuActionResult.Success(MenuUpdate.Back)
     }
 
     private fun toggle(context: MenuActionContext): MenuActionResult {

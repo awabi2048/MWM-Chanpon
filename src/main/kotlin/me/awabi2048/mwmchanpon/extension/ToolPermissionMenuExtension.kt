@@ -12,7 +12,6 @@ import java.util.UUID
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.mwmchanpon.tool.ToolPermissionDefinition
 import me.awabi2048.mwmchanpon.ui.ToolPermissionMenu
-import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.MenuExtension
 import me.awabi2048.myworldmanager.api.extension.MenuExtensionContext
 import me.awabi2048.myworldmanager.model.WorldData
@@ -58,9 +57,7 @@ class ToolPermissionMenuExtension(
         val memberUuid = ItemTag.getWorldUuid(item) ?: return false
         val worldData = context.get<WorldData>("worldData") ?: return false
 
-        menu.open(player, worldData, memberUuid) {
-            MyWorldManagerApi.openMemberManagementMenu(player, worldData.uuid)
-        }
+        menu.open(player, worldData, memberUuid)
         return true
     }
 
