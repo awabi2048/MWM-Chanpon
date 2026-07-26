@@ -1,5 +1,8 @@
 package me.awabi2048.mwmchanpon.ui
 
+import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.ManagedMenuInteraction
+import com.awabi2048.ccsystem.api.gui.ManagedMenuInteractionOutcome
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.MyWorldManager
@@ -68,6 +71,9 @@ internal class WorldSettingsAccessGuard(
     }
 
     private fun denySound(player: Player) {
-        ManagedMenuPresenter.rejected(player)
+        CCSystem.getAPI().getMenuRuntimeService().feedback(
+            player,
+            ManagedMenuInteraction(ManagedMenuInteractionOutcome.REJECTED),
+        )
     }
 }
