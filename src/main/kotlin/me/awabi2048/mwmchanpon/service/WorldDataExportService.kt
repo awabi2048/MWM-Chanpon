@@ -239,31 +239,6 @@ class WorldDataExportService(
                     copyTree(sourceDirectory, target.resolve(name))
                 }
             }
-            copyAdditionalDimensionData(source.resolve("data"), target.resolve("data"))
-        }
-    }
-
-    private fun copyAdditionalDimensionData(source: Path, target: Path) {
-        if (!Files.isDirectory(source)) return
-        Files.walk(source).use { paths ->
-            paths.sorted(Comparator.comparing { source.relativize(it).toString() }).forEach { path ->
-                val relative = source.relativize(path)
-                if (relative.toString().isEmpty()) return@forEach
-                val classification = StandaloneAdditionalWorldDataPolicy.classify(relative)
-                if (classification != AdditionalWorldDataDisposition.DIMENSION) return@forEach
-                val destination = target.resolve(relative)
-                if (Files.isDirectory(path)) {
-                    Files.createDirectories(destination)
-                } else {
-                    Files.createDirectories(destination.parent)
-                    Files.copy(
-                        path,
-                        destination,
-                        StandardCopyOption.REPLACE_EXISTING,
-                        StandardCopyOption.COPY_ATTRIBUTES,
-                    )
-                }
-            }
         }
     }
 
@@ -284,14 +259,7 @@ class WorldDataExportService(
         manifest.set("game_mode", "creative")
         manifest.set("allow_commands", true)
         manifest.set("shared_data_source", serverMainWorldName)
-        manifest.set(
-            "additional_world_data_policy",
-            linkedMapOf(
-                "dimension" to StandaloneAdditionalWorldDataPolicy.dimensionDescriptions,
-                "primary_only" to StandaloneAdditionalWorldDataPolicy.primaryOnlyDescriptions,
-                "excluded" to StandaloneAdditionalWorldDataPolicy.excludedDescriptions,
-            ),
-        )
+        manifest.set("shared_data_policy", "all selected dimensions use the running server main world data/")
         manifest.set("primary_world_uuid", primary.uuid.toString())
         manifest.set(
             "worlds",
@@ -419,54 +387,6 @@ class WorldDataExportService(
 }
 
 private data class ExportCoordinates(val x: Double, val y: Double, val z: Double, val yaw: Float)
-
-internal enum class AdditionalWorldDataDisposition {
-    DIMENSION,
-    PRIMARY_ONLY,
-    EXCLUDED,
-}
-
-/**
- * 追加ワールドの保存データを、完全バニラの単一ワールドへ移す際の分類。
- *
- * map data と idcounts は全ディメンションで共有されるため、追加ワールド由来の値を
- * そのまま統合するとID衝突が起きる。level.dat 内の値も同様に複数値を保持できない。
- * ディメンションごとに読み込まれる SavedData だけを各dimensionの data/ へ移す。
- */
-internal object StandaloneAdditionalWorldDataPolicy {
-    val dimensionDescriptions = listOf(
-        "raids and other dimension-local SavedData under dimensions/<namespace>/<id>/data/",
-        "Paper persistent dimension data when stored as an ordinary SavedData file",
-    )
-    val primaryOnlyDescriptions = listOf(
-        "map_*.dat and idcounts.dat (use the running server main world directory data)",
-        "scoreboard.dat and command_storage_*.dat (use the running server main world directory data)",
-        "level.dat values including world border, game rules, day time, weather and scheduled events (use the running server main world as the base)",
-    )
-    val excludedDescriptions = listOf(
-        "session.lock and uid.dat",
-        "unknown plugin-private files that are not ordinary .dat SavedData",
-    )
-
-    fun classify(relative: Path): AdditionalWorldDataDisposition {
-        val name = relative.fileName?.toString().orEmpty()
-        if (name == "idcounts.dat" || MAP_DATA.matches(name)) {
-            return AdditionalWorldDataDisposition.PRIMARY_ONLY
-        }
-        if (name == "scoreboard.dat" || name.startsWith("command_storage_")) {
-            return AdditionalWorldDataDisposition.PRIMARY_ONLY
-        }
-        if (name == "session.lock" || name == "uid.dat") {
-            return AdditionalWorldDataDisposition.EXCLUDED
-        }
-        if (name.endsWith(".dat") || name.endsWith(".dat_old")) {
-            return AdditionalWorldDataDisposition.DIMENSION
-        }
-        return AdditionalWorldDataDisposition.EXCLUDED
-    }
-
-    private val MAP_DATA = Regex("""map_\d+\.dat(?:_old)?""")
-}
 
 internal object StandaloneExportFileName {
     private val forbidden = Regex("""[\\/:*?"<>|\u0000-\u001f]""")
