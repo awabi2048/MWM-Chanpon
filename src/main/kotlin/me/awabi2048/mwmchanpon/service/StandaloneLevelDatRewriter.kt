@@ -2,8 +2,9 @@ package me.awabi2048.mwmchanpon.service
 
 import java.nio.file.Files
 import java.nio.file.Path
-import net.kyori.adventure.nbt.BinaryTagIO
-import net.kyori.adventure.nbt.CompoundBinaryTag
+import net.querz.nbt.io.NBTUtil
+import net.querz.nbt.io.NamedTag
+import net.querz.nbt.tag.CompoundTag
 
 internal data class StandaloneLevelMetadata(
     val levelName: String,
@@ -19,44 +20,34 @@ internal data class StandaloneLevelMetadata(
 internal object StandaloneLevelDatRewriter {
     fun rewrite(source: Path, target: Path, metadata: StandaloneLevelMetadata) {
         require(Files.isRegularFile(source)) { "level.dat is missing: $source" }
-        val root = BinaryTagIO.reader().read(source, BinaryTagIO.Compression.GZIP)
-        val originalData = root.getCompound("Data")
-        val originalVersion = originalData.getCompound("Version")
-        val version = CompoundBinaryTag.builder()
-            .put(originalVersion)
-            .putInt("Id", metadata.dataVersion)
-            .putString("Name", metadata.versionName)
-            .putString("Series", "main")
-            .putByte("Snapshot", 0)
-            .build()
-        var dataBuilder = CompoundBinaryTag.builder()
-            .put(originalData)
-            .putLong("LastPlayed", metadata.lastPlayed)
-            .putInt("DataVersion", metadata.dataVersion)
-            .putString("LevelName", metadata.levelName)
-            .putInt("GameType", 1)
-            .putByte("allowCommands", 1)
-            .putInt("SpawnX", metadata.spawnX)
-            .putInt("SpawnY", metadata.spawnY)
-            .putInt("SpawnZ", metadata.spawnZ)
-            .putFloat("SpawnAngle", metadata.spawnAngle)
-            .put("Version", version)
-        val player = originalData.getCompound("Player")
-        if (player.size() > 0) {
-            dataBuilder = dataBuilder.put(
-                "Player",
-                CompoundBinaryTag.builder()
-                    .put(player)
-                    .putInt("playerGameType", 1)
-                    .putInt("previousPlayerGameType", 1)
-                    .build(),
-            )
+        val namedRoot = NBTUtil.read(source.toFile(), true)
+        val root = (namedRoot.tag as? CompoundTag)?.clone()
+            ?: error("level.dat root is not a compound tag")
+        val data = root.getCompoundTag("Data")?.clone() ?: CompoundTag()
+        val version = data.getCompoundTag("Version")?.clone() ?: CompoundTag()
+        version.putInt("Id", metadata.dataVersion)
+        version.putString("Name", metadata.versionName)
+        version.putString("Series", "main")
+        version.putByte("Snapshot", 0)
+
+        data.putLong("LastPlayed", metadata.lastPlayed)
+        data.putInt("DataVersion", metadata.dataVersion)
+        data.putString("LevelName", metadata.levelName)
+        data.putInt("GameType", 1)
+        data.putByte("allowCommands", 1)
+        data.putInt("SpawnX", metadata.spawnX)
+        data.putInt("SpawnY", metadata.spawnY)
+        data.putInt("SpawnZ", metadata.spawnZ)
+        data.putFloat("SpawnAngle", metadata.spawnAngle)
+        data.put("Version", version)
+
+        data.getCompoundTag("Player")?.clone()?.let { player ->
+            player.putInt("playerGameType", 1)
+            player.putInt("previousPlayerGameType", 1)
+            data.put("Player", player)
         }
-        val rewritten = CompoundBinaryTag.builder()
-            .put(root)
-            .put("Data", dataBuilder.build())
-            .build()
+        root.put("Data", data)
         Files.createDirectories(target.parent)
-        BinaryTagIO.writer().write(rewritten, target, BinaryTagIO.Compression.GZIP)
+        NBTUtil.write(NamedTag(namedRoot.name, root), target.toFile(), true)
     }
 }
