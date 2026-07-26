@@ -7,22 +7,18 @@ import com.awabi2048.ccsystem.api.gui.GuiCycleDirection
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
-import io.papermc.paper.connection.PlayerGameConnection
-import io.papermc.paper.dialog.Dialog
-import io.papermc.paper.event.player.PlayerCustomClickEvent
-import io.papermc.paper.registry.data.dialog.ActionButton
-import io.papermc.paper.registry.data.dialog.DialogBase
-import io.papermc.paper.registry.data.dialog.action.DialogAction
-import io.papermc.paper.registry.data.dialog.body.DialogBody
-import io.papermc.paper.registry.data.dialog.input.DialogInput
-import io.papermc.paper.registry.data.dialog.type.DialogType
+import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuDialogButton
+import com.awabi2048.ccsystem.api.gui.MenuDialogHandler
+import com.awabi2048.ccsystem.api.gui.MenuDialogInput
+import com.awabi2048.ccsystem.api.gui.MenuDialogRequest
+import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsInventoryHolder
 import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.util.GuiLoreActions
 import me.awabi2048.myworldmanager.util.ItemTag
-import net.kyori.adventure.key.Key
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.Bukkit
@@ -37,7 +33,6 @@ import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponWorldProtectionMode
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
@@ -51,8 +46,6 @@ class ChanponEnvironmentGui(
     private val buildPermissionService: WorldBuildPermissionService,
 ) : Listener {
     private val accessGuard = WorldSettingsAccessGuard(storage, protectionService)
-    private val pendingTimeInputs = ConcurrentHashMap<UUID, UUID>()
-    private val pendingProtectionPasswordInputs = ConcurrentHashMap<UUID, UUID>()
 
     fun open(player: Player, worldData: WorldData) {
         if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
@@ -138,69 +131,6 @@ class ChanponEnvironmentGui(
         }
     }
 
-    @EventHandler
-    fun onCustomTimeInput(event: PlayerCustomClickEvent) {
-        val identifier = event.identifier
-        if (identifier != Key.key("mwmchanpon:environment/time_submit") &&
-            identifier != Key.key("mwmchanpon:environment/time_cancel")
-        ) {
-            return
-        }
-
-        val conn = event.commonConnection as? PlayerGameConnection ?: return
-        val player = conn.player
-        val worldUuid = pendingTimeInputs.remove(player.uniqueId) ?: return
-        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
-        if (identifier == Key.key("mwmchanpon:environment/time_cancel")) {
-            open(player, worldData)
-            return
-        }
-
-        val input = event.getDialogResponseView()?.getText("custom_time").orEmpty()
-        val parsed = parseCustomTime(input)
-        if (parsed == null) {
-            player.sendMessage(i18n(player, "time.custom.invalid"))
-            showCustomTimeDialog(player, worldData, input)
-            return
-        }
-
-        worldData.fixedTime = parsed
-        MyWorldManagerApi.getWorldRepository()?.save(worldData)
-        applyTime(worldUuid, parsed)
-        open(player, worldData)
-    }
-
-    @EventHandler
-    fun onProtectionPasswordInput(event: PlayerCustomClickEvent) {
-        val identifier = event.identifier
-        if (identifier != Key.key("mwmchanpon:environment/protection_password_submit") &&
-            identifier != Key.key("mwmchanpon:environment/protection_password_cancel")
-        ) {
-            return
-        }
-
-        val conn = event.commonConnection as? PlayerGameConnection ?: return
-        val player = conn.player
-        val worldUuid = pendingProtectionPasswordInputs.remove(player.uniqueId) ?: return
-        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
-        if (identifier == Key.key("mwmchanpon:environment/protection_password_cancel")) {
-            open(player, worldData)
-            return
-        }
-
-        val input = event.getDialogResponseView()?.getText("protection_password").orEmpty().trim()
-        if (input.length < MIN_PROTECTION_PASSWORD_LENGTH) {
-            player.sendMessage(i18n(player, "protection.password_too_short"))
-            showProtectionPasswordDialog(player, worldData, input)
-            return
-        }
-
-        storage.setProtectionPassword(worldData.uuid, input)
-        buildPermissionService.sync(worldData)
-        player.sendMessage(i18n(player, "protection.password_updated"))
-        open(player, worldData)
-    }
-
     private fun cycleWeather(player: Player, worldData: WorldData, direction: GuiCycleDirection) {
         val next = GuiCycle.selectNullable(worldData.fixedWeather, WEATHER_VALUES, direction)
         worldData.fixedWeather = next
@@ -263,77 +193,87 @@ class ChanponEnvironmentGui(
     }
 
     private fun showCustomTimeDialog(player: Player, worldData: WorldData, initial: String = worldData.fixedTime?.toString() ?: "") {
-        pendingTimeInputs[player.uniqueId] = worldData.uuid
-        val dialog = Dialog.create { builder ->
-            builder.empty()
-                .base(
-                    DialogBase.builder(i18nComponent(player, "time.custom.title"))
-                        .body(listOf(DialogBody.plainMessage(i18nComponent(player, "time.custom.body"))))
-                        .inputs(
-                            listOf(
-                                DialogInput.text("custom_time", i18nComponent(player, "time.custom.label"))
-                                    .initial(initial)
-                                    .maxLength(8)
-                                    .build()
+        CCSystem.getAPI().getMenuDialogService().show(
+            player,
+            MenuDialogRequest(
+                owner = "mwmchanpon",
+                id = "environment-custom-time",
+                title = i18nComponent(player, "time.custom.title"),
+                body = listOf(i18nComponent(player, "time.custom.body")),
+                inputs = listOf(
+                    MenuDialogInput.Text(
+                        "custom_time",
+                        i18nComponent(player, "time.custom.label"),
+                        initial,
+                        maxLength = 8,
+                    ),
+                ),
+                confirm = MenuDialogButton(
+                    i18nComponent(player, "time.custom.apply"),
+                    MenuDialogHandler { target, response ->
+                        val parsed = parseCustomTime(response.textValue("custom_time"))
+                            ?: return@MenuDialogHandler MenuActionResult.Rejected(
+                                Component.text(i18n(target, "time.custom.invalid")),
                             )
-                        )
-                        .build()
-                )
-                .type(
-                    DialogType.confirmation(
-                        ActionButton.create(
-                            i18nComponent(player, "time.custom.apply"),
-                            null,
-                            100,
-                            DialogAction.customClick(Key.key("mwmchanpon:environment/time_submit"), null)
-                        ),
-                        ActionButton.create(
-                            Component.text(i18n(player, "common.back"), NamedTextColor.GRAY),
-                            null,
-                            200,
-                            DialogAction.customClick(Key.key("mwmchanpon:environment/time_cancel"), null)
-                        )
-                    )
-                )
-        }
-        player.showDialog(dialog)
+                        worldData.fixedTime = parsed
+                        MyWorldManagerApi.getWorldRepository()?.save(worldData)
+                        applyTime(worldData.uuid, parsed)
+                        open(target, worldData)
+                        MenuActionResult.Success(MenuUpdate.Close)
+                    },
+                ),
+                cancel = MenuDialogButton(
+                    Component.text(i18n(player, "common.back"), NamedTextColor.GRAY),
+                    MenuDialogHandler { target, _ ->
+                        open(target, worldData)
+                        MenuActionResult.Success(MenuUpdate.Close)
+                    },
+                ),
+            ),
+        )
     }
 
     private fun showProtectionPasswordDialog(player: Player, worldData: WorldData, initial: String = "") {
-        pendingProtectionPasswordInputs[player.uniqueId] = worldData.uuid
-        val dialog = Dialog.create { builder ->
-            builder.empty()
-                .base(
-                    DialogBase.builder(i18nComponent(player, "protection.password_set_title"))
-                        .body(listOf(DialogBody.plainMessage(i18nComponent(player, "protection.password_set_body"))))
-                        .inputs(
-                            listOf(
-                                DialogInput.text("protection_password", i18nComponent(player, "protection.password_label"))
-                                    .initial(initial)
-                                    .maxLength(64)
-                                    .build()
+        CCSystem.getAPI().getMenuDialogService().show(
+            player,
+            MenuDialogRequest(
+                owner = "mwmchanpon",
+                id = "environment-protection-password",
+                title = i18nComponent(player, "protection.password_set_title"),
+                body = listOf(i18nComponent(player, "protection.password_set_body")),
+                inputs = listOf(
+                    MenuDialogInput.Text(
+                        "protection_password",
+                        i18nComponent(player, "protection.password_label"),
+                        initial,
+                        maxLength = 64,
+                    ),
+                ),
+                confirm = MenuDialogButton(
+                    i18nComponent(player, "protection.password_apply"),
+                    MenuDialogHandler { target, response ->
+                        val input = response.textValue("protection_password").trim()
+                        if (input.length < MIN_PROTECTION_PASSWORD_LENGTH) {
+                            return@MenuDialogHandler MenuActionResult.Rejected(
+                                Component.text(i18n(target, "protection.password_too_short")),
                             )
-                        )
-                        .build()
-                )
-                .type(
-                    DialogType.confirmation(
-                        ActionButton.create(
-                            i18nComponent(player, "protection.password_apply"),
-                            null,
-                            100,
-                            DialogAction.customClick(Key.key("mwmchanpon:environment/protection_password_submit"), null)
-                        ),
-                        ActionButton.create(
-                            Component.text(i18n(player, "common.back"), NamedTextColor.GRAY),
-                            null,
-                            200,
-                            DialogAction.customClick(Key.key("mwmchanpon:environment/protection_password_cancel"), null)
-                        )
-                    )
-                )
-        }
-        player.showDialog(dialog)
+                        }
+                        storage.setProtectionPassword(worldData.uuid, input)
+                        buildPermissionService.sync(worldData)
+                        target.sendMessage(i18n(target, "protection.password_updated"))
+                        open(target, worldData)
+                        MenuActionResult.Success(MenuUpdate.Close)
+                    },
+                ),
+                cancel = MenuDialogButton(
+                    Component.text(i18n(player, "common.back"), NamedTextColor.GRAY),
+                    MenuDialogHandler { target, _ ->
+                        open(target, worldData)
+                        MenuActionResult.Success(MenuUpdate.Close)
+                    },
+                ),
+            ),
+        )
     }
 
     private fun parseCustomTime(input: String): Long? {

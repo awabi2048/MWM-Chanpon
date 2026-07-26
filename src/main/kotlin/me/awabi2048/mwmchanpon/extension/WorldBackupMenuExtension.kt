@@ -5,15 +5,12 @@ import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
-import io.papermc.paper.connection.PlayerGameConnection
-import io.papermc.paper.dialog.Dialog
-import io.papermc.paper.event.player.PlayerCustomClickEvent
-import io.papermc.paper.registry.data.dialog.ActionButton
-import io.papermc.paper.registry.data.dialog.DialogBase
-import io.papermc.paper.registry.data.dialog.action.DialogAction
-import io.papermc.paper.registry.data.dialog.body.DialogBody
-import io.papermc.paper.registry.data.dialog.input.DialogInput
-import io.papermc.paper.registry.data.dialog.type.DialogType
+import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuDialogButton
+import com.awabi2048.ccsystem.api.gui.MenuDialogHandler
+import com.awabi2048.ccsystem.api.gui.MenuDialogInput
+import com.awabi2048.ccsystem.api.gui.MenuDialogRequest
+import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import me.awabi2048.mwmchanpon.backup.BackupEntry
 import me.awabi2048.mwmchanpon.backup.BackupDisplay
 import me.awabi2048.mwmchanpon.util.cancelWithDebug
@@ -33,7 +30,6 @@ import me.awabi2048.myworldmanager.api.extension.MenuExtensionContext
 import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.util.GuiLoreActions
 import me.awabi2048.myworldmanager.util.ItemTag
-import net.kyori.adventure.key.Key
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.Bukkit
@@ -42,14 +38,12 @@ import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.inventory.InventoryClickEvent
-import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.Plugin
 import org.bukkit.plugin.java.JavaPlugin
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 
 class WorldBackupMenuExtension(
     private val plugin: Plugin,
@@ -58,7 +52,6 @@ class WorldBackupMenuExtension(
     private val automationService: BackupAutomationService,
     private val manualRollbackService: ManualRollbackService
 ) : MenuExtension, Listener {
-    private val pendingBackupNameInputs = ConcurrentHashMap<UUID, Holder>()
 
     override fun getId(): String = EXTENSION_ID
 
@@ -147,32 +140,6 @@ class WorldBackupMenuExtension(
                 }
             }
         }
-    }
-
-    @Suppress("UnstableApiUsage")
-    @EventHandler
-    fun onBackupNameInput(event: PlayerCustomClickEvent) {
-        val identifier = event.identifier
-        if (identifier != Key.key("mwmchanpon:backup/owner_name_submit") &&
-            identifier != Key.key("mwmchanpon:backup/owner_name_cancel")
-        ) {
-            return
-        }
-        val player = (event.commonConnection as? PlayerGameConnection)?.player ?: return
-        val source = pendingBackupNameInputs.remove(player.uniqueId) ?: return
-
-        if (identifier == Key.key("mwmchanpon:backup/owner_name_cancel")) {
-            open(player, source.worldUuid, source.page)
-            return
-        }
-
-        val name = BackupDisplay.normalizeManualName(event.getDialogResponseView()?.getText("backup_name").orEmpty())
-        openBackupConfirm(player, source, name)
-    }
-
-    @EventHandler
-    fun onQuit(event: PlayerQuitEvent) {
-        pendingBackupNameInputs.remove(event.player.uniqueId)
     }
 
     @EventHandler
@@ -291,42 +258,39 @@ class WorldBackupMenuExtension(
         else -> message
     }
 
-    @Suppress("UnstableApiUsage")
     private fun openBackupNameInput(player: Player, source: Holder) {
-        pendingBackupNameInputs[player.uniqueId] = source.copy()
-        val dialog = Dialog.create { builder ->
-            builder.empty()
-                .base(
-                    DialogBase.builder(i18nComponent(player, "owner_backup.name_input.title"))
-                        .body(listOf(DialogBody.plainMessage(i18nComponent(player, "owner_backup.name_input.body"))))
-                        .inputs(
-                            listOf(
-                                DialogInput.text("backup_name", i18nComponent(player, "owner_backup.name_input.label"))
-                                    .maxLength(MAX_BACKUP_NAME_LENGTH)
-                                    .initial("")
-                                    .build()
-                            )
-                        )
-                        .build()
-                )
-                .type(
-                    DialogType.confirmation(
-                        ActionButton.create(
-                            i18nComponent(player, "owner_backup.name_input.submit"),
-                            null,
-                            100,
-                            DialogAction.customClick(Key.key("mwmchanpon:backup/owner_name_submit"), null)
-                        ),
-                        ActionButton.create(
-                            i18nComponent(player, "owner_backup.name_input.cancel"),
-                            null,
-                            200,
-                            DialogAction.customClick(Key.key("mwmchanpon:backup/owner_name_cancel"), null)
-                        )
-                    )
-                )
-        }
-        player.showDialog(dialog)
+        val sourceSnapshot = source.copy()
+        CCSystem.getAPI().getMenuDialogService().show(
+            player,
+            MenuDialogRequest(
+                owner = "mwmchanpon",
+                id = "owner-backup-name",
+                title = i18nComponent(player, "owner_backup.name_input.title"),
+                body = listOf(i18nComponent(player, "owner_backup.name_input.body")),
+                inputs = listOf(
+                    MenuDialogInput.Text(
+                        "backup_name",
+                        i18nComponent(player, "owner_backup.name_input.label"),
+                        maxLength = MAX_BACKUP_NAME_LENGTH,
+                    ),
+                ),
+                confirm = MenuDialogButton(
+                    i18nComponent(player, "owner_backup.name_input.submit"),
+                    MenuDialogHandler { target, response ->
+                        val name = BackupDisplay.normalizeManualName(response.textValue("backup_name"))
+                        openBackupConfirm(target, sourceSnapshot, name)
+                        MenuActionResult.Success(MenuUpdate.Close)
+                    },
+                ),
+                cancel = MenuDialogButton(
+                    i18nComponent(player, "owner_backup.name_input.cancel"),
+                    MenuDialogHandler { target, _ ->
+                        open(target, sourceSnapshot.worldUuid, sourceSnapshot.page)
+                        MenuActionResult.Success(MenuUpdate.Close)
+                    },
+                ),
+            ),
+        )
     }
 
     private fun openBackupConfirm(player: Player, source: Holder, backupName: String) {
