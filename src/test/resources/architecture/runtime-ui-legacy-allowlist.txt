@@ -9,7 +9,7 @@ INVENTORY_CLICK_EVENT|2|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponCreati
 INVENTORY_CLICK_EVENT|3|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponPlayerWorldMenuProvider.kt
 INVENTORY_CLICK_EVENT|3|src/main/kotlin/me/awabi2048/mwmchanpon/util/CancelWithDebug.kt
 INVENTORY_CLICK_EVENT|3|src/main/kotlin/me/awabi2048/mwmchanpon/extension/ProductionToggleExtension.kt
-INVENTORY_CLICK_EVENT|5|src/main/kotlin/me/awabi2048/mwmchanpon/extension/WorldBackupMenuExtension.kt
+INVENTORY_CLICK_EVENT|3|src/main/kotlin/me/awabi2048/mwmchanpon/extension/WorldBackupMenuExtension.kt
 INVENTORY_CLICK_EVENT|7|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponEnvironmentGui.kt
 INVENTORY_CLICK_EVENT|8|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponWorldSettingsMenuProvider.kt
 MANUAL_CLICK_SOUND|13|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponWorldSettingsMenuProvider.kt

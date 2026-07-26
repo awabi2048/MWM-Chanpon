@@ -142,97 +142,6 @@ class WorldBackupMenuExtension(
         }
     }
 
-    @EventHandler
-    fun onBackupConfirmClick(event: InventoryClickEvent) {
-        val player = event.whoClicked as? Player ?: return
-        val holder = event.view.topInventory.holder as? BackupConfirmHolder ?: return
-        event.cancelWithDebug("WorldBackupMenuExtension.onBackupConfirmClick: confirm_click")
-        if (event.clickedInventory != event.view.topInventory) return
-        when (ItemTag.getType(event.currentItem ?: return)) {
-            ItemTag.TYPE_GUI_CANCEL -> open(player, holder.source.worldUuid, holder.source.page)
-            ItemTag.TYPE_GUI_CONFIRM -> {
-                if (ownedProductionWorld(player, holder.source.worldUuid) == null) {
-                    ManagedMenuPresenter.close(player)
-                    return
-                }
-                if (automationService.isManualOperationBlocked(player)) {
-                    player.sendMessage(i18nComponent(player, "message.manual_operation_blocked"))
-                    open(player, holder.source.worldUuid, holder.source.page)
-                    return
-                }
-                val remaining = backupService.ownerBackupCooldownRemainingSeconds(holder.source.worldUuid)
-                if (remaining > 0) {
-                    player.sendMessage(i18nComponent(player, "message.owner_backup_cooldown", mapOf("remaining" to BackupDisplay.formatDuration(remaining))))
-                    open(player, holder.source.worldUuid, holder.source.page)
-                    return
-                }
-                ManagedMenuPresenter.close(player)
-                backupService.createOwnerWorldBackup(holder.source.worldUuid, player.uniqueId, player.name, "owner_manual", holder.backupName)
-                    .thenAccept { result ->
-                        Bukkit.getScheduler().runTask(plugin, Runnable {
-                            if (result.status == BackupOperationStatus.SUCCESS) {
-                                player.sendMessage(i18nComponent(player, "message.backup_success"))
-                            } else {
-                                val cooldown = result.message.removePrefix("cooldown:").toLongOrNull()
-                                if (cooldown != null) {
-                                    player.sendMessage(i18nComponent(player, "message.owner_backup_cooldown", mapOf("remaining" to BackupDisplay.formatDuration(cooldown))))
-                                } else {
-                                    player.sendMessage(i18nComponent(player, "message.backup_failed"))
-                                }
-                            }
-                        })
-                    }
-            }
-        }
-    }
-
-    @EventHandler
-    fun onRestoreConfirmClick(event: InventoryClickEvent) {
-        val player = event.whoClicked as? Player ?: return
-        val holder = event.view.topInventory.holder as? RestoreConfirmHolder ?: return
-        event.cancelWithDebug("WorldBackupMenuExtension.onRestoreConfirmClick: confirm_click")
-        if (event.clickedInventory != event.view.topInventory) return
-        when (ItemTag.getType(event.currentItem ?: return)) {
-            ItemTag.TYPE_GUI_CANCEL -> open(player, holder.source.worldUuid, holder.source.page)
-            ItemTag.TYPE_GUI_CONFIRM -> {
-                if (ownedProductionWorld(player, holder.source.worldUuid) == null) {
-                    ManagedMenuPresenter.close(player)
-                    return
-                }
-                val backup = backupService.listBackupsForWorld(holder.source.worldUuid).firstOrNull { it.id == holder.backupId } ?: return
-                if (automationService.isManualOperationBlocked(player)) {
-                    player.sendMessage(i18nComponent(player, "message.manual_operation_blocked"))
-                    return
-                }
-                val rollbackCooldown = backupService.manualRollbackCooldownRemainingSeconds(listOf(holder.source.worldUuid))
-                if (rollbackCooldown > 0L) {
-                    player.sendMessage(i18nComponent(player, "message.rollback_cooldown", mapOf("remaining" to BackupDisplay.formatDuration(rollbackCooldown))))
-                    return
-                }
-                val preflightFailure =
-                    backupService.restorePreflightFailure(
-                        backup,
-                        listOf(holder.source.worldUuid)
-                    )
-                if (preflightFailure != null) {
-                    player.sendMessage(Component.text("要因: ${restoreReason(preflightFailure)}", NamedTextColor.RED))
-                    return
-                }
-                ManagedMenuPresenter.close(player)
-                manualRollbackService.schedule(
-                    player,
-                    { backupService.restoreWorldBackup(backup, holder.source.worldUuid) },
-                    { result ->
-                        if (result.status == BackupOperationStatus.SUCCESS || result.status == BackupOperationStatus.RECOVERED) {
-                            backupService.markManualRollbackExecuted(result.restoredWorlds)
-                        }
-                        sendRestoreResult(player, result)
-                    }
-                )
-            }
-        }
-    }
-
     private fun executeOwnerBackup(player: Player, source: Holder, backupName: String) {
         if (ownedProductionWorld(player, source.worldUuid) == null) return
         if (automationService.isManualOperationBlocked(player)) {
@@ -597,8 +506,6 @@ class WorldBackupMenuExtension(
     private fun holderRequest(player: Player): WorldSettingsMenuRequest? {
         return when (val holder = player.openInventory.topInventory.holder) {
             is Holder -> holder.request
-            is BackupConfirmHolder -> holder.source.request
-            is RestoreConfirmHolder -> holder.source.request
             else -> null
         }
     }
@@ -627,16 +534,6 @@ class WorldBackupMenuExtension(
     private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)
 
     data class Holder(val worldUuid: UUID, val page: Int, val request: WorldSettingsMenuRequest) : WorldSettingsInventoryHolder {
-        lateinit var inv: Inventory
-        override fun getInventory(): Inventory = inv
-    }
-
-    private class BackupConfirmHolder(val source: Holder, val backupName: String) : WorldSettingsInventoryHolder {
-        lateinit var inv: Inventory
-        override fun getInventory(): Inventory = inv
-    }
-
-    private class RestoreConfirmHolder(val backupId: String, val source: Holder) : WorldSettingsInventoryHolder {
         lateinit var inv: Inventory
         override fun getInventory(): Inventory = inv
     }
