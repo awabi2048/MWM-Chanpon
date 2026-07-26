@@ -7,6 +7,9 @@ import com.awabi2048.ccsystem.api.gui.MenuActionResult
 import com.awabi2048.ccsystem.api.gui.MenuDialogButton
 import com.awabi2048.ccsystem.api.gui.MenuDialogHandler
 import com.awabi2048.ccsystem.api.gui.MenuDialogRequest
+import com.awabi2048.ccsystem.api.gui.ManagedMenuInteraction
+import com.awabi2048.ccsystem.api.gui.ManagedMenuInteractionOutcome
+import com.awabi2048.ccsystem.api.gui.MenuClickType
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -128,11 +131,12 @@ class ProductionToggleExtension(
         when (ItemTag.getString(item, "chanpon_action")) {
             ACTION_SET_PRODUCTION -> {
                 if (!canUseProduction(player)) return true
-                mwm().soundManager.playClickSound(player, item, "world_settings")
                 if (ownerHasProductionWorld(worldData.owner, worldData.uuid)) {
+                    feedback(player, ManagedMenuInteractionOutcome.REJECTED)
                     player.sendMessage(i18n(player, "message.production_limit"))
                     return true
                 }
+                feedback(player, ManagedMenuInteractionOutcome.SUCCESS, MenuClickType.NAVIGATION)
                 openConfirmation(player, worldData.uuid, ConfirmationAction.SET_PRODUCTION, currentRequest(player, context))
             }
             ACTION_TOGGLE_SUBMISSION -> {
@@ -140,25 +144,28 @@ class ProductionToggleExtension(
                 if (!event.click.isLeftClick) {
                     return true
                 }
-                mwm().soundManager.playClickSound(player, item, "world_settings")
                 if (worldData.owner != player.uniqueId) {
+                    feedback(player, ManagedMenuInteractionOutcome.REJECTED)
                     player.sendMessage(i18n(player, "message.owner_only_submit"))
                     return true
                 }
                 val current = try {
                     storage.getSubmissionState(worldData.uuid)
                 } catch (ex: IllegalStateException) {
+                    feedback(player, ManagedMenuInteractionOutcome.REJECTED)
                     player.sendMessage(i18n(player, "message.state_error"))
                     event.inventory.setItem(event.slot, createSubmissionErrorItem(player))
                     return true
                 }
                 if (plugin.isSubmissionClosed()) {
+                    feedback(player, ManagedMenuInteractionOutcome.REJECTED)
                     player.sendMessage(i18n(player, "message.deadline_closed"))
                     event.inventory.setItem(event.slot, createDecorationItem(Material.GRAY_STAINED_GLASS_PANE))
                     return true
                 }
                 when (current) {
                     SubmissionState.UNSUBMITTED -> {
+                        feedback(player, ManagedMenuInteractionOutcome.SUCCESS, MenuClickType.NAVIGATION)
                         openConfirmation(player, worldData.uuid, ConfirmationAction.SUBMIT, currentRequest(player, context))
                     }
                     SubmissionState.SUBMITTED -> return true
@@ -466,6 +473,17 @@ class ProductionToggleExtension(
         SET_PRODUCTION("set_production"),
         UNSET_PRODUCTION("unset_production"),
         SUBMIT("submit")
+    }
+
+    private fun feedback(
+        player: Player,
+        outcome: ManagedMenuInteractionOutcome,
+        clickType: MenuClickType = MenuClickType.DEFAULT,
+    ) {
+        CCSystem.getAPI().getMenuRuntimeService().feedback(
+            player,
+            ManagedMenuInteraction(outcome, clickType),
+        )
     }
 
 }
