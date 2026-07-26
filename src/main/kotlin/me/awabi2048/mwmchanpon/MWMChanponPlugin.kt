@@ -294,7 +294,6 @@ class MWMChanponPlugin : JavaPlugin() {
             server.pluginManager.registerEvents(FreecamWorldPolicyListener(chanponStorage), this)
         }
         server.pluginManager.registerEvents(playerWorldMenuProvider, this)
-        server.pluginManager.registerEvents(worldMenuAccessProvider, this)
         server.pluginManager.registerEvents(publishLevelSynchronizer, this)
         server.pluginManager.registerEvents(SubmittedWorldProtectionListener(submittedProtectionService), this)
         server.pluginManager.registerEvents(SpawnWorldProtectionListener(globalStorage, spawnProtectionService), this)
