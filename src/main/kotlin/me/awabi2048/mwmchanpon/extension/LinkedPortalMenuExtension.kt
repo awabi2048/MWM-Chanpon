@@ -11,30 +11,28 @@ import net.kyori.adventure.text.Component
 import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.bukkit.event.inventory.ClickType
-import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 
 class LinkedPortalMenuExtension : MenuExtension {
     override fun getId(): String = EXTENSION_ID
 
-    override fun onRender(inventory: Inventory, player: Player, context: MenuExtensionContext) {
-        if (context.menuType != "world_settings") return
-        val worldData = context.get<WorldData>("worldData") ?: return
+    override fun onRender(items: Map<Int, ItemStack>, player: Player, context: MenuExtensionContext): Map<Int, ItemStack> {
+        if (context.menuType != "world_settings") return items
+        val worldData = context.get<WorldData>("worldData") ?: return items
         val isOwner = context.get<Boolean>("isOwner") == true
         val isMember = context.get<Boolean>("isMember") == true
-        if (!isOwner && !isMember) return
+        if (!isOwner && !isMember) return items
 
         val isProtected = context.get<Boolean>("isProtected") == true
         if (isProtected) {
             // 完成済み/提出済みのワールドでは、ポータル取得を中央寄せレイアウトの3点目（slot 23）に配置する。
-            inventory.setItem(23, portalItem(player, worldData))
-            return
+            return items + (23 to portalItem(player, worldData))
         }
 
-        val footerStart = inventory.size - 9
+        val footerStart = ((items.keys.maxOrNull() ?: 53) + 1) - 9
         val slot = if (isOwner) footerStart + 1 else footerStart + 2
-        inventory.setItem(slot, portalItem(player, worldData))
+        return items + (slot to portalItem(player, worldData))
     }
 
     override fun onClick(click: ClickType, item: ItemStack, player: Player, context: MenuExtensionContext): Boolean {

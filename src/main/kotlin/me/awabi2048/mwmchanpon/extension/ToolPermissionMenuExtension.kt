@@ -22,7 +22,6 @@ import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import org.bukkit.event.inventory.ClickType
 import org.bukkit.inventory.ItemStack
-import org.bukkit.inventory.Inventory
 
 class ToolPermissionMenuExtension(
     private val menu: ToolPermissionMenu,
@@ -31,22 +30,22 @@ class ToolPermissionMenuExtension(
 ) : MenuExtension {
     override fun getId(): String = ToolPermissionMenu.EXTENSION_ID
 
-    override fun onRender(inventory: Inventory, player: Player, context: MenuExtensionContext) {
-        if (context.menuType != "member_management") return
-        val worldData = context.get<WorldData>("worldData") ?: return
-        if (worldData.owner != player.uniqueId) return
+    override fun onRender(items: Map<Int, ItemStack>, player: Player, context: MenuExtensionContext): Map<Int, ItemStack> {
+        if (context.menuType != "member_management") return items
+        val worldData = context.get<WorldData>("worldData") ?: return items
+        if (worldData.owner != player.uniqueId) return items
 
-        for (slot in 0 until inventory.size) {
-            val item = inventory.getItem(slot) ?: continue
-            if (ItemTag.getType(item) != ItemTag.TYPE_GUI_MEMBER_ITEM) continue
+        return items.mapValues { (_, sourceItem) ->
+            val item = sourceItem.clone()
+            if (ItemTag.getType(item) != ItemTag.TYPE_GUI_MEMBER_ITEM) return@mapValues sourceItem
 
-            val memberUuid = ItemTag.getWorldUuid(item) ?: continue
+            val memberUuid = ItemTag.getWorldUuid(item) ?: return@mapValues sourceItem
             val states = controller.getMemberToolStates(worldData, memberUuid)
             val newLore = rebuildLore(player, worldData, memberUuid, states)
             val meta = item.itemMeta
             meta.lore(newLore)
             item.itemMeta = meta
-            inventory.setItem(slot, item)
+            item
         }
     }
 

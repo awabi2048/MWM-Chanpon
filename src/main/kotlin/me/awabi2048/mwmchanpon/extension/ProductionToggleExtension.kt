@@ -41,7 +41,6 @@ import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.inventory.ClickType
-import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
@@ -57,25 +56,25 @@ class ProductionToggleExtension(
 
     override fun getId(): String = EXTENSION_ID
 
-    override fun onRender(inventory: Inventory, player: Player, context: MenuExtensionContext) {
+    override fun onRender(items: Map<Int, ItemStack>, player: Player, context: MenuExtensionContext): Map<Int, ItemStack> {
         when (context.menuType) {
             "world_settings" -> {
-                if (context.get<Boolean>("isProtected") == true) return
-                if (globalStorage.getWorldCreationAvailability() != WorldCreationAvailability.PRODUCTION) return
-                val worldData = context.get<WorldData>("worldData") ?: return
+                if (context.get<Boolean>("isProtected") == true) return items
+                if (globalStorage.getWorldCreationAvailability() != WorldCreationAvailability.PRODUCTION) return items
+                val worldData = context.get<WorldData>("worldData") ?: return items
                 if (plugin.isSubmissionClosed()) {
-                    inventory.setItem(WORLD_MENU_SLOT, createDecorationItem(Material.GRAY_STAINED_GLASS_PANE))
-                    return
+                    return items + (WORLD_MENU_SLOT to createDecorationItem(Material.GRAY_STAINED_GLASS_PANE))
                 }
                 val item = if (storage.isProductionWorld(worldData.uuid)) {
                     createSubmissionItem(player, worldData.uuid)
                 } else {
-                    if (ownerHasProductionWorld(worldData.owner, worldData.uuid)) return
+                    if (ownerHasProductionWorld(worldData.owner, worldData.uuid)) return items
                     createProductionItem(player)
                 }
-                inventory.setItem(WORLD_MENU_SLOT, item)
+                return items + (WORLD_MENU_SLOT to item)
             }
         }
+        return items
     }
 
     override fun onClick(click: ClickType, item: ItemStack, player: Player, context: MenuExtensionContext): Boolean {

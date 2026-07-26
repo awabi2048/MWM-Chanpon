@@ -40,7 +40,6 @@ import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.bukkit.event.inventory.ClickType
-import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.Plugin
@@ -74,12 +73,12 @@ class WorldBackupMenuExtension(
 
     override fun getId(): String = EXTENSION_ID
 
-    override fun onRender(inventory: Inventory, player: Player, context: MenuExtensionContext) {
-        if (context.menuType != "world_settings") return
-        if (context.get<Boolean>("isProtected") == true) return
-        val worldData = context.get<WorldData>("worldData") ?: return
-        if (!canManage(player, worldData)) return
-        inventory.setItem(WORLD_MENU_SLOT, entryItem(player, worldData.uuid))
+    override fun onRender(items: Map<Int, ItemStack>, player: Player, context: MenuExtensionContext): Map<Int, ItemStack> {
+        if (context.menuType != "world_settings") return items
+        if (context.get<Boolean>("isProtected") == true) return items
+        val worldData = context.get<WorldData>("worldData") ?: return items
+        if (!canManage(player, worldData)) return items
+        return items + (WORLD_MENU_SLOT to entryItem(player, worldData.uuid))
     }
 
     override fun onClick(click: ClickType, item: ItemStack, player: Player, context: MenuExtensionContext): Boolean {

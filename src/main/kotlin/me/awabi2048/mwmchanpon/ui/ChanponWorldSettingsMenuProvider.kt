@@ -729,7 +729,16 @@ class ChanponWorldSettingsMenuProvider(
                 "isProtected" to isProtected
             )
         )
-        MyWorldManagerApi.getMenuExtensions().forEach { it.onRender(inventory, player, context) }
+        var items = inventory.contents
+            .mapIndexedNotNull { slot, item -> item?.let { slot to it.clone() } }
+            .toMap()
+        MyWorldManagerApi.getMenuExtensions().forEach { extension ->
+            items = extension.onRender(items, player, context)
+        }
+        inventory.clear()
+        items.forEach { (slot, item) ->
+            if (slot in 0 until inventory.size) inventory.setItem(slot, item)
+        }
     }
 
     private fun publishItem(player: Player, worldData: WorldData): ItemStack {
