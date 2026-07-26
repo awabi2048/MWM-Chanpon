@@ -40,7 +40,7 @@ import org.bukkit.enchantments.Enchantment
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
-import org.bukkit.event.inventory.InventoryClickEvent
+import org.bukkit.event.inventory.ClickType
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
@@ -78,11 +78,10 @@ class ProductionToggleExtension(
         }
     }
 
-    override fun onClick(event: InventoryClickEvent, player: Player, context: MenuExtensionContext): Boolean {
-        val item = event.currentItem ?: return false
+    override fun onClick(click: ClickType, item: ItemStack, player: Player, context: MenuExtensionContext): Boolean {
         if (ItemTag.getExtensionId(item) != getId()) return false
         return when (context.menuType) {
-            "world_settings" -> handleWorldSettingsClick(event, player, context, item)
+            "world_settings" -> handleWorldSettingsClick(click, player, context, item)
             else -> false
         }
     }
@@ -122,7 +121,7 @@ class ProductionToggleExtension(
     }
 
     private fun handleWorldSettingsClick(
-        event: InventoryClickEvent,
+        click: ClickType,
         player: Player,
         context: MenuExtensionContext,
         item: ItemStack
@@ -141,7 +140,7 @@ class ProductionToggleExtension(
             }
             ACTION_TOGGLE_SUBMISSION -> {
                 // 本番用設定の解除は管理者メニューに集約し、通常の /worldmenu では提出操作だけを扱う。
-                if (!event.click.isLeftClick) {
+                if (!click.isLeftClick) {
                     return true
                 }
                 if (worldData.owner != player.uniqueId) {
@@ -154,13 +153,11 @@ class ProductionToggleExtension(
                 } catch (ex: IllegalStateException) {
                     feedback(player, ManagedMenuInteractionOutcome.REJECTED)
                     player.sendMessage(i18n(player, "message.state_error"))
-                    event.inventory.setItem(event.slot, createSubmissionErrorItem(player))
                     return true
                 }
                 if (plugin.isSubmissionClosed()) {
                     feedback(player, ManagedMenuInteractionOutcome.REJECTED)
                     player.sendMessage(i18n(player, "message.deadline_closed"))
-                    event.inventory.setItem(event.slot, createDecorationItem(Material.GRAY_STAINED_GLASS_PANE))
                     return true
                 }
                 when (current) {

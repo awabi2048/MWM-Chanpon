@@ -1,10 +1,6 @@
 # Phase 1以降で削減する既存違反の完全な一時許可リスト。
 CREATE_INVENTORY|6|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponWorldSettingsMenuProvider.kt
-INVENTORY_CLICK_EVENT|2|src/main/kotlin/me/awabi2048/mwmchanpon/extension/LinkedPortalMenuExtension.kt
-INVENTORY_CLICK_EVENT|2|src/main/kotlin/me/awabi2048/mwmchanpon/extension/ToolPermissionMenuExtension.kt
 INVENTORY_CLICK_EVENT|2|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponCreationConfirmationMenuProvider.kt
 INVENTORY_CLICK_EVENT|3|src/main/kotlin/me/awabi2048/mwmchanpon/util/CancelWithDebug.kt
-INVENTORY_CLICK_EVENT|3|src/main/kotlin/me/awabi2048/mwmchanpon/extension/ProductionToggleExtension.kt
-INVENTORY_CLICK_EVENT|2|src/main/kotlin/me/awabi2048/mwmchanpon/extension/WorldBackupMenuExtension.kt
 INVENTORY_CLICK_EVENT|8|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponWorldSettingsMenuProvider.kt
 MANUAL_CLICK_SOUND|13|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponWorldSettingsMenuProvider.kt

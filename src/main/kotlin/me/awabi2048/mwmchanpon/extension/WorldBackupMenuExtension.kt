@@ -39,7 +39,7 @@ import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
-import org.bukkit.event.inventory.InventoryClickEvent
+import org.bukkit.event.inventory.ClickType
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
@@ -82,8 +82,7 @@ class WorldBackupMenuExtension(
         inventory.setItem(WORLD_MENU_SLOT, entryItem(player, worldData.uuid))
     }
 
-    override fun onClick(event: InventoryClickEvent, player: Player, context: MenuExtensionContext): Boolean {
-        val item = event.currentItem ?: return false
+    override fun onClick(click: ClickType, item: ItemStack, player: Player, context: MenuExtensionContext): Boolean {
         if (ItemTag.getExtensionId(item) != EXTENSION_ID) return false
         val worldUuid = ItemTag.getWorldUuid(item) ?: return false
         if (ownedProductionWorld(player, worldUuid) == null) return true

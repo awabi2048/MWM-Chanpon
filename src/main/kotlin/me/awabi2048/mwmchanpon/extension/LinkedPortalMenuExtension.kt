@@ -10,7 +10,7 @@ import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import org.bukkit.Material
 import org.bukkit.entity.Player
-import org.bukkit.event.inventory.InventoryClickEvent
+import org.bukkit.event.inventory.ClickType
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
@@ -37,8 +37,7 @@ class LinkedPortalMenuExtension : MenuExtension {
         inventory.setItem(slot, portalItem(player, worldData))
     }
 
-    override fun onClick(event: InventoryClickEvent, player: Player, context: MenuExtensionContext): Boolean {
-        val item = event.currentItem ?: return false
+    override fun onClick(click: ClickType, item: ItemStack, player: Player, context: MenuExtensionContext): Boolean {
         if (ItemTag.getExtensionId(item) != EXTENSION_ID) return false
         val worldUuid = ItemTag.getWorldUuid(item) ?: return true
         val portal = MyWorldManagerApi.getWorldService()?.createLinkedWorldPortalItem(player, worldUuid)

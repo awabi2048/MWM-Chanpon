@@ -20,7 +20,8 @@ import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
-import org.bukkit.event.inventory.InventoryClickEvent
+import org.bukkit.event.inventory.ClickType
+import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.Inventory
 
 class ToolPermissionMenuExtension(
@@ -49,10 +50,9 @@ class ToolPermissionMenuExtension(
         }
     }
 
-    override fun onClick(event: InventoryClickEvent, player: Player, context: MenuExtensionContext): Boolean {
+    override fun onClick(click: ClickType, item: ItemStack, player: Player, context: MenuExtensionContext): Boolean {
         if (context.menuType != "member_management") return false
-        val item = event.currentItem ?: return false
-        if (ItemTag.getType(item) != ItemTag.TYPE_GUI_MEMBER_ITEM || !event.isLeftClick || event.isShiftClick) return false
+        if (ItemTag.getType(item) != ItemTag.TYPE_GUI_MEMBER_ITEM || !click.isLeftClick || click.isShiftClick) return false
 
         if (player.uniqueId != (context.get<WorldData>("worldData")?.owner ?: return false)) return false
 

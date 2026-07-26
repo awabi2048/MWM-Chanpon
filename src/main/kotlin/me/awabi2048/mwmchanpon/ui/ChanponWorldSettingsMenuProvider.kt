@@ -353,7 +353,7 @@ class ChanponWorldSettingsMenuProvider(
                 val extension = MyWorldManagerApi.getMenuExtensions().firstOrNull { it.getId() == extensionId } ?: return
                 mwm.soundManager.playClickSound(player, item, "world_settings")
                 val extensionMenuType = "world_settings"
-                extension.onClick(event, player, MenuExtensionContext(
+                extension.onClick(event.click, item, player, MenuExtensionContext(
                     extensionMenuType,
                     mutableMapOf(
                         "worldData" to worldData,
