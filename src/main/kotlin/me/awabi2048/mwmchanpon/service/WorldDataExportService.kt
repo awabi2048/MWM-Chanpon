@@ -66,12 +66,13 @@ class WorldDataExportService(
             )
         }
         val portalSnapshots = worlds.flatMap { core.getRelatedPortals(it.uuid) }.distinctBy { it.id }
-        val bootstrapWorldDirectory = Bukkit.getWorlds()
-            .asSequence()
-            .map { it.worldFolder.toPath() }
-            .firstOrNull { Files.isRegularFile(it.resolve("level.dat")) }
+        val serverMainWorld = Bukkit.getWorlds().firstOrNull()
+        val serverMainWorldDirectory = serverMainWorld
+            ?.worldFolder
+            ?.toPath()
+            ?.takeIf { Files.isRegularFile(it.resolve("level.dat")) }
             ?: return CompletableFuture.completedFuture(
-                WorldDataExportResult(false, null, "bootstrap level.dat is unavailable")
+                WorldDataExportResult(false, null, "server main world level.dat is unavailable")
             )
 
         val fiscalYear = plugin.config.getInt("standalone_export.fiscal_year")
@@ -85,7 +86,7 @@ class WorldDataExportService(
                 val primary = worlds.first()
                 copyPrimaryWorld(
                     worldDirectories.getValue(primary.uuid),
-                    bootstrapWorldDirectory,
+                    serverMainWorldDirectory,
                     staging.toPath()
                 )
                 val now = System.currentTimeMillis()
@@ -118,7 +119,15 @@ class WorldDataExportService(
                     spawnCoordinates,
                     portalSnapshots
                 )
-                writeManifest(staging, output.name, fiscalYear, primary, worlds, portalSnapshots)
+                writeManifest(
+                    staging,
+                    output.name,
+                    fiscalYear,
+                    primary,
+                    worlds,
+                    portalSnapshots,
+                    serverMainWorld.name,
+                )
                 zipWorld(staging.toPath(), temporaryZip.toPath())
                 try {
                     Files.move(
@@ -159,19 +168,36 @@ class WorldDataExportService(
         }
     }
 
-    private fun copyPrimaryWorld(source: Path, bootstrapWorld: Path, target: Path) {
+    private fun copyPrimaryWorld(source: Path, serverMainWorld: Path, target: Path) {
         require(Files.isDirectory(source)) { "primary world directory is missing: $source" }
         copyTree(source, target) { path ->
-            path.fileName?.toString() !in ROOT_EXCLUDED_FILES
+            val relative = source.relativize(path)
+            val first = relative.iterator().asSequence().firstOrNull()?.toString()
+            path.fileName?.toString() !in ROOT_EXCLUDED_FILES &&
+                first !in SERVER_MAIN_DATA_PATHS
+        }
+        SERVER_MAIN_DATA_PATHS.forEach { name ->
+            val sourcePath = serverMainWorld.resolve(name)
+            val targetPath = target.resolve(name)
+            if (Files.isDirectory(sourcePath)) {
+                copyTree(sourcePath, targetPath)
+            } else if (Files.isRegularFile(sourcePath)) {
+                Files.copy(
+                    sourcePath,
+                    targetPath,
+                    StandardCopyOption.REPLACE_EXISTING,
+                    StandardCopyOption.COPY_ATTRIBUTES,
+                )
+            }
         }
         if (!Files.isRegularFile(target.resolve("level.dat"))) {
             Files.copy(
-                bootstrapWorld.resolve("level.dat"),
+                serverMainWorld.resolve("level.dat"),
                 target.resolve("level.dat"),
                 StandardCopyOption.REPLACE_EXISTING,
                 StandardCopyOption.COPY_ATTRIBUTES
             )
-            val oldLevelData = bootstrapWorld.resolve("level.dat_old")
+            val oldLevelData = serverMainWorld.resolve("level.dat_old")
             if (Files.isRegularFile(oldLevelData)) {
                 Files.copy(
                     oldLevelData,
@@ -212,6 +238,31 @@ class WorldDataExportService(
                     copyTree(sourceDirectory, target.resolve(name))
                 }
             }
+            copyAdditionalDimensionData(source.resolve("data"), target.resolve("data"))
+        }
+    }
+
+    private fun copyAdditionalDimensionData(source: Path, target: Path) {
+        if (!Files.isDirectory(source)) return
+        Files.walk(source).use { paths ->
+            paths.sorted(Comparator.comparing { source.relativize(it).toString() }).forEach { path ->
+                val relative = source.relativize(path)
+                if (relative.toString().isEmpty()) return@forEach
+                val classification = StandaloneAdditionalWorldDataPolicy.classify(relative)
+                if (classification != AdditionalWorldDataDisposition.DIMENSION) return@forEach
+                val destination = target.resolve(relative)
+                if (Files.isDirectory(path)) {
+                    Files.createDirectories(destination)
+                } else {
+                    Files.createDirectories(destination.parent)
+                    Files.copy(
+                        path,
+                        destination,
+                        StandardCopyOption.REPLACE_EXISTING,
+                        StandardCopyOption.COPY_ATTRIBUTES,
+                    )
+                }
+            }
         }
     }
 
@@ -221,7 +272,8 @@ class WorldDataExportService(
         fiscalYear: Int,
         primary: WorldData,
         worlds: List<WorldData>,
-        portals: List<me.awabi2048.myworldmanager.api.service.ApiPortalSnapshot>
+        portals: List<me.awabi2048.myworldmanager.api.service.ApiPortalSnapshot>,
+        serverMainWorldName: String,
     ) {
         val manifest = YamlConfiguration()
         manifest.set("format", 2)
@@ -230,6 +282,15 @@ class WorldDataExportService(
         manifest.set("fiscal_year", fiscalYear)
         manifest.set("game_mode", "creative")
         manifest.set("allow_commands", true)
+        manifest.set("shared_data_source", serverMainWorldName)
+        manifest.set(
+            "additional_world_data_policy",
+            linkedMapOf(
+                "dimension" to StandaloneAdditionalWorldDataPolicy.dimensionDescriptions,
+                "primary_only" to StandaloneAdditionalWorldDataPolicy.primaryOnlyDescriptions,
+                "excluded" to StandaloneAdditionalWorldDataPolicy.excludedDescriptions,
+            ),
+        )
         manifest.set("primary_world_uuid", primary.uuid.toString())
         manifest.set(
             "worlds",
@@ -351,11 +412,60 @@ class WorldDataExportService(
 
     companion object {
         private val ROOT_EXCLUDED_FILES = setOf("session.lock", "uid.dat")
+        private val SERVER_MAIN_DATA_PATHS = setOf("level.dat", "level.dat_old", "data")
         private val DIMENSION_DIRECTORIES = listOf("region", "entities", "poi")
     }
 }
 
 private data class ExportCoordinates(val x: Double, val y: Double, val z: Double, val yaw: Float)
+
+internal enum class AdditionalWorldDataDisposition {
+    DIMENSION,
+    PRIMARY_ONLY,
+    EXCLUDED,
+}
+
+/**
+ * 追加ワールドの保存データを、完全バニラの単一ワールドへ移す際の分類。
+ *
+ * map data と idcounts は全ディメンションで共有されるため、追加ワールド由来の値を
+ * そのまま統合するとID衝突が起きる。level.dat 内の値も同様に複数値を保持できない。
+ * ディメンションごとに読み込まれる SavedData だけを各dimensionの data/ へ移す。
+ */
+internal object StandaloneAdditionalWorldDataPolicy {
+    val dimensionDescriptions = listOf(
+        "raids and other dimension-local SavedData under dimensions/<namespace>/<id>/data/",
+        "Paper persistent dimension data when stored as an ordinary SavedData file",
+    )
+    val primaryOnlyDescriptions = listOf(
+        "map_*.dat and idcounts.dat (use the running server main world directory data)",
+        "scoreboard.dat and command_storage_*.dat (use the running server main world directory data)",
+        "level.dat values including world border, game rules, day time, weather and scheduled events (use the running server main world as the base)",
+    )
+    val excludedDescriptions = listOf(
+        "session.lock and uid.dat",
+        "unknown plugin-private files that are not ordinary .dat SavedData",
+    )
+
+    fun classify(relative: Path): AdditionalWorldDataDisposition {
+        val name = relative.fileName?.toString().orEmpty()
+        if (name == "idcounts.dat" || MAP_DATA.matches(name)) {
+            return AdditionalWorldDataDisposition.PRIMARY_ONLY
+        }
+        if (name == "scoreboard.dat" || name.startsWith("command_storage_")) {
+            return AdditionalWorldDataDisposition.PRIMARY_ONLY
+        }
+        if (name == "session.lock" || name == "uid.dat") {
+            return AdditionalWorldDataDisposition.EXCLUDED
+        }
+        if (name.endsWith(".dat") || name.endsWith(".dat_old")) {
+            return AdditionalWorldDataDisposition.DIMENSION
+        }
+        return AdditionalWorldDataDisposition.EXCLUDED
+    }
+
+    private val MAP_DATA = Regex("""map_\d+\.dat(?:_old)?""")
+}
 
 internal object StandaloneExportFileName {
     private val forbidden = Regex("""[\\/:*?"<>|\u0000-\u001f]""")
