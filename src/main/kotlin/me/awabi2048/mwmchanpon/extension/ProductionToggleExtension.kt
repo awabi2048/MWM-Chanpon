@@ -1,11 +1,13 @@
 package me.awabi2048.mwmchanpon.extension
-import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
-
-import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuDialogButton
+import com.awabi2048.ccsystem.api.gui.MenuDialogHandler
+import com.awabi2048.ccsystem.api.gui.MenuDialogRequest
+import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
@@ -23,7 +25,6 @@ import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.event.MwmWorldCreatedEvent
 import me.awabi2048.myworldmanager.api.extension.MenuExtension
 import me.awabi2048.myworldmanager.api.extension.MenuExtensionContext
-import me.awabi2048.myworldmanager.api.extension.WorldSettingsInventoryHolder
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsMenuRequest
 import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.session.WorldCreationSession
@@ -169,57 +170,43 @@ class ProductionToggleExtension(
         return true
     }
 
-    @EventHandler
-    fun onConfirmationClick(event: InventoryClickEvent) {
-        val player = event.whoClicked as? Player ?: return
-        val holder = event.view.topInventory.holder as? SubmissionConfirmationHolder ?: return
-        event.cancelWithDebug("ProductionToggleExtension.onConfirmationClick: confirm_click")
-        if (event.clickedInventory != event.view.topInventory) return
-        val item = event.currentItem ?: return
-        when (ItemTag.getType(item)) {
-            ItemTag.TYPE_GUI_CONFIRM -> {
-                holder.resolved = true
-                ManagedMenuPresenter.close(player)
-                executeConfirmedAction(player, holder.worldUuid, holder.action)
-                returnToWorldSettings(player, holder.worldUuid, holder.request)
-            }
-            ItemTag.TYPE_GUI_CANCEL -> {
-                holder.resolved = true
-                player.sendMessage(i18n(player, "message.cancelled_confirmation"))
-                returnToWorldSettings(player, holder.worldUuid, holder.request)
-            }
-        }
-    }
-
     private fun openConfirmation(
         player: Player,
         worldUuid: UUID,
         action: ConfirmationAction,
         request: WorldSettingsMenuRequest
     ) {
-        val holder = SubmissionConfirmationHolder(worldUuid, action, request)
-        val layout = ChanponGuiElements.confirmationLayout()
-        val inventory = Bukkit.createInventory(
-            holder,
-            layout.size,
-            i18nComponent(player, "confirm.${action.key}.title")
+        CCSystem.getAPI().getMenuDialogService().show(
+            player,
+            MenuDialogRequest(
+                owner = "mwmchanpon",
+                id = "production-${action.key}-confirmation",
+                title = i18nComponent(player, "confirm.${action.key}.title"),
+                body = i18nList(player, "confirm.${action.key}.lore").map(Component::text),
+                confirm = MenuDialogButton(
+                    i18nComponent(player, "confirm.button.confirm.display"),
+                    MenuDialogHandler { target, _ ->
+                        executeConfirmedAction(target, worldUuid, action)
+                        returnToWorldSettings(target, worldUuid, request)
+                        MenuActionResult.Success(MenuUpdate.Close)
+                    },
+                ),
+                cancel = MenuDialogButton(
+                    i18nComponent(player, "confirm.button.cancel.display"),
+                    MenuDialogHandler { target, _ ->
+                        target.sendMessage(i18n(target, "message.cancelled_confirmation"))
+                        returnToWorldSettings(target, worldUuid, request)
+                        MenuActionResult.Success(MenuUpdate.Close)
+                    },
+                ),
+            ),
         )
-        holder.inv = inventory
-
-        applyConfirmationFrame(inventory)
-        ChanponGuiElements.setConfirmationItems(
-            inventory,
-            createConfirmationCenterItem(player, action),
-            createConfirmationButton(player, true),
-            createConfirmationButton(player, false)
-        )
-        ManagedMenuPresenter.open(player, inventory)
     }
 
     private fun returnToWorldSettings(player: Player, worldUuid: UUID, request: WorldSettingsMenuRequest) {
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
         if (worldData == null) {
-            ManagedMenuPresenter.close(player)
+            CCSystem.getAPI().getMenuRuntimeService().close(player)
             return
         }
         mwm().worldSettingsGui.open(
@@ -441,33 +428,6 @@ class ProductionToggleExtension(
         return item
     }
 
-    private fun createConfirmationCenterItem(player: Player, action: ConfirmationAction): ItemStack {
-        val item = ItemStack(action.material)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "confirm.${action.key}.display"))
-            meta.lore(ChanponLore.build(i18nList(player, "confirm.${action.key}.lore").map(GuiLoreLine::Text)))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
-        return item
-    }
-
-    private fun createConfirmationButton(player: Player, confirm: Boolean): ItemStack {
-        val item = ItemStack(if (confirm) Material.LIME_CONCRETE else Material.RED_CONCRETE)
-        val key = if (confirm) "confirm.button.confirm" else "confirm.button.cancel"
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "$key.display"))
-            meta.lore(null)
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        ItemTag.tagItem(item, if (confirm) ItemTag.TYPE_GUI_CONFIRM else ItemTag.TYPE_GUI_CANCEL)
-        return item
-    }
-
-    private fun applyConfirmationFrame(inventory: Inventory) {
-        ChanponGuiElements.applyConfirmationFrame(inventory)
-    }
-
     private fun createDecorationItem(material: Material): ItemStack {
         return ChanponGuiElements.decoration(material)
     }
@@ -502,20 +462,10 @@ class ProductionToggleExtension(
         private const val ACTION_UNSET_PRODUCTION = "unset_production"
     }
 
-    private enum class ConfirmationAction(val key: String, val material: Material) {
-        SET_PRODUCTION("set_production", Material.HEART_OF_THE_SEA),
-        UNSET_PRODUCTION("unset_production", Material.REDSTONE),
-        SUBMIT("submit", Material.BRICKS)
+    private enum class ConfirmationAction(val key: String) {
+        SET_PRODUCTION("set_production"),
+        UNSET_PRODUCTION("unset_production"),
+        SUBMIT("submit")
     }
 
-    private class SubmissionConfirmationHolder(
-        val worldUuid: UUID,
-        val action: ConfirmationAction,
-        val request: WorldSettingsMenuRequest
-    ) : WorldSettingsInventoryHolder {
-        lateinit var inv: Inventory
-        var resolved: Boolean = false
-
-        override fun getInventory(): Inventory = inv
-    }
 }
