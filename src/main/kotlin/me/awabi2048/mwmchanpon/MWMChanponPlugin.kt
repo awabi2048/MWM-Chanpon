@@ -45,6 +45,7 @@ import me.awabi2048.mwmchanpon.tool.LuckPermsToolPermissionService
 import me.awabi2048.mwmchanpon.tool.ToolPermissionConfig
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.mwmchanpon.ui.AutomationSettingsMenu
+import me.awabi2048.mwmchanpon.ui.AnnualArchiveFlow
 import me.awabi2048.mwmchanpon.ui.BackupListMenu
 import me.awabi2048.mwmchanpon.ui.ChanponAdminMenu
 import me.awabi2048.mwmchanpon.ui.ChanponAdminWorldListMenu
@@ -88,6 +89,7 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var linkedPortalMenuExtension: LinkedPortalMenuExtension
     private lateinit var environmentGui: ChanponEnvironmentGui
     private lateinit var archiveService: ArchiveService
+    private lateinit var annualArchiveFlow: AnnualArchiveFlow
     private lateinit var worldAccessPolicy: ChanponWorldAccessPolicy
     private lateinit var worldMenuAccessProvider: ChanponWorldMenuAccessProvider
     private lateinit var worldPortalPolicy: ChanponWorldPortalPolicy
@@ -176,7 +178,14 @@ class MWMChanponPlugin : JavaPlugin() {
         worldDataExportService = WorldDataExportService(this, chanponStorage)
         backupListMenu = BackupListMenu(this, backupService)
         archiveService = ArchiveService(this, chanponStorage, globalStorage)
-        worldDataManagementMenu = WorldDataManagementMenu(this, chanponStorage, backupService, backupListMenu, archiveService)
+        annualArchiveFlow = AnnualArchiveFlow(this, archiveService)
+        worldDataManagementMenu = WorldDataManagementMenu(
+            this,
+            chanponStorage,
+            backupService,
+            backupListMenu,
+            annualArchiveFlow,
+        )
         worldDataExportMenu = WorldDataExportMenu(this, worldDataExportService)
         automationService = BackupAutomationService(this, chanponStorage, backupService)
         manualRollbackService = ManualRollbackService(this)

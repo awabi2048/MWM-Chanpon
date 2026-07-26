@@ -5,7 +5,6 @@ CREATE_INVENTORY|1|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponDiscoveryMe
 CREATE_INVENTORY|1|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponPlayerWorldMenuProvider.kt
 CREATE_INVENTORY|1|src/main/kotlin/me/awabi2048/mwmchanpon/ui/SubmittedWorldMenuProvider.kt
 CREATE_INVENTORY|1|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ToolPermissionMenu.kt
-CREATE_INVENTORY|2|src/main/kotlin/me/awabi2048/mwmchanpon/ui/AnnualArchiveFlow.kt
 CREATE_INVENTORY|2|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponFavoriteVisitMenuProvider.kt
 CREATE_INVENTORY|3|src/main/kotlin/me/awabi2048/mwmchanpon/extension/WorldBackupMenuExtension.kt
 CREATE_INVENTORY|4|src/main/kotlin/me/awabi2048/mwmchanpon/ui/SubmissionAdminMenu.kt
@@ -18,7 +17,6 @@ DIALOG_CREATE|2|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponEnvironmentGui
 INVENTORY_CLICK_EVENT|2|src/main/kotlin/me/awabi2048/mwmchanpon/extension/LinkedPortalMenuExtension.kt
 INVENTORY_CLICK_EVENT|2|src/main/kotlin/me/awabi2048/mwmchanpon/extension/ToolPermissionMenuExtension.kt
 INVENTORY_CLICK_EVENT|2|src/main/kotlin/me/awabi2048/mwmchanpon/listener/ToolPermissionMenuListener.kt
-INVENTORY_CLICK_EVENT|2|src/main/kotlin/me/awabi2048/mwmchanpon/ui/AnnualArchiveFlow.kt
 INVENTORY_CLICK_EVENT|2|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponAdminWorldListMenu.kt
 INVENTORY_CLICK_EVENT|2|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponCreationConfirmationMenuProvider.kt
 INVENTORY_CLICK_EVENT|2|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponDiscoveryMenuProvider.kt

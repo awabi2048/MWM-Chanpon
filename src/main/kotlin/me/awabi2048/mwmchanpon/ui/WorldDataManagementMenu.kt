@@ -19,7 +19,6 @@ import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.backup.BackupKind
 import me.awabi2048.mwmchanpon.backup.BackupOperationStatus
 import me.awabi2048.mwmchanpon.backup.BackupService
-import me.awabi2048.mwmchanpon.service.ArchiveService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.model.WorldData
@@ -35,7 +34,7 @@ class WorldDataManagementMenu(
     private val storage: ChanponWorldStorage,
     private val backupService: BackupService,
     private val backupListMenu: BackupListMenu,
-    private val archiveService: ArchiveService,
+    private val annualArchiveFlow: AnnualArchiveFlow,
 ) {
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
     private val childReturnPages = ConcurrentHashMap<UUID, Int>()
@@ -320,7 +319,7 @@ class WorldDataManagementMenu(
     private fun startAnnualArchive(context: MenuActionContext): MenuActionResult {
         Bukkit.getScheduler().runTask(
             plugin,
-            Runnable { AnnualArchiveFlow(plugin, archiveService).start(context.player) },
+            Runnable { annualArchiveFlow.start(context.player) },
         )
         return MenuActionResult.Success(MenuUpdate.Close)
     }
