@@ -67,6 +67,7 @@ class WorldDataExportService(
         }
         val portalSnapshots = worlds.flatMap { core.getRelatedPortals(it.uuid) }.distinctBy { it.id }
         val serverMainWorld = Bukkit.getWorlds().firstOrNull()
+        serverMainWorld?.save()
         val serverMainWorldDirectory = serverMainWorld
             ?.worldFolder
             ?.toPath()
