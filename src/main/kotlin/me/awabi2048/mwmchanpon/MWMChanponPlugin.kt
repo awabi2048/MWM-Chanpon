@@ -293,7 +293,6 @@ class MWMChanponPlugin : JavaPlugin() {
         if (server.pluginManager.isPluginEnabled("Chanpon-Utilities")) {
             server.pluginManager.registerEvents(FreecamWorldPolicyListener(chanponStorage), this)
         }
-        server.pluginManager.registerEvents(easyVoidWorldCreationService, this)
         server.pluginManager.registerEvents(playerWorldMenuProvider, this)
         server.pluginManager.registerEvents(worldMenuAccessProvider, this)
         server.pluginManager.registerEvents(publishLevelSynchronizer, this)

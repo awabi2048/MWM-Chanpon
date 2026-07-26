@@ -6,7 +6,6 @@ CREATE_INVENTORY|5|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponEnvironment
 CREATE_INVENTORY|6|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponWorldSettingsMenuProvider.kt
 DIALOG_CREATE|1|src/main/kotlin/me/awabi2048/mwmchanpon/extension/ChanponWorldMenuAccessProvider.kt
 DIALOG_CREATE|1|src/main/kotlin/me/awabi2048/mwmchanpon/extension/WorldBackupMenuExtension.kt
-DIALOG_CREATE|2|src/main/kotlin/me/awabi2048/mwmchanpon/service/EasyVoidWorldCreationService.kt
 DIALOG_CREATE|2|src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponEnvironmentGui.kt
 INVENTORY_CLICK_EVENT|2|src/main/kotlin/me/awabi2048/mwmchanpon/extension/LinkedPortalMenuExtension.kt
 INVENTORY_CLICK_EVENT|2|src/main/kotlin/me/awabi2048/mwmchanpon/extension/ToolPermissionMenuExtension.kt
