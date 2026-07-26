@@ -119,7 +119,7 @@ class ChanponEnvironmentGui(
             ACTION_TIME -> {
                 if (context.click.isShiftClick && context.click.isLeftClick) {
                     showCustomTimeDialog(context.player, worldData)
-                    return MenuActionResult.Success(MenuUpdate.Close)
+                    return MenuActionResult.Success(MenuUpdate.None)
                 } else {
                     cycleTime(worldData, direction ?: return MenuActionResult.Ignored)
                 }
@@ -139,7 +139,7 @@ class ChanponEnvironmentGui(
                         worldData,
                         storage.getProtectionPassword(worldData.uuid).orEmpty(),
                     )
-                    return MenuActionResult.Success(MenuUpdate.Close)
+                    return MenuActionResult.Success(MenuUpdate.None)
                 } else {
                     cycleProtection(worldData, direction ?: return MenuActionResult.Ignored)
                 }

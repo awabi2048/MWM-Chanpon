@@ -32,6 +32,25 @@ class MenuRuntimeNavigationContractTest {
         assertFalse("MenuUpdate.Close" in backBody)
     }
 
+    @Test
+    fun `creation transitions leave the newly opened surface active`() {
+        val source = uiRoot.resolve("ChanponPlayerWorldMenuProvider.kt").readText()
+        val body = functionBody(source, "createWorld")
+        assertTrue("startEasyCreation(player)" in body)
+        assertTrue("MenuUpdate.None" in body)
+        assertFalse("runTask" in body)
+    }
+
+    @Test
+    fun `environment dialogs do not request inventory close`() {
+        val source = uiRoot.resolve("ChanponEnvironmentGui.kt").readText()
+        val body = functionBody(source, "setting")
+        assertTrue("showCustomTimeDialog(context.player, worldData)" in body)
+        assertTrue("showProtectionPasswordDialog(" in body)
+        assertTrue(body.split("MenuUpdate.None").size >= 3)
+        assertFalse("MenuUpdate.Close" in body)
+    }
+
     private fun functionBody(source: String, name: String): String {
         val start = source.indexOf("private fun $name").takeIf { it >= 0 }
             ?: source.indexOf("fun $name").takeIf { it >= 0 }

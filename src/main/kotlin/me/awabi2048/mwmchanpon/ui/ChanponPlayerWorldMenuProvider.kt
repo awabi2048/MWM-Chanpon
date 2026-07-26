@@ -219,16 +219,14 @@ class ChanponPlayerWorldMenuProvider(
         }
         if (context.click.isRightClick && !context.click.isShiftClick) {
             startEasyCreation(player)
-            return MenuActionResult.Success(MenuUpdate.Close)
+            return MenuActionResult.Success(MenuUpdate.None)
         }
-        Bukkit.getScheduler().runTask(plugin, Runnable {
-            val session = mwm.creationSessionManager.startSession(player.uniqueId)
-            session.isDialogMode = true
-            session.billingMode = WorldPointBillingMode.NONE
-            player.sendMessage(mwm.languageManager.getMessage(player, "messages.wizard_start"))
-            mwm.creationGui.openTypeSelection(player)
-        })
-        return MenuActionResult.Success(MenuUpdate.Close)
+        val session = mwm.creationSessionManager.startSession(player.uniqueId)
+        session.isDialogMode = true
+        session.billingMode = WorldPointBillingMode.NONE
+        player.sendMessage(mwm.languageManager.getMessage(player, "messages.wizard_start"))
+        mwm.creationGui.openTypeSelection(player)
+        return MenuActionResult.Success(MenuUpdate.None)
     }
 
     private fun openUserSettings(context: MenuActionContext): MenuActionResult {
