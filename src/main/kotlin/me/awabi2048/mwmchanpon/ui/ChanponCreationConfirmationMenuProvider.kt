@@ -23,6 +23,7 @@ import me.awabi2048.myworldmanager.util.GuiItemFactory
 import me.awabi2048.myworldmanager.util.GuiLoreActions
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
+import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.World
 import org.bukkit.entity.Player
@@ -67,6 +68,14 @@ class ChanponCreationConfirmationMenuProvider(
                         }
                     },
                 ),
+                onClose = { context ->
+                    Bukkit.getScheduler().runTaskLater(mwm(), Runnable {
+                        val current = CCSystem.getAPI().getMenuNavigationService().currentRoute(context.player)
+                        if (current?.owner != RUNTIME_OWNER || current.id != ROUTE_CONFIRMATION) {
+                            mwm().creationSessionManager.endSession(context.player.uniqueId)
+                        }
+                    }, 2L)
+                },
             ),
         )
     }
@@ -74,8 +83,7 @@ class ChanponCreationConfirmationMenuProvider(
     override fun getId(): String = PROVIDER_ID
 
     override fun open(player: Player, session: WorldCreationSession): Boolean {
-        runtime.open(player, MenuRoute(RUNTIME_OWNER, ROUTE_CONFIRMATION))
-        return true
+        return runtime.navigate(player, MenuRoute(RUNTIME_OWNER, ROUTE_CONFIRMATION))
     }
 
     private fun render(player: Player, session: WorldCreationSession): InventoryMenuView {

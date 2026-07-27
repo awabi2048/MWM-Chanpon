@@ -64,6 +64,23 @@ class MenuRuntimeNavigationContractTest {
         assertFalse("showConfirmDialog" in source)
     }
 
+    @Test
+    fun `公開メニュープロバイダーはRuntimeの表示結果と親経路を保持する`() {
+        val environment = uiRoot.resolve("ChanponEnvironmentGui.kt").readText()
+        assertTrue("runtime.navigate(player, route(worldData.uuid))" in environment)
+        assertFalse("runtime.open(player, route(worldData.uuid))" in environment)
+
+        val confirmation = uiRoot.resolve("ChanponCreationConfirmationMenuProvider.kt").readText()
+        assertTrue("return runtime.navigate(" in confirmation)
+
+        listOf("ChanponPlayerWorldMenuProvider.kt", "SubmittedWorldMenuProvider.kt").forEach { file ->
+            val source = uiRoot.resolve(file).readText()
+            assertTrue("runtime.navigate(" in source, file)
+            assertTrue("runtime.open(" in source, file)
+            assertTrue("return opened" in source, file)
+        }
+    }
+
     private fun functionBody(source: String, name: String): String {
         val start = source.indexOf("private fun $name").takeIf { it >= 0 }
             ?: source.indexOf("fun $name").takeIf { it >= 0 }

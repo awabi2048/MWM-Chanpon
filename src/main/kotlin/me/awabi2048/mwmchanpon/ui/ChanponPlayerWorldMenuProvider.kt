@@ -79,7 +79,17 @@ class ChanponPlayerWorldMenuProvider(
         if (mwm.playerPlatformResolver.isBedrock(player)) return false
         val targetPlayerUuid = request.targetPlayerUuid ?: player.uniqueId
         val targetPlayerName = request.targetPlayerName ?: player.name
-        runtime.open(
+        val opened = if (request.showBackButton) runtime.navigate(
+            player,
+            route(
+                Source(
+                    request.page,
+                    request.showBackButton,
+                    targetPlayerUuid,
+                    targetPlayerName,
+                ),
+            ),
+        ) else runtime.open(
             player,
             route(
                 Source(
@@ -90,8 +100,8 @@ class ChanponPlayerWorldMenuProvider(
                 ),
             ),
         )
-        clearGuiTransitionLater(player)
-        return true
+        if (opened) clearGuiTransitionLater(player)
+        return opened
     }
 
     private fun render(player: Player, source: Source): InventoryMenuView {

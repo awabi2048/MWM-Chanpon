@@ -73,8 +73,7 @@ class ChanponWorldSettingsMenuProvider(
     override fun getId(): String = PROVIDER_ID
 
     override fun open(player: Player, worldData: WorldData, request: WorldSettingsMenuRequest): Boolean {
-        runtime.navigate(player, route(Source(Screen.MAIN, worldData.uuid, request)))
-        return true
+        return runtime.navigate(player, route(Source(Screen.MAIN, worldData.uuid, request)))
     }
 
     private fun render(player: Player, source: Source): InventoryMenuView {
@@ -315,7 +314,6 @@ class ChanponWorldSettingsMenuProvider(
                 openCriticalMenu(player, worldData)
             }
             ItemTag.TYPE_GUI_SETTING_ENVIRONMENT -> {
-                pushSettingsRoute(player, worldData)
                 environmentGui.open(player, worldData)
             }
             ItemTag.TYPE_GUI_SETTING_INFO -> {

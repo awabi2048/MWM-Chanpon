@@ -67,14 +67,13 @@ class ChanponAdminWorldListMenu(
 
     override fun open(player: Player, request: AdminWorldListRequest): Boolean {
         val previous = sessions[player.uniqueId] ?: ListState()
-        open(
+        return open(
             player,
             page = request.page ?: previous.page,
             visibilityFilter = previous.visibilityFilter,
             sortType = previous.sortType,
             fromAdminMenu = request.fromAdminMenu ?: previous.fromAdminMenu,
         )
-        return true
     }
 
     fun open(
@@ -86,10 +85,12 @@ class ChanponAdminWorldListMenu(
             sessions[player.uniqueId]?.sortType ?: SortType.CREATED_DESC,
         fromAdminMenu: Boolean =
             sessions[player.uniqueId]?.fromAdminMenu ?: false,
-    ) {
+    ): Boolean {
         val state = ListState(page, visibilityFilter, sortType, fromAdminMenu)
         sessions[player.uniqueId] = state
-        runtime.navigate(player, listRoute(state))
+        val opened = runtime.navigate(player, listRoute(state))
+        if (!opened) sessions.remove(player.uniqueId)
+        return opened
     }
 
     private fun renderList(player: Player, route: MenuRoute): InventoryMenuView {

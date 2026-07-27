@@ -62,7 +62,7 @@ class ChanponEnvironmentGui(
 
     fun open(player: Player, worldData: WorldData) {
         if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
-        runtime.open(player, route(worldData.uuid))
+        runtime.navigate(player, route(worldData.uuid))
     }
 
     private fun render(player: Player, worldData: WorldData?): InventoryMenuView {

@@ -33,6 +33,7 @@ import me.awabi2048.myworldmanager.util.GuiItemFactory
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
+import org.bukkit.Bukkit
 import org.bukkit.HeightMap
 import org.bukkit.Location
 import org.bukkit.Material
@@ -72,6 +73,15 @@ class EasyVoidWorldCreationService(
                     ACTION_CREATE to MenuActionHandler { context -> confirmCreation(context.player) },
                     ACTION_BACK to MenuActionHandler { context -> returnToNameInput(context.player) },
                 ),
+                onClose = { context ->
+                    Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+                        val current = CCSystem.getAPI().getMenuNavigationService().currentRoute(context.player)
+                        if (current?.owner != OWNER || current.id != CONFIRM_ROUTE) {
+                            pendingCreations.remove(context.player.uniqueId)
+                            returnRoutes.remove(context.player.uniqueId)
+                        }
+                    }, 2L)
+                },
             ),
         )
     }

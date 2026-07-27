@@ -45,6 +45,14 @@ class SubmittedWorldMenuProvider(
                 id = ROUTE,
                 renderer = { context -> render(context.player, context.route) },
                 actions = mapOf(ACTION_BACK to MenuActionHandler(::handleReturn)),
+                onClose = { context ->
+                    Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+                        val current = CCSystem.getAPI().getMenuNavigationService().currentRoute(context.player)
+                        if (current?.owner != OWNER || current.id != ROUTE) {
+                            requests.remove(context.player.uniqueId)
+                        }
+                    }, 2L)
+                },
             ),
         )
     }
@@ -61,11 +69,13 @@ class SubmittedWorldMenuProvider(
         }
 
         requests[player.uniqueId] = request
-        runtime.open(
+        val route = MenuRoute(OWNER, ROUTE, mapOf(WORLD_UUID to worldData.uuid.toString()))
+        val opened = if (request.showBackButton) runtime.navigate(
             player,
-            MenuRoute(OWNER, ROUTE, mapOf(WORLD_UUID to worldData.uuid.toString())),
-        )
-        return true
+            route,
+        ) else runtime.open(player, route)
+        if (!opened) requests.remove(player.uniqueId)
+        return opened
     }
 
     private fun render(player: Player, route: MenuRoute): InventoryMenuView {

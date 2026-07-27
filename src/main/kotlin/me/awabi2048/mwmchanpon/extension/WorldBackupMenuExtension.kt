@@ -85,13 +85,12 @@ class WorldBackupMenuExtension(
         if (ItemTag.getExtensionId(item) != EXTENSION_ID) return false
         val worldUuid = ItemTag.getWorldUuid(item) ?: return false
         if (ownedProductionWorld(player, worldUuid) == null) return true
-        open(player, worldUuid)
-        return true
+        return open(player, worldUuid)
     }
 
-    fun open(player: Player, worldUuid: UUID, page: Int = 0) {
-        if (ownedProductionWorld(player, worldUuid) == null) return
-        runtime.open(player, route(worldUuid, page, currentRequest(player)))
+    fun open(player: Player, worldUuid: UUID, page: Int = 0): Boolean {
+        if (ownedProductionWorld(player, worldUuid) == null) return false
+        return runtime.navigate(player, route(worldUuid, page, currentRequest(player)))
     }
 
     private fun render(player: Player, source: Holder): InventoryMenuView {

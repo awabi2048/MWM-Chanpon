@@ -38,8 +38,9 @@ class ChanponWorldMenuAccessProvider(
         }
 
         pendingPasswordInputs[player.uniqueId] = PasswordRequest(worldData.uuid, showBackButton)
-        showPasswordDialog(player, worldData)
-        return true
+        val opened = showPasswordDialog(player, worldData)
+        if (!opened) pendingPasswordInputs.remove(player.uniqueId)
+        return opened
     }
 
     private fun submitPassword(player: Player, password: String): MenuActionResult {
@@ -68,10 +69,11 @@ class ChanponWorldMenuAccessProvider(
         return MenuActionResult.Success(MenuUpdate.Close)
     }
 
-    private fun showPasswordDialog(player: Player, worldData: WorldData) {
-        CCSystem.getAPI().getMenuDialogService().show(
-            player,
-            MenuDialogRequest(
+    private fun showPasswordDialog(player: Player, worldData: WorldData): Boolean {
+        return runCatching {
+            CCSystem.getAPI().getMenuDialogService().show(
+                player,
+                MenuDialogRequest(
                 owner = OWNER,
                 id = PASSWORD_DIALOG,
                 title = i18nComponent(player, "protection.password_title"),
@@ -96,8 +98,15 @@ class ChanponWorldMenuAccessProvider(
                         MenuActionResult.Success(MenuUpdate.Close)
                     },
                 ),
-            ),
-        )
+                ),
+            )
+            true
+        }.getOrElse { error ->
+            JavaPlugin.getPlugin(MyWorldManager::class.java).logger.warning(
+                "Failed to show password dialog for ${worldData.uuid}: ${error.message}"
+            )
+            false
+        }
     }
 
     private fun openWorldSettings(player: Player, worldData: WorldData, showBackButton: Boolean) {

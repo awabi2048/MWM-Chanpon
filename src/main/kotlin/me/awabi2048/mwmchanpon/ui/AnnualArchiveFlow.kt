@@ -47,6 +47,7 @@ class AnnualArchiveFlow(
                     ACTION_CONFIRM_NAME to MenuActionHandler(::confirmName),
                     ACTION_CANCEL to MenuActionHandler(::cancelFromMenu),
                 ),
+                onClose = { context -> cancelClosedStep(context.player.uniqueId, ArchiveStep.CONFIRM_NAME) },
             ),
         )
         runtime.register(
@@ -58,6 +59,7 @@ class AnnualArchiveFlow(
                     ACTION_EXECUTE to MenuActionHandler(::executeFromMenu),
                     ACTION_CANCEL to MenuActionHandler(::cancelFromMenu),
                 ),
+                onClose = { context -> cancelClosedStep(context.player.uniqueId, ArchiveStep.CONFIRM_FINAL) },
             ),
         )
     }
@@ -234,6 +236,13 @@ class AnnualArchiveFlow(
     private fun unregisterWhenIdle() {
         if (sessions.isEmpty()) {
             HandlerList.unregisterAll(this)
+        }
+    }
+
+    private fun cancelClosedStep(playerUuid: UUID, expectedStep: ArchiveStep) {
+        if (sessions[playerUuid]?.step == expectedStep) {
+            sessions.remove(playerUuid)
+            unregisterWhenIdle()
         }
     }
 
