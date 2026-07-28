@@ -123,7 +123,6 @@ class ChanponWorldSettingsMenuProvider(
             )
         }
         mwm.settingsSessionManager.getSession(player)?.showBackButton = request.showBackButton
-        GuiHelper.scheduleGuiTransitionReset(mwm, player)
 
         val session = mwm.settingsSessionManager.getSession(player)
         val isAdminFlow = session?.isAdminFlow == true
@@ -260,7 +259,6 @@ class ChanponWorldSettingsMenuProvider(
                 isGui = false
             )
         }
-        mwm.settingsSessionManager.getSession(player)?.let { it.isGuiTransition = false }
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
         val session = mwm.settingsSessionManager.getSession(player)
         val type = ItemTag.getType(item)
@@ -271,8 +269,7 @@ class ChanponWorldSettingsMenuProvider(
         // オーバーレイはMWM公開APIで表現できる設定だけを処理し、未公開のタグ編集入口を再公開しない。
         if (type == ItemTag.TYPE_GUI_INFO && ItemTag.getWorldUuid(item) == worldData.uuid) {
             if (isCurrentWorld(player, worldData)) return
-            mwm.settingsSessionManager.getSession(player)?.isGuiTransition = true
-            runtime.preserveHistoryOnClose(player)
+            runtime.suspendForExternal(player)
             mwm.worldService.teleportToWorldKeepingInventory(
                 player,
                 worldData.uuid,
@@ -282,7 +279,6 @@ class ChanponWorldSettingsMenuProvider(
                         "chanpon_warp=callback player=${player.name}/${player.uniqueId} world=${worldData.uuid} " +
                             "currentWorld=${player.world.name} holder=${player.openInventory.topInventory.holder?.javaClass?.name ?: "none"}"
                     )
-                    mwm.settingsSessionManager.getSession(player)?.isGuiTransition = true
                     Bukkit.getScheduler().runTaskLater(plugin, Runnable {
                         if (player.isOnline) {
                             player.sendMessage(
@@ -292,8 +288,7 @@ class ChanponWorldSettingsMenuProvider(
                                     mapOf("world" to worldData.name)
                                 )
                             )
-                            runtime.replace(player, route(source))
-                            mwm.settingsSessionManager.getSession(player)?.isGuiTransition = false
+                            runtime.resumeFromExternal(player)
                             mwm.logWorldSettingsDebug(
                                 "chanpon_warp=reopened player=${player.name}/${player.uniqueId} world=${worldData.uuid} " +
                                     "holder=${player.openInventory.topInventory.holder?.javaClass?.name ?: "none"}"

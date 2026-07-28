@@ -100,7 +100,6 @@ class ChanponPlayerWorldMenuProvider(
                 ),
             ),
         )
-        if (opened) clearGuiTransitionLater(player)
         return opened
     }
 
@@ -548,15 +547,6 @@ class ChanponPlayerWorldMenuProvider(
 
     private fun i18n(player: Player, key: String): String =
         CCSystem.getAPI().getI18nString(player, "chanpon.backup.$key")
-
-    private fun clearGuiTransitionLater(player: Player) {
-        plugin.server.scheduler.runTaskLater(plugin, Runnable {
-            val session = mwm().settingsSessionManager.getSession(player)
-            if (session != null && session.isGuiTransition) {
-                session.isGuiTransition = false
-            }
-        }, 5L)
-    }
 
     private fun List<String>.filterMeaningful(): List<String> =
         filter { line ->
