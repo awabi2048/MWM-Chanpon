@@ -955,9 +955,7 @@ class ChanponWorldSettingsMenuProvider(
             SettingIconActionDefinition(
                 intent,
                 click,
-                GuiLoreActions.single(
-                    language,
-                    player,
+                GuiLoreLine.Action(
                     language.getMessage(player, operationKey),
                     language.getMessage(player, actionKey),
                 ),
