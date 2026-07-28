@@ -175,7 +175,7 @@ class ChanponWorldSettingsMenuProvider(
             }
         }
         items[4] = worldInfoItem(player, worldData)
-        if (request.showBackButton) {
+        if (CCSystem.getAPI().getMenuNavigationService().canGoBack(player)) {
             items[if (isProtected) PROTECTED_BACK_SLOT else layout.infoSlot] = returnItem(player)
         }
 
@@ -272,6 +272,7 @@ class ChanponWorldSettingsMenuProvider(
         if (type == ItemTag.TYPE_GUI_INFO && ItemTag.getWorldUuid(item) == worldData.uuid) {
             if (isCurrentWorld(player, worldData)) return
             mwm.settingsSessionManager.getSession(player)?.isGuiTransition = true
+            runtime.preserveHistoryOnClose(player)
             mwm.worldService.teleportToWorldKeepingInventory(
                 player,
                 worldData.uuid,
@@ -291,7 +292,7 @@ class ChanponWorldSettingsMenuProvider(
                                     mapOf("world" to worldData.name)
                                 )
                             )
-                            open(player, worldData, currentRequest(player))
+                            runtime.replace(player, route(source))
                             mwm.settingsSessionManager.getSession(player)?.isGuiTransition = false
                             mwm.logWorldSettingsDebug(
                                 "chanpon_warp=reopened player=${player.name}/${player.uniqueId} world=${worldData.uuid} " +
@@ -361,14 +362,12 @@ class ChanponWorldSettingsMenuProvider(
                 environmentGui.open(player, worldData)
             }
             ItemTag.TYPE_GUI_SETTING_INFO -> {
-                pushSettingsRoute(player, worldData)
                 mwm.worldSettingsGui.editWorldInfo(player, worldData)
             }
             ItemTag.TYPE_GUI_SETTING_ICON -> {
                 mwm.worldSettingsGui.enterIconSelection(player, worldData)
             }
             ItemTag.TYPE_GUI_SETTING_SPAWN -> {
-                pushSettingsRoute(player, worldData)
                 val intent = settingIconIntent(player, type, click) ?: return
                 val isGuest = intent != SettingIconIntent.SET_MEMBER_SPAWN
                 mwm.worldSettingsGui.enterSpawnSetting(player, worldData, isGuest)
@@ -391,8 +390,7 @@ class ChanponWorldSettingsMenuProvider(
             ItemTag.TYPE_GUI_SETTING_ANNOUNCEMENT -> {
                 when (settingIconIntent(player, type, click) ?: return) {
                     SettingIconIntent.EDIT_ANNOUNCEMENT -> {
-                    pushSettingsRoute(player, worldData)
-                    mwm.worldSettingsGui.editAnnouncement(player, worldData)
+                        mwm.worldSettingsGui.editAnnouncement(player, worldData)
                     }
                     SettingIconIntent.CLEAR_ANNOUNCEMENT ->
                         mwm.worldSettingsGui.clearAnnouncements(player, worldData)
@@ -420,9 +418,7 @@ class ChanponWorldSettingsMenuProvider(
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
         when (ItemTag.getType(item)) {
             ItemTag.TYPE_GUI_RETURN -> {
-                if (!runtime.back(player)) {
-                    open(player, worldData, currentRequest(player))
-                }
+                runtime.back(player)
             }
             TYPE_EXPAND_DIRECTION -> {
                 if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
@@ -462,9 +458,7 @@ class ChanponWorldSettingsMenuProvider(
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(source.worldUuid) ?: return
         when (ItemTag.getType(item)) {
             ItemTag.TYPE_GUI_CANCEL -> {
-                if (!runtime.back(player)) {
-                    openExpansionMenu(player, worldData)
-                }
+                runtime.back(player)
             }
             ItemTag.TYPE_GUI_CONFIRM -> {
                 if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
@@ -478,9 +472,7 @@ class ChanponWorldSettingsMenuProvider(
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(source.worldUuid) ?: return
         when (ItemTag.getType(item)) {
             ItemTag.TYPE_GUI_CANCEL -> {
-                if (!runtime.back(player)) {
-                    openExpansionMenu(player, worldData)
-                }
+                runtime.back(player)
             }
             ItemTag.TYPE_GUI_CONFIRM -> {
                 if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
@@ -499,9 +491,7 @@ class ChanponWorldSettingsMenuProvider(
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
         when (ItemTag.getType(item)) {
             ItemTag.TYPE_GUI_RETURN -> {
-                if (!runtime.back(player)) {
-                    open(player, worldData, currentRequest(player))
-                }
+                runtime.back(player)
             }
             ItemTag.TYPE_GUI_SETTING_DELETE_WORLD -> {
                 if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
@@ -515,9 +505,7 @@ class ChanponWorldSettingsMenuProvider(
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(source.worldUuid) ?: return
         when (ItemTag.getType(item)) {
             ItemTag.TYPE_GUI_CANCEL -> {
-                if (!runtime.back(player)) {
-                    openCriticalMenu(player, worldData)
-                }
+                runtime.back(player)
             }
             ItemTag.TYPE_GUI_CONFIRM -> {
                 if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
@@ -596,14 +584,14 @@ class ChanponWorldSettingsMenuProvider(
                     if (index == 0) {
                         executeConfirmAction(player, latest, action, direction)
                     } else {
-                        open(player, latest, currentRequest(player))
+                        runtime.reopenCurrent(player)
                     }
                 })
             },
             onClosed = {
                 Bukkit.getScheduler().runTask(plugin, Runnable {
-                    val latest = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldData.uuid) ?: return@Runnable
-                    open(player, latest, currentRequest(player))
+                    if (MyWorldManagerApi.getWorldRepository()?.findByUuid(worldData.uuid) == null) return@Runnable
+                    runtime.reopenCurrent(player)
                 })
             }
         )
@@ -615,15 +603,13 @@ class ChanponWorldSettingsMenuProvider(
             ConfirmAction.EXPAND -> service?.expandWorldBorder(worldData.uuid, direction) == true
             ConfirmAction.STEP_BACK -> service?.stepBackWorldBorder(worldData.uuid) == true
         }
-        val latest = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldData.uuid) ?: worldData
         player.sendMessage(i18nComponent(player, if (success) action.successKey else action.failedKey))
         when {
             success && action == ConfirmAction.EXPAND -> {
                 mwm().settingsSessionManager.endSession(player)
                 runtime.close(player)
             }
-            success -> openExpansionMenu(player, latest)
-            else -> open(player, latest, currentRequest(player))
+            else -> runtime.reopenCurrent(player)
         }
     }
 
@@ -717,18 +703,6 @@ class ChanponWorldSettingsMenuProvider(
                 confirmButton(player, false),
             ),
         )
-    }
-
-    private fun pushSettingsRoute(player: Player, worldData: WorldData) {
-        val request = currentRequest(player)
-        mwm().mwmMenuRoutes.pushCustom(
-            player,
-            "chanpon.world_settings:${worldData.uuid}:$request"
-        ) { target ->
-            val latest = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldData.uuid) ?: return@pushCustom false
-            open(target, latest, request)
-            true
-        }
     }
 
     private fun renderExtensions(

@@ -189,7 +189,7 @@ class ChanponPlayerWorldMenuProvider(
                 payload(currentSource.copy(page = page - 1)),
             )
         }
-        if (source.showBackButton) {
+        if (CCSystem.getAPI().getMenuNavigationService().canGoBack(player)) {
             elements += MenuElement(
                 pageLayout.layout.backSlot,
                 createReturnItem(player),

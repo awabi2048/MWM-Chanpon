@@ -121,7 +121,7 @@ class ChanponAdminWorldListMenu(
                     statePayload(current) + (WORLD_UUID to worldData.uuid.toString()),
                 )
             }
-        if (current.fromAdminMenu) {
+        if (CCSystem.getAPI().getMenuNavigationService().canGoBack(player)) {
             elements += MenuElement(45, backItem(player), GuiElementRole.BACK, ACTION_BACK)
         }
         elements += MenuElement(

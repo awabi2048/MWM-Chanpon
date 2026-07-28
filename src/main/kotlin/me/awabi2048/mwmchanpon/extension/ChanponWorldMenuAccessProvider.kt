@@ -37,7 +37,7 @@ class ChanponWorldMenuAccessProvider(
             return true
         }
 
-        pendingPasswordInputs[player.uniqueId] = PasswordRequest(worldData.uuid, showBackButton)
+        pendingPasswordInputs[player.uniqueId] = PasswordRequest(worldData.uuid)
         val opened = showPasswordDialog(player, worldData)
         if (!opened) pendingPasswordInputs.remove(player.uniqueId)
         return opened
@@ -65,8 +65,8 @@ class ChanponWorldMenuAccessProvider(
             detail = "password"
         )
         player.sendMessage(i18n(player, "protection.password_success"))
-        openWorldSettings(player, worldData, request.showBackButton)
-        return MenuActionResult.Success(MenuUpdate.Close)
+        openWorldSettings(player, worldData)
+        return MenuActionResult.Success(MenuUpdate.None)
     }
 
     private fun showPasswordDialog(player: Player, worldData: WorldData): Boolean {
@@ -95,7 +95,11 @@ class ChanponWorldMenuAccessProvider(
                     i18nComponent(player, "common.back"),
                     MenuDialogHandler { actor, _ ->
                         pendingPasswordInputs.remove(actor.uniqueId)
-                        MenuActionResult.Success(MenuUpdate.Close)
+                        val runtime = CCSystem.getAPI().getMenuRuntimeService()
+                        CCSystem.getAPI().getMenuNavigationService().currentRoute(actor)?.let { route ->
+                            runtime.replace(actor, route)
+                        }
+                        MenuActionResult.Success(MenuUpdate.None)
                     },
                 ),
                 ),
@@ -109,7 +113,7 @@ class ChanponWorldMenuAccessProvider(
         }
     }
 
-    private fun openWorldSettings(player: Player, worldData: WorldData, showBackButton: Boolean) {
+    private fun openWorldSettings(player: Player, worldData: WorldData) {
         val mwm = JavaPlugin.getPlugin(MyWorldManager::class.java)
         mwm.settingsSessionManager.updateSessionAction(
             player,
@@ -118,7 +122,7 @@ class ChanponWorldMenuAccessProvider(
             isGui = true,
             isAdminFlow = false
         )
-        mwm.menuEntryRouter.openWorldSettings(player, worldData, showBackButton)
+        mwm.worldSettingsGui.open(player, worldData)
     }
 
     private fun i18n(player: Player?, key: String): String =
@@ -127,10 +131,7 @@ class ChanponWorldMenuAccessProvider(
     private fun i18nComponent(player: Player?, key: String): Component =
         CCSystem.getAPI().getI18nComponent(player, "chanpon.environment.$key")
 
-    private data class PasswordRequest(
-        val worldUuid: UUID,
-        val showBackButton: Boolean
-    )
+    private data class PasswordRequest(val worldUuid: UUID)
 
     private companion object {
         private const val OWNER = "mwm-chanpon"

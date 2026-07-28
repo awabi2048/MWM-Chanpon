@@ -92,7 +92,7 @@ class SubmittedWorldMenuProvider(
                 GuiElementRole.CONTENT,
             )
         }
-        if (requests[player.uniqueId]?.showBackButton == true) {
+        if (CCSystem.getAPI().getMenuNavigationService().canGoBack(player)) {
             elements += MenuElement(36, createReturnItem(player), GuiElementRole.BACK, ACTION_BACK)
         }
         return InventoryMenuView(
