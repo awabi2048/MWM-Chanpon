@@ -143,6 +143,19 @@ class WorldDataExportMenu(
         exportService.exportStandaloneWorld(selected).thenAccept { result ->
             Bukkit.getScheduler().runTask(plugin, Runnable {
                 context.player.sendMessage(resultMessage(context.player, result.success, result.file?.name))
+                if (!result.success) {
+                    result.message.lineSequence()
+                        .filter(String::isNotBlank)
+                        .forEach { detail ->
+                            context.player.sendMessage(
+                                i18nComponent(
+                                    context.player,
+                                    "message.export_failure_detail",
+                                    mapOf("detail" to detail),
+                                )
+                            )
+                        }
+                }
             })
         }
         return MenuActionResult.Success(MenuUpdate.Close)
