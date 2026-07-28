@@ -331,7 +331,6 @@ class ChanponWorldSettingsMenuProvider(
                     player.sendMessage(i18nComponent(player, "message.expand_max"))
                     return
                 }
-                pushSettingsRoute(player, worldData)
                 if (mwm.playerPlatformResolver.isBedrock(player)) {
                     openConfirmByPlatform(player, worldData, ConfirmAction.EXPAND, null)
                 } else {
@@ -339,7 +338,6 @@ class ChanponWorldSettingsMenuProvider(
                 }
             }
             ItemTag.TYPE_GUI_SETTING_CRITICAL -> {
-                pushSettingsRoute(player, worldData)
                 openCriticalMenu(player, worldData)
             }
             ItemTag.TYPE_GUI_SETTING_ENVIRONMENT -> {
@@ -355,7 +353,8 @@ class ChanponWorldSettingsMenuProvider(
             }
             ItemTag.TYPE_GUI_SETTING_SPAWN -> {
                 pushSettingsRoute(player, worldData)
-                val isGuest = if (mwm.playerPlatformResolver.isBedrock(player)) true else click.isLeftClick
+                val intent = settingIconIntent(player, type, click) ?: return
+                val isGuest = intent != SettingIconIntent.SET_MEMBER_SPAWN
                 mwm.worldSettingsGui.enterSpawnSetting(player, worldData, isGuest)
             }
             ItemTag.TYPE_GUI_SETTING_PUBLISH -> {
@@ -367,7 +366,6 @@ class ChanponWorldSettingsMenuProvider(
                 open(player, worldData, currentRequest(player))
             }
             ItemTag.TYPE_GUI_SETTING_MEMBER -> {
-                pushSettingsRoute(player, worldData)
                 mwm.worldSettingsGui.openMemberManagement(player, worldData, 0, true)
             }
             ItemTag.TYPE_GUI_SETTING_NOTIFICATION -> {
@@ -375,20 +373,21 @@ class ChanponWorldSettingsMenuProvider(
                 open(player, worldData, currentRequest(player))
             }
             ItemTag.TYPE_GUI_SETTING_ANNOUNCEMENT -> {
-                if (click.isLeftClick) {
+                when (settingIconIntent(player, type, click) ?: return) {
+                    SettingIconIntent.EDIT_ANNOUNCEMENT -> {
                     pushSettingsRoute(player, worldData)
                     mwm.worldSettingsGui.editAnnouncement(player, worldData)
-                } else {
-                    mwm.worldSettingsGui.clearAnnouncements(player, worldData)
+                    }
+                    SettingIconIntent.CLEAR_ANNOUNCEMENT ->
+                        mwm.worldSettingsGui.clearAnnouncements(player, worldData)
+                    else -> return
                 }
                 open(player, worldData, currentRequest(player))
             }
             ItemTag.TYPE_GUI_SETTING_TOUR -> {
-                pushSettingsRoute(player, worldData)
                 mwm.tourGui.openEditMenu(player, worldData, 0)
             }
             ItemTag.TYPE_GUI_SETTING_VISITOR -> {
-                pushSettingsRoute(player, worldData)
                 mwm.worldSettingsGui.openVisitorManagement(player, worldData, 0)
             }
             ItemTag.TYPE_GUI_SETTING_PORTALS -> {
@@ -917,13 +916,104 @@ class ChanponWorldSettingsMenuProvider(
         val lore = describedStructuredLore(
             player,
             mwmDescription(player, iconKey),
-            listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "mwm_action.action"))),
+            settingIconActions(player, type).map { it.lore },
             requireTargetWorld = requireTargetWorld,
             worldData = worldData
         )
         val icon = mwm().menuConfigManager.getIconMaterial("world_settings", iconKey, material)
         return componentItem(icon, display, lore, type)
     }
+
+    /**
+     * アイコンの表示案内と受理するクリックを同じ定義に保持する。
+     * 左右で意味が分かれる設定を単一クリック表示へ退化させないための正本。
+     */
+    private fun settingIconActions(player: Player, type: String): List<SettingIconActionDefinition> {
+        val language = mwm().languageManager
+        fun action(
+            click: SettingIconClick,
+            operationKey: String,
+            actionKey: String,
+            intent: SettingIconIntent,
+        ) =
+            SettingIconActionDefinition(
+                intent,
+                click,
+                GuiLoreLine.Action(
+                    language.getMessage(player, operationKey),
+                    language.getMessage(player, actionKey),
+                ),
+            )
+
+        return when (type) {
+            ItemTag.TYPE_GUI_SETTING_SPAWN -> {
+                if (mwm().playerPlatformResolver.isBedrock(player)) {
+                    listOf(
+                        SettingIconActionDefinition(
+                            SettingIconIntent.SET_BOTH_SPAWN,
+                            SettingIconClick.ANY,
+                            GuiLoreActions.singleClick(
+                                language,
+                                player,
+                                language.getMessage(player, "gui.settings.spawn.action.set_both"),
+                            ),
+                        )
+                    )
+                } else {
+                    listOf(
+                        action(SettingIconClick.LEFT, "lore.click.left", "gui.settings.spawn.action.set_guest", SettingIconIntent.SET_GUEST_SPAWN),
+                        action(SettingIconClick.RIGHT, "lore.click.right", "gui.settings.spawn.action.set_member", SettingIconIntent.SET_MEMBER_SPAWN),
+                    )
+                }
+            }
+            ItemTag.TYPE_GUI_SETTING_ANNOUNCEMENT -> listOf(
+                action(SettingIconClick.LEFT, "lore.click.left", "gui.settings.announcement.action.set_message", SettingIconIntent.EDIT_ANNOUNCEMENT),
+                action(SettingIconClick.RIGHT, "lore.click.right", "gui.settings.announcement.action.reset_message", SettingIconIntent.CLEAR_ANNOUNCEMENT),
+            )
+            else -> listOf(
+                SettingIconActionDefinition(
+                    SettingIconIntent.PRIMARY,
+                    SettingIconClick.ANY,
+                    GuiLoreActions.singleClick(language, player, i18n(player, "mwm_action.action")),
+                )
+            )
+        }
+    }
+
+    private fun settingIconIntent(
+        player: Player,
+        type: String,
+        click: org.bukkit.event.inventory.ClickType,
+    ): SettingIconIntent? {
+        return settingIconActions(player, type).firstOrNull { it.click.matches(click) }?.intent
+    }
+
+    private enum class SettingIconClick {
+        ANY,
+        LEFT,
+        RIGHT;
+
+        fun matches(click: org.bukkit.event.inventory.ClickType): Boolean = when (this) {
+            ANY -> click.isLeftClick || click.isRightClick
+            LEFT -> click.isLeftClick
+            RIGHT -> click.isRightClick
+        }
+    }
+
+    private enum class SettingIconIntent {
+        PRIMARY,
+        SET_GUEST_SPAWN,
+        SET_MEMBER_SPAWN,
+        SET_BOTH_SPAWN,
+        EDIT_ANNOUNCEMENT,
+        CLEAR_ANNOUNCEMENT,
+    }
+
+    private data class SettingIconActionDefinition(
+        val intent: SettingIconIntent,
+        val click: SettingIconClick,
+        val lore: GuiLoreLine,
+    )
 
     private fun mwmDescription(player: Player, iconKey: String): List<GuiLoreLine> {
         val key = when (iconKey) {

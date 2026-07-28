@@ -102,6 +102,40 @@ class MenuRuntimeNavigationContractTest {
     }
 
     @Test
+    fun `world settings child menus rely on runtime navigation without manual duplicate push`() {
+        val source = uiRoot.resolve("ChanponWorldSettingsMenuProvider.kt").readText()
+        val body = functionBody(source, "handleSettingsClick")
+
+        listOf(
+            "openExpansionMenu(player, worldData)",
+            "openCriticalMenu(player, worldData)",
+            "openMemberManagement(player, worldData, 0, true)",
+            "openEditMenu(player, worldData, 0)",
+            "openVisitorManagement(player, worldData, 0)",
+        ).forEach { childOpen ->
+            val callIndex = body.indexOf(childOpen)
+            assertTrue(callIndex >= 0, "子画面呼び出しが見つかりません: $childOpen")
+            val preceding = body.substring(maxOf(0, callIndex - 160), callIndex)
+            assertFalse("pushSettingsRoute(player, worldData)" in preceding, "子画面の直前で履歴を二重追加しています: $childOpen")
+        }
+    }
+
+    @Test
+    fun `split world setting interactions share one display and dispatch definition`() {
+        val source = uiRoot.resolve("ChanponWorldSettingsMenuProvider.kt").readText()
+        val actions = functionBody(source, "settingIconActions")
+        val dispatch = functionBody(source, "settingIconIntent")
+
+        assertTrue("SET_GUEST_SPAWN" in actions)
+        assertTrue("SET_MEMBER_SPAWN" in actions)
+        assertTrue("EDIT_ANNOUNCEMENT" in actions)
+        assertTrue("CLEAR_ANNOUNCEMENT" in actions)
+        assertTrue("settingIconActions(player, type)" in dispatch)
+        assertTrue("it.click.matches(click)" in dispatch)
+        assertTrue("settingIconActions(player, type).map { it.lore }" in source)
+    }
+
+    @Test
     fun `dialog cancellation replaces its source menu without adding history`() {
         val backup = Path.of(
             "src/main/kotlin/me/awabi2048/mwmchanpon/extension/WorldBackupMenuExtension.kt",
