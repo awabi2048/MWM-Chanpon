@@ -11,6 +11,9 @@ import java.util.concurrent.CompletableFuture
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
+import me.awabi2048.mwmchanpon.api.StandaloneExportContext
+import me.awabi2048.mwmchanpon.api.StandaloneExportContributors
+import me.awabi2048.mwmchanpon.api.StandaloneExportWorld
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.model.WorldData
@@ -66,6 +69,28 @@ class WorldDataExportService(
             )
         }
         val portalSnapshots = worlds.flatMap { core.getRelatedPortals(it.uuid) }.distinctBy { it.id }
+        val primaryUuid = worlds.first().uuid
+        val contributorContext = StandaloneExportContext(
+            worlds.map { world ->
+                StandaloneExportWorld(
+                    uuid = world.uuid,
+                    sourceWorldName = core.getWorldFolderName(world),
+                    dimensionKey = if (world.uuid == primaryUuid) {
+                        "minecraft:overworld"
+                    } else {
+                        StandaloneWorldExportLayout.dimensionKey(world.uuid)
+                    },
+                    primary = world.uuid == primaryUuid,
+                )
+            },
+        )
+        val preparedContributions = runCatching {
+            StandaloneExportContributors.prepare(contributorContext)
+        }.getOrElse { error ->
+            return CompletableFuture.completedFuture(
+                WorldDataExportResult(false, null, error.message ?: "standalone export validation failed")
+            )
+        }
         val serverMainWorldSource = runCatching {
             ServerMainWorldDirectory.resolve(Bukkit.getWorldContainer().toPath())
         }.getOrElse { error ->
@@ -124,6 +149,7 @@ class WorldDataExportService(
                     spawnCoordinates,
                     portalSnapshots
                 )
+                preparedContributions.forEach { it.writeTo(staging.toPath()) }
                 writeManifest(
                     staging,
                     output.name,
