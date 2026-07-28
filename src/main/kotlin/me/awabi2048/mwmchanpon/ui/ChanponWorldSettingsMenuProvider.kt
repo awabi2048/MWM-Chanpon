@@ -20,6 +20,7 @@ import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
+import com.awabi2048.ccsystem.api.gui.MenuRuntimeActions
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import java.util.UUID
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
@@ -37,6 +38,7 @@ import me.awabi2048.myworldmanager.api.service.ExpansionSequenceOptions
 import me.awabi2048.myworldmanager.api.service.ExpansionSequencePhase
 import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.session.SettingsAction
+import me.awabi2048.myworldmanager.session.MenuExternalInput
 import me.awabi2048.myworldmanager.util.GuiHelper
 import me.awabi2048.myworldmanager.util.GuiItemFactory
 import me.awabi2048.myworldmanager.util.GuiLoreActions
@@ -65,7 +67,15 @@ class ChanponWorldSettingsMenuProvider(
                 owner = RUNTIME_OWNER,
                 id = ROUTE_SETTINGS,
                 renderer = { context -> render(context.player, source(context.route)) },
-                actions = mapOf(ACTION_SELECT to MenuActionHandler(::handleAction)),
+                actions = mapOf(
+                    ACTION_SELECT to MenuActionHandler(::handleAction),
+                    MenuRuntimeActions.PLAYER_INVENTORY_CLICK to MenuActionHandler { context ->
+                        mwm().worldSettingsGui.handleIconSelection(context.player, context.item)
+                    },
+                ),
+                onClose = { context ->
+                    mwm().worldSettingsGui.handleManagedMenuClose(context.player, context.reason)
+                },
             )
         )
     }
@@ -96,15 +106,22 @@ class ChanponWorldSettingsMenuProvider(
                 "showBack=${request.showBackButton} playerFlow=${request.isPlayerWorldFlow} " +
                 "currentHolder=${player.openInventory.topInventory.holder?.javaClass?.name ?: "none"}"
         )
-        mwm.settingsSessionManager.updateSessionAction(
-            player,
-            worldData.uuid,
-            SettingsAction.VIEW_SETTINGS,
-            true,
-            null,
-            request.isPlayerWorldFlow,
-            request.parentShowBackButton
-        )
+        val activeSession = mwm.settingsSessionManager.getSession(player)
+        val selectingIcon =
+            activeSession?.worldUuid == worldData.uuid &&
+                activeSession.action == SettingsAction.SELECT_ICON &&
+                activeSession.isExternalInputActive(MenuExternalInput.SELECT_ICON)
+        if (!selectingIcon) {
+            mwm.settingsSessionManager.updateSessionAction(
+                player,
+                worldData.uuid,
+                SettingsAction.VIEW_SETTINGS,
+                true,
+                null,
+                request.isPlayerWorldFlow,
+                request.parentShowBackButton
+            )
+        }
         mwm.settingsSessionManager.getSession(player)?.showBackButton = request.showBackButton
         GuiHelper.scheduleGuiTransitionReset(mwm, player)
 
@@ -348,7 +365,6 @@ class ChanponWorldSettingsMenuProvider(
                 mwm.worldSettingsGui.editWorldInfo(player, worldData)
             }
             ItemTag.TYPE_GUI_SETTING_ICON -> {
-                pushSettingsRoute(player, worldData)
                 mwm.worldSettingsGui.enterIconSelection(player, worldData)
             }
             ItemTag.TYPE_GUI_SETTING_SPAWN -> {
