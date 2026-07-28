@@ -22,9 +22,8 @@ class ChanponSpawnWorldService(
         if (worldData.isArchived) return null
         if (!service.loadWorld(worldUuid)) return null
         val world = Bukkit.getWorld(service.getWorldFolderName(worldData)) ?: return null
-        // 退避時はプレイヤー属性によらずゲストスポーン位置へ飛ばす。
-        // ゲストスポーン未設定時はバニラのスポーン地点にフォールバックする。
-        return worldData.spawnPosGuest ?: world.spawnLocation
+        // すべての退避は、設定済みスポーンワールドのバニラスポーン地点へ統一する。
+        return world.spawnLocation
     }
 
     fun handleFirstJoin(player: Player) {

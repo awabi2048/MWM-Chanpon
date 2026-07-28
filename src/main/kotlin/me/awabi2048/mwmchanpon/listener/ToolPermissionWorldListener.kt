@@ -1,5 +1,6 @@
 package me.awabi2048.mwmchanpon.listener
 
+import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
@@ -11,6 +12,7 @@ class ToolPermissionWorldListener(
 ) : Listener {
     @EventHandler
     fun onPlayerChangedWorld(event: PlayerChangedWorldEvent) {
+        if (MyWorldManagerApi.isLogoutRelocation(event.player)) return
         controller.syncPlayerLocation(event.player)
     }
 
