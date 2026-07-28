@@ -19,7 +19,6 @@ import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
-import me.awabi2048.mwmchanpon.ui.ChanponGuiElements
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.WorldCreationOperation
@@ -29,6 +28,7 @@ import me.awabi2048.myworldmanager.api.service.ManagedWorldCreationRequest
 import me.awabi2048.myworldmanager.api.service.ManagedWorldSpawn
 import me.awabi2048.myworldmanager.api.service.WorldPointBillingMode
 import me.awabi2048.myworldmanager.util.WorldNameValidation
+import me.awabi2048.myworldmanager.util.GuiHelper
 import me.awabi2048.myworldmanager.util.GuiItemFactory
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
@@ -173,12 +173,12 @@ class EasyVoidWorldCreationService(
 
     private fun renderConfirmation(player: Player): InventoryMenuView {
         val pending = pendingCreations[player.uniqueId]
-        val layout = ChanponGuiElements.confirmationLayout()
+        val layout = GuiHelper.confirmationLayout()
         if (pending == null) {
             return InventoryMenuView(layout.size, component(player, "confirm_title"), emptyList())
         }
         val preview = GuiItemFactory.item(
-            Material.OBSIDIAN,
+            Material.PAPER,
             i18n(player, "confirm_title"),
             GuiLoreSpec.Rich(
                 listOf(
@@ -202,13 +202,23 @@ class EasyVoidWorldCreationService(
                 MenuElement(layout.previewSlot, preview, GuiElementRole.CONTENT),
                 MenuElement(
                     layout.confirmSlot,
-                    ChanponGuiElements.confirm(i18n(player, "create"), true),
+                    GuiItemFactory.item(
+                        Material.LIME_CONCRETE,
+                        i18n(player, "create"),
+                        GuiLoreSpec.None,
+                        ItemTag.TYPE_GUI_CONFIRM,
+                    ),
                     GuiElementRole.CONFIRM,
                     ACTION_CREATE,
                 ),
                 MenuElement(
                     layout.cancelSlot,
-                    ChanponGuiElements.confirm(i18n(player, "back"), false),
+                    GuiItemFactory.item(
+                        Material.RED_CONCRETE,
+                        i18n(player, "back"),
+                        GuiLoreSpec.None,
+                        ItemTag.TYPE_GUI_CANCEL,
+                    ),
                     GuiElementRole.CANCEL,
                     ACTION_BACK,
                 ),
