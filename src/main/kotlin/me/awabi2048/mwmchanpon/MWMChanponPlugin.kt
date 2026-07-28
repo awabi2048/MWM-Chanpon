@@ -116,7 +116,7 @@ class MWMChanponPlugin : JavaPlugin() {
                     sourcePlugin = this,
                     resourcePath = "config.yml",
                     targetPath = dataFolder.resolve("config.yml").toPath(),
-                    currentVersion = 3,
+                    currentVersion = 4,
                     classification = com.awabi2048.ccsystem.api.config.ConfigClassification.MANAGED_CONFIG,
                     migrations = mapOf(
                         1 to com.awabi2048.ccsystem.api.config.ConfigMigration { config ->
@@ -127,6 +127,11 @@ class MWMChanponPlugin : JavaPlugin() {
                         2 to com.awabi2048.ccsystem.api.config.ConfigMigration { config ->
                             if (!config.contains("standalone_export.fiscal_year")) {
                                 config.set("standalone_export.fiscal_year", 2026)
+                            }
+                        },
+                        3 to com.awabi2048.ccsystem.api.config.ConfigMigration { config ->
+                            if (!config.contains("creation.easy.platform_material")) {
+                                config.set("creation.easy.platform_material", "OBSIDIAN")
                             }
                         }
                     ),
@@ -142,6 +147,13 @@ class MWMChanponPlugin : JavaPlugin() {
                         }
                         require(config.getInt("standalone_export.fiscal_year") in 2000..9999) {
                             "standalone_export.fiscal_year must be between 2000 and 9999"
+                        }
+                        require(
+                            me.awabi2048.mwmchanpon.service.EasyPlatformMaterialPolicy.resolve(
+                                config.getString("creation.easy.platform_material").orEmpty()
+                            ) != null
+                        ) {
+                            "creation.easy.platform_material must be a placeable solid block material"
                         }
                     },
                     reloadAction = { reloadConfig() }

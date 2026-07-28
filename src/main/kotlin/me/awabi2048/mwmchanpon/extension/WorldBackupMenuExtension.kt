@@ -349,59 +349,31 @@ class WorldBackupMenuExtension(
 
     private fun openBackupConfirm(player: Player, source: Holder, backupName: String) {
         val sourceSnapshot = source.copy()
-        CCSystem.getAPI().getMenuDialogService().show(
-            player,
-            MenuDialogRequest(
-                owner = "mwmchanpon",
-                id = "owner-backup-confirmation",
-                title = i18nComponent(player, "confirm.owner_backup.title"),
-                body = i18nList(
-                    player,
-                    "confirm.owner_backup.lore",
-                    mapOf("name" to backupName),
-                ).map(Component::text),
-                confirm = MenuDialogButton(
-                    Component.text(i18n(player, "confirm.button.confirm")),
-                    MenuDialogHandler { target, _ ->
-                        executeOwnerBackup(target, sourceSnapshot, backupName)
-                        MenuActionResult.Success(MenuUpdate.Close)
-                    },
-                ),
-                cancel = MenuDialogButton(
-                    Component.text(i18n(player, "confirm.button.cancel")),
-                    MenuDialogHandler { target, _ ->
-                        open(target, sourceSnapshot.worldUuid, sourceSnapshot.page)
-                        MenuActionResult.Success(MenuUpdate.Close)
-                    },
-                ),
-            ),
+        mwm().confirmationMenuGui.openSimple(
+            player = player,
+            menuId = "owner-backup-confirmation",
+            title = i18nComponent(player, "confirm.owner_backup.title"),
+            bodyLines = i18nList(
+                player,
+                "confirm.owner_backup.lore",
+                mapOf("name" to backupName),
+            ).map(Component::text),
+            confirmLabel = Component.text(i18n(player, "confirm.button.confirm")),
+            cancelLabel = Component.text(i18n(player, "confirm.button.cancel")),
+            onConfirm = { executeOwnerBackup(player, sourceSnapshot, backupName) },
         )
     }
 
     private fun openRestoreConfirm(player: Player, backup: BackupEntry, source: Holder) {
         val sourceSnapshot = source.copy()
-        CCSystem.getAPI().getMenuDialogService().show(
-            player,
-            MenuDialogRequest(
-                owner = "mwmchanpon",
-                id = "restore-confirmation",
-                title = i18nComponent(player, "confirm.restore.title"),
-                body = i18nList(player, "confirm.restore.lore").map(Component::text),
-                confirm = MenuDialogButton(
-                    Component.text(i18n(player, "confirm.button.confirm")),
-                    MenuDialogHandler { target, _ ->
-                        executeRestore(target, backup, sourceSnapshot)
-                        MenuActionResult.Success(MenuUpdate.Close)
-                    },
-                ),
-                cancel = MenuDialogButton(
-                    Component.text(i18n(player, "confirm.button.cancel")),
-                    MenuDialogHandler { target, _ ->
-                        open(target, sourceSnapshot.worldUuid, sourceSnapshot.page)
-                        MenuActionResult.Success(MenuUpdate.Close)
-                    },
-                ),
-            ),
+        mwm().confirmationMenuGui.openSimple(
+            player = player,
+            menuId = "restore-confirmation",
+            title = i18nComponent(player, "confirm.restore.title"),
+            bodyLines = i18nList(player, "confirm.restore.lore").map(Component::text),
+            confirmLabel = Component.text(i18n(player, "confirm.button.confirm")),
+            cancelLabel = Component.text(i18n(player, "confirm.button.cancel")),
+            onConfirm = { executeRestore(player, backup, sourceSnapshot) },
         )
     }
 

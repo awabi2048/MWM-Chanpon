@@ -4,9 +4,6 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
-import com.awabi2048.ccsystem.api.gui.MenuDialogButton
-import com.awabi2048.ccsystem.api.gui.MenuDialogHandler
-import com.awabi2048.ccsystem.api.gui.MenuDialogRequest
 import com.awabi2048.ccsystem.api.gui.ManagedMenuInteraction
 import com.awabi2048.ccsystem.api.gui.ManagedMenuInteractionOutcome
 import com.awabi2048.ccsystem.api.gui.MenuClickType
@@ -135,7 +132,7 @@ class ProductionToggleExtension(
                     return true
                 }
                 feedback(player, ManagedMenuInteractionOutcome.SUCCESS, MenuClickType.NAVIGATION)
-                openConfirmation(player, worldData.uuid, ConfirmationAction.SET_PRODUCTION, currentRequest(player, context))
+                openConfirmation(player, worldData.uuid, ConfirmationAction.SET_PRODUCTION)
             }
             ACTION_TOGGLE_SUBMISSION -> {
                 // 本番用設定の解除は管理者メニューに集約し、通常の /worldmenu では提出操作だけを扱う。
@@ -162,7 +159,7 @@ class ProductionToggleExtension(
                 when (current) {
                     SubmissionState.UNSUBMITTED -> {
                         feedback(player, ManagedMenuInteractionOutcome.SUCCESS, MenuClickType.NAVIGATION)
-                        openConfirmation(player, worldData.uuid, ConfirmationAction.SUBMIT, currentRequest(player, context))
+                        openConfirmation(player, worldData.uuid, ConfirmationAction.SUBMIT)
                     }
                     SubmissionState.SUBMITTED -> return true
                     SubmissionState.COMPLETED -> return true
@@ -177,56 +174,17 @@ class ProductionToggleExtension(
         player: Player,
         worldUuid: UUID,
         action: ConfirmationAction,
-        request: WorldSettingsMenuRequest
     ) {
-        CCSystem.getAPI().getMenuDialogService().show(
-            player,
-            MenuDialogRequest(
-                owner = "mwmchanpon",
-                id = "production-${action.key}-confirmation",
-                title = i18nComponent(player, "confirm.${action.key}.title"),
-                body = i18nList(player, "confirm.${action.key}.lore").map(Component::text),
-                confirm = MenuDialogButton(
-                    i18nComponent(player, "confirm.button.confirm.display"),
-                    MenuDialogHandler { target, _ ->
-                        executeConfirmedAction(target, worldUuid, action)
-                        returnToWorldSettings(target, worldUuid, request)
-                        MenuActionResult.Success(MenuUpdate.Close)
-                    },
-                ),
-                cancel = MenuDialogButton(
-                    i18nComponent(player, "confirm.button.cancel.display"),
-                    MenuDialogHandler { target, _ ->
-                        target.sendMessage(i18n(target, "message.cancelled_confirmation"))
-                        returnToWorldSettings(target, worldUuid, request)
-                        MenuActionResult.Success(MenuUpdate.Close)
-                    },
-                ),
-            ),
-        )
-    }
-
-    private fun returnToWorldSettings(player: Player, worldUuid: UUID, request: WorldSettingsMenuRequest) {
-        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
-        if (worldData == null) {
-            CCSystem.getAPI().getMenuRuntimeService().close(player)
-            return
-        }
-        mwm().worldSettingsGui.open(
-            player,
-            worldData,
-            request.showBackButton,
-            request.isPlayerWorldFlow,
-            request.parentShowBackButton
-        )
-    }
-
-    private fun currentRequest(player: Player, context: MenuExtensionContext): WorldSettingsMenuRequest {
-        val session = mwm().settingsSessionManager.getSession(player)
-        return WorldSettingsMenuRequest(
-            context.get<Boolean>("showBackButton") ?: session?.showBackButton ?: false,
-            context.get<Boolean?>("isPlayerWorldFlow") ?: session?.isPlayerWorldFlow,
-            context.get<Boolean?>("parentShowBackButton") ?: session?.parentShowBackButton
+        mwm().confirmationMenuGui.openSimple(
+            player = player,
+            menuId = "production-${action.key}-confirmation",
+            title = i18nComponent(player, "confirm.${action.key}.title"),
+            bodyLines = i18nList(player, "confirm.${action.key}.lore").map(Component::text),
+            confirmLabel = i18nComponent(player, "confirm.button.confirm.display"),
+            cancelLabel = i18nComponent(player, "confirm.button.cancel.display"),
+            onConfirm = { executeConfirmedAction(player, worldUuid, action) },
+            onCancel = { player.sendMessage(i18n(player, "message.cancelled_confirmation")) },
+            returnOnConfirm = true,
         )
     }
 

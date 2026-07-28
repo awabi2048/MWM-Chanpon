@@ -8,6 +8,8 @@ production:
 
 creation:
   max_worlds_per_player: 50
+  easy:
+    platform_material: OBSIDIAN
 
 world_expansion:
   max_level: 3
@@ -62,4 +64,4 @@ backup:
       scheduled: 14
       restore_point: 5
       pre_rollback: 10
-config_version: 3
+config_version: 4

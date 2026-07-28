@@ -57,7 +57,7 @@ object EasyPlatformMaterialPolicy {
 class EasyVoidWorldCreationService(
     private val plugin: MWMChanponPlugin
 ) {
-    private data class PendingCreation(val worldName: String, val platformMaterial: Material)
+    private data class PendingCreation(val worldName: String)
 
     private val pendingCreations = ConcurrentHashMap<UUID, PendingCreation>()
     private val returnRoutes = ConcurrentHashMap<UUID, MenuRoute>()
@@ -106,26 +106,13 @@ class EasyVoidWorldCreationService(
     private fun handleNameSubmit(
         player: Player,
         nameInput: String,
-        materialInputValue: String,
     ): MenuActionResult {
         val name = nameInput.trim()
-        val materialInput = materialInputValue.trim()
-        val platformMaterial = EasyPlatformMaterialPolicy.resolve(materialInput)
         if (name.isBlank()) {
             showNameDialog(
                 player,
                 name,
-                platformMaterial ?: DEFAULT_PLATFORM_MATERIAL,
                 legacy("§c${i18n(player, "name_required")}")
-            )
-            return MenuActionResult.Success(MenuUpdate.None)
-        }
-        if (platformMaterial == null) {
-            showNameDialog(
-                player,
-                name,
-                DEFAULT_PLATFORM_MATERIAL,
-                legacy("§c${i18n(player, "platform_material_invalid")}")
             )
             return MenuActionResult.Success(MenuUpdate.None)
         }
@@ -133,18 +120,18 @@ class EasyVoidWorldCreationService(
         val mwm = mwm()
         when (val validation = mwm.worldValidator.validateName(name)) {
             is WorldNameValidation.Failure -> {
-                showNameDialog(player, name, platformMaterial, mwm.languageManager.getComponent(player, validation.messageKey, validation.placeholders))
+                showNameDialog(player, name, mwm.languageManager.getComponent(player, validation.messageKey, validation.placeholders))
                 return MenuActionResult.Success(MenuUpdate.None)
             }
             WorldNameValidation.Ok -> Unit
         }
 
         if (mwm.worldConfigRepository.findByOwnerAndDisplayName(player.uniqueId, name) != null) {
-            showNameDialog(player, name, platformMaterial, mwm.languageManager.getComponent(player, "messages.world_name_duplicate"))
+            showNameDialog(player, name, mwm.languageManager.getComponent(player, "messages.world_name_duplicate"))
             return MenuActionResult.Success(MenuUpdate.None)
         }
 
-        pendingCreations[player.uniqueId] = PendingCreation(name, platformMaterial)
+        pendingCreations[player.uniqueId] = PendingCreation(name)
         runtime.navigate(player, MenuRoute(OWNER, CONFIRM_ROUTE))
         return MenuActionResult.Success(MenuUpdate.None)
     }
@@ -152,7 +139,6 @@ class EasyVoidWorldCreationService(
     private fun showNameDialog(
         player: Player,
         initial: String = "",
-        platformMaterial: Material = DEFAULT_PLATFORM_MATERIAL,
         error: Component? = null
     ) {
         CCSystem.getAPI().getMenuDialogService().show(
@@ -167,12 +153,6 @@ class EasyVoidWorldCreationService(
                 },
                 inputs = listOf(
                     MenuDialogInput.Text(NAME_INPUT, component(player, "name_label"), initial, maxLength = 32),
-                    MenuDialogInput.Text(
-                        PLATFORM_MATERIAL_INPUT,
-                        component(player, "platform_material_label"),
-                        platformMaterial.key.asString(),
-                        maxLength = 64,
-                    ),
                 ),
                 confirm = MenuDialogButton(
                     component(player, "next"),
@@ -180,7 +160,6 @@ class EasyVoidWorldCreationService(
                         handleNameSubmit(
                             actor,
                             response.textValue(NAME_INPUT),
-                            response.textValue(PLATFORM_MATERIAL_INPUT),
                         )
                     },
                 ),
@@ -208,7 +187,7 @@ class EasyVoidWorldCreationService(
                         i18n(
                             player,
                             "confirm_template",
-                            "material" to pending.platformMaterial.key.asString(),
+                            "material" to configuredPlatformMaterial().key.asString(),
                         ),
                     ),
                 ),
@@ -250,13 +229,13 @@ class EasyVoidWorldCreationService(
         showNameDialog(
             player,
             pending?.worldName.orEmpty(),
-            pending?.platformMaterial ?: DEFAULT_PLATFORM_MATERIAL,
         )
         return MenuActionResult.Success(MenuUpdate.None)
     }
 
     private fun create(player: Player, pending: PendingCreation) {
         if (!canCreate(player)) return
+        val platformMaterial = configuredPlatformMaterial()
         val worldService = MyWorldManagerApi.getWorldService()
         if (worldService == null) {
             player.sendMessage(mwm().languageManager.getMessage(player, "error.internal_error"))
@@ -275,7 +254,7 @@ class EasyVoidWorldCreationService(
                 initialSpawn = ManagedWorldSpawn(0, SPAWN_Y, 0),
                 cost = 0,
                 billingMode = WorldPointBillingMode.NONE,
-                initializeWorld = { world -> placePlatform(world, pending.platformMaterial) }
+                initializeWorld = { world -> placePlatform(world, platformMaterial) }
             )
         ).thenAccept { success ->
             if (success) {
@@ -313,6 +292,11 @@ class EasyVoidWorldCreationService(
         }
     }
 
+    private fun configuredPlatformMaterial(): Material =
+        EasyPlatformMaterialPolicy.resolve(
+            plugin.config.getString(PLATFORM_MATERIAL_CONFIG_PATH, DEFAULT_PLATFORM_MATERIAL.key.asString()).orEmpty()
+        ) ?: error("$PLATFORM_MATERIAL_CONFIG_PATH contains an invalid block material")
+
     private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)
 
     private fun i18n(player: Player?, key: String, vararg placeholders: Pair<String, Any>): String =
@@ -341,7 +325,7 @@ class EasyVoidWorldCreationService(
 
     private companion object {
         private const val NAME_INPUT = "easy_world_name"
-        private const val PLATFORM_MATERIAL_INPUT = "easy_platform_material"
+        const val PLATFORM_MATERIAL_CONFIG_PATH = "creation.easy.platform_material"
         private const val SOURCE_WORLD = "chanpon:easy_void"
         private const val PLATFORM_Y = 64
         private const val SPAWN_Y = 65

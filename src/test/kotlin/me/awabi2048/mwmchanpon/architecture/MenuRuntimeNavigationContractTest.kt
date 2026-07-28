@@ -5,6 +5,7 @@ import kotlin.io.path.readText
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.yaml.snakeyaml.Yaml
 
 class MenuRuntimeNavigationContractTest {
     private val uiRoot = Path.of("src/main/kotlin/me/awabi2048/mwmchanpon/ui")
@@ -62,6 +63,20 @@ class MenuRuntimeNavigationContractTest {
         assertTrue("id = CONFIRM_ROUTE" in source)
         assertFalse("CONFIRM_DIALOG" in source)
         assertFalse("showConfirmDialog" in source)
+        assertFalse("PLATFORM_MATERIAL_INPUT" in source)
+        assertTrue("creation.easy.platform_material" in source)
+    }
+
+    @Test
+    fun `easy creation platform material is managed by config`() {
+        val config = Yaml().load<Map<String, Any>>(Path.of("src/main/resources/config.yml").readText())
+        @Suppress("UNCHECKED_CAST")
+        val creation = config["creation"] as Map<String, Any>
+        @Suppress("UNCHECKED_CAST")
+        val easy = creation["easy"] as Map<String, Any>
+
+        assertTrue(config["config_version"] == 4)
+        assertTrue(easy["platform_material"] == "OBSIDIAN")
     }
 
     @Test
