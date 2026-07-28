@@ -50,7 +50,7 @@ class MenuRuntimeNavigationContractTest {
         assertTrue("showProtectionPasswordDialog(" in body)
         assertTrue(body.split("MenuUpdate.None").size >= 3)
         assertFalse("MenuUpdate.Close" in body)
-        assertTrue("replaceCurrent = true" in source)
+        assertTrue("MenuUpdate.Replace(route(worldData.uuid))" in source)
     }
 
     @Test

@@ -226,15 +226,13 @@ class ChanponEnvironmentGui(
                         worldData.fixedTime = parsed
                         MyWorldManagerApi.getWorldRepository()?.save(worldData)
                         applyTime(worldData.uuid, parsed)
-                        open(target, worldData, replaceCurrent = true)
-                        MenuActionResult.Success(MenuUpdate.Close)
+                        MenuActionResult.Success(MenuUpdate.Replace(route(worldData.uuid)))
                     },
                 ),
                 cancel = MenuDialogButton(
                     Component.text(i18n(player, "common.back"), NamedTextColor.GRAY),
                     MenuDialogHandler { target, _ ->
-                        open(target, worldData, replaceCurrent = true)
-                        MenuActionResult.Success(MenuUpdate.Close)
+                        MenuActionResult.Success(MenuUpdate.Replace(route(worldData.uuid)))
                     },
                 ),
             ),
@@ -269,15 +267,13 @@ class ChanponEnvironmentGui(
                         storage.setProtectionPassword(worldData.uuid, input)
                         buildPermissionService.sync(worldData)
                         target.sendMessage(i18n(target, "protection.password_updated"))
-                        open(target, worldData, replaceCurrent = true)
-                        MenuActionResult.Success(MenuUpdate.Close)
+                        MenuActionResult.Success(MenuUpdate.Replace(route(worldData.uuid)))
                     },
                 ),
                 cancel = MenuDialogButton(
                     Component.text(i18n(player, "common.back"), NamedTextColor.GRAY),
                     MenuDialogHandler { target, _ ->
-                        open(target, worldData, replaceCurrent = true)
-                        MenuActionResult.Success(MenuUpdate.Close)
+                        MenuActionResult.Success(MenuUpdate.Replace(route(worldData.uuid)))
                     },
                 ),
             ),

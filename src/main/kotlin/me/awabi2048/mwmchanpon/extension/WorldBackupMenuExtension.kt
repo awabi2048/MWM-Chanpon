@@ -329,7 +329,7 @@ class WorldBackupMenuExtension(
                     MenuDialogHandler { target, response ->
                         val name = BackupDisplay.normalizeManualName(response.textValue("backup_name"))
                         openBackupConfirm(target, sourceSnapshot, name)
-                        MenuActionResult.Success(MenuUpdate.Close)
+                        MenuActionResult.Success(MenuUpdate.None)
                     },
                 ),
                 cancel = MenuDialogButton(
@@ -339,7 +339,7 @@ class WorldBackupMenuExtension(
                             target,
                             route(sourceSnapshot.worldUuid, sourceSnapshot.page, sourceSnapshot.request),
                         )
-                        MenuActionResult.Success(MenuUpdate.Close)
+                        MenuActionResult.Success(MenuUpdate.None)
                     },
                 ),
             ),

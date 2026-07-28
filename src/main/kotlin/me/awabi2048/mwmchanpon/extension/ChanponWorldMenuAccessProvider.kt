@@ -52,8 +52,7 @@ class ChanponWorldMenuAccessProvider(
         if (!storage.matchesProtectionPassword(worldData.uuid, password)) {
             player.sendMessage(i18n(player, "protection.password_invalid"))
             pendingPasswordInputs[player.uniqueId] = request
-            showPasswordDialog(player, worldData)
-            return MenuActionResult.Success(MenuUpdate.None)
+            return MenuActionResult.Success(MenuUpdate.Refresh)
         }
 
         MyWorldManagerApi.getMemberManager()?.addMemberDirect(
@@ -95,11 +94,7 @@ class ChanponWorldMenuAccessProvider(
                     i18nComponent(player, "common.back"),
                     MenuDialogHandler { actor, _ ->
                         pendingPasswordInputs.remove(actor.uniqueId)
-                        val runtime = CCSystem.getAPI().getMenuRuntimeService()
-                        CCSystem.getAPI().getMenuNavigationService().currentRoute(actor)?.let { route ->
-                            runtime.replace(actor, route)
-                        }
-                        MenuActionResult.Success(MenuUpdate.None)
+                        MenuActionResult.Success(MenuUpdate.Resume)
                     },
                 ),
                 ),

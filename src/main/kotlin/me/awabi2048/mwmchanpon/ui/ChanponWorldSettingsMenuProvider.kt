@@ -570,7 +570,8 @@ class ChanponWorldSettingsMenuProvider(
     private fun openBedrockConfirmForm(player: Player, worldData: WorldData, action: ConfirmAction, direction: BlockFace?): Boolean {
         val directionName = direction?.let { directionName(player, it) } ?: i18n(player, "direction.center")
         val modified = action == ConfirmAction.STEP_BACK && worldData.latestBorderExpansionRecord()?.modified == true
-        return mwm().floodgateFormBridge.sendSimpleForm(
+        runtime.suspendForExternal(player)
+        val opened = mwm().floodgateFormBridge.sendSimpleForm(
             player = player,
             title = i18n(player, "confirm.${action.key}.title"),
             content = confirmContentLines(player, action, directionName, modified).joinToString("\n"),
@@ -584,17 +585,19 @@ class ChanponWorldSettingsMenuProvider(
                     if (index == 0) {
                         executeConfirmAction(player, latest, action, direction)
                     } else {
-                        runtime.reopenCurrent(player)
+                        runtime.resumeFromExternal(player)
                     }
                 })
             },
             onClosed = {
                 Bukkit.getScheduler().runTask(plugin, Runnable {
                     if (MyWorldManagerApi.getWorldRepository()?.findByUuid(worldData.uuid) == null) return@Runnable
-                    runtime.reopenCurrent(player)
+                    runtime.resumeFromExternal(player)
                 })
             }
         )
+        if (!opened) runtime.resumeFromExternal(player)
+        return opened
     }
 
     private fun executeConfirmAction(player: Player, worldData: WorldData, action: ConfirmAction, direction: BlockFace?) {
@@ -609,7 +612,7 @@ class ChanponWorldSettingsMenuProvider(
                 mwm().settingsSessionManager.endSession(player)
                 runtime.close(player)
             }
-            else -> runtime.reopenCurrent(player)
+            else -> runtime.resumeFromExternal(player)
         }
     }
 
