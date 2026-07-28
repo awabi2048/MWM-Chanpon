@@ -241,24 +241,20 @@ class ChanponPlayerWorldMenuProvider(
     private fun openUserSettings(context: MenuActionContext): MenuActionResult {
         val source = source(context.payload)
         if (source.targetPlayerUuid != context.player.uniqueId) return MenuActionResult.Rejected()
-        Bukkit.getScheduler().runTask(plugin, Runnable {
-            mwm().userSettingsGui.open(context.player, true)
-        })
+        mwm().userSettingsGui.open(context.player, true)
         return MenuActionResult.Success(MenuUpdate.None)
     }
 
     private fun openPending(context: MenuActionContext): MenuActionResult {
         val source = source(context.payload)
         if (source.targetPlayerUuid != context.player.uniqueId) return MenuActionResult.Rejected()
-        Bukkit.getScheduler().runTask(plugin, Runnable {
-            mwm().pendingInteractionGui.open(
-                player = context.player,
-                page = 0,
-                returnPage = source.page,
-                showBackButton = source.showBackButton,
-                fromBedrockMenu = false,
-            )
-        })
+        mwm().pendingInteractionGui.open(
+            player = context.player,
+            page = 0,
+            returnPage = source.page,
+            showBackButton = source.showBackButton,
+            fromBedrockMenu = false,
+        )
         return MenuActionResult.Success(MenuUpdate.None)
     }
 
@@ -508,15 +504,13 @@ class ChanponPlayerWorldMenuProvider(
             world.owner == player.uniqueId || world.moderators.contains(player.uniqueId) || world.members.contains(player.uniqueId)
 
     private fun openWorldSettings(player: Player, source: Source, worldData: WorldData) {
-        Bukkit.getScheduler().runTask(plugin, Runnable {
-            mwm().worldSettingsGui.open(
-                player,
-                worldData,
-                true,
-                true,
-                source.showBackButton
-            )
-        })
+        mwm().worldSettingsGui.open(
+            player,
+            worldData,
+            true,
+            true,
+            source.showBackButton
+        )
     }
 
     private fun isCurrentWorld(player: Player, world: WorldData): Boolean =

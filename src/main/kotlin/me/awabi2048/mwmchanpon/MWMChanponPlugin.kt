@@ -164,10 +164,6 @@ class MWMChanponPlugin : JavaPlugin() {
             "MWM-Chanpon Config preparation failed"
         }
         reloadConfig()
-        CCSystem.getAPI().getMenuNavigationService().registerMenuMatcher(MENU_OWNER) { inventory ->
-            inventory.holder?.javaClass?.name?.startsWith("me.awabi2048.mwmchanpon") == true
-        }
-
         val chanponStorage = ChanponWorldStorage(dataFolder)
         publishLevelSynchronizer = PublishLevelSynchronizer()
         chanponStorage.setVisibilitySyncHandler(publishLevelSynchronizer::sync)
@@ -339,9 +335,6 @@ class MWMChanponPlugin : JavaPlugin() {
         runCatching { CCSystem.getAPI().getConfigSchemaService().unregister("mwm-chanpon") }
         runCatching { CCSystem.getAPI().getMenuCommandService().unregisterOwner("mwm-chanpon") }
         runCatching { CCSystem.getAPI().getMenuRuntimeService().unregisterOwner("mwm-chanpon") }
-        runCatching {
-            CCSystem.getAPI().getMenuNavigationService().closeOwnedMenus(MENU_OWNER, server.onlinePlayers)
-        }
         if (::productionToggleExtension.isInitialized) {
             MyWorldManagerApi.unregisterMenuExtension(productionToggleExtension)
         }
@@ -411,7 +404,6 @@ class MWMChanponPlugin : JavaPlugin() {
         if (::toolController.isInitialized) {
             toolController.clearOnlineActivePermissions()
         }
-        runCatching { CCSystem.getAPI().getMenuNavigationService().unregisterOwner(MENU_OWNER) }
         logger.info("MWM-Chanpon addon has been disabled.")
     }
 

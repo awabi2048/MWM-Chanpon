@@ -279,22 +279,20 @@ class ChanponWorldSettingsMenuProvider(
                         "chanpon_warp=callback player=${player.name}/${player.uniqueId} world=${worldData.uuid} " +
                             "currentWorld=${player.world.name} holder=${player.openInventory.topInventory.holder?.javaClass?.name ?: "none"}"
                     )
-                    Bukkit.getScheduler().runTaskLater(plugin, Runnable {
-                        if (player.isOnline) {
-                            player.sendMessage(
-                                mwm.languageManager.getMessage(
-                                    player,
-                                    "messages.warp_success",
-                                    mapOf("world" to worldData.name)
-                                )
+                    if (player.isOnline) {
+                        player.sendMessage(
+                            mwm.languageManager.getMessage(
+                                player,
+                                "messages.warp_success",
+                                mapOf("world" to worldData.name)
                             )
-                            runtime.resumeFromExternal(player)
-                            mwm.logWorldSettingsDebug(
-                                "chanpon_warp=reopened player=${player.name}/${player.uniqueId} world=${worldData.uuid} " +
-                                    "holder=${player.openInventory.topInventory.holder?.javaClass?.name ?: "none"}"
-                            )
-                        }
-                    }, 3L)
+                        )
+                        runtime.resumeFromExternal(player)
+                        mwm.logWorldSettingsDebug(
+                            "chanpon_warp=reopened player=${player.name}/${player.uniqueId} world=${worldData.uuid} " +
+                                "holder=${player.openInventory.topInventory.holder?.javaClass?.name ?: "none"}"
+                        )
+                    }
                 }
             )
             return

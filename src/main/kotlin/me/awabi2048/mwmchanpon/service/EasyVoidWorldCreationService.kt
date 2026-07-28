@@ -256,11 +256,7 @@ class EasyVoidWorldCreationService(
                 billingMode = WorldPointBillingMode.NONE,
                 initializeWorld = { world -> placePlatform(world, platformMaterial) }
             )
-        ).thenAccept { success ->
-            if (success) {
-                CCSystem.getAPI().getMenuNavigationService().clear(player)
-            }
-        }
+        )
     }
 
     private fun canCreate(player: Player): Boolean {
