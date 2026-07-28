@@ -335,7 +335,10 @@ class WorldBackupMenuExtension(
                 cancel = MenuDialogButton(
                     i18nComponent(player, "owner_backup.name_input.cancel"),
                     MenuDialogHandler { target, _ ->
-                        open(target, sourceSnapshot.worldUuid, sourceSnapshot.page)
+                        runtime.replace(
+                            target,
+                            route(sourceSnapshot.worldUuid, sourceSnapshot.page, sourceSnapshot.request),
+                        )
                         MenuActionResult.Success(MenuUpdate.Close)
                     },
                 ),

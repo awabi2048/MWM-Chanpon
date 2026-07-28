@@ -50,6 +50,7 @@ class MenuRuntimeNavigationContractTest {
         assertTrue("showProtectionPasswordDialog(" in body)
         assertTrue(body.split("MenuUpdate.None").size >= 3)
         assertFalse("MenuUpdate.Close" in body)
+        assertTrue("replaceCurrent = true" in source)
     }
 
     @Test
@@ -98,6 +99,19 @@ class MenuRuntimeNavigationContractTest {
 
         assertTrue("if (handled)" in body)
         assertTrue("MenuActionResult.Ignored" in body)
+    }
+
+    @Test
+    fun `dialog cancellation replaces its source menu without adding history`() {
+        val backup = Path.of(
+            "src/main/kotlin/me/awabi2048/mwmchanpon/extension/WorldBackupMenuExtension.kt",
+        ).readText()
+        assertTrue("runtime.replace(" in backup)
+        assertTrue("sourceSnapshot.request" in backup)
+
+        val environment = uiRoot.resolve("ChanponEnvironmentGui.kt").readText()
+        assertTrue("replaceCurrent: Boolean = false" in environment)
+        assertTrue("runtime.replace(player, route(worldData.uuid))" in environment)
     }
 
     @Test

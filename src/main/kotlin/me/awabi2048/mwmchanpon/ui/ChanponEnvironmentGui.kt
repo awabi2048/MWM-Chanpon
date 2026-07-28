@@ -60,9 +60,13 @@ class ChanponEnvironmentGui(
         )
     }
 
-    fun open(player: Player, worldData: WorldData) {
+    fun open(player: Player, worldData: WorldData, replaceCurrent: Boolean = false) {
         if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
-        runtime.navigate(player, route(worldData.uuid))
+        if (replaceCurrent) {
+            runtime.replace(player, route(worldData.uuid))
+        } else {
+            runtime.navigate(player, route(worldData.uuid))
+        }
     }
 
     private fun render(player: Player, worldData: WorldData?): InventoryMenuView {
@@ -222,14 +226,14 @@ class ChanponEnvironmentGui(
                         worldData.fixedTime = parsed
                         MyWorldManagerApi.getWorldRepository()?.save(worldData)
                         applyTime(worldData.uuid, parsed)
-                        open(target, worldData)
+                        open(target, worldData, replaceCurrent = true)
                         MenuActionResult.Success(MenuUpdate.Close)
                     },
                 ),
                 cancel = MenuDialogButton(
                     Component.text(i18n(player, "common.back"), NamedTextColor.GRAY),
                     MenuDialogHandler { target, _ ->
-                        open(target, worldData)
+                        open(target, worldData, replaceCurrent = true)
                         MenuActionResult.Success(MenuUpdate.Close)
                     },
                 ),
@@ -265,14 +269,14 @@ class ChanponEnvironmentGui(
                         storage.setProtectionPassword(worldData.uuid, input)
                         buildPermissionService.sync(worldData)
                         target.sendMessage(i18n(target, "protection.password_updated"))
-                        open(target, worldData)
+                        open(target, worldData, replaceCurrent = true)
                         MenuActionResult.Success(MenuUpdate.Close)
                     },
                 ),
                 cancel = MenuDialogButton(
                     Component.text(i18n(player, "common.back"), NamedTextColor.GRAY),
                     MenuDialogHandler { target, _ ->
-                        open(target, worldData)
+                        open(target, worldData, replaceCurrent = true)
                         MenuActionResult.Success(MenuUpdate.Close)
                     },
                 ),
