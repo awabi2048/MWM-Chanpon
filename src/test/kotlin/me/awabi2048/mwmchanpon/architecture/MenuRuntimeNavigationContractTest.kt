@@ -80,6 +80,27 @@ class MenuRuntimeNavigationContractTest {
     }
 
     @Test
+    fun `owner backup back action pops runtime history without reopening settings`() {
+        val source = Path.of(
+            "src/main/kotlin/me/awabi2048/mwmchanpon/extension/WorldBackupMenuExtension.kt",
+        ).readText()
+        val body = functionBody(source, "back")
+
+        assertTrue("MenuUpdate.Back" in body)
+        assertFalse("worldSettingsGui.open" in body)
+        assertFalse("MenuUpdate.Close" in body)
+    }
+
+    @Test
+    fun `world settings extension adapter preserves handled outcome`() {
+        val source = uiRoot.resolve("ChanponWorldSettingsMenuProvider.kt").readText()
+        val body = functionBody(source, "handleExtensionAction")
+
+        assertTrue("if (handled)" in body)
+        assertTrue("MenuActionResult.Ignored" in body)
+    }
+
+    @Test
     fun `公開メニュープロバイダーはRuntimeの表示結果と親経路を保持する`() {
         val environment = uiRoot.resolve("ChanponEnvironmentGui.kt").readText()
         assertTrue("runtime.navigate(player, route(worldData.uuid))" in environment)

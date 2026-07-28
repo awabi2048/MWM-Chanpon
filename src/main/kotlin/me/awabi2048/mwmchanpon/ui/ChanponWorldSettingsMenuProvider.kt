@@ -181,6 +181,9 @@ class ChanponWorldSettingsMenuProvider(
 
     private fun handleAction(context: MenuActionContext): MenuActionResult {
         val source = source(context.route)
+        if (source.screen == Screen.MAIN && ItemTag.getType(context.item) == ItemTag.TYPE_GUI_EXTENSION) {
+            return handleExtensionAction(context, source)
+        }
         when (source.screen) {
             Screen.MAIN -> handleSettingsClick(context.player, source, context.item, context.click)
             Screen.EXPANSION -> handleExpansionClick(context.player, source, context.item)
@@ -190,6 +193,35 @@ class ChanponWorldSettingsMenuProvider(
             Screen.DELETE_CONFIRM -> handleDeleteConfirmClick(context.player, source, context.item)
         }
         return MenuActionResult.Success(MenuUpdate.None)
+    }
+
+    private fun handleExtensionAction(context: MenuActionContext, source: Source): MenuActionResult {
+        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(source.worldUuid)
+            ?: return MenuActionResult.Rejected()
+        val extensionId = ItemTag.getExtensionId(context.item) ?: return MenuActionResult.Ignored
+        val extension = MyWorldManagerApi.getMenuExtensions()
+            .firstOrNull { it.getId() == extensionId }
+            ?: return MenuActionResult.Ignored
+        val session = mwm().settingsSessionManager.getSession(context.player)
+        val handled = extension.onClick(
+            context.click,
+            context.item,
+            context.player,
+            MenuExtensionContext(
+                "world_settings",
+                mutableMapOf(
+                    "worldData" to worldData,
+                    "showBackButton" to currentRequest(context.player).showBackButton,
+                    "isOwner" to (worldData.owner == context.player.uniqueId || session?.isAdminFlow == true),
+                    "isModerator" to worldData.moderators.contains(context.player.uniqueId),
+                ),
+            ),
+        )
+        return if (handled) {
+            MenuActionResult.Success(MenuUpdate.None)
+        } else {
+            MenuActionResult.Ignored
+        }
     }
 
     private fun handleSettingsClick(
@@ -214,9 +246,6 @@ class ChanponWorldSettingsMenuProvider(
         mwm.settingsSessionManager.getSession(player)?.let { it.isGuiTransition = false }
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
         val session = mwm.settingsSessionManager.getSession(player)
-        val isOwner = worldData.owner == player.uniqueId || session?.isAdminFlow == true
-        val isModerator = worldData.moderators.contains(player.uniqueId)
-
         val type = ItemTag.getType(item)
         mwm.logWorldSettingsDebug(
             "chanpon_click=dispatch player=${player.name}/${player.uniqueId} world=$worldUuid " +
@@ -367,20 +396,6 @@ class ChanponWorldSettingsMenuProvider(
             }
             ItemTag.TYPE_GUI_RETURN -> {
                 runtime.back(player)
-            }
-            ItemTag.TYPE_GUI_EXTENSION -> {
-                val extensionId = ItemTag.getExtensionId(item) ?: return
-                val extension = MyWorldManagerApi.getMenuExtensions().firstOrNull { it.getId() == extensionId } ?: return
-                val extensionMenuType = "world_settings"
-                extension.onClick(click, item, player, MenuExtensionContext(
-                    extensionMenuType,
-                    mutableMapOf(
-                        "worldData" to worldData,
-                        "showBackButton" to currentRequest(player).showBackButton,
-                        "isOwner" to isOwner,
-                        "isModerator" to isModerator
-                    )
-                ))
             }
         }
     }

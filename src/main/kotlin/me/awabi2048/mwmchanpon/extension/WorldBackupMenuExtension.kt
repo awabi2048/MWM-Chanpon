@@ -155,11 +155,7 @@ class WorldBackupMenuExtension(
     }
 
     private fun back(context: MenuActionContext): MenuActionResult {
-        val source = source(context.payload)
-        Bukkit.getScheduler().runTask(plugin, Runnable {
-            returnToWorldSettings(context.player, source.worldUuid, source.request)
-        })
-        return MenuActionResult.Success(MenuUpdate.Close)
+        return MenuActionResult.Success(MenuUpdate.Back)
     }
 
     private fun changePage(context: MenuActionContext): MenuActionResult {
@@ -484,26 +480,6 @@ class WorldBackupMenuExtension(
         "scheduled" -> Material.CLOCK
         "restore_point" -> Material.END_CRYSTAL
         else -> Material.RECOVERY_COMPASS
-    }
-
-    private fun returnToWorldSettings(
-        player: Player,
-        worldUuid: UUID,
-        request: WorldSettingsMenuRequest,
-    ) {
-        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
-        if (worldData == null) {
-            runtime.close(player)
-            return
-        }
-        val mwm = org.bukkit.plugin.java.JavaPlugin.getPlugin(MyWorldManager::class.java)
-        mwm.worldSettingsGui.open(
-            player,
-            worldData,
-            request.showBackButton,
-            request.isPlayerWorldFlow,
-            request.parentShowBackButton,
-        )
     }
 
     private fun route(worldUuid: UUID, page: Int, request: WorldSettingsMenuRequest): MenuRoute {
