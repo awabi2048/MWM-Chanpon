@@ -179,7 +179,7 @@ class ChanponWorldSettingsMenuProvider(
         }
         items[4] = worldInfoItem(player, worldData)
         if (CCSystem.getAPI().getMenuNavigationService().canGoBack(player)) {
-            items[inventorySize - 5] = returnItem(player)
+            items[ChanponGuiElements.backSlot(inventorySize)] = returnItem(player)
         }
 
         items = renderExtensions(
@@ -708,7 +708,7 @@ class ChanponWorldSettingsMenuProvider(
         val items = mutableMapOf(
             20 to expansionOptionItem(player, "center", Material.MAP, ACTION_CENTER),
             24 to expansionOptionItem(player, "direction_select", Material.COMPASS, ACTION_SELECT_DIRECTION),
-            40 to returnItem(player),
+            ChanponGuiElements.backSlot(45) to returnItem(player),
         )
         if (worldData.latestBorderExpansionRecord() != null) {
             items[42] = stepBackItem(player, worldData)
@@ -749,7 +749,12 @@ class ChanponWorldSettingsMenuProvider(
         InventoryMenuView(
             45,
             i18nComponent(player, "critical.menu_title"),
-            menuElements(mapOf(36 to returnItem(player), 22 to deleteWorldItem(player))),
+            menuElements(
+                mapOf(
+                    ChanponGuiElements.backSlot(45) to returnItem(player),
+                    22 to deleteWorldItem(player),
+                ),
+            ),
         )
 
     private fun renderDeleteConfirmation(

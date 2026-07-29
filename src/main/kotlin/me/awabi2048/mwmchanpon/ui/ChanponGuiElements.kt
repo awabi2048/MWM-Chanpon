@@ -34,6 +34,12 @@ internal object ChanponGuiElements {
 
     fun threeChoiceLayout(): GuiThreeChoiceLayout = layouts.threeChoice45()
 
+    fun backSlot(inventorySize: Int): Int = when (inventorySize) {
+        45 -> layouts.backSlot45()
+        54 -> layouts.backSlot54()
+        else -> error("Unsupported inventory size for a centered back button: $inventorySize")
+    }
+
     fun applyConfirmationFrame(inventory: Inventory) {
         applyStandardFrame(inventory)
     }
