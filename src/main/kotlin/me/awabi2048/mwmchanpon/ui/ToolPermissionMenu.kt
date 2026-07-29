@@ -109,7 +109,10 @@ class ToolPermissionMenu(
     }
 
     private fun back(context: MenuActionContext): MenuActionResult {
-        return MenuActionResult.Success(MenuUpdate.Back)
+        val worldUuid = uuid(context.route.payload[WORLD_UUID])
+            ?: return MenuActionResult.Rejected()
+        MyWorldManagerApi.replaceWithLatestMemberManagementMenu(context.player, worldUuid)
+        return MenuActionResult.Success(MenuUpdate.None)
     }
 
     private fun toggle(context: MenuActionContext): MenuActionResult {

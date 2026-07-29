@@ -77,16 +77,17 @@ class ToolPermissionMenuExtension(
         val offlinePlayer = Bukkit.getOfflinePlayer(memberUuid)
         val lines = mutableListOf<GuiLoreLine>()
 
-        val dateStr = if (offlinePlayer.lastSeen > 0) {
-            Instant.ofEpochMilli(offlinePlayer.lastSeen)
-                .atZone(ZoneId.systemDefault())
-                .format(DateTimeFormatter.ofPattern("yyyy年M月d日"))
-        } else {
-            i18n(player, "online")
+        if (!offlinePlayer.isOnline) {
+            val dateStr = if (offlinePlayer.lastSeen > 0) {
+                Instant.ofEpochMilli(offlinePlayer.lastSeen)
+                    .atZone(ZoneId.systemDefault())
+                    .format(DateTimeFormatter.ofPattern("yyyy年M月d日 HH:mm"))
+            } else {
+                i18n(player, "unknown")
+            }
+            lines.add(GuiLoreLine.Data(i18n(player, "last_online_label"), dateStr, "§f"))
+            lines.add(GuiLoreLine.Spacer)
         }
-
-        lines.add(GuiLoreLine.Data(i18n(player, "last_online_label"), dateStr, "§f"))
-        lines.add(GuiLoreLine.Spacer)
 
         lines.add(GuiLoreLine.Data(i18n(player, "tool_permission_title"), null, ""))
         definitions.forEach { definition ->
