@@ -22,6 +22,7 @@ import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuRuntimeActions
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
+import com.awabi2048.ccsystem.api.gui.PlayerInventoryInteraction
 import java.util.UUID
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
@@ -195,7 +196,17 @@ class ChanponWorldSettingsMenuProvider(
             "chanpon_open=inventory player=${player.name}/${player.uniqueId} world=${worldData.uuid} " +
                 "size=$inventorySize protected=$isProtected"
         )
-        return InventoryMenuView(inventorySize, title, menuElements(items))
+        return InventoryMenuView(
+            inventorySize,
+            title,
+            menuElements(items),
+            playerInventoryInteraction =
+                if (selectingIcon) {
+                    PlayerInventoryInteraction.SELECTION
+                } else {
+                    PlayerInventoryInteraction.INTERACTIVE
+                },
+        )
     }
 
     private fun handleAction(context: MenuActionContext): MenuActionResult {
