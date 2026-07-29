@@ -32,7 +32,7 @@ class ToolPermissionMenuExtension(
     override fun onRender(items: Map<Int, ItemStack>, player: Player, context: MenuExtensionContext): Map<Int, ItemStack> {
         if (context.menuType != "member_management") return items
         val worldData = context.get<WorldData>("worldData") ?: return items
-        if (worldData.owner != player.uniqueId) return items
+        if (!canManage(player, worldData)) return items
 
         return items.mapValues { (_, sourceItem) ->
             val item = sourceItem.clone()
@@ -52,14 +52,16 @@ class ToolPermissionMenuExtension(
         if (context.menuType != "member_management") return false
         if (ItemTag.getType(item) != ItemTag.TYPE_GUI_MEMBER_ITEM || !click.isLeftClick || click.isShiftClick) return false
 
-        if (player.uniqueId != (context.get<WorldData>("worldData")?.owner ?: return false)) return false
-
-        val memberUuid = ItemTag.getWorldUuid(item) ?: return false
         val worldData = context.get<WorldData>("worldData") ?: return false
+        if (!canManage(player, worldData)) return false
+        val memberUuid = ItemTag.getWorldUuid(item) ?: return false
 
         menu.open(player, worldData, memberUuid)
         return true
     }
+
+    private fun canManage(player: Player, worldData: WorldData): Boolean =
+        player.uniqueId == worldData.owner || player.hasPermission("myworldmanager.admin")
 
     private fun i18n(player: Player, key: String): String {
         return CCSystem.getAPI().getI18nString(player, "chanpon.member_lore.$key")

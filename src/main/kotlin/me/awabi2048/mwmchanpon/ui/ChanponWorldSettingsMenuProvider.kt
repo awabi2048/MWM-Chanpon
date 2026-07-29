@@ -128,9 +128,11 @@ class ChanponWorldSettingsMenuProvider(
         val isAdminFlow = session?.isAdminFlow == true
         val isActualOwner = worldData.owner == player.uniqueId || isAdminFlow
         val isModerator = worldData.moderators.contains(player.uniqueId)
+        val isMember = worldData.members.contains(player.uniqueId)
         val isImportedArchive = storage.isImportedArchive(worldData.uuid)
         val isOwner = isActualOwner && !isImportedArchive
         val hasManagePermission = (isOwner || isModerator) && !isImportedArchive
+        val isMemberLayout = isMember && !hasManagePermission
         val isProtected = protectionService.isProtected(worldData)
 
         val title = GuiHelper.inventoryTitle(
@@ -141,7 +143,7 @@ class ChanponWorldSettingsMenuProvider(
             )
         )
         val layout = ChanponGuiElements.settingsLayout()
-        val inventorySize = if (isProtected) PROTECTED_SETTINGS_SIZE else layout.size
+        val inventorySize = if (isProtected || isMemberLayout) PROTECTED_SETTINGS_SIZE else layout.size
         var items = mutableMapOf<Int, ItemStack>()
 
         if (isProtected && isOwner) {
@@ -175,7 +177,7 @@ class ChanponWorldSettingsMenuProvider(
         }
         items[4] = worldInfoItem(player, worldData)
         if (CCSystem.getAPI().getMenuNavigationService().canGoBack(player)) {
-            items[if (isProtected) PROTECTED_BACK_SLOT else layout.infoSlot] = returnItem(player)
+            items[inventorySize - 5] = returnItem(player)
         }
 
         items = renderExtensions(
@@ -187,6 +189,7 @@ class ChanponWorldSettingsMenuProvider(
             isModerator,
             isProtected,
             inventorySize,
+            worldData.owner == player.uniqueId,
         ).toMutableMap()
         mwm.logWorldSettingsDebug(
             "chanpon_open=inventory player=${player.name}/${player.uniqueId} world=${worldData.uuid} " +
@@ -361,6 +364,10 @@ class ChanponWorldSettingsMenuProvider(
                 mwm.worldSettingsGui.enterIconSelection(player, worldData)
             }
             ItemTag.TYPE_GUI_SETTING_SPAWN -> {
+                if (mwm.playerPlatformResolver.isBedrock(player)) {
+                    openBedrockSpawnForm(player, worldData)
+                    return
+                }
                 val intent = settingIconIntent(player, type, click) ?: return
                 val isGuest = intent != SettingIconIntent.SET_MEMBER_SPAWN
                 mwm.worldSettingsGui.enterSpawnSetting(player, worldData, isGuest)
@@ -710,6 +717,7 @@ class ChanponWorldSettingsMenuProvider(
         isModerator: Boolean,
         isProtected: Boolean = false,
         inventorySize: Int,
+        isActualOwner: Boolean,
     ): Map<Int, ItemStack> {
         val context = MenuExtensionContext(
             "world_settings",
@@ -717,6 +725,7 @@ class ChanponWorldSettingsMenuProvider(
                 "worldData" to worldData,
                 "showBackButton" to showBackButton,
                 "isOwner" to isOwner,
+                "isActualOwner" to isActualOwner,
                 "isMember" to worldData.members.contains(player.uniqueId),
                 "isModerator" to isModerator,
                 "isProtected" to isProtected,
@@ -941,7 +950,7 @@ class ChanponWorldSettingsMenuProvider(
                             GuiLoreActions.singleClick(
                                 language,
                                 player,
-                                language.getMessage(player, "gui.settings.spawn.action.set_both"),
+                                language.getMessage(player, "gui.settings.spawn.action.select_type"),
                             ),
                         )
                     )
@@ -964,6 +973,35 @@ class ChanponWorldSettingsMenuProvider(
                 )
             )
         }
+    }
+
+    private fun openBedrockSpawnForm(player: Player, worldData: WorldData) {
+        val forms = MyWorldManagerApi.getBedrockFormService() ?: return
+        val language = mwm().languageManager
+        forms.sendSimpleForm(
+            player = player,
+            title = language.getMessage(player, "gui.settings.spawn.display"),
+            content = language.getMessage(player, "gui.settings.spawn.form.content"),
+            buttons = listOf(
+                language.getMessage(player, "gui.settings.spawn.type.guest"),
+                language.getMessage(player, "gui.settings.spawn.type.member"),
+                language.getMessage(player, "gui.common.back"),
+            ),
+            onSelect = { index ->
+                Bukkit.getScheduler().runTask(plugin, Runnable {
+                    when (index) {
+                        0 -> mwm().worldSettingsGui.enterSpawnSetting(player, worldData, true)
+                        1 -> mwm().worldSettingsGui.enterSpawnSetting(player, worldData, false)
+                        else -> open(player, worldData, currentRequest(player))
+                    }
+                })
+            },
+            onClosed = {
+                Bukkit.getScheduler().runTask(plugin, Runnable {
+                    open(player, worldData, currentRequest(player))
+                })
+            },
+        )
     }
 
     private fun settingIconIntent(

@@ -37,9 +37,8 @@ class ChanponWorldAccessPolicy(
         archiveOperationGuard.canPerform(sender, ChanponOperation.EDIT)
 
     override fun canInviteTarget(sender: Player, worldData: WorldData, target: OfflinePlayer): Boolean {
-        val targetPlayer = target as? Player ?: return false
         return archiveOperationGuard.canPerform(sender, ChanponOperation.EDIT) &&
-            canCreateWorld(targetPlayer)
+            (target !is Player || canCreateWorld(target))
     }
 
     override fun inviteToWorldDeniedMessageKey(sender: Player, worldData: WorldData): String? =
@@ -47,8 +46,7 @@ class ChanponWorldAccessPolicy(
 
     override fun inviteTargetDeniedMessageKey(sender: Player, worldData: WorldData, target: OfflinePlayer): String? = when {
         !archiveOperationGuard.canPerform(sender, ChanponOperation.EDIT) -> "messages.world_operation_locked"
-        target !is Player -> "messages.member_invite_target_offline"
-        !canCreateWorld(target) -> "messages.member_invite_target_cannot_create"
+        target is Player && !canCreateWorld(target) -> "messages.member_invite_target_cannot_create"
         else -> null
     }
 

@@ -57,6 +57,7 @@ class ProductionToggleExtension(
         when (context.menuType) {
             "world_settings" -> {
                 if (context.get<Boolean>("isProtected") == true) return items
+                if (context.get<Boolean>("isActualOwner") != true) return items
                 if (globalStorage.getWorldCreationAvailability() != WorldCreationAvailability.PRODUCTION) return items
                 val worldData = context.get<WorldData>("worldData") ?: return items
                 if (plugin.isSubmissionClosed()) {

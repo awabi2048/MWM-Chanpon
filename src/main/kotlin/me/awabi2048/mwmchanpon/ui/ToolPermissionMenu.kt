@@ -41,6 +41,7 @@ class ToolPermissionMenu(
                 actions = mapOf(
                     ACTION_BACK to MenuActionHandler(::back),
                     ACTION_TOGGLE to MenuActionHandler(::toggle),
+                    ACTION_ROLE to MenuActionHandler(::toggleRole),
                 ),
             ),
         )
@@ -77,7 +78,7 @@ class ToolPermissionMenu(
             elements += MenuElement(4, head, GuiElementRole.CONTENT)
         }
         if (worldData != null && targetUuid != null) {
-            listOf(20, 22, 24).zip(definitions).forEach { (slot, definition) ->
+            listOf(19, 20, 21).zip(definitions).forEach { (slot, definition) ->
                 elements += MenuElement(
                     slot,
                     createToolItem(worldData, targetUuid, definition),
@@ -86,11 +87,21 @@ class ToolPermissionMenu(
                     mapOf(TOOL_ID to definition.id),
                 )
             }
+            if (targetUuid != worldData.owner) {
+                elements += MenuElement(
+                    23,
+                    createRoleItem(worldData, targetUuid),
+                    GuiElementRole.ACTION,
+                    ACTION_ROLE,
+                )
+            }
         }
+        elements += MenuElement(24, decoration(), GuiElementRole.DECORATION)
+        elements += MenuElement(25, decoration(), GuiElementRole.DECORATION)
         elements += MenuElement(40, backItem(), GuiElementRole.BACK, ACTION_BACK)
         return InventoryMenuView(
             45,
-            CCSystem.getAPI().getGuiElementService().name("§8ツール権限の編集"),
+            CCSystem.getAPI().getGuiElementService().name(i18n("title")),
             elements,
         )
     }
@@ -103,7 +114,7 @@ class ToolPermissionMenu(
         val worldData = world(context.route) ?: return MenuActionResult.Rejected()
         val targetUuid = uuid(context.route.payload[TARGET_UUID])
             ?: return MenuActionResult.Rejected()
-        if (worldData.owner != context.player.uniqueId) {
+        if (!canManage(context.player, worldData)) {
             context.player.sendMessage("§cオーナーのみ操作できます")
             return MenuActionResult.Rejected()
         }
@@ -114,6 +125,59 @@ class ToolPermissionMenu(
         controller.setEnabled(worldData, targetUuid, definition.id, next)
         return MenuActionResult.Success(MenuUpdate.Refresh)
     }
+
+    private fun toggleRole(context: MenuActionContext): MenuActionResult {
+        val worldData = world(context.route) ?: return MenuActionResult.Rejected()
+        val targetUuid = uuid(context.route.payload[TARGET_UUID])
+            ?: return MenuActionResult.Rejected()
+        if (!canManage(context.player, worldData) || targetUuid == worldData.owner) {
+            return MenuActionResult.Rejected()
+        }
+        if (worldData.moderators.remove(targetUuid)) {
+            if (!worldData.members.contains(targetUuid)) worldData.members.add(targetUuid)
+        } else {
+            worldData.members.remove(targetUuid)
+            if (!worldData.moderators.contains(targetUuid)) worldData.moderators.add(targetUuid)
+        }
+        MyWorldManagerApi.getWorldRepository()?.save(worldData)
+        controller.syncWorld(worldData)
+        return MenuActionResult.Success(MenuUpdate.Refresh)
+    }
+
+    private fun createRoleItem(worldData: WorldData, targetUuid: UUID): ItemStack {
+        val moderator = targetUuid in worldData.moderators
+        val item = ItemStack(Material.PLAYER_HEAD)
+        item.editMeta { meta ->
+            meta.displayName(CCSystem.getAPI().getGuiElementService().name(i18n("role.display")))
+            meta.lore(
+                ChanponLore.build(
+                    listOf(
+                        GuiLoreLine.Data(
+                            i18n("role.state_label"),
+                            i18n(if (moderator) "role.moderator" else "role.member"),
+                            if (moderator) "§e" else "§f",
+                        ),
+                        GuiLoreLine.SingleAction(
+                            i18n("role.operation"),
+                            i18n("role.action"),
+                            i18n("role.resolved"),
+                        ),
+                    ),
+                ),
+            )
+        }
+        return item
+    }
+
+    private fun decoration(): ItemStack =
+        ItemStack(Material.WHITE_STAINED_GLASS_PANE).also { item ->
+            item.editMeta { meta ->
+                meta.displayName(CCSystem.getAPI().getGuiElementService().name(""))
+            }
+        }
+
+    private fun canManage(player: Player, worldData: WorldData): Boolean =
+        player.uniqueId == worldData.owner || player.hasPermission("myworldmanager.admin")
 
     private fun createToolItem(
         worldData: WorldData,
@@ -169,6 +233,7 @@ class ToolPermissionMenu(
         private const val ROUTE = "mwm-chanpon:tool-permissions"
         private const val ACTION_BACK = "back"
         private const val ACTION_TOGGLE = "toggle"
+        private const val ACTION_ROLE = "role"
         private const val WORLD_UUID = "world_uuid"
         private const val TARGET_UUID = "target_uuid"
         private const val TOOL_ID = "tool_id"

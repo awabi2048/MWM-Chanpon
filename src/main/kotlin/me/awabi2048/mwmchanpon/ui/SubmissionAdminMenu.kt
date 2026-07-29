@@ -230,7 +230,7 @@ class SubmissionAdminMenu(
         val current = state(context.route)
         if (context.click == ClickType.MIDDLE) {
             if (!canToggleProduction(context.player)) return MenuActionResult.Rejected()
-            val enabling = !storage.isProductionWorld(worldUuid)
+            if (!storage.isProductionWorld(worldUuid)) return MenuActionResult.Rejected()
             return MenuActionResult.Success(
                 MenuUpdate.Navigate(
                     MenuRoute(
@@ -238,7 +238,7 @@ class SubmissionAdminMenu(
                         ROUTE_PRODUCTION_CONFIRM,
                         statePayload(current) + mapOf(
                             WORLD_UUID to worldUuid.toString(),
-                            ENABLING to enabling.toString(),
+                            ENABLING to false.toString(),
                         ),
                     ),
                 ),
@@ -552,7 +552,7 @@ class SubmissionAdminMenu(
             if (player.gameMode == GameMode.CREATIVE) {
                 add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.right"), i18n(player, "admin_menu.world.action_complete")))
             }
-            add(GuiLoreLine.Action(i18n(player, "common.middle_click"), i18n(player, "admin_menu.world.action_toggle_production")))
+            add(GuiLoreLine.Action(i18n(player, "common.middle_click"), i18n(player, "admin_menu.world.action_remove_production")))
         }
     }
 
