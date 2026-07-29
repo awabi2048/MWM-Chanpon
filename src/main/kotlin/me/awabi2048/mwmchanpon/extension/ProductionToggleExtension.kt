@@ -138,7 +138,7 @@ class ProductionToggleExtension(
             ACTION_TOGGLE_SUBMISSION -> {
                 // 本番用設定の解除は管理者メニューに集約し、通常の /worldmenu では提出操作だけを扱う。
                 if (!click.isLeftClick) {
-                    return true
+                    return false
                 }
                 if (worldData.owner != player.uniqueId) {
                     feedback(player, ManagedMenuInteractionOutcome.REJECTED)
@@ -162,8 +162,8 @@ class ProductionToggleExtension(
                         feedback(player, ManagedMenuInteractionOutcome.SUCCESS, MenuClickType.NAVIGATION)
                         openConfirmation(player, worldData.uuid, ConfirmationAction.SUBMIT)
                     }
-                    SubmissionState.SUBMITTED -> return true
-                    SubmissionState.COMPLETED -> return true
+                    SubmissionState.SUBMITTED -> return false
+                    SubmissionState.COMPLETED -> return false
                 }
             }
             else -> return false
