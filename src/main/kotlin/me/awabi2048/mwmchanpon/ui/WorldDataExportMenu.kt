@@ -102,12 +102,23 @@ class WorldDataExportMenu(
         val fileName = runCatching {
             me.awabi2048.mwmchanpon.service.StandaloneExportFileName.create(fiscalYear, selectedWorlds.map { it.name })
         }.getOrDefault("-")
+        val layout = ChanponGuiElements.confirmationLayout()
         val elements = listOf(
-            MenuElement(13, confirmationInfoItem(player, primary?.name ?: "-", selectedWorlds.size, fileName), GuiElementRole.CONTENT),
-            actionElement(11, backItem(player), GuiElementRole.BACK, ACTION_BACK),
-            actionElement(15, confirmationExecuteItem(player), GuiElementRole.CONFIRM, ACTION_CONFIRM, enabled = primary != null),
+            MenuElement(
+                layout.previewSlot,
+                confirmationInfoItem(player, primary?.name ?: "-", selectedWorlds.size, fileName),
+                GuiElementRole.CONTENT,
+            ),
+            actionElement(
+                layout.confirmSlot,
+                confirmationExecuteItem(player),
+                GuiElementRole.CONFIRM,
+                ACTION_CONFIRM,
+                enabled = primary != null,
+            ),
+            actionElement(layout.cancelSlot, backItem(player), GuiElementRole.CANCEL, ACTION_BACK),
         )
-        return InventoryMenuView(27, i18nComponent(player, "export_menu.confirm.title"), elements)
+        return InventoryMenuView(layout.size, i18nComponent(player, "export_menu.confirm.title"), elements)
     }
 
     private fun back(context: MenuActionContext): MenuActionResult {
