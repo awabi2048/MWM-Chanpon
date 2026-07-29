@@ -18,6 +18,7 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuInteraction
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuRuntimeActions
@@ -199,7 +200,11 @@ class ChanponWorldSettingsMenuProvider(
         return InventoryMenuView(
             inventorySize,
             title,
-            menuElements(items),
+            menuElements(
+                items,
+                displayOnlyInfoWorldUuid =
+                    worldData.uuid.takeIf { isCurrentWorld(player, worldData) },
+            ),
             playerInventoryInteraction =
                 if (selectingIcon) {
                     PlayerInventoryInteraction.SELECTION
@@ -1352,7 +1357,10 @@ class ChanponWorldSettingsMenuProvider(
         return CCSystem.getAPI().getI18nComponent(player, "chanpon.settings.$key", placeholders)
     }
 
-    private fun menuElements(items: Map<Int, ItemStack>): List<MenuElement> =
+    private fun menuElements(
+        items: Map<Int, ItemStack>,
+        displayOnlyInfoWorldUuid: UUID? = null,
+    ): List<MenuElement> =
         items.map { (slot, item) ->
             val type = ItemTag.getType(item)
             val role = when (type) {
@@ -1364,14 +1372,22 @@ class ChanponWorldSettingsMenuProvider(
                 else -> GuiElementRole.ACTION
             }
             val clickableInfo =
-                type == ItemTag.TYPE_GUI_INFO && ItemTag.getWorldUuid(item) != null
+                type == ItemTag.TYPE_GUI_INFO &&
+                    ItemTag.getWorldUuid(item) != null &&
+                    ItemTag.getWorldUuid(item) != displayOnlyInfoWorldUuid
+            val effectiveRole = if (clickableInfo) GuiElementRole.ACTION else role
+            val interaction = when {
+                effectiveRole == GuiElementRole.BACK -> MenuInteraction.Back()
+                role == GuiElementRole.DECORATION ||
+                    (role == GuiElementRole.CONTENT && !clickableInfo) ->
+                    MenuInteraction.DisplayOnly
+                else -> MenuInteraction.Action(ACTION_SELECT)
+            }
             MenuElement(
                 slot,
                 item,
-                if (clickableInfo) GuiElementRole.ACTION else role,
-                if (role == GuiElementRole.DECORATION ||
-                    (role == GuiElementRole.CONTENT && !clickableInfo)
-                ) null else ACTION_SELECT,
+                effectiveRole,
+                interaction = interaction,
             )
         }
 
