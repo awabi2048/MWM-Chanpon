@@ -575,14 +575,8 @@ class ChanponEnvironmentGui(
 
     private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)
 
-    private fun isInTargetWorld(player: Player, worldData: WorldData): Boolean {
-        val currentWorldUuid = MyWorldManagerApi.getWorldRepository()?.findByWorldName(player.world.name)?.uuid
-        if (currentWorldUuid == worldData.uuid) return true
-        val targetWorldName = MyWorldManagerApi.getWorldService()?.getWorldFolderName(worldData)
-            ?: worldData.customWorldName
-            ?: "my_world.${worldData.uuid}"
-        return player.world.name == targetWorldName
-    }
+    private fun isInTargetWorld(player: Player, worldData: WorldData): Boolean =
+        MyWorldManagerApi.getWorldService()?.isPlayerInWorld(player, worldData) == true
 
     private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): String {
         return CCSystem.getAPI().getI18nString(player, "chanpon.environment.$key", placeholders)

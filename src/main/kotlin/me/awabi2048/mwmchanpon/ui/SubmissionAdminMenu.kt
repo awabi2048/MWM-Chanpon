@@ -673,7 +673,7 @@ class SubmissionAdminMenu(
                     add(GuiLoreLine.Option(i18n(player, optionKey), selected, "\u00A7f", "\u00A77"))
                 }
                 add(GuiLoreLine.Spacer)
-                addAll(GuiLoreActions.cyclePreviousNext(mwm().languageManager, player))
+                add(GuiLoreActions.cycle(mwm().languageManager, player))
             }, GuiLoreFrame.BOTH)
         )
         item.editMeta { meta ->

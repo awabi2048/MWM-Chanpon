@@ -243,7 +243,7 @@ class ChanponCreationConfirmationMenuProvider(
                 ))
             }
             add(GuiLoreLine.Spacer)
-            addAll(GuiLoreActions.cyclePreviousNext(lang, player))
+            add(GuiLoreActions.cycle(lang, player))
         }, GuiLoreFrame.BOTH)
         val material = when (session.seedEnvironment) {
             World.Environment.NORMAL -> Material.GRASS_BLOCK

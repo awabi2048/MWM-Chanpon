@@ -766,7 +766,7 @@ class ChanponWorldSettingsMenuProvider(
                     add(GuiLoreLine.Option(displayName, selected, selectedColor, "\u00A77"))
                 }
                 add(GuiLoreLine.Spacer)
-                addAll(GuiLoreActions.cyclePreviousNext(mwm().languageManager, player))
+                add(GuiLoreActions.cycle(mwm().languageManager, player))
             }, GuiLoreFrame.BOTH)
         )
         return componentItem(Material.OAK_SIGN, i18n(player, "publish.title"), lore, ItemTag.TYPE_GUI_SETTING_PUBLISH)
@@ -775,14 +775,27 @@ class ChanponWorldSettingsMenuProvider(
     private fun expansionItem(player: Player, worldData: WorldData): ItemStack {
         val level = worldData.borderExpansionLevel
         val max = maxExpansionLevel()
-        val lines = if (level >= max) i18nList(player, "expand.status_max") else emptyList()
+        val lines = if (level >= max) {
+            i18nList(player, "expand.status_max").map(GuiLoreLine::Text)
+        } else {
+            listOf(
+                GuiLoreActions.singleClick(
+                    mwm().languageManager,
+                    player,
+                    mwm().languageManager.getMessage(
+                        player,
+                        "gui.settings.expand.action.open_menu",
+                    ),
+                ),
+            )
+        }
         return componentItem(
             Material.FILLED_MAP,
             i18n(player, "expand.display"),
             describedStructuredLore(
                 player,
                 mwm().languageManager.getMessageList(player, "gui.settings.expand.blocks.description").map(GuiLoreLine::Text),
-                lines.map(GuiLoreLine::Text),
+                lines,
                 requireTargetWorld = true,
                 worldData = worldData
             ),
@@ -1216,7 +1229,7 @@ class ChanponWorldSettingsMenuProvider(
     }
 
     private fun isCurrentWorld(player: Player, worldData: WorldData): Boolean =
-        mwm().worldConfigRepository.findByWorldName(player.world.name)?.uuid == worldData.uuid
+        MyWorldManagerApi.getWorldService()?.isPlayerInWorld(player, worldData) == true
 
     private fun maxExpansionLevel(): Int {
         return plugin.config.getInt("world_expansion.max_level", 3).coerceAtLeast(0)

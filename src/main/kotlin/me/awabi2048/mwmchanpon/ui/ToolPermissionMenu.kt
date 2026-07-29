@@ -94,6 +94,8 @@ class ToolPermissionMenu(
                     GuiElementRole.ACTION,
                     ACTION_ROLE,
                 )
+            } else {
+                elements += MenuElement(23, decoration(), GuiElementRole.DECORATION)
             }
         }
         elements += MenuElement(24, decoration(), GuiElementRole.DECORATION)
@@ -170,11 +172,7 @@ class ToolPermissionMenu(
     }
 
     private fun decoration(): ItemStack =
-        ItemStack(Material.WHITE_STAINED_GLASS_PANE).also { item ->
-            item.editMeta { meta ->
-                meta.displayName(CCSystem.getAPI().getGuiElementService().name(""))
-            }
-        }
+        ChanponGuiElements.decoration(Material.WHITE_STAINED_GLASS_PANE)
 
     private fun canManage(player: Player, worldData: WorldData): Boolean =
         player.uniqueId == worldData.owner || player.hasPermission("myworldmanager.admin")

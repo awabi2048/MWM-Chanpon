@@ -108,13 +108,27 @@ class BackupListMenu(
     private fun renderList(player: Player, route: MenuRoute): InventoryMenuView {
         val source = source(route)
         val backups = backups(source)
-        val pages = pageCount(backups.size)
-        val safePage = source.page.coerceIn(0, pages - 1)
-        val layout = ChanponGuiElements.pagedListLayout()
+        val variablePage = if (source.mode == BackupListMode.WORLD) {
+            CCSystem.getAPI().getGuiLayoutService().sevenColumnPage(backups.size, source.page)
+        } else {
+            null
+        }
+        val pages = variablePage?.totalPages ?: pageCount(backups.size)
+        val safePage = variablePage?.page ?: source.page.coerceIn(0, pages - 1)
+        val variableLayout = variablePage?.layout
+        val fixedLayout = if (variableLayout == null) ChanponGuiElements.pagedListLayout() else null
+        val inventorySize = variableLayout?.size ?: fixedLayout!!.size
+        val previousPageSlot = variableLayout?.previousPageSlot ?: fixedLayout!!.previousPageSlot
+        val nextPageSlot = variableLayout?.nextPageSlot ?: fixedLayout!!.nextPageSlot
+        val backSlot = variableLayout?.backSlot ?: fixedLayout!!.backSlot
+        val infoSlot = variableLayout?.actionSlot ?: fixedLayout!!.infoSlot
+        val itemSlots = variableLayout?.itemSlots ?: fixedLayout!!.itemSlots
+        val startIndex = variablePage?.startIndex ?: safePage * ITEMS_PER_PAGE
+        val itemCount = variablePage?.itemCount ?: ITEMS_PER_PAGE
         val elements = mutableListOf<MenuElement>()
         if (safePage > 0) {
             elements += MenuElement(
-                layout.previousPageSlot,
+                previousPageSlot,
                 navItem(player, false),
                 GuiElementRole.NAVIGATION,
                 ACTION_PAGE,
@@ -123,22 +137,22 @@ class BackupListMenu(
         }
         if (safePage < pages - 1) {
             elements += MenuElement(
-                layout.nextPageSlot,
+                nextPageSlot,
                 navItem(player, true),
                 GuiElementRole.NAVIGATION,
                 ACTION_PAGE,
                 sourcePayload(source.copy(page = safePage + 1)),
             )
         }
-        elements += MenuElement(layout.backSlot, backItem(player), GuiElementRole.BACK, ACTION_BACK)
+        elements += MenuElement(backSlot, backItem(player), GuiElementRole.BACK, ACTION_BACK)
         elements += MenuElement(
-            layout.infoSlot,
+            infoSlot,
             infoItem(player, backups.size, safePage + 1, pages),
             GuiElementRole.CONTENT,
         )
-        backups.drop(safePage * ITEMS_PER_PAGE).take(ITEMS_PER_PAGE).forEachIndexed { index, backup ->
+        backups.drop(startIndex).take(itemCount).forEachIndexed { index, backup ->
             elements += MenuElement(
-                layout.itemSlots[index],
+                itemSlots[index],
                 backupItem(player, backup),
                 GuiElementRole.ACTION,
                 ACTION_BACKUP,
@@ -146,7 +160,7 @@ class BackupListMenu(
             )
         }
         return InventoryMenuView(
-            layout.size,
+            inventorySize,
             i18nComponent(player, "backup_list.title"),
             elements,
         )

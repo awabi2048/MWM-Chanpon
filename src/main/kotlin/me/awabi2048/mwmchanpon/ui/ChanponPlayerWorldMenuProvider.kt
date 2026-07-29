@@ -514,7 +514,7 @@ class ChanponPlayerWorldMenuProvider(
     }
 
     private fun isCurrentWorld(player: Player, world: WorldData): Boolean =
-        mwm().worldConfigRepository.findByWorldName(player.world.name)?.uuid == world.uuid
+        MyWorldManagerApi.getWorldService()?.isPlayerInWorld(player, world) == true
 
     private fun canBypassWorldLimits(player: Player): Boolean =
         player.hasPermission("myworldmanager.admin.bypass_world_limits") ||

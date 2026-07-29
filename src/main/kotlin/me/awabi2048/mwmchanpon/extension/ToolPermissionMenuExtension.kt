@@ -88,14 +88,17 @@ class ToolPermissionMenuExtension(
         lines.add(GuiLoreLine.Data(i18n(player, "last_online_label"), dateStr, "§f"))
         lines.add(GuiLoreLine.Spacer)
 
-        val enabledTools = definitions.filter { states[it.id] == true }
-        if (enabledTools.isEmpty()) {
-            lines.add(GuiLoreLine.Data(i18n(player, "tool_permission_title"), i18n(player, "none"), "§f"))
-        } else {
-            lines.add(GuiLoreLine.Data(i18n(player, "tool_permission_title"), null, ""))
-            enabledTools.forEach { def ->
-                lines.add(GuiLoreLine.Option(def.displayName, true, def.color, "§7"))
-            }
+        lines.add(GuiLoreLine.Data(i18n(player, "tool_permission_title"), null, ""))
+        definitions.forEach { definition ->
+            lines.add(
+                GuiLoreLine.Text(
+                    if (states[definition.id] == true) {
+                        "§6✦ ${definition.displayName}"
+                    } else {
+                        "§8・ §7${definition.displayName}"
+                    },
+                ),
+            )
         }
 
         val actionLines = mutableListOf<GuiLoreLine>(

@@ -396,7 +396,7 @@ class ChanponAdminWorldListMenu(
                 structuredLore(
                     listOf(
                         GuiLoreLine.Data(i18n(player, "$key.label"), current, "§e"),
-                    ) + GuiLoreActions.cyclePreviousNext(mwm().languageManager, player),
+                    ) + GuiLoreActions.cycle(mwm().languageManager, player),
                 ),
             )
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
