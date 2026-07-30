@@ -14,7 +14,7 @@ import me.awabi2048.mwmchanpon.extension.ChanponWorldPublishPolicy
 import me.awabi2048.mwmchanpon.extension.ChanponWorldRuntimePolicy
 import me.awabi2048.mwmchanpon.extension.ChanponWorldPlayerStatePolicy
 import me.awabi2048.mwmchanpon.extension.ChanponWorldWorkPermissionPolicy
-import me.awabi2048.mwmchanpon.extension.LinkedPortalMenuExtension
+import me.awabi2048.mwmchanpon.extension.LinkedPortalCapability
 import me.awabi2048.mwmchanpon.extension.ProductionToggleExtension
 import me.awabi2048.mwmchanpon.extension.ProductionWorldGuard
 import me.awabi2048.mwmchanpon.extension.ToolPermissionMenuExtension
@@ -83,7 +83,7 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var chanponAdminMenu: ChanponAdminMenu
     private lateinit var toolPermissionExtension: ToolPermissionMenuExtension
     private lateinit var worldBackupMenuExtension: WorldBackupMenuExtension
-    private lateinit var linkedPortalMenuExtension: LinkedPortalMenuExtension
+    private lateinit var linkedPortalCapability: LinkedPortalCapability
     private lateinit var environmentGui: ChanponEnvironmentGui
     private lateinit var archiveService: ArchiveService
     private lateinit var annualArchiveFlow: AnnualArchiveFlow
@@ -295,10 +295,9 @@ class MWMChanponPlugin : JavaPlugin() {
         val toolMenu = ToolPermissionMenu(this, toolController, toolDefinitions)
         toolPermissionExtension = ToolPermissionMenuExtension(toolMenu, toolController, toolDefinitions)
         worldBackupMenuExtension = WorldBackupMenuExtension(this, chanponStorage, backupService, automationService, manualRollbackService)
-        linkedPortalMenuExtension = LinkedPortalMenuExtension()
+        linkedPortalCapability = LinkedPortalCapability()
         MyWorldManagerApi.registerMenuExtension(toolPermissionExtension)
         MyWorldManagerApi.registerMenuExtension(worldBackupMenuExtension)
-        MyWorldManagerApi.registerMenuExtension(linkedPortalMenuExtension)
         productionToggleExtension.syncForcedTagsForProductionWorlds()
         server.pluginManager.registerEvents(MemberPermissionSyncListener(toolController, chanponStorage), this)
         server.pluginManager.registerEvents(PlayerJoinListener(toolController, spawnWorldService), this)
@@ -351,9 +350,6 @@ class MWMChanponPlugin : JavaPlugin() {
         }
         if (::worldBackupMenuExtension.isInitialized) {
             MyWorldManagerApi.unregisterMenuExtension(worldBackupMenuExtension)
-        }
-        if (::linkedPortalMenuExtension.isInitialized) {
-            MyWorldManagerApi.unregisterMenuExtension(linkedPortalMenuExtension)
         }
         if (::productionWorldGuard.isInitialized) {
             MyWorldManagerApi.unregisterWorldDeleteGuard(productionWorldGuard)
