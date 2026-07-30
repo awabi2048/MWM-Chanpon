@@ -40,7 +40,7 @@ import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.PlayerWorldCapabilityContract
 import me.awabi2048.myworldmanager.api.extension.PlayerWorldCapabilitySubject
-import me.awabi2048.myworldmanager.api.extension.PlayerWorldRouteProvider
+import me.awabi2048.myworldmanager.api.extension.PlayerWorldRouteCapability
 import me.awabi2048.myworldmanager.api.extension.PlayerWorldRouteRequest
 import me.awabi2048.myworldmanager.api.extension.WorldCreationOperation
 import me.awabi2048.myworldmanager.api.extension.WorldCreationRequest
@@ -65,7 +65,7 @@ class ChanponPlayerWorldCapability(
     private val plugin: MWMChanponPlugin,
     private val storage: ChanponWorldStorage,
     private val easyVoidCreationService: EasyVoidWorldCreationService,
-) : PlayerWorldRouteProvider {
+) : PlayerWorldRouteCapability {
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
     init {

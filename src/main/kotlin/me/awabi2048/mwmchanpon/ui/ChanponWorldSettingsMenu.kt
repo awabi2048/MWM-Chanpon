@@ -37,7 +37,7 @@ import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsAction
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsActionRequest
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsNavigationRequest
-import me.awabi2048.myworldmanager.api.extension.WorldSettingsRouteProvider
+import me.awabi2048.myworldmanager.api.extension.WorldSettingsRouteCapability
 import me.awabi2048.myworldmanager.api.service.ExpansionExecutionMode
 import me.awabi2048.myworldmanager.api.service.ExpansionSequenceOptions
 import me.awabi2048.myworldmanager.api.service.ExpansionSequencePhase
@@ -54,7 +54,7 @@ class ChanponWorldSettingsMenu(
     private val storage: ChanponWorldStorage,
     private val protectionService: SubmittedWorldProtectionService,
     private val environmentGui: ChanponEnvironmentGui
-) : WorldSettingsRouteProvider {
+) : WorldSettingsRouteCapability {
     private val accessGuard = WorldSettingsAccessGuard(storage, protectionService)
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
