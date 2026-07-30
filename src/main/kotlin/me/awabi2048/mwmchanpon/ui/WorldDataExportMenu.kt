@@ -5,6 +5,13 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryOption
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
+import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.GuiValueTone
+import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
@@ -80,17 +87,16 @@ class WorldDataExportMenu(
         elements += MenuElement(50, infoItem(player, worlds.size, safeSelected.size, safePage + 1, pages), GuiElementRole.CONTENT)
         if (safePage < pages - 1) elements += actionElement(53, navItem(player, true, safePage + 1), GuiElementRole.NAVIGATION, ACTION_PAGE, mapOf(PAGE to (safePage + 1).toString()))
         worlds.drop(safePage * ITEMS_PER_PAGE).take(ITEMS_PER_PAGE).forEachIndexed { index, world ->
-            elements += actionElement(
+            elements += worldItem(
+                player,
                 layout.itemSlots[index],
-                worldItem(player, world, world.uuid in safeSelected),
-                GuiElementRole.ACTION,
-                ACTION_TOGGLE,
-                mapOf(WORLD_UUID to world.uuid.toString()),
+                world,
+                world.uuid in safeSelected,
             )
         }
-        elements += actionElement(47, selectAllItem(player), GuiElementRole.ACTION, ACTION_SELECT_ALL)
-        elements += actionElement(48, clearSelectionItem(player), GuiElementRole.ACTION, ACTION_CLEAR_SELECTION)
-        elements += actionElement(51, exportSelectionItem(player, safeSelected.size), GuiElementRole.CONFIRM, ACTION_EXPORT_SELECTION, enabled = safeSelected.isNotEmpty())
+        elements += controlEntry(player, 47, Material.CHEST, "export_menu.select_all", ACTION_SELECT_ALL)
+        elements += controlEntry(player, 48, Material.BARRIER, "export_menu.clear", ACTION_CLEAR_SELECTION)
+        elements += exportSelectionItem(player, 51, safeSelected.size)
         return InventoryMenuView(layout.size, i18nComponent(player, "export_menu.title"), elements)
     }
 
@@ -110,12 +116,14 @@ class WorldDataExportMenu(
                 confirmationInfoItem(player, primary?.name ?: "-", selectedWorlds.size, fileName),
                 GuiElementRole.CONTENT,
             ),
-            actionElement(
+            controlEntry(
+                player,
                 layout.confirmSlot,
-                confirmationExecuteItem(player),
-                GuiElementRole.CONFIRM,
+                if (primary != null) Material.LIME_CONCRETE else Material.GRAY_DYE,
+                "export_menu.confirm.execute",
                 ACTION_CONFIRM,
-                enabled = primary != null,
+                GuiElementRole.CONFIRM,
+                primary != null,
             ),
             actionElement(layout.cancelSlot, backItem(player), GuiElementRole.CANCEL, ACTION_BACK),
         )
@@ -173,101 +181,89 @@ class WorldDataExportMenu(
         return MenuActionResult.Success(MenuUpdate.Close)
     }
 
-    private fun worldItem(player: Player, world: WorldData, selected: Boolean): ItemStack {
-        val item = ItemStack(world.icon)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "export_menu.world.display", mapOf("world" to world.name)))
-            meta.lore(structuredBlocks(listOf(
-                GuiLoreBlock(listOf(
-                    GuiLoreLine.Data(
-                        i18n(player, "export_menu.world.owner_label"),
-                        Bukkit.getOfflinePlayer(world.owner).name ?: "-",
-                        "§f"
-                    ),
-                    GuiLoreLine.Data(i18n(player, "export_menu.world.created_label"), world.createdAt, "§f")
-                )),
-                GuiLoreBlock(listOf(
-                    GuiLoreLine.Option(
-                        i18n(player, if (selected) "export_menu.world.selected" else "export_menu.world.not_selected"),
-                        selected,
-                        "§a",
-                        "§7"
-                    )
-                )),
-                GuiLoreBlock(listOf(
-                    CCSystem.getAPI().getGuiActionService().singleClick(
-                        player,
-                        i18n(player, "export_menu.world.action")
-                    )
-                ))
-            )))
-            meta.setEnchantmentGlintOverride(selected)
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        return item
-    }
-
-    private fun selectAllItem(player: Player): ItemStack =
-        controlItem(
-            player,
-            Material.CHEST,
-            "export_menu.select_all",
-            ACTION_SELECT_ALL
-        )
-
-    private fun clearSelectionItem(player: Player): ItemStack =
-        controlItem(
-            player,
-            Material.BARRIER,
-            "export_menu.clear",
-            ACTION_CLEAR_SELECTION
-        )
-
-    private fun controlItem(
+    private fun worldItem(
         player: Player,
-        material: Material,
-        key: String,
-        action: String
-    ): ItemStack {
-        val item = ItemStack(material)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "$key.display"))
-            meta.lore(structuredBlocks(listOf(
-                GuiLoreBlock(listOf(GuiLoreLine.Text(i18n(player, "$key.description")))),
-                GuiLoreBlock(listOf(
-                    CCSystem.getAPI().getGuiActionService()
-                        .singleClick(player, i18n(player, "$key.action"))
-                ))
-            )))
-        }
-        return item
-    }
+        slot: Int,
+        world: WorldData,
+        selected: Boolean,
+    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+        player,
+        GuiMenuEntrySpec(
+            slot = slot,
+            material = world.icon,
+            name = GuiNameSpec.Component(
+                i18nComponent(player, "export_menu.world.display", mapOf("world" to world.name)),
+            ),
+            role = GuiElementRole.ACTION,
+            data = listOf(
+                GuiMenuEntryData(
+                    i18n(player, "export_menu.world.owner_label"),
+                    Bukkit.getOfflinePlayer(world.owner).name ?: "-",
+                ),
+                GuiMenuEntryData(i18n(player, "export_menu.world.created_label"), world.createdAt),
+            ),
+            options = listOf(GuiMenuEntryOption(
+                i18n(player, if (selected) "export_menu.world.selected" else "export_menu.world.not_selected"),
+                selected,
+            )),
+            actions = listOf(GuiMenuEntryAction(
+                ACTION_TOGGLE,
+                MenuAcceptedClicks.LEFT_RIGHT,
+                i18n(player, "export_menu.world.action"),
+                mapOf(WORLD_UUID to world.uuid.toString()),
+            )),
+            glint = selected,
+        ),
+    )
 
-    private fun exportSelectionItem(player: Player, selectedCount: Int): ItemStack {
+    private fun exportSelectionItem(player: Player, slot: Int, selectedCount: Int): MenuElement {
         val enabled = selectedCount > 0
-        val item = ItemStack(if (enabled) Material.DISPENSER else Material.GRAY_DYE)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "export_menu.execute.display"))
-            val status = mutableListOf<GuiLoreLine>(
-                GuiLoreLine.Data(
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = slot,
+                material = if (enabled) Material.DISPENSER else Material.GRAY_DYE,
+                name = GuiNameSpec.Component(i18nComponent(player, "export_menu.execute.display")),
+                role = if (enabled) GuiElementRole.CONFIRM else GuiElementRole.CONTENT,
+                data = listOf(GuiMenuEntryData(
                     i18n(player, "export_menu.execute.selected_label"),
                     selectedCount,
-                    "§f"
-                )
-            )
-            if (!enabled) status += GuiLoreLine.Warning(i18n(player, "export_menu.execute.disabled"))
-            meta.lore(structuredBlocks(listOf(
-                GuiLoreBlock(status),
-                GuiLoreBlock(listOf(
-                    CCSystem.getAPI().getGuiActionService().singleClick(
-                        player,
-                        i18n(player, "export_menu.execute.action")
-                    )
-                ))
-            )))
-        }
-        return item
+                )),
+                warnings = if (enabled) emptyList() else {
+                    listOf(i18n(player, "export_menu.execute.disabled"))
+                },
+                actions = if (enabled) listOf(GuiMenuEntryAction(
+                    ACTION_EXPORT_SELECTION,
+                    MenuAcceptedClicks.LEFT_RIGHT,
+                    i18n(player, "export_menu.execute.action"),
+                )) else emptyList(),
+            ),
+        )
     }
+
+    private fun controlEntry(
+        player: Player,
+        slot: Int,
+        material: Material,
+        key: String,
+        actionId: String,
+        role: GuiElementRole = GuiElementRole.ACTION,
+        enabled: Boolean = true,
+    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+        player,
+        GuiMenuEntrySpec(
+            slot = slot,
+            material = material,
+            name = GuiNameSpec.Component(i18nComponent(player, "$key.display")),
+            role = if (enabled) role else GuiElementRole.CONTENT,
+            description = listOf(i18n(player, "$key.description")),
+            actions = if (enabled) listOf(GuiMenuEntryAction(
+                actionId,
+                MenuAcceptedClicks.LEFT_RIGHT,
+                i18n(player, "$key.action"),
+            )) else emptyList(),
+        ),
+    )
 
     private fun confirmationInfoItem(
         player: Player,
@@ -291,9 +287,6 @@ class WorldDataExportMenu(
         }
         return item
     }
-
-    private fun confirmationExecuteItem(player: Player): ItemStack =
-        controlItem(player, Material.LIME_CONCRETE, "export_menu.confirm.execute", ACTION_CONFIRM)
 
     private fun actionElement(
         slot: Int,

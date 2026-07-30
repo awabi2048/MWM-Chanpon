@@ -3,6 +3,13 @@ package me.awabi2048.mwmchanpon.ui
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
+import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameStyle
+import com.awabi2048.ccsystem.api.gui.GuiValueTone
+import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
@@ -79,21 +86,10 @@ class ToolPermissionMenu(
         }
         if (worldData != null && targetUuid != null) {
             listOf(19, 20, 21).zip(definitions).forEach { (slot, definition) ->
-                elements += MenuElement(
-                    slot,
-                    createToolItem(worldData, targetUuid, definition),
-                    GuiElementRole.ACTION,
-                    ACTION_TOGGLE,
-                    mapOf(TOOL_ID to definition.id),
-                )
+                elements += createToolItem(player, slot, worldData, targetUuid, definition)
             }
             if (targetUuid != worldData.owner) {
-                elements += MenuElement(
-                    23,
-                    createRoleItem(worldData, targetUuid),
-                    GuiElementRole.ACTION,
-                    ACTION_ROLE,
-                )
+                elements += createRoleItem(player, 23, worldData, targetUuid)
             } else {
                 elements += MenuElement(23, decoration(), GuiElementRole.DECORATION)
             }
@@ -146,29 +142,32 @@ class ToolPermissionMenu(
         return MenuActionResult.Success(MenuUpdate.Refresh)
     }
 
-    private fun createRoleItem(worldData: WorldData, targetUuid: UUID): ItemStack {
+    private fun createRoleItem(
+        player: Player,
+        slot: Int,
+        worldData: WorldData,
+        targetUuid: UUID,
+    ): MenuElement {
         val moderator = targetUuid in worldData.moderators
-        val item = ItemStack(Material.PLAYER_HEAD)
-        item.editMeta { meta ->
-            meta.displayName(CCSystem.getAPI().getGuiElementService().name(i18n("role.display")))
-            meta.lore(
-                ChanponLore.build(
-                    listOf(
-                        GuiLoreLine.Data(
-                            i18n("role.state_label"),
-                            i18n(if (moderator) "role.moderator" else "role.member"),
-                            if (moderator) "§e" else "§f",
-                        ),
-                        GuiLoreLine.SingleAction(
-                            i18n("role.operation"),
-                            i18n("role.action"),
-                            i18n("role.resolved"),
-                        ),
-                    ),
-                ),
-            )
-        }
-        return item
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = slot,
+                material = Material.PLAYER_HEAD,
+                name = GuiNameSpec.Text(i18n("role.display"), GuiNameStyle.DEFAULT),
+                role = GuiElementRole.ACTION,
+                data = listOf(GuiMenuEntryData(
+                    i18n("role.state_label"),
+                    i18n(if (moderator) "role.moderator" else "role.member"),
+                    if (moderator) GuiValueTone.PRIMARY else GuiValueTone.DEFAULT,
+                )),
+                actions = listOf(GuiMenuEntryAction(
+                    ACTION_ROLE,
+                    MenuAcceptedClicks.LEFT_RIGHT,
+                    i18n("role.action"),
+                )),
+            ),
+        )
     }
 
     private fun decoration(): ItemStack =
@@ -178,34 +177,34 @@ class ToolPermissionMenu(
         player.uniqueId == worldData.owner || player.hasPermission("myworldmanager.admin")
 
     private fun createToolItem(
+        player: Player,
+        slot: Int,
         worldData: WorldData,
         targetPlayerUuid: UUID,
         definition: ToolPermissionDefinition,
-    ): ItemStack {
+    ): MenuElement {
         val enabled = controller.isEnabled(worldData, targetPlayerUuid, definition.id)
-        val item = ItemStack(definition.material)
-        item.editMeta { meta ->
-            meta.displayName(CCSystem.getAPI().getGuiElementService().name("§f${definition.displayName}"))
-            meta.lore(
-                ChanponLore.build(
-                    listOf(
-                        GuiLoreLine.Data(
-                            i18n("state_label"),
-                            i18n(if (enabled) "enabled" else "disabled"),
-                            if (enabled) "§a" else "§c",
-                        ),
-                        GuiLoreLine.SingleAction(
-                            i18n("toggle_operation"),
-                            i18n("toggle_action"),
-                            i18n("toggle_resolved"),
-                        ),
-                    ),
-                ),
-            )
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
-        }
-        if (enabled) item.addUnsafeEnchantment(Enchantment.UNBREAKING, 1)
-        return item
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = slot,
+                material = definition.material,
+                name = GuiNameSpec.Text(definition.displayName, GuiNameStyle.DEFAULT),
+                role = GuiElementRole.ACTION,
+                data = listOf(GuiMenuEntryData(
+                    i18n("state_label"),
+                    i18n(if (enabled) "enabled" else "disabled"),
+                    if (enabled) GuiValueTone.SUCCESS else GuiValueTone.DANGER,
+                )),
+                actions = listOf(GuiMenuEntryAction(
+                    ACTION_TOGGLE,
+                    MenuAcceptedClicks.LEFT_RIGHT,
+                    i18n("toggle_action"),
+                    mapOf(TOOL_ID to definition.id),
+                )),
+                glint = enabled,
+            ),
+        )
     }
 
     private fun backItem(): ItemStack =

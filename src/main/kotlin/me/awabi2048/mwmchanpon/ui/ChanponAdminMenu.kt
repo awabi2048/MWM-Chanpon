@@ -147,12 +147,7 @@ class ChanponAdminMenu(
             MenuElement(21, menuItem(player, Material.CHEST, "admin.world_data", ACTION_WORLD_DATA), GuiElementRole.ACTION, ACTION_WORLD_DATA),
             MenuElement(23, menuItem(player, Material.CLOCK, "admin.automation", ACTION_AUTOMATION), GuiElementRole.ACTION, ACTION_AUTOMATION),
             MenuElement(25, menuItem(player, Material.DISPENSER, "admin.export", ACTION_EXPORT), GuiElementRole.ACTION, ACTION_EXPORT),
-            MenuElement(
-            ChanponAdminMenuLayout.FOOTER_BUILDING_PERMISSION,
             buildingPermissionItem(player),
-            GuiElementRole.ACTION,
-            ACTION_BUILDING_ALLOWED,
-            ),
             worldCreationAvailabilityItem(player),
             MenuElement(
             ChanponAdminMenuLayout.FOOTER_MAIN_SWITCH,
@@ -257,39 +252,30 @@ class ChanponAdminMenu(
         return menuItem(player, Material.COMPASS, key, ACTION_SET_SPAWN_WORLD)
     }
 
-    private fun buildingPermissionItem(player: Player): ItemStack {
+    private fun buildingPermissionItem(player: Player): MenuElement {
         val allowed = globalStorage.isBuildingAllowed()
-        val buildingAction = CCSystem.getAPI().getGuiActionService().singleClick(
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
             player,
-            controlsI18n(player, if (allowed) "build.deny_action" else "build.allow_action")
-        )
-        val item = CCSystem.getAPI().getGuiElementService().menuIcon(
-            GuiMenuIconSpec(
+            GuiMenuEntrySpec(
+                slot = ChanponAdminMenuLayout.FOOTER_BUILDING_PERMISSION,
                 material = if (allowed) Material.BRICKS else Material.BARRIER,
                 name = GuiNameSpec.Text(controlsI18n(player, "build.display"), GuiNameStyle.PRIMARY),
                 role = GuiElementRole.ACTION,
                 amount = 1,
                 description = listOf(controlsI18n(player, if (allowed) "build.allowed_description" else "build.denied_description")),
-                data = listOf(com.awabi2048.ccsystem.api.gui.GuiMenuIconData(
+                data = listOf(GuiMenuEntryData(
                     controlsI18n(player, "build.current"),
                     controlsI18n(player, if (allowed) "build.allowed" else "build.denied"),
-                    "§e"
+                    GuiValueTone.PRIMARY,
                 )),
-                options = emptyList(),
-                warnings = emptyList(),
-                dangers = emptyList(),
-                actions = listOf(
-                    GuiMenuIconAction(
-                        operation = buildingAction.operation,
-                        action = buildingAction.action,
-                        resolvedText = buildingAction.resolvedText,
-                        enabled = true
-                    )
-                ),
+                actions = listOf(GuiMenuEntryAction(
+                    ACTION_BUILDING_ALLOWED,
+                    MenuAcceptedClicks.LEFT_RIGHT,
+                    controlsI18n(player, if (allowed) "build.deny_action" else "build.allow_action"),
+                )),
                 glint = null
-            )
+            ),
         )
-        return item
     }
 
     private fun worldCreationAvailabilityItem(player: Player): MenuElement {
