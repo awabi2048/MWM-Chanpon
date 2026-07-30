@@ -48,18 +48,18 @@ class ToolPermissionMenu(
     }
 
     fun open(player: Player, worldData: WorldData, targetPlayerUuid: UUID) {
-        runtime.navigate(
-            player,
-            MenuRoute(
-                OWNER,
-                ROUTE,
-                mapOf(
-                    WORLD_UUID to worldData.uuid.toString(),
-                    TARGET_UUID to targetPlayerUuid.toString(),
-                ),
+        runtime.navigate(player, route(worldData.uuid, targetPlayerUuid))
+    }
+
+    fun route(worldUuid: UUID, targetPlayerUuid: UUID): MenuRoute =
+        MenuRoute(
+            OWNER,
+            ROUTE,
+            mapOf(
+                WORLD_UUID to worldUuid.toString(),
+                TARGET_UUID to targetPlayerUuid.toString(),
             ),
         )
-    }
 
     private fun render(player: Player, route: MenuRoute): InventoryMenuView {
         val worldData = world(route)

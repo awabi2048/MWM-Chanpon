@@ -31,7 +31,6 @@ import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
-import me.awabi2048.myworldmanager.api.extension.MenuExtensionContext
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsMenuProvider
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsMenuRequest
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsCapabilityPlacements
@@ -179,17 +178,6 @@ class ChanponWorldSettingsMenuProvider(
             items[ChanponGuiElements.backSlot(inventorySize)] = returnItem(player)
         }
 
-        items = renderExtensions(
-            items,
-            player,
-            worldData,
-            request.showBackButton,
-            isOwner,
-            isModerator,
-            isProtected,
-            inventorySize,
-            worldData.owner == player.uniqueId,
-        ).toMutableMap()
         val capabilityArguments = mapOf(WORLD_UUID to worldData.uuid.toString())
         val capabilityInteractions = mutableMapOf<Int, MenuInteraction>()
         val capabilityService = CCSystem.getAPI().getMenuCapabilityService()
@@ -278,9 +266,6 @@ class ChanponWorldSettingsMenuProvider(
 
     private fun handleAction(context: MenuActionContext): MenuActionResult {
         val source = source(context.route)
-        if (source.screen == Screen.MAIN && ItemTag.getType(context.item) == ItemTag.TYPE_GUI_EXTENSION) {
-            return handleExtensionAction(context, source)
-        }
         return when (source.screen) {
             Screen.MAIN -> handleSettingsClick(context.player, source, context.item, context.click)
             Screen.EXPANSION -> handleExpansionClick(context.player, source, context.item)
@@ -288,35 +273,6 @@ class ChanponWorldSettingsMenuProvider(
             Screen.CONFIRM -> handleConfirmClick(context.player, source, context.item)
             Screen.CRITICAL -> handleCriticalClick(context.player, source, context.item)
             Screen.DELETE_CONFIRM -> handleDeleteConfirmClick(context.player, source, context.item)
-        }
-    }
-
-    private fun handleExtensionAction(context: MenuActionContext, source: Source): MenuActionResult {
-        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(source.worldUuid)
-            ?: return MenuActionResult.Rejected()
-        val extensionId = ItemTag.getExtensionId(context.item) ?: return MenuActionResult.Ignored
-        val extension = MyWorldManagerApi.getMenuExtensions()
-            .firstOrNull { it.getId() == extensionId }
-            ?: return MenuActionResult.Ignored
-        val session = mwm().settingsSessionManager.getSession(context.player)
-        val handled = extension.onClick(
-            context.click,
-            context.item,
-            context.player,
-            MenuExtensionContext(
-                "world_settings",
-                mutableMapOf(
-                    "worldData" to worldData,
-                    "showBackButton" to currentRequest(context.player).showBackButton,
-                    "isOwner" to (worldData.owner == context.player.uniqueId || session?.isAdminFlow == true),
-                    "isModerator" to worldData.moderators.contains(context.player.uniqueId),
-                ),
-            ),
-        )
-        return if (handled) {
-            MenuActionResult.Success(MenuUpdate.None)
-        } else {
-            MenuActionResult.Ignored
         }
     }
 
@@ -839,37 +795,6 @@ class ChanponWorldSettingsMenuProvider(
                 confirmButton(player, false),
             ),
         )
-    }
-
-    private fun renderExtensions(
-        sourceItems: Map<Int, ItemStack>,
-        player: Player,
-        worldData: WorldData,
-        showBackButton: Boolean,
-        isOwner: Boolean,
-        isModerator: Boolean,
-        isProtected: Boolean = false,
-        inventorySize: Int,
-        isActualOwner: Boolean,
-    ): Map<Int, ItemStack> {
-        val context = MenuExtensionContext(
-            "world_settings",
-            mutableMapOf(
-                "worldData" to worldData,
-                "showBackButton" to showBackButton,
-                "isOwner" to isOwner,
-                "isActualOwner" to isActualOwner,
-                "isMember" to worldData.members.contains(player.uniqueId),
-                "isModerator" to isModerator,
-                "isProtected" to isProtected,
-                "inventorySize" to inventorySize,
-            )
-        )
-        var items = sourceItems
-        MyWorldManagerApi.getMenuExtensions().forEach { extension ->
-            items = extension.onRender(items, player, context)
-        }
-        return items
     }
 
     private fun publishItem(player: Player, worldData: WorldData): ItemStack {

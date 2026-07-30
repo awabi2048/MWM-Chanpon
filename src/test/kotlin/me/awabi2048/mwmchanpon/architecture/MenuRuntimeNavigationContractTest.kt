@@ -93,15 +93,6 @@ class MenuRuntimeNavigationContractTest {
     }
 
     @Test
-    fun `world settings extension adapter preserves handled outcome`() {
-        val source = uiRoot.resolve("ChanponWorldSettingsMenuProvider.kt").readText()
-        val body = functionBody(source, "handleExtensionAction")
-
-        assertTrue("if (handled)" in body)
-        assertTrue("MenuActionResult.Ignored" in body)
-    }
-
-    @Test
     fun `world settings child menus rely on runtime navigation without manual duplicate push`() {
         val source = uiRoot.resolve("ChanponWorldSettingsMenuProvider.kt").readText()
         val body = functionBody(source, "handleSettingsClick")
