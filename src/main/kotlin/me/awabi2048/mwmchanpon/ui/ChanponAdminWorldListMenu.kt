@@ -9,6 +9,9 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
@@ -16,6 +19,7 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionTextProvider
@@ -115,23 +119,23 @@ class ChanponAdminWorldListMenu(
         val layout = ChanponGuiElements.pagedListLayout()
         val elements = mutableListOf<MenuElement>()
         currentWorld(player)?.let { worldData ->
-            elements += MenuElement(
+            elements += worldEntry(
+                player,
                 4,
-                worldItem(player, worldData, current = true),
-                GuiElementRole.ACTION,
-                ACTION_WORLD,
-                statePayload(current) + (WORLD_UUID to worldData.uuid.toString()),
+                worldData,
+                current = true,
+                payload = statePayload(current) + (WORLD_UUID to worldData.uuid.toString()),
             )
         }
         worlds.drop(current.page * ITEMS_PER_PAGE)
             .take(ITEMS_PER_PAGE)
             .forEachIndexed { index, worldData ->
-                elements += MenuElement(
+                elements += worldEntry(
+                    player,
                     layout.itemSlots[index],
-                    worldItem(player, worldData, current = false),
-                    GuiElementRole.ACTION,
-                    ACTION_WORLD,
-                    statePayload(current) + (WORLD_UUID to worldData.uuid.toString()),
+                    worldData,
+                    current = false,
+                    payload = statePayload(current) + (WORLD_UUID to worldData.uuid.toString()),
                 )
             }
         if (CCSystem.getAPI().getMenuNavigationService().canGoBack(player)) {
@@ -302,6 +306,52 @@ class ChanponAdminWorldListMenu(
 
     private fun currentWorld(player: Player): WorldData? =
         MyWorldManagerApi.getWorldRepository()?.findByWorldName(player.world.name)
+
+    private fun worldEntry(
+        player: Player,
+        slot: Int,
+        worldData: WorldData,
+        current: Boolean,
+        payload: Map<String, String>,
+    ): MenuElement {
+        val visibility = storage.getVisibility(worldData.uuid)
+        val owner = Bukkit.getOfflinePlayer(worldData.owner).name ?: i18n(player, "admin_list.unknown")
+        val members = (worldData.moderators + worldData.members)
+            .distinct()
+            .map { Bukkit.getOfflinePlayer(it).name ?: i18n(player, "admin_list.unknown") }
+            .let { names ->
+                if (names.isEmpty()) i18n(player, "admin_list.world.no_members") else names.joinToString(", ")
+            }
+        val actions = buildList {
+            add(GuiMenuEntryAction(ACTION_WORLD, MenuAcceptedClicks.LEFT, i18n(player, "admin_list.world.action_warp"), payload))
+            if (!current) {
+                add(GuiMenuEntryAction(ACTION_WORLD, MenuAcceptedClicks.RIGHT, i18n(player, "admin_list.world.action_settings"), payload))
+            }
+            if (player.gameMode == GameMode.CREATIVE) {
+                add(GuiMenuEntryAction(ACTION_WORLD, MenuAcceptedClicks.MIDDLE, i18n(player, "admin_list.world.action_copy"), payload))
+            }
+        }
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = slot,
+                material = worldData.icon,
+                name = GuiNameSpec.Component(
+                    i18nComponent(player, "admin_list.world.display", mapOf("world" to worldData.name)),
+                ),
+                role = GuiElementRole.ACTION,
+                data = listOf(
+                    GuiMenuEntryData(i18n(player, "admin_list.world.owner_label"), owner),
+                    GuiMenuEntryData(i18n(player, "admin_list.world.members_label"), members),
+                    GuiMenuEntryData(i18n(player, "admin_list.world.created_label"), formatCreatedAt(worldData.createdAt)),
+                    GuiMenuEntryData(i18n(player, "admin_list.world.visibility_label"), visibilityName(player, visibility)),
+                    GuiMenuEntryData(i18n(player, "admin_list.world.directory_label"), worldDirectory(worldData)),
+                ),
+                warnings = if (current) listOf(i18n(player, "admin_list.world.action_settings_current")) else emptyList(),
+                actions = actions,
+            ),
+        )
+    }
 
     private fun worldItem(player: Player, worldData: WorldData, current: Boolean): ItemStack =
         ItemStack(worldData.icon).also { item ->

@@ -6,6 +6,11 @@ import com.awabi2048.ccsystem.api.gui.GuiClickLabel
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
+import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
@@ -154,11 +159,10 @@ class BackupListMenu(
             GuiElementRole.CONTENT,
         )
         backups.drop(startIndex).take(itemCount).forEachIndexed { index, backup ->
-            elements += MenuElement(
+            elements += backupEntry(
+                player,
                 itemSlots[index],
-                backupItem(player, backup),
-                GuiElementRole.ACTION,
-                ACTION_BACKUP,
+                backup,
                 sourcePayload(source.copy(page = safePage)) + (BACKUP_ID to backup.id),
             )
         }
@@ -412,6 +416,38 @@ class BackupListMenu(
         put(PAGE, source.page.toString())
         source.worldUuid?.let { put(WORLD_UUID, it.toString()) }
     }
+
+    private fun backupEntry(
+        player: Player,
+        slot: Int,
+        backup: BackupEntry,
+        payload: Map<String, String>,
+    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+        player,
+        GuiMenuEntrySpec(
+            slot = slot,
+            material = materialFor(backup.kind),
+            name = GuiNameSpec.Component(
+                i18nComponent(
+                    player,
+                    "backup_list.item.display",
+                    mapOf("name" to BackupDisplay.displayName(backup)),
+                ),
+            ),
+            role = GuiElementRole.ACTION,
+            data = listOf(
+                GuiMenuEntryData(i18n(player, "backup_list.item.kind_label"), i18n(player, "kind.${backup.kind.i18nKey}")),
+                GuiMenuEntryData(i18n(player, "backup_list.item.created_label"), BackupDisplay.formatCreatedAt(backup.createdAt)),
+                GuiMenuEntryData(i18n(player, "backup_list.item.worlds_label"), backup.worldUuids.size),
+                GuiMenuEntryData(i18n(player, "backup_list.item.size_label"), formatBytes(backup.sizeBytes)),
+                GuiMenuEntryData(i18n(player, "backup_list.item.actor_label"), BackupDisplay.actorName(backup)),
+            ),
+            actions = listOf(
+                GuiMenuEntryAction(ACTION_BACKUP, MenuAcceptedClicks.LEFT, i18n(player, "backup_list.item.rollback_action"), payload),
+                GuiMenuEntryAction(ACTION_BACKUP, MenuAcceptedClicks.MIDDLE, i18n(player, "backup_list.item.delete_action"), payload),
+            ),
+        ),
+    )
 
     private fun backupItem(player: Player, backup: BackupEntry): ItemStack =
         ItemStack(materialFor(backup.kind)).also { item ->

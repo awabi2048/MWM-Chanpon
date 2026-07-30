@@ -8,8 +8,10 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.GuiValueTone
 import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
@@ -143,11 +145,10 @@ class SubmissionAdminMenu(
         worlds.drop(safePage * ITEMS_PER_PAGE)
             .take(ITEMS_PER_PAGE)
             .forEachIndexed { index, worldData ->
-                elements += MenuElement(
+                elements += worldEntry(
+                    player,
                     layout.itemSlots[index],
-                    worldItem(player, worldData),
-                    GuiElementRole.ACTION,
-                    ACTION_WORLD,
+                    worldData,
                     statePayload(current) + (WORLD_UUID to worldData.uuid.toString()),
                 )
             }
@@ -502,6 +503,64 @@ class SubmissionAdminMenu(
         } else {
             result
         }
+    }
+
+    private fun worldEntry(
+        player: Player,
+        slot: Int,
+        worldData: WorldData,
+        payload: Map<String, String>,
+    ): MenuElement {
+        val state = stateFor(worldData)
+        val unknown = i18n(player, "admin_menu.unknown")
+        val ownerName = playerName(worldData.owner, unknown)
+        val members = (worldData.moderators + worldData.members)
+            .distinct()
+            .map { playerName(it, unknown) }
+            .let { if (it.isEmpty()) i18n(player, "admin_menu.world.no_members") else it.joinToString(", ") }
+        val production = storage.isProductionWorld(worldData.uuid)
+        val actions = buildList {
+            add(GuiMenuEntryAction(ACTION_WORLD, MenuAcceptedClicks.LEFT, i18n(player, "admin_menu.world.action_warp"), payload))
+            if (player.gameMode == GameMode.CREATIVE) {
+                add(GuiMenuEntryAction(ACTION_WORLD, MenuAcceptedClicks.RIGHT, i18n(player, "admin_menu.world.action_complete"), payload))
+            }
+            if (production) {
+                add(GuiMenuEntryAction(ACTION_WORLD, MenuAcceptedClicks.MIDDLE, i18n(player, "admin_menu.world.action_remove_production"), payload))
+            }
+        }
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = slot,
+                material = worldData.icon,
+                name = GuiNameSpec.Component(i18nComponent(player, "admin_menu.world.display", mapOf("world" to worldData.name))),
+                role = GuiElementRole.ACTION,
+                data = listOf(
+                    GuiMenuEntryData(i18n(player, "admin_menu.world.owner_label"), ownerName),
+                    GuiMenuEntryData(i18n(player, "admin_menu.world.members_label"), members),
+                    GuiMenuEntryData(i18n(player, "admin_menu.world.created_label"), formatCreatedAt(worldData.createdAt)),
+                    GuiMenuEntryData(
+                        i18n(player, "admin_menu.world.production_label"),
+                        i18n(player, if (production) "admin_menu.world.production_yes" else "admin_menu.world.production_no"),
+                        if (production) GuiValueTone.SUCCESS else GuiValueTone.MUTED,
+                    ),
+                    GuiMenuEntryData(
+                        i18n(player, "admin_menu.world.state_label"),
+                        i18n(player, "state.${state.i18nKey}"),
+                        when (state) {
+                            SubmissionState.UNSUBMITTED -> GuiValueTone.WARNING
+                            SubmissionState.SUBMITTED -> GuiValueTone.SUCCESS
+                            SubmissionState.COMPLETED -> GuiValueTone.INFO
+                        },
+                    ),
+                    GuiMenuEntryData(
+                        i18n(player, "admin_menu.world.completed_label"),
+                        i18n(player, if (state == SubmissionState.COMPLETED) "admin_menu.world.completed_yes" else "admin_menu.world.completed_no"),
+                    ),
+                ),
+                actions = actions,
+            ),
+        )
     }
 
     private fun worldItem(player: Player, worldData: WorldData): ItemStack {

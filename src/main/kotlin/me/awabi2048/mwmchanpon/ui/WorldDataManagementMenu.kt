@@ -119,11 +119,10 @@ class WorldDataManagementMenu(
             GuiElementRole.CONTENT,
         )
         worlds.drop(safePage * ITEMS_PER_PAGE).take(ITEMS_PER_PAGE).forEachIndexed { index, world ->
-            elements += MenuElement(
+            elements += worldEntry(
+                player,
                 layout.itemSlots[index],
-                worldItem(player, world),
-                GuiElementRole.ACTION,
-                ACTION_WORLD,
+                world,
                 mapOf(
                     WORLD_UUID to world.uuid.toString(),
                     PAGE to safePage.toString(),
@@ -321,6 +320,41 @@ class WorldDataManagementMenu(
 
     private fun listRoute(page: Int): MenuRoute =
         MenuRoute(OWNER, ROUTE_LIST, mapOf(PAGE to page.toString()))
+
+    private fun worldEntry(
+        player: Player,
+        slot: Int,
+        world: WorldData,
+        payload: Map<String, String>,
+    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+        player,
+        GuiMenuEntrySpec(
+            slot = slot,
+            material = world.icon,
+            name = GuiNameSpec.Component(
+                i18nComponent(player, "world_data.world.display", mapOf("world" to world.name)),
+            ),
+            role = GuiElementRole.ACTION,
+            data = listOf(
+                com.awabi2048.ccsystem.api.gui.GuiMenuEntryData(
+                    i18n(player, "world_data.world.owner_label"),
+                    Bukkit.getOfflinePlayer(world.owner).name ?: "-",
+                ),
+                com.awabi2048.ccsystem.api.gui.GuiMenuEntryData(
+                    i18n(player, "world_data.world.created_label"),
+                    world.createdAt,
+                ),
+                com.awabi2048.ccsystem.api.gui.GuiMenuEntryData(
+                    i18n(player, "world_data.world.backups_label"),
+                    backupService.listBackupsForWorld(world.uuid).size,
+                ),
+            ),
+            actions = listOf(
+                GuiMenuEntryAction(ACTION_WORLD, MenuAcceptedClicks.LEFT, i18n(player, "world_data.world.backup_action"), payload),
+                GuiMenuEntryAction(ACTION_WORLD, MenuAcceptedClicks.RIGHT, i18n(player, "world_data.world.list_action"), payload),
+            ),
+        ),
+    )
 
     private fun worldItem(player: Player, world: WorldData): ItemStack =
         ItemStack(world.icon).also { item ->
