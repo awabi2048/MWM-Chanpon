@@ -149,12 +149,7 @@ class ChanponAdminMenu(
             MenuElement(25, menuItem(player, Material.DISPENSER, "admin.export", ACTION_EXPORT), GuiElementRole.ACTION, ACTION_EXPORT),
             buildingPermissionItem(player),
             worldCreationAvailabilityItem(player),
-            MenuElement(
-            ChanponAdminMenuLayout.FOOTER_MAIN_SWITCH,
             switchToMwmItem(player),
-            GuiElementRole.NAVIGATION,
-            ACTION_SWITCH_MWM,
-            ),
         )
         currentWorldUuid(player)?.let { worldUuid ->
             elements += MenuElement(
@@ -341,23 +336,22 @@ class ChanponAdminMenu(
         return item
     }
 
-    private fun switchToMwmItem(player: Player): ItemStack {
-        val item = ItemStack(Material.NETHER_STAR)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "admin.switch_mwm.display"))
-            meta.lore(structuredBlocks(listOf(
-                GuiLoreBlock(listOf(GuiLoreLine.Text(i18n(player, "admin.switch_mwm.description")))),
-                GuiLoreBlock(
-                    listOf(
-                        CCSystem.getAPI().getGuiActionService()
-                            .singleClick(player, i18n(player, "admin.switch_mwm.action")),
-                    ),
-                )
-            )))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        return item
-    }
+    private fun switchToMwmItem(player: Player): MenuElement =
+        CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = ChanponAdminMenuLayout.FOOTER_MAIN_SWITCH,
+                material = Material.NETHER_STAR,
+                name = GuiNameSpec.Component(i18nComponent(player, "admin.switch_mwm.display")),
+                role = GuiElementRole.NAVIGATION,
+                description = listOf(i18n(player, "admin.switch_mwm.description")),
+                actions = listOf(GuiMenuEntryAction(
+                    ACTION_SWITCH_MWM,
+                    MenuAcceptedClicks.LEFT_RIGHT,
+                    i18n(player, "admin.switch_mwm.action"),
+                )),
+            ),
+        )
 
     private fun switchToChanponPresentation(player: Player): MenuCapabilityPresentation {
         return MenuCapabilityPresentation(
