@@ -356,59 +356,6 @@ class WorldDataManagementMenu(
         ),
     )
 
-    private fun worldItem(player: Player, world: WorldData): ItemStack =
-        ItemStack(world.icon).also { item ->
-            item.editMeta { meta ->
-                meta.displayName(
-                    i18nComponent(
-                        player,
-                        "world_data.world.display",
-                        mapOf("world" to world.name),
-                    ),
-                )
-                meta.lore(
-                    structuredBlocks(
-                        listOf(
-                            GuiLoreBlock(
-                                listOf(
-                                    GuiLoreLine.Data(
-                                        i18n(player, "world_data.world.owner_label"),
-                                        Bukkit.getOfflinePlayer(world.owner).name ?: "-",
-                                        "§f",
-                                    ),
-                                    GuiLoreLine.Data(
-                                        i18n(player, "world_data.world.created_label"),
-                                        world.createdAt,
-                                        "§f",
-                                    ),
-                                    GuiLoreLine.Data(
-                                        i18n(player, "world_data.world.backups_label"),
-                                        backupService.listBackupsForWorld(world.uuid).size,
-                                        "§f",
-                                    ),
-                                ),
-                            ),
-                            GuiLoreBlock(
-                                listOf(
-                                    GuiLoreLine.Action(
-                                        CCSystem.getAPI().getGuiActionService()
-                                            .clickLabel(player, GuiClickLabel.LEFT),
-                                        i18n(player, "world_data.world.backup_action"),
-                                    ),
-                                    GuiLoreLine.Action(
-                                        CCSystem.getAPI().getGuiActionService()
-                                            .clickLabel(player, GuiClickLabel.RIGHT),
-                                        i18n(player, "world_data.world.list_action"),
-                                    ),
-                                ),
-                            ),
-                        ),
-                    ),
-                )
-                meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-            }
-        }
-
     private fun controlItem(
         player: Player,
         material: Material,

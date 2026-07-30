@@ -9,9 +9,6 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
-import com.awabi2048.ccsystem.api.gui.GuiMenuIconAction
-import com.awabi2048.ccsystem.api.gui.GuiMenuIconData
-import com.awabi2048.ccsystem.api.gui.GuiMenuIconSpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
@@ -914,86 +911,6 @@ class ChanponWorldSettingsMenu(
         )
     }
 
-    private fun mwmActionItem(
-        player: Player,
-        worldData: WorldData,
-        action: WorldSettingsAction,
-        iconKey: String,
-        material: Material,
-        langPrefix: String = "gui.settings.$iconKey",
-        requireTargetWorld: Boolean = false,
-    ): ItemStack {
-        val lore = describedStructuredLore(
-            player,
-            mwmDescription(player, iconKey),
-            contractActionLines(
-                player,
-                worldData,
-                action,
-                listOf(i18n(player, "mwm_action.action")),
-            ),
-            requireTargetWorld,
-            worldData,
-        )
-        return componentItem(
-            MyWorldManagerApi.getConfiguredMenuIcon("world_settings", iconKey, material),
-            text(player, "$langPrefix.display"),
-            lore,
-        )
-    }
-
-    private fun spawnItem(player: Player, worldData: WorldData): ItemStack {
-        val actionTexts = if (MyWorldManagerApi.getBedrockFormService()?.isBedrock(player) == true) {
-            listOf(text(player, "gui.settings.spawn.action.select_type"))
-        } else {
-            listOf(
-                text(player, "gui.settings.spawn.action.set_guest"),
-                text(player, "gui.settings.spawn.action.set_member"),
-            )
-        }
-        val actions = contractActionLines(
-            player,
-            worldData,
-            WorldSettingsAction.SET_SPAWN,
-            actionTexts,
-        )
-        return componentItem(
-            MyWorldManagerApi.getConfiguredMenuIcon("world_settings", "spawn", Material.COMPASS),
-            text(player, "gui.settings.spawn.display"),
-            describedStructuredLore(
-                player,
-                mwmDescription(player, "spawn"),
-                actions,
-                requireTargetWorld = true,
-                worldData = worldData,
-            ),
-        )
-    }
-
-    private fun announcementItem(player: Player, worldData: WorldData): ItemStack =
-        componentItem(
-            MyWorldManagerApi.getConfiguredMenuIcon(
-                "world_settings",
-                "announcement",
-                Material.OAK_SIGN,
-            ),
-            text(player, "gui.settings.announcement.display"),
-            describedStructuredLore(
-                player,
-                mwmDescription(player, "announcement"),
-                contractActionLines(
-                    player,
-                    worldData,
-                    WorldSettingsAction.EDIT_ANNOUNCEMENT,
-                    listOf(
-                        text(player, "gui.settings.announcement.action.set_message"),
-                        text(player, "gui.settings.announcement.action.reset_message"),
-                    ),
-                ),
-                worldData = worldData,
-            ),
-        )
-
     private fun worldInfoElement(player: Player, worldData: WorldData): MenuElement {
         val outside = !isCurrentWorld(player, worldData)
         val warpContract = MyWorldManagerApi.getWorldSettingsActionContract(
@@ -1269,57 +1186,6 @@ class ChanponWorldSettingsMenu(
 
     private fun textList(player: Player, key: String): List<String> =
         CCSystem.getAPI().getI18nStringList(player, key)
-
-    private fun singleClick(player: Player, action: String): GuiLoreLine.SingleAction {
-        val operation = text(player, "lore.click.any")
-        return GuiLoreLine.SingleAction(
-            operation,
-            action,
-            textWithPlaceholders(
-                player,
-                "lore.action_single_with_operation",
-                mapOf("operation" to operation, "action" to action),
-            ),
-        )
-    }
-
-    private fun contractActionLines(
-        player: Player,
-        worldData: WorldData,
-        action: WorldSettingsAction,
-        actionTexts: List<String>,
-    ): List<GuiLoreLine> {
-        val contract = requireNotNull(
-            MyWorldManagerApi.getWorldSettingsActionContract(player, worldData.uuid, action),
-        ) { "Missing world settings action contract: $action/${worldData.uuid}" }
-        require(contract.options.size == actionTexts.size) {
-            "World settings action presentation mismatch: $action options=${contract.options.size} texts=${actionTexts.size}"
-        }
-        val actionService = CCSystem.getAPI().getGuiActionService()
-        val resolved = contract.options.zip(actionTexts)
-        return if (resolved.size == 1) {
-            resolved.map { (option, actionText) ->
-                actionService.single(
-                    player,
-                    actionService.clickLabel(player, option.displayClick),
-                    actionText,
-                )
-            }
-        } else {
-            resolved.map { (option, actionText) ->
-                GuiLoreLine.Action(
-                    actionService.clickLabel(player, option.displayClick),
-                    actionText,
-                )
-            }
-        }
-    }
-
-    private fun cycleAction(player: Player): GuiLoreLine.Action =
-        GuiLoreLine.Action(
-            text(player, "lore.click.left_right"),
-            text(player, "gui.common.action.cycle"),
-        )
 
     private fun textWithPlaceholders(
         player: Player,

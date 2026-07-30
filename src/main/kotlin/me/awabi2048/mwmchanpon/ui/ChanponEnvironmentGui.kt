@@ -430,22 +430,6 @@ class ChanponEnvironmentGui(
         )
     }
 
-    private fun categoryItem(player: Player, key: String, currentValue: String, active: Boolean): ItemStack {
-        val item = ItemStack(
-            if (active) Material.GRASS_BLOCK else Material.GRASS_BLOCK
-        )
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "$key.display"))
-            meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(listOf(
-                GuiLoreLine.Data(i18n(player, "common.current_label"), currentValue, "§e"),
-                CCSystem.getAPI().getGuiActionService()
-                    .singleClick(player, i18n(player, "common.action_next"))
-            ), GuiLoreFrame.BOTH)))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
-        }
-        return item
-    }
-
     private fun backItem(player: Player): ItemStack {
         val item = ItemStack(Material.REDSTONE)
         item.editMeta { meta ->

@@ -570,75 +570,6 @@ class SubmissionAdminMenu(
         )
     }
 
-    private fun worldItem(player: Player, worldData: WorldData): ItemStack {
-        val state = stateFor(worldData)
-        val item = ItemStack(worldData.icon)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "admin_menu.world.display", mapOf("world" to worldData.name)))
-            meta.lore(structuredLore(worldLore(player, worldData, state)))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        return item
-    }
-
-    private fun worldLore(player: Player, worldData: WorldData, state: SubmissionState): List<GuiLoreLine> {
-        val unknown = i18n(player, "admin_menu.unknown")
-        val ownerName = playerName(worldData.owner, unknown)
-        val members = (worldData.moderators + worldData.members)
-            .distinct()
-            .map { playerName(it, unknown) }
-        val memberLine = if (members.isEmpty()) {
-            i18n(player, "admin_menu.world.no_members")
-        } else {
-            members.joinToString("§7, §f", prefix = "§f")
-        }
-        val created = formatCreatedAt(worldData.createdAt)
-        val production = if (storage.isProductionWorld(worldData.uuid)) {
-            i18n(player, "admin_menu.world.production_yes")
-        } else {
-            i18n(player, "admin_menu.world.production_no")
-        }
-        val completed = if (state == SubmissionState.COMPLETED) {
-            i18n(player, "admin_menu.world.completed_yes")
-        } else {
-            i18n(player, "admin_menu.world.completed_no")
-        }
-        return buildList {
-            add(GuiLoreLine.Data(i18n(player, "admin_menu.world.owner_label"), ownerName, "§f"))
-            add(GuiLoreLine.Data(i18n(player, "admin_menu.world.members_label"), memberLine, ""))
-            add(GuiLoreLine.Data(i18n(player, "admin_menu.world.created_label"), created, "§f"))
-            add(GuiLoreLine.Data(i18n(player, "admin_menu.world.production_label"), production, ""))
-            add(GuiLoreLine.Data(
-                i18n(player, "admin_menu.world.state_label"),
-                i18n(player, "state.${state.i18nKey}"),
-                when (state) {
-                    SubmissionState.UNSUBMITTED -> "§6"
-                    SubmissionState.SUBMITTED -> "§a"
-                    SubmissionState.COMPLETED -> "§b"
-                }
-            ))
-            add(GuiLoreLine.Data(i18n(player, "admin_menu.world.completed_label"), completed, ""))
-            add(GuiLoreLine.Spacer)
-            add(
-                GuiLoreLine.Action(
-                    CCSystem.getAPI().getGuiActionService()
-                        .clickLabel(player, GuiClickLabel.LEFT),
-                    i18n(player, "admin_menu.world.action_warp"),
-                ),
-            )
-            if (player.gameMode == GameMode.CREATIVE) {
-                add(
-                    GuiLoreLine.Action(
-                        CCSystem.getAPI().getGuiActionService()
-                            .clickLabel(player, GuiClickLabel.RIGHT),
-                        i18n(player, "admin_menu.world.action_complete"),
-                    ),
-                )
-            }
-            add(GuiLoreLine.Action(i18n(player, "common.middle_click"), i18n(player, "admin_menu.world.action_remove_production")))
-        }
-    }
-
     private fun productionToggleConfirmationItem(player: Player, key: String): ItemStack {
         val item = ItemStack(Material.HEART_OF_THE_SEA)
         item.editMeta { meta ->
@@ -716,52 +647,6 @@ class SubmissionAdminMenu(
         val item = ItemStack(Material.REDSTONE)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "admin_menu.back.display"))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        return item
-    }
-
-    private fun progressFilterItem(player: Player, filter: ProgressFilter): ItemStack {
-        return filterListItem(
-            player,
-            Material.HOPPER,
-            "admin_menu.progress_filter.display",
-            ProgressFilter.entries.map { it.key },
-            filter.key,
-        )
-    }
-
-    private fun sortItem(player: Player, sortType: SortType): ItemStack {
-        return filterListItem(
-            player,
-            Material.COMPARATOR,
-            "admin_menu.sort.display",
-            SortType.entries.map { it.key },
-            sortType.key,
-        )
-    }
-
-    private fun filterListItem(
-        player: Player,
-        material: Material,
-        displayKey: String,
-        optionKeys: List<String>,
-        selectedKey: String,
-    ): ItemStack {
-        val item = ItemStack(material)
-        val lore = CCSystem.getAPI().getLoreService().render(
-            GuiLoreSpec.Rich(buildList {
-                optionKeys.forEach { optionKey ->
-                    val selected = optionKey == selectedKey
-                    add(GuiLoreLine.Option(i18n(player, optionKey), selected, "\u00A7f", "\u00A77"))
-                }
-                add(GuiLoreLine.Spacer)
-                add(CCSystem.getAPI().getGuiActionService().cycle(player))
-            }, GuiLoreFrame.BOTH)
-        )
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, displayKey))
-            meta.lore(lore)
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
         return item

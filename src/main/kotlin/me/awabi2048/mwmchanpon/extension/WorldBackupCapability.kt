@@ -556,53 +556,6 @@ class WorldBackupCapability(
         )
     }
 
-    private fun backupItem(player: Player, backup: BackupEntry): ItemStack {
-        val item = ItemStack(materialFor(backup))
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "owner_backup.item.display", mapOf("name" to BackupDisplay.displayName(backup))))
-            meta.lore(structuredBlocks(listOf(
-                GuiLoreBlock(listOf(
-                    GuiLoreLine.Data(i18n(player, "owner_backup.item.created_label"), BackupDisplay.formatCreatedAt(backup.createdAt), "§f"),
-                    GuiLoreLine.Data(i18n(player, "owner_backup.item.actor_label"), BackupDisplay.actorName(backup), "§f")
-                )),
-                GuiLoreBlock(listOf(
-                    GuiLoreLine.Action(
-                        CCSystem.getAPI().getGuiActionService()
-                            .clickLabel(player, GuiClickLabel.LEFT),
-                        i18n(player, "owner_backup.item.rollback_action"),
-                    )
-                ))
-            )))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        return item
-    }
-
-    private fun backupControlItem(player: Player, worldUuid: UUID): ItemStack {
-        val remaining = backupService.ownerBackupCooldownRemainingSeconds(worldUuid)
-        val item = ItemStack(if (remaining > 0) Material.CLOCK else Material.CHEST)
-        val key = if (remaining > 0) "owner_backup.cooldown" else "owner_backup.create"
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "$key.display", mapOf("remaining" to BackupDisplay.formatDuration(remaining))))
-            meta.lore(if (remaining > 0) {
-                structuredBlocks(listOf(GuiLoreBlock(listOf(
-                    GuiLoreLine.Text(i18n(player, "$key.description", mapOf("remaining" to BackupDisplay.formatDuration(remaining))))
-                ))))
-            } else {
-                structuredBlocks(listOf(
-                    GuiLoreBlock(listOf(GuiLoreLine.Text(i18n(player, "$key.description")))),
-                    GuiLoreBlock(
-                        listOf(
-                            CCSystem.getAPI().getGuiActionService()
-                                .singleClick(player, i18n(player, "$key.action")),
-                        ),
-                    )
-                ))
-            })
-        }
-        return item
-    }
-
     private fun infoItem(player: Player, world: WorldData, count: Int, page: Int, pages: Int): ItemStack {
         val item = ItemStack(world.icon)
         item.editMeta { meta ->
