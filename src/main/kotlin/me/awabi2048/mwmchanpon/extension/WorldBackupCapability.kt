@@ -229,7 +229,7 @@ class WorldBackupCapability(
             return MenuActionResult.Rejected()
         }
         openBackupNameInput(context.player, source)
-        return MenuActionResult.Success(MenuUpdate.Close)
+        return MenuActionResult.Success(MenuUpdate.None)
     }
 
     private fun executeOwnerBackup(player: Player, source: Holder, backupName: String) {
