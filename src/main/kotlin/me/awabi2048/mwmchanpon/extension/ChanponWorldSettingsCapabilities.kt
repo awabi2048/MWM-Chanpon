@@ -2,11 +2,14 @@ package me.awabi2048.mwmchanpon.extension
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionPresentationProvider
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentationProvider
+import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import me.awabi2048.mwmchanpon.ui.ChanponWorldSettingsMenu
 import me.awabi2048.mwmchanpon.ui.WorldSettingsFeature
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
@@ -57,19 +60,28 @@ internal class ChanponWorldSettingsCapabilities(
                         feature,
                     )
                 },
-                actionAvailability = MenuCapabilityAvailability { context ->
-                    worldData(context)?.let {
-                        menu.isFeatureActionable(context.player, it, feature)
-                    } == true
-                },
-                actionHandler = MenuCapabilityActionHandler { context ->
-                    menu.handleFeature(
-                        context.player,
-                        requireNotNull(worldData(context)),
-                        feature,
-                        context.click,
-                    )
-                },
+                actions = listOf(
+                    MenuCapabilityAction(
+                        id = feature.name.lowercase(),
+                        clicks = menu.acceptedClicks(feature),
+                        presentationProvider = MenuCapabilityActionPresentationProvider { context ->
+                            menu.renderFeatureAction(context.player, feature)
+                        },
+                        availability = MenuCapabilityAvailability { context ->
+                            worldData(context)?.let {
+                                menu.isFeatureActionable(context.player, it, feature)
+                            } == true
+                        },
+                        handler = MenuCapabilityActionHandler { context ->
+                            menu.handleFeature(
+                                context.player,
+                                requireNotNull(worldData(context)),
+                                feature,
+                                context.click,
+                            )
+                        },
+                    ),
+                ),
             ),
         )
     }

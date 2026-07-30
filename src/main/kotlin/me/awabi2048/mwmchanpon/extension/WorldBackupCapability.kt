@@ -13,8 +13,10 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionPresentationProvider
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
@@ -44,6 +46,7 @@ import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
+import org.bukkit.event.inventory.ClickType
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.Plugin
@@ -109,7 +112,21 @@ class WorldBackupCapability(
                 presentationProvider = MenuCapabilityPresentationProvider { context ->
                     entryPresentation(context.player)
                 },
-                actionHandler = MenuCapabilityActionHandler(::openFromCapability),
+                actions = listOf(
+                    MenuCapabilityAction(
+                        id = "open",
+                        clicks = setOf(ClickType.LEFT),
+                        presentationProvider = MenuCapabilityActionPresentationProvider {
+                            listOf(
+                                CCSystem.getAPI().getGuiActionService().singleClick(
+                                    it.player,
+                                    i18n(it.player, "owner_backup.action"),
+                                ),
+                            )
+                        },
+                        handler = MenuCapabilityActionHandler(::openFromCapability),
+                    ),
+                ),
             ),
         )
     }
@@ -466,14 +483,6 @@ class WorldBackupCapability(
                 listOf(
                     GuiLoreBlock(
                         listOf(GuiLoreLine.Text(i18n(player, "owner_backup.description"))),
-                    ),
-                    GuiLoreBlock(
-                        listOf(
-                            CCSystem.getAPI().getGuiActionService().singleClick(
-                                player,
-                                i18n(player, "owner_backup.action"),
-                            ),
-                        ),
                     ),
                 ),
             ),

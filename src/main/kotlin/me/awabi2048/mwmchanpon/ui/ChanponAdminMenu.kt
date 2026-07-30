@@ -17,7 +17,9 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionPresentationProvider
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
@@ -34,6 +36,7 @@ import me.awabi2048.myworldmanager.api.extension.AdminMenuCapabilityPlacements
 import net.kyori.adventure.text.Component
 import org.bukkit.Material
 import org.bukkit.entity.Player
+import org.bukkit.event.inventory.ClickType
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 
@@ -100,13 +103,30 @@ class ChanponAdminMenu(
                 presentationProvider = MenuCapabilityPresentationProvider {
                     switchToChanponPresentation(it.player)
                 },
-                actionHandler = MenuCapabilityActionHandler {
-                    if (!it.player.hasPermission("mwmchanpon.admin")) {
-                        MenuActionResult.Rejected(i18nComponent(it.player, "admin.no_permission"))
-                    } else {
-                        MenuActionResult.Success(MenuUpdate.Navigate(MenuRoute(OWNER, ROUTE_MAIN)))
-                    }
-                },
+                actions = listOf(
+                    MenuCapabilityAction(
+                        id = "open",
+                        clicks = setOf(ClickType.LEFT),
+                        presentationProvider = MenuCapabilityActionPresentationProvider {
+                            listOf(
+                                CCSystem.getAPI().getGuiActionService().singleClick(
+                                    it.player,
+                                    CCSystem.getAPI().getI18nString(
+                                        it.player,
+                                        "gui.admin_menu.menu_switch.action",
+                                    ),
+                                ),
+                            )
+                        },
+                        handler = MenuCapabilityActionHandler {
+                            if (!it.player.hasPermission("mwmchanpon.admin")) {
+                                MenuActionResult.Rejected(i18nComponent(it.player, "admin.no_permission"))
+                            } else {
+                                MenuActionResult.Success(MenuUpdate.Navigate(MenuRoute(OWNER, ROUTE_MAIN)))
+                            }
+                        },
+                    ),
+                ),
             ),
         )
     }
@@ -377,7 +397,6 @@ class ChanponAdminMenu(
     }
 
     private fun switchToChanponPresentation(player: Player): MenuCapabilityPresentation {
-        val actions = CCSystem.getAPI().getGuiActionService()
         return MenuCapabilityPresentation(
             GuiItemSpec(
                 material = Material.NETHER_STAR,
@@ -396,17 +415,6 @@ class ChanponAdminMenu(
                                 "gui.admin_menu.menu_switch.lore",
                                 mapOf("next" to i18n(player, "admin.provider_display")),
                             ).map(GuiLoreLine::Text),
-                        ),
-                        GuiLoreBlock(
-                            listOf(
-                                actions.singleClick(
-                                    player,
-                                    CCSystem.getAPI().getI18nString(
-                                        player,
-                                        "gui.admin_menu.menu_switch.action",
-                                    ),
-                                ),
-                            ),
                         ),
                     ),
                 ),

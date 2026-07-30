@@ -10,7 +10,9 @@ import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionPresentationProvider
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
@@ -29,6 +31,7 @@ import me.awabi2048.myworldmanager.model.WorldData
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
+import org.bukkit.event.inventory.ClickType
 
 class ToolPermissionCapability(
     private val menu: ToolPermissionMenu,
@@ -58,7 +61,21 @@ class ToolPermissionCapability(
                         ),
                     )
                 },
-                actionHandler = MenuCapabilityActionHandler(::handlePrimaryAction),
+                actions = listOf(
+                    MenuCapabilityAction(
+                        id = "edit",
+                        clicks = setOf(ClickType.LEFT),
+                        presentationProvider = MenuCapabilityActionPresentationProvider {
+                            listOf(
+                                GuiLoreLine.Action(
+                                    i18n(it.player, "click_edit_operation"),
+                                    i18n(it.player, "click_edit_action"),
+                                ),
+                            )
+                        },
+                        handler = MenuCapabilityActionHandler(::handlePrimaryAction),
+                    ),
+                ),
             ),
         )
     }
@@ -119,28 +136,7 @@ class ToolPermissionCapability(
             )
         }
 
-        val actionLines = mutableListOf<GuiLoreLine>(
-            GuiLoreLine.Action(
-                i18n(player, "click_edit_operation"),
-                i18n(player, "click_edit_action"),
-            ),
-            GuiLoreLine.Spacer,
-        )
-        if (memberUuid != worldData.owner) {
-            actionLines += GuiLoreLine.Action(
-                i18n(player, "transfer_owner_operation"),
-                i18n(player, "transfer_owner_action"),
-            )
-            actionLines += GuiLoreLine.Action(
-                i18n(player, "remove_member_operation"),
-                i18n(player, "remove_member_action"),
-            )
-        }
-
-        val blocks = listOf(
-            GuiLoreBlock(detailLines),
-            GuiLoreBlock(actionLines),
-        )
+        val blocks = listOf(GuiLoreBlock(detailLines))
         return MenuCapabilityPresentation(
             item = GuiItemSpec(
                 material = Material.PLAYER_HEAD,

@@ -8,8 +8,10 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionPresentationProvider
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
@@ -33,6 +35,7 @@ import net.kyori.adventure.text.format.TextDecoration
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
+import org.bukkit.event.inventory.ClickType
 
 /**
  * MWMが所有するPlayerWorld画面へChanpon固有の表示値と操作だけを提供する。
@@ -58,7 +61,14 @@ class ChanponPlayerWorldCapability(
                 presentationProvider = MenuCapabilityPresentationProvider {
                     createWorldPresentation(it.player, requireNotNull(world(it)))
                 },
-                actionHandler = MenuCapabilityActionHandler(::handleWorld),
+                actions = listOf(
+                    MenuCapabilityAction(
+                        id = "world",
+                        clicks = setOf(ClickType.LEFT, ClickType.RIGHT, ClickType.SHIFT_LEFT),
+                        presentationProvider = MenuCapabilityActionPresentationProvider(::worldActionLore),
+                        handler = MenuCapabilityActionHandler(::handleWorld),
+                    ),
+                ),
             ),
         )
         service.register(
@@ -75,6 +85,7 @@ class ChanponPlayerWorldCapability(
                         subject.targetPlayerName,
                     )
                 },
+                actions = emptyList(),
             ),
         )
         service.register(
@@ -88,10 +99,18 @@ class ChanponPlayerWorldCapability(
                 presentationProvider = MenuCapabilityPresentationProvider {
                     creationPresentation(it)
                 },
-                actionAvailability = MenuCapabilityAvailability {
-                    creationBlockReason(it) == null && hasCreatePermission(it.player)
-                },
-                actionHandler = MenuCapabilityActionHandler(::handleCreate),
+                actions = listOf(
+                    MenuCapabilityAction(
+                        id = "create",
+                        clicks = setOf(ClickType.LEFT, ClickType.RIGHT),
+                        presentationProvider =
+                            MenuCapabilityActionPresentationProvider(::creationActionLore),
+                        availability = MenuCapabilityAvailability {
+                            creationBlockReason(it) == null && hasCreatePermission(it.player)
+                        },
+                        handler = MenuCapabilityActionHandler(::handleCreate),
+                    ),
+                ),
             ),
         )
     }
@@ -169,6 +188,54 @@ class ChanponPlayerWorldCapability(
     private fun startEasyCreation(player: Player, returnRoute: MenuRoute): MenuActionResult =
         easyVoidCreationService.start(player, returnRoute)
 
+    private fun worldActionLore(context: MenuCapabilityContext): List<GuiLoreLine> {
+        val world = requireNotNull(world(context))
+        return if (isCurrentWorld(context.player, world)) {
+            listOf(
+                CCSystem.getAPI().getGuiActionService().singleClick(
+                    context.player,
+                    text(context.player, "gui.player_world.world_item.settings"),
+                ),
+            )
+        } else {
+            listOf(
+                GuiLoreLine.Action(
+                    CCSystem.getAPI().getGuiActionService()
+                        .clickLabel(
+                            context.player,
+                            com.awabi2048.ccsystem.api.gui.GuiClickLabel.LEFT,
+                        ),
+                    text(context.player, "gui.player_world.world_item.warp"),
+                ),
+                GuiLoreLine.Action(
+                    CCSystem.getAPI().getGuiActionService()
+                        .clickLabel(
+                            context.player,
+                            com.awabi2048.ccsystem.api.gui.GuiClickLabel.RIGHT,
+                        ),
+                    text(context.player, "gui.player_world.world_item.settings"),
+                ),
+            )
+        }
+    }
+
+    private fun creationActionLore(context: MenuCapabilityContext): List<GuiLoreLine> =
+        listOf(
+            GuiLoreLine.Action(
+                CCSystem.getAPI().getGuiActionService()
+                    .clickLabel(context.player, com.awabi2048.ccsystem.api.gui.GuiClickLabel.LEFT),
+                text(context.player, "gui.player_world.creation_button.action"),
+            ),
+            GuiLoreLine.Action(
+                CCSystem.getAPI().getGuiActionService()
+                    .clickLabel(context.player, com.awabi2048.ccsystem.api.gui.GuiClickLabel.RIGHT),
+                plugin.getMessage(
+                    context.player,
+                    "chanpon.player_world.easy_creation.action",
+                ),
+            ),
+        )
+
     private fun createWorldPresentation(
         player: Player,
         world: WorldData,
@@ -179,7 +246,6 @@ class ChanponPlayerWorldCapability(
         val tagNames = world.tags.joinToString(", ") {
             MyWorldManagerApi.getWorldTagService()?.getDisplayName(player, it) ?: it
         }
-        val currentWorld = isCurrentWorld(player, world)
         val information = buildList {
             add(
                 GuiLoreLine.Data(
@@ -206,27 +272,6 @@ class ChanponPlayerWorldCapability(
                 )
             }
         }
-        val actions = if (currentWorld) {
-            listOf(
-                CCSystem.getAPI().getGuiActionService().singleClick(
-                    player,
-                    text(player, "gui.player_world.world_item.settings"),
-                ),
-            )
-        } else {
-            listOf(
-                GuiLoreLine.Action(
-                    CCSystem.getAPI().getGuiActionService()
-                        .clickLabel(player, com.awabi2048.ccsystem.api.gui.GuiClickLabel.LEFT),
-                    text(player, "gui.player_world.world_item.warp"),
-                ),
-                GuiLoreLine.Action(
-                    CCSystem.getAPI().getGuiActionService()
-                        .clickLabel(player, com.awabi2048.ccsystem.api.gui.GuiClickLabel.RIGHT),
-                    text(player, "gui.player_world.world_item.settings"),
-                ),
-            )
-        }
         val blocks = buildList {
             if (world.description.isNotBlank()) {
                 add(GuiLoreBlock(listOf(GuiLoreLine.Text(world.description))))
@@ -243,7 +288,6 @@ class ChanponPlayerWorldCapability(
                     ),
                 )
             }
-            add(GuiLoreBlock(actions))
         }
         return MenuCapabilityPresentation(
             item = GuiItemSpec(
@@ -275,29 +319,6 @@ class ChanponPlayerWorldCapability(
                         GuiLoreBlock(
                             textList(player, "gui.player_world.creation_button.description")
                                 .map(GuiLoreLine::Text),
-                        ),
-                        GuiLoreBlock(
-                            listOf(
-                                GuiLoreLine.Action(
-                                    CCSystem.getAPI().getGuiActionService()
-                                        .clickLabel(
-                                            player,
-                                            com.awabi2048.ccsystem.api.gui.GuiClickLabel.LEFT,
-                                        ),
-                                    text(player, "gui.player_world.creation_button.action"),
-                                ),
-                                GuiLoreLine.Action(
-                                    CCSystem.getAPI().getGuiActionService()
-                                        .clickLabel(
-                                            player,
-                                            com.awabi2048.ccsystem.api.gui.GuiClickLabel.RIGHT,
-                                        ),
-                                    plugin.getMessage(
-                                        player,
-                                        "chanpon.player_world.easy_creation.action",
-                                    ),
-                                ),
-                            ),
                         ),
                     ),
                 ),

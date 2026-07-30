@@ -424,8 +424,6 @@ class ChanponWorldSettingsMenu(
                     val selected = option == visibility
                     add(GuiLoreLine.Option(displayName, selected, selectedColor, "\u00A77"))
                 }
-                add(GuiLoreLine.Spacer)
-                add(cycleAction(player))
             }, GuiLoreFrame.BOTH)
         )
         return capabilityPresentation(Material.OAK_SIGN, i18n(player, "publish.title"), lore)
@@ -440,9 +438,7 @@ class ChanponWorldSettingsMenu(
         val lines = if (level >= max) {
             i18nList(player, "expand.status_max").map(GuiLoreLine::Text)
         } else {
-            listOf(
-                singleClick(player, text(player, "gui.settings.expand.action.open_menu")),
-            )
+            emptyList()
         }
         return capabilityPresentation(
             Material.FILLED_MAP,
@@ -462,7 +458,6 @@ class ChanponWorldSettingsMenu(
         worldData: WorldData,
     ): MenuCapabilityPresentation {
         val status = i18n(player, if (worldData.notificationEnabled) "common.on" else "common.off")
-        val singleAction = singleClick(player, i18n(player, "notification.action"))
         return MenuCapabilityPresentation(
             GuiItemSpec(
                 material = Material.BELL,
@@ -485,7 +480,6 @@ class ChanponWorldSettingsMenu(
                                 ),
                             ),
                         ),
-                        GuiLoreBlock(listOf(singleAction)),
                     ),
                 ),
                 role = GuiElementRole.ACTION,
@@ -508,7 +502,7 @@ class ChanponWorldSettingsMenu(
             describedStructuredLore(
                 player,
                 textList(player, "gui.settings.critical.blocks.summary").map(GuiLoreLine::Text),
-                listOf(singleClick(player, i18n(player, "critical.action"))),
+                emptyList(),
                 requireTargetWorld = true,
                 worldData = worldData,
             ),
@@ -563,7 +557,7 @@ class ChanponWorldSettingsMenu(
         val lore = describedStructuredLore(
             player,
             mwmDescription(player, iconKey),
-            listOf(singleClick(player, i18n(player, "mwm_action.action"))),
+            emptyList(),
             requireTargetWorld = requireTargetWorld,
             worldData = worldData,
         )
@@ -904,6 +898,30 @@ class ChanponWorldSettingsMenu(
         )
         WorldSettingsFeature.CRITICAL -> criticalPresentation(player, worldData)
     }
+
+    internal fun acceptedClicks(feature: WorldSettingsFeature): Set<org.bukkit.event.inventory.ClickType> =
+        if (feature == WorldSettingsFeature.PUBLISH) {
+            com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks.LEFT_RIGHT
+        } else {
+            com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks.STANDARD
+        }
+
+    internal fun renderFeatureAction(
+        player: Player,
+        feature: WorldSettingsFeature,
+    ): List<GuiLoreLine> = listOf(
+        when (feature) {
+            WorldSettingsFeature.PUBLISH -> cycleAction(player)
+            WorldSettingsFeature.EXPANSION ->
+                singleClick(player, text(player, "gui.settings.expand.action.open_menu"))
+            WorldSettingsFeature.NOTIFICATION ->
+                singleClick(player, i18n(player, "notification.action"))
+            WorldSettingsFeature.ENVIRONMENT ->
+                singleClick(player, i18n(player, "mwm_action.action"))
+            WorldSettingsFeature.CRITICAL ->
+                singleClick(player, i18n(player, "critical.action"))
+        },
+    )
 
     internal fun handleFeature(
         player: Player,

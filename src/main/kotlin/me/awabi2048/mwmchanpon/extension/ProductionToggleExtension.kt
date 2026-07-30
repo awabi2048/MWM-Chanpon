@@ -12,7 +12,9 @@ import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionPresentationProvider
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
@@ -20,6 +22,7 @@ import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentationProvider
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
+import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
@@ -77,9 +80,23 @@ class ProductionToggleExtension(
                 availability = MenuCapabilityAvailability(::isCapabilityAvailable),
                 presentationProvider =
                     MenuCapabilityPresentationProvider(::resolveCapabilityPresentation),
-                actionAvailability =
-                    MenuCapabilityAvailability { resolveCapabilityRoute(it) != null },
-                actionHandler = MenuCapabilityActionHandler(::handleCapabilityAction),
+                actions = listOf(
+                    MenuCapabilityAction(
+                        id = "open-confirmation",
+                        clicks = MenuAcceptedClicks.LEFT,
+                        presentationProvider = MenuCapabilityActionPresentationProvider {
+                            listOf(
+                                CCSystem.getAPI().getGuiActionService().singleClick(
+                                    it.player,
+                                    capabilityActionText(it),
+                                ),
+                            )
+                        },
+                        availability =
+                            MenuCapabilityAvailability { resolveCapabilityRoute(it) != null },
+                        handler = MenuCapabilityActionHandler(::handleCapabilityAction),
+                    ),
+                ),
             ),
         )
         CCSystem.getAPI().getMenuCapabilityService().register(
@@ -93,12 +110,26 @@ class ProductionToggleExtension(
                         creationDraft(it)?.getBoolean(EXTRA_KEY) ?: false,
                     )
                 },
-                actionHandler = MenuCapabilityActionHandler {
-                    val draft = creationDraft(it)
-                        ?: return@MenuCapabilityActionHandler MenuActionResult.Ignored
-                    toggleCreationSelection(it.player, draft)
-                    MenuActionResult.Success(MenuUpdate.Refresh)
-                },
+                actions = listOf(
+                    MenuCapabilityAction(
+                        id = "toggle",
+                        clicks = MenuAcceptedClicks.LEFT,
+                        presentationProvider = MenuCapabilityActionPresentationProvider {
+                            listOf(
+                                CCSystem.getAPI().getGuiActionService().singleClick(
+                                    it.player,
+                                    i18n(it.player, "production.lore.action"),
+                                ),
+                            )
+                        },
+                        handler = MenuCapabilityActionHandler {
+                            val draft = creationDraft(it)
+                                ?: return@MenuCapabilityActionHandler MenuActionResult.Ignored
+                            toggleCreationSelection(it.player, draft)
+                            MenuActionResult.Success(MenuUpdate.Refresh)
+                        },
+                    ),
+                ),
             ),
         )
     }
@@ -214,6 +245,17 @@ class ProductionToggleExtension(
             ),
         ) ?: return MenuActionResult.Ignored
         return MenuActionResult.Success(MenuUpdate.Navigate(route))
+    }
+
+    private fun capabilityActionText(
+        context: com.awabi2048.ccsystem.api.gui.MenuCapabilityContext,
+    ): String {
+        val worldData = requireNotNull(worldData(context.arguments))
+        return if (storage.isProductionWorld(worldData.uuid)) {
+            i18n(context.player, "submission.lore.unsubmitted.action")
+        } else {
+            i18n(context.player, "production.lore.action")
+        }
     }
 
     private fun renderConfirmation(player: Player, route: MenuRoute): InventoryMenuView {
@@ -393,10 +435,6 @@ class ProductionToggleExtension(
             i18nComponent(player, "production.display"),
             structuredLore(
                 listOf(
-                    CCSystem.getAPI().getGuiActionService().singleClick(
-                        player,
-                        i18n(player, "production.lore.action"),
-                    ),
                     GuiLoreLine.Warning(i18n(player, "production.lore.limit_warning")),
                 ),
             ),
@@ -469,8 +507,6 @@ class ProductionToggleExtension(
         return when (state) {
             SubmissionState.UNSUBMITTED -> structuredLore(listOf(
                 stateLine,
-                CCSystem.getAPI().getGuiActionService()
-                    .singleClick(player, i18n(player, "$key.action")),
                 GuiLoreLine.Warning(i18n(player, "$key.warning"))
             ))
             SubmissionState.SUBMITTED,

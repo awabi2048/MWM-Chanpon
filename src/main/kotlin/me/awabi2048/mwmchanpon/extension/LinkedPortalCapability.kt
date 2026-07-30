@@ -6,8 +6,10 @@ import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionPresentationProvider
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
@@ -18,6 +20,7 @@ import me.awabi2048.myworldmanager.api.extension.WorldSettingsCapabilityPlacemen
 import me.awabi2048.myworldmanager.model.WorldData
 import org.bukkit.Material
 import org.bukkit.entity.Player
+import org.bukkit.event.inventory.ClickType
 
 class LinkedPortalCapability {
     init {
@@ -35,7 +38,21 @@ class LinkedPortalCapability {
                 presentationProvider = MenuCapabilityPresentationProvider { context ->
                     portalPresentation(context.player)
                 },
-                actionHandler = MenuCapabilityActionHandler(::receivePortal),
+                actions = listOf(
+                    MenuCapabilityAction(
+                        id = "receive",
+                        clicks = setOf(ClickType.LEFT),
+                        presentationProvider = MenuCapabilityActionPresentationProvider {
+                            listOf(
+                                CCSystem.getAPI().getGuiActionService().singleClick(
+                                    it.player,
+                                    i18n(it.player, "linked_portal.display"),
+                                ),
+                            )
+                        },
+                        handler = MenuCapabilityActionHandler(::receivePortal),
+                    ),
+                ),
             ),
         )
     }

@@ -16,7 +16,9 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionPresentationProvider
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
@@ -75,10 +77,25 @@ class ChanponAdminWorldListMenu(
                 presentationProvider = MenuCapabilityPresentationProvider {
                     adminMenuWorldListPresentation(it.player)
                 },
-                actionHandler = MenuCapabilityActionHandler { context ->
-                    val state = ListState(fromAdminMenu = true)
-                    MenuActionResult.Success(MenuUpdate.Navigate(listRoute(state)))
-                },
+                actions = listOf(
+                    MenuCapabilityAction(
+                        id = "open",
+                        clicks = setOf(ClickType.LEFT),
+                        presentationProvider = MenuCapabilityActionPresentationProvider {
+                            listOf(
+                                CCSystem.getAPI().getGuiActionService().singleClick(
+                                    it.player,
+                                    CCSystem.getAPI()
+                                        .getI18nString(it.player, "gui.admin_menu.info.action"),
+                                ),
+                            )
+                        },
+                        handler = MenuCapabilityActionHandler { context ->
+                            val state = ListState(fromAdminMenu = true)
+                            MenuActionResult.Success(MenuUpdate.Navigate(listRoute(state)))
+                        },
+                    ),
+                ),
             ),
         )
     }
@@ -167,7 +184,6 @@ class ChanponAdminWorldListMenu(
     }
 
     private fun adminMenuWorldListPresentation(player: Player): MenuCapabilityPresentation {
-        val actions = CCSystem.getAPI().getGuiActionService()
         return MenuCapabilityPresentation(
             GuiItemSpec(
                 material = Material.FILLED_MAP,
@@ -181,15 +197,6 @@ class ChanponAdminWorldListMenu(
                             CCSystem.getAPI()
                                 .getI18nStringList(player, "gui.admin_menu.info.lore")
                                 .map(GuiLoreLine::Text),
-                        ),
-                        GuiLoreBlock(
-                            listOf(
-                                actions.singleClick(
-                                    player,
-                                    CCSystem.getAPI()
-                                        .getI18nString(player, "gui.admin_menu.info.action"),
-                                ),
-                            ),
                         ),
                     ),
                 ),
