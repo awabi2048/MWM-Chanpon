@@ -15,6 +15,10 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityItemRenderer
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
@@ -23,7 +27,8 @@ import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.storage.WorldCreationAvailability
 import me.awabi2048.mwmchanpon.protection.SpawnWorldProtectionService
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
-import me.awabi2048.myworldmanager.api.extension.AdminMenuProvider
+import me.awabi2048.myworldmanager.api.extension.AdminMenuCapabilityPlacements
+import me.awabi2048.myworldmanager.util.GuiItemFactory
 import me.awabi2048.myworldmanager.util.GuiLoreActions
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
@@ -40,7 +45,7 @@ class ChanponAdminMenu(
     private val worldDataManagementMenu: WorldDataManagementMenu,
     private val automationSettingsMenu: AutomationSettingsMenu,
     private val worldDataExportMenu: WorldDataExportMenu
-) : AdminMenuProvider {
+) {
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
     init {
@@ -83,13 +88,26 @@ class ChanponAdminMenu(
                 ),
             ),
         )
+        CCSystem.getAPI().getMenuCapabilityService().register(
+            MenuCapabilityDefinition(
+                owner = OWNER,
+                id = MENU_SWITCH_CAPABILITY,
+                placement = AdminMenuCapabilityPlacements.MENU_SWITCH,
+                availability = MenuCapabilityAvailability {
+                    it.player.hasPermission("mwmchanpon.admin")
+                },
+                itemRenderer = MenuCapabilityItemRenderer {
+                    switchToChanponItem(it.player)
+                },
+                actionHandler = MenuCapabilityActionHandler {
+                    open(it.player)
+                    MenuActionResult.Success(MenuUpdate.None)
+                },
+            ),
+        )
     }
-    override fun getId(): String = PROVIDER_ID
 
-    override fun getDisplayName(player: Player): String =
-        i18n(player, "admin.provider_display")
-
-    override fun open(player: Player) {
+    fun open(player: Player) {
         if (!player.hasPermission("mwmchanpon.admin")) {
             player.sendMessage(i18nComponent(player, "admin.no_permission"))
             return
@@ -369,6 +387,35 @@ class ChanponAdminMenu(
         return item
     }
 
+    private fun switchToChanponItem(player: Player): ItemStack {
+        val language = mwm().languageManager
+        return GuiItemFactory.item(
+            Material.NETHER_STAR,
+            language.getMessage(player, "gui.admin_menu.menu_switch.display"),
+            GuiLoreSpec.Blocks(
+                listOf(
+                    GuiLoreBlock(
+                        language.getMessageList(
+                            player,
+                            "gui.admin_menu.menu_switch.lore",
+                            mapOf("next" to i18n(player, "admin.provider_display")),
+                        ).map(GuiLoreLine::Text),
+                    ),
+                    GuiLoreBlock(
+                        listOf(
+                            GuiLoreActions.singleClick(
+                                language,
+                                player,
+                                language.getMessage(player, "gui.admin_menu.menu_switch.action"),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            ItemTag.TYPE_GUI_ADMIN_MENU_SWITCH,
+        )
+    }
+
     private fun decoration(material: Material): ItemStack {
         return ChanponGuiElements.decoration(material)
     }
@@ -409,6 +456,6 @@ class ChanponAdminMenu(
         private const val ACTION_NONE = "none"
         private const val ACTION_CONFIRM_SPAWN = "confirm_spawn"
         private const val ACTION_CANCEL_SPAWN = "cancel_spawn"
-        private const val PROVIDER_ID = "mwm-chanpon:admin_menu"
+        private const val MENU_SWITCH_CAPABILITY = "admin-menu-switch"
     }
 }

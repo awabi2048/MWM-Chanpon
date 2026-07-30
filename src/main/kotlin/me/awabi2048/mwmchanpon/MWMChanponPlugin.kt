@@ -279,7 +279,6 @@ class MWMChanponPlugin : JavaPlugin() {
         MyWorldManagerApi.registerWorldWorkPermissionPolicy(worldWorkPermissionPolicy)
         MyWorldManagerApi.registerWorldPublishPolicy(worldPublishPolicy)
         MyWorldManagerApi.registerWorldRuntimePolicy(worldRuntimePolicy)
-        MyWorldManagerApi.registerAdminMenuProvider(chanponAdminMenu)
         MyWorldManagerApi.registerCommandPolicy(commandExtension)
         adminCommand = ChanponAdminCommand(
             chanponAdminMenu,
@@ -378,9 +377,6 @@ class MWMChanponPlugin : JavaPlugin() {
         }
         if (::worldRuntimePolicy.isInitialized) {
             MyWorldManagerApi.unregisterWorldRuntimePolicy(worldRuntimePolicy)
-        }
-        if (::chanponAdminMenu.isInitialized) {
-            MyWorldManagerApi.unregisterAdminMenuProvider(chanponAdminMenu)
         }
         if (::commandExtension.isInitialized) {
             MyWorldManagerApi.unregisterCommandPolicy(commandExtension)
