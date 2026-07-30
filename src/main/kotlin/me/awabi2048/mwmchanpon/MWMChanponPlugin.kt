@@ -53,7 +53,6 @@ import me.awabi2048.mwmchanpon.ui.ChanponEnvironmentGui
 import me.awabi2048.mwmchanpon.ui.ChanponPlayerWorldMenuProvider
 import me.awabi2048.mwmchanpon.ui.ChanponWorldSettingsMenuProvider
 import me.awabi2048.mwmchanpon.ui.SubmissionAdminMenu
-import me.awabi2048.mwmchanpon.ui.SubmittedWorldMenuProvider
 import me.awabi2048.mwmchanpon.ui.ToolPermissionMenu
 import me.awabi2048.mwmchanpon.ui.WorldDataExportMenu
 import me.awabi2048.mwmchanpon.ui.WorldDataManagementMenu
@@ -69,7 +68,6 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var creationConfirmationMenuProvider: ChanponCreationConfirmationMenuProvider
     private lateinit var productionWorldGuard: ProductionWorldGuard
     private lateinit var submittedProtectionService: SubmittedWorldProtectionService
-    private lateinit var submittedWorldMenuProvider: SubmittedWorldMenuProvider
     private lateinit var chanponWorldSettingsMenuProvider: ChanponWorldSettingsMenuProvider
     private lateinit var playerWorldMenuProvider: ChanponPlayerWorldMenuProvider
     private lateinit var chanponAdminWorldListMenu: ChanponAdminWorldListMenu
@@ -247,7 +245,6 @@ class MWMChanponPlugin : JavaPlugin() {
             )
         )
         chanponAdminWorldListMenu = ChanponAdminWorldListMenu(this, chanponStorage)
-        submittedWorldMenuProvider = SubmittedWorldMenuProvider(this, chanponStorage, submittedProtectionService)
         environmentGui = ChanponEnvironmentGui(this, chanponStorage, submittedProtectionService, buildPermissionService)
         chanponWorldSettingsMenuProvider = ChanponWorldSettingsMenuProvider(this, chanponStorage, submittedProtectionService, environmentGui)
         easyVoidWorldCreationService = EasyVoidWorldCreationService(this)
@@ -266,7 +263,6 @@ class MWMChanponPlugin : JavaPlugin() {
         MyWorldManagerApi.registerWorldDeleteGuard(productionWorldGuard)
         MyWorldManagerApi.registerCreationConfirmationMenuProvider(creationConfirmationMenuProvider)
         MyWorldManagerApi.registerAdminWorldListProvider(chanponAdminWorldListMenu)
-        MyWorldManagerApi.registerWorldSettingsMenuProvider(submittedWorldMenuProvider)
         MyWorldManagerApi.registerWorldSettingsMenuProvider(chanponWorldSettingsMenuProvider)
         MyWorldManagerApi.registerPlayerWorldMenuProvider(playerWorldMenuProvider)
         // Discovery / favorite / visit menus stay on MWM standard providers; Chanpon only supplies policies.
@@ -340,9 +336,6 @@ class MWMChanponPlugin : JavaPlugin() {
         }
         if (::chanponAdminWorldListMenu.isInitialized) {
             MyWorldManagerApi.unregisterAdminWorldListProvider(chanponAdminWorldListMenu)
-        }
-        if (::submittedWorldMenuProvider.isInitialized) {
-            MyWorldManagerApi.unregisterWorldSettingsMenuProvider(submittedWorldMenuProvider)
         }
         if (::chanponWorldSettingsMenuProvider.isInitialized) {
             MyWorldManagerApi.unregisterWorldSettingsMenuProvider(chanponWorldSettingsMenuProvider)
