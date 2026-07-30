@@ -74,10 +74,9 @@ class ChanponPlayerWorldCapability(
         context: PlayerWorldCapabilityContext,
     ): PlayerWorldCreationView? {
         if (context.targetPlayerUuid != context.player.uniqueId) return null
-        val worlds = mwm().playerWorldGui.getPlayerWorlds(context.targetPlayerUuid)
         val reason = creationBlockReason(
             context.player,
-            worlds.count { it.owner == context.targetPlayerUuid },
+            context.worlds.count { it.owner == context.targetPlayerUuid },
             plugin.config.getInt("creation.max_worlds_per_player", 50),
         )
         return if (reason == null && hasCreatePermission(context.player)) {
@@ -108,11 +107,7 @@ class ChanponPlayerWorldCapability(
             startEasyCreation(player, returnRoute)
             return MenuActionResult.Success(MenuUpdate.None)
         }
-        val session = mwm().creationSessionManager.startSession(player.uniqueId)
-        session.isDialogMode = true
-        session.billingMode = WorldPointBillingMode.NONE
-        player.sendMessage(mwm().languageManager.getMessage(player, "messages.wizard_start"))
-        mwm().creationGui.openTypeSelection(player)
+        MyWorldManagerApi.openStandardWorldCreation(player, WorldPointBillingMode.NONE)
         return MenuActionResult.Success(MenuUpdate.None)
     }
 
@@ -126,17 +121,14 @@ class ChanponPlayerWorldCapability(
             click.isShiftClick &&
             click.isLeftClick
         ) {
-            val stats = mwm().playerStatsRepository.findByUuid(player.uniqueId)
-            stats.worldDisplayOrder.remove(worldData.uuid)
-            stats.worldDisplayOrder.add(0, worldData.uuid)
-            mwm().playerStatsRepository.save(stats)
+            MyWorldManagerApi.prioritizePlayerWorld(player.uniqueId, worldData.uuid)
             return MenuActionResult.Success(MenuUpdate.Refresh)
         }
         if (click.isLeftClick && !click.isShiftClick) {
             if (worldData.isArchived) return MenuActionResult.Rejected()
             if (isCurrentWorld(player, worldData)) {
                 if (!canOpenSettings(player, worldData)) return MenuActionResult.Rejected()
-                openWorldSettingsFromCapability(player, worldData)
+                openWorldSettingsFromCapability(context, worldData)
                 return MenuActionResult.Success(MenuUpdate.None)
             }
             MyWorldManagerApi.getWorldService()?.teleportToWorld(player, worldData.uuid)
@@ -150,7 +142,7 @@ class ChanponPlayerWorldCapability(
             return MenuActionResult.Success(MenuUpdate.Close)
         }
         if (click.isRightClick && !click.isShiftClick && canOpenSettings(player, worldData)) {
-            openWorldSettingsFromCapability(player, worldData)
+            openWorldSettingsFromCapability(context, worldData)
             return MenuActionResult.Success(MenuUpdate.None)
         }
         return MenuActionResult.Ignored
@@ -568,15 +560,17 @@ class ChanponPlayerWorldCapability(
         )
     }
 
-    private fun openWorldSettingsFromCapability(player: Player, worldData: WorldData) {
-        val session = mwm().playerWorldSessionManager.getSession(player.uniqueId)
+    private fun openWorldSettingsFromCapability(
+        context: PlayerWorldCapabilityContext,
+        worldData: WorldData,
+    ) {
         MyWorldManagerApi.openWorldSettings(
-            player,
+            context.player,
             worldData.uuid,
             WorldSettingsNavigationRequest(
                 showBackButton = true,
                 isPlayerWorldFlow = true,
-                parentShowBackButton = session.showBackButton,
+                parentShowBackButton = context.showBackButton,
             ),
         )
     }
