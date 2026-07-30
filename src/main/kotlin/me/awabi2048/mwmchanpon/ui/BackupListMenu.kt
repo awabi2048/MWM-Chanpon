@@ -449,68 +449,6 @@ class BackupListMenu(
         ),
     )
 
-    private fun backupItem(player: Player, backup: BackupEntry): ItemStack =
-        ItemStack(materialFor(backup.kind)).also { item ->
-            item.editMeta { meta ->
-                meta.displayName(
-                    i18nComponent(
-                        player,
-                        "backup_list.item.display",
-                        mapOf("name" to BackupDisplay.displayName(backup)),
-                    ),
-                )
-                meta.lore(
-                    structuredBlocks(
-                        listOf(
-                            GuiLoreBlock(
-                                listOf(
-                                    GuiLoreLine.Data(
-                                        i18n(player, "backup_list.item.kind_label"),
-                                        i18n(player, "kind.${backup.kind.i18nKey}"),
-                                        "",
-                                    ),
-                                    GuiLoreLine.Data(
-                                        i18n(player, "backup_list.item.created_label"),
-                                        BackupDisplay.formatCreatedAt(backup.createdAt),
-                                        "§f",
-                                    ),
-                                    GuiLoreLine.Data(
-                                        i18n(player, "backup_list.item.worlds_label"),
-                                        backup.worldUuids.size,
-                                        "§f",
-                                    ),
-                                    GuiLoreLine.Data(
-                                        i18n(player, "backup_list.item.size_label"),
-                                        formatBytes(backup.sizeBytes),
-                                        "§f",
-                                    ),
-                                    GuiLoreLine.Data(
-                                        i18n(player, "backup_list.item.actor_label"),
-                                        BackupDisplay.actorName(backup),
-                                        "§f",
-                                    ),
-                                ),
-                            ),
-                            GuiLoreBlock(
-                                listOf(
-                                    GuiLoreLine.Action(
-                                        CCSystem.getAPI().getGuiActionService()
-                                            .clickLabel(player, GuiClickLabel.LEFT),
-                                        i18n(player, "backup_list.item.rollback_action"),
-                                    ),
-                                    GuiLoreLine.Action(
-                                        i18n(player, "common.middle_click"),
-                                        i18n(player, "backup_list.item.delete_action"),
-                                    ),
-                                ),
-                            ),
-                        ),
-                    ),
-                )
-                meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-            }
-        }
-
     private fun materialFor(kind: BackupKind): Material = when (kind) {
         BackupKind.USER_MANUAL -> Material.PLAYER_HEAD
         BackupKind.ADMIN_MANUAL -> Material.GOLDEN_HELMET

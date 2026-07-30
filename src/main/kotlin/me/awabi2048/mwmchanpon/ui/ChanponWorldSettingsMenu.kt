@@ -584,15 +584,15 @@ class ChanponWorldSettingsMenu(
 
     private fun renderExpansion(player: Player, worldData: WorldData): InventoryMenuView {
         val elements = mutableListOf(
-            actionElement(
-                20,
-                expansionOptionItem(player, "center", Material.MAP),
-                OPERATION_EXPAND_CENTER,
+            simpleActionEntry(
+                player, 20, Material.MAP,
+                "expand_menu.center.display", "expand_menu.center.description",
+                "expand_menu.center.action", OPERATION_EXPAND_CENTER,
             ),
-            actionElement(
-                24,
-                expansionOptionItem(player, "direction_select", Material.COMPASS),
-                OPERATION_EXPAND_DIRECTION,
+            simpleActionEntry(
+                player, 24, Material.COMPASS,
+                "expand_menu.direction_select.display", "expand_menu.direction_select.description",
+                "expand_menu.direction_select.action", OPERATION_EXPAND_DIRECTION,
             ),
             actionElement(
                 ChanponGuiElements.backSlot(45),
@@ -602,7 +602,20 @@ class ChanponWorldSettingsMenu(
             ),
         )
         if (worldData.latestBorderExpansionRecord() != null) {
-            elements += actionElement(42, stepBackItem(player, worldData), OPERATION_STEP_BACK)
+            elements += simpleActionEntry(
+                player,
+                42,
+                Material.RECOVERY_COMPASS,
+                "step_back.display",
+                "step_back.description",
+                "step_back.action",
+                OPERATION_STEP_BACK,
+                warnings = if (worldData.latestBorderExpansionRecord()?.modified == true) {
+                    listOf(i18n(player, "step_back.modified_warning"))
+                } else {
+                    emptyList()
+                },
+            )
         }
         return InventoryMenuView(45, i18nComponent(player, "expand_menu.title"), elements)
     }
@@ -647,7 +660,16 @@ class ChanponWorldSettingsMenu(
                     OPERATION_BACK,
                     GuiElementRole.BACK,
                 ),
-                actionElement(22, deleteWorldItem(player), OPERATION_DELETE),
+                simpleActionEntry(
+                    player,
+                    22,
+                    Material.TNT,
+                    "critical.delete_display",
+                    "critical.delete_description",
+                    "critical.delete_action",
+                    OPERATION_DELETE,
+                    dangers = listOf(i18n(player, "critical.delete_danger")),
+                ),
             ),
         )
 
@@ -807,17 +829,6 @@ class ChanponWorldSettingsMenu(
             return "critical.disabled_warning"
         }
         return null
-    }
-
-    private fun deleteWorldItem(player: Player): ItemStack {
-        val lore = CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(listOf(
-            GuiLoreBlock(listOf(
-                GuiLoreLine.Text(i18n(player, "critical.delete_description")),
-                GuiLoreLine.Danger(i18n(player, "critical.delete_danger"))
-            )),
-            GuiLoreBlock(listOf(singleClick(player, i18n(player, "critical.delete_action"))))
-        )))
-        return componentItem(Material.TNT, i18n(player, "critical.delete_display"), lore)
     }
 
     private fun criticalUnavailablePresentation(
@@ -1083,49 +1094,53 @@ class ChanponWorldSettingsMenu(
         )
     }
 
-    private fun expansionOptionItem(
+    private fun simpleActionEntry(
         player: Player,
-        key: String,
+        slot: Int,
         material: Material,
-    ): ItemStack =
+        nameKey: String,
+        descriptionKey: String,
+        actionKey: String,
+        operation: String,
+        warnings: List<String> = emptyList(),
+        dangers: List<String> = emptyList(),
+    ): MenuElement =
+        CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = slot,
+                material = material,
+                name = GuiNameSpec.Text(i18n(player, nameKey), GuiNameStyle.DEFAULT),
+                role = GuiElementRole.ACTION,
+                description = listOf(i18n(player, descriptionKey)),
+                warnings = warnings,
+                dangers = dangers,
+                actions = listOf(
+                    GuiMenuEntryAction(
+                        ACTION_SELECT,
+                        MenuAcceptedClicks.LEFT_RIGHT,
+                        i18n(player, actionKey),
+                        mapOf(OPERATION to operation),
+                    ),
+                ),
+            ),
+        )
+
+    private fun modifiedWarningItem(player: Player): ItemStack =
         componentItem(
-            material,
-            i18n(player, "expand_menu.$key.display"),
-            loreBlocks(listOf(
-                GuiLoreBlock(listOf(GuiLoreLine.Text(i18n(player, "expand_menu.$key.description")))),
-                GuiLoreBlock(listOf(singleClick(player, i18n(player, "expand_menu.$key.action"))))
-            )),
-        )
-
-    private fun stepBackItem(player: Player, worldData: WorldData): ItemStack {
-        val modified = worldData.latestBorderExpansionRecord()?.modified == true
-        val lines = buildList {
-            add(GuiLoreLine.Text(i18n(player, "step_back.description")))
-            if (modified) add(GuiLoreLine.Warning(i18n(player, "step_back.modified_warning")))
-        }
-        return componentItem(
-            Material.RECOVERY_COMPASS,
-            i18n(player, "step_back.display"),
-            loreBlocks(listOf(
-                GuiLoreBlock(lines),
-                GuiLoreBlock(listOf(singleClick(player, i18n(player, "step_back.action"))))
-            )),
-        )
-    }
-
-    private fun modifiedWarningItem(player: Player): ItemStack {
-        return componentItem(
             Material.REDSTONE_TORCH,
             i18n(player, "modified_warning.display"),
-            loreBlocks(listOf(
-                GuiLoreBlock(listOf(
-                    GuiLoreLine.Warning(i18n(player, "modified_warning.description")),
-                    GuiLoreLine.Text(i18n(player, "modified_warning.consequence"))
-                )),
-                GuiLoreBlock(listOf(singleClick(player, i18n(player, "modified_warning.action"))))
-            )),
+            loreBlocks(
+                listOf(
+                    GuiLoreBlock(
+                        listOf(
+                            GuiLoreLine.Warning(i18n(player, "modified_warning.description")),
+                            GuiLoreLine.Text(i18n(player, "modified_warning.consequence")),
+                        ),
+                    ),
+                ),
+            ),
         )
-    }
 
     private fun confirmCenterItem(player: Player, worldData: WorldData, action: ConfirmAction, direction: BlockFace?): ItemStack {
         val directionName = direction?.let { directionName(player, it) } ?: i18n(player, "direction.center")
