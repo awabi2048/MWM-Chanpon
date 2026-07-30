@@ -9,10 +9,11 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityItemRenderer
-import com.awabi2048.ccsystem.api.gui.MenuCapabilityRouteResolver
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
@@ -76,7 +77,9 @@ class ProductionToggleExtension(
                 placement = WorldSettingsCapabilityPlacements.FOOTER_ACTIONS,
                 availability = MenuCapabilityAvailability(::isCapabilityAvailable),
                 itemRenderer = MenuCapabilityItemRenderer(::renderCapabilityItem),
-                routeResolver = MenuCapabilityRouteResolver(::resolveCapabilityRoute),
+                actionAvailability =
+                    MenuCapabilityAvailability { resolveCapabilityRoute(it) != null },
+                actionHandler = MenuCapabilityActionHandler(::handleCapabilityAction),
             ),
         )
     }
@@ -163,6 +166,18 @@ class ProductionToggleExtension(
                 CONFIRMATION_ACTION_ARGUMENT to action.key,
             ),
         )
+    }
+
+    private fun handleCapabilityAction(
+        context: MenuCapabilityActionContext,
+    ): MenuActionResult {
+        val route = resolveCapabilityRoute(
+            com.awabi2048.ccsystem.api.gui.MenuCapabilityContext(
+                context.player,
+                context.arguments,
+            ),
+        ) ?: return MenuActionResult.Ignored
+        return MenuActionResult.Success(MenuUpdate.Navigate(route))
     }
 
     private fun renderConfirmation(player: Player, route: MenuRoute): InventoryMenuView {

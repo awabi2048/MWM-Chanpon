@@ -202,13 +202,15 @@ class ChanponWorldSettingsMenuProvider(
             .forEach { (capability, slot) ->
                 items[slot] = capability.item
                 capabilityInteractions[slot] =
-                    capability.targetRoute?.let {
+                    if (capability.actionable) {
                         MenuInteraction.Action(
                             ACTION_CAPABILITY,
                             capability.acceptedClicks,
                             capabilityArguments + (CAPABILITY_ID to capability.capabilityId),
                         )
-                    } ?: MenuInteraction.DisplayOnly
+                    } else {
+                        MenuInteraction.DisplayOnly
+                    }
             }
         return InventoryMenuView(
             inventorySize,
@@ -1399,12 +1401,8 @@ class ChanponWorldSettingsMenuProvider(
     private fun handleCapability(context: MenuActionContext): MenuActionResult {
         val capabilityId = context.payload[CAPABILITY_ID] ?: return MenuActionResult.Ignored
         val arguments = context.payload - CAPABILITY_ID
-        val capability = CCSystem.getAPI().getMenuCapabilityService()
-            .resolve(capabilityId, context.player, arguments)
-            ?: return MenuActionResult.Ignored
-        if (context.click !in capability.acceptedClicks) return MenuActionResult.Ignored
-        val target = capability.targetRoute ?: return MenuActionResult.Ignored
-        return MenuActionResult.Success(MenuUpdate.Navigate(target))
+        return CCSystem.getAPI().getMenuCapabilityService()
+            .execute(capabilityId, context.player, context.click, arguments)
     }
 
     private fun confirmationElements(
