@@ -4,8 +4,6 @@ import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
-import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
-import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
@@ -76,14 +74,7 @@ class LinkedPortalCapability {
         GuiItemSpec(
             material = Material.END_PORTAL_FRAME,
             name = GuiNameSpec.Component(i18nComponent(player, "linked_portal.display")),
-            lore = GuiLoreSpec.Blocks(
-                listOf(
-                    GuiLoreBlock(
-                        i18nList(player, "linked_portal.description")
-                            .map(GuiLoreLine::Text),
-                    ),
-                ),
-            ),
+            lore = GuiLoreSpec.NameOnly,
             role = GuiElementRole.ACTION,
             amount = 1,
         ),
@@ -99,9 +90,6 @@ class LinkedPortalCapability {
 
     private fun i18nComponent(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nComponent(player, "chanpon.backup.$key", placeholders)
-
-    private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
-        CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
 
     companion object {
         private const val OWNER = "mwm-chanpon"

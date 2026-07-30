@@ -95,7 +95,7 @@ class ChanponPlayerWorldCapability(
                         },
                         availability = MenuCapabilityAvailability {
                             world(it)?.let { world ->
-                                !isCurrentWorld(it.player, world) && canOpenSettings(it.player, world)
+                                canOpenSettings(it.player, world)
                             } == true
                         },
                         handler = MenuCapabilityActionHandler(::handleWorld),
@@ -686,6 +686,34 @@ class ChanponPlayerWorldCapability(
 
     private fun pendingElement(slot: Int, player: Player): MenuElement {
         val summary = MyWorldManagerApi.getPendingInteractionSummary(player.uniqueId)
+        if (summary.count == 0) {
+            return MenuElement(
+                slot,
+                CCSystem.getAPI().getGuiElementService().item(
+                    GuiItemSpec(
+                        material = Material.BARRIER,
+                        name = GuiNameSpec.Component(
+                            component(player, "gui.player_world.pending_button.display"),
+                        ),
+                        lore = GuiLoreSpec.Blocks(
+                            listOf(
+                                GuiLoreBlock(
+                                    listOf(
+                                        GuiLoreLine.Text(
+                                            text(player, "gui.player_world.pending_button.empty"),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ),
+                        role = GuiElementRole.CONTENT,
+                        amount = 1,
+                    ),
+                ),
+                GuiElementRole.CONTENT,
+                interaction = MenuInteraction.DisplayOnly,
+            )
+        }
         val latest = summary.latestCreatedAt?.let {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
                 .withZone(ZoneId.systemDefault())

@@ -19,7 +19,6 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
-import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
 import com.awabi2048.ccsystem.api.gui.MenuInteraction
 import com.awabi2048.ccsystem.api.gui.MenuElement
@@ -318,18 +317,28 @@ class ChanponWorldSettingsMenu(
         slot: Int,
         item: ItemStack,
         operation: String,
-        acceptedClicks: Set<ClickType> = MenuAcceptedClicks.LEFT_RIGHT,
-    ): MenuElement =
-        MenuElement(
+        worldAction: WorldSettingsAction,
+        player: Player,
+        worldData: WorldData,
+    ): MenuElement {
+        val contract = MyWorldManagerApi.getWorldSettingsActionContract(player, worldData.uuid, worldAction)
+        val actionable = contract?.actionable == true
+        val acceptedClicks = contract?.acceptedClicks.orEmpty()
+        return MenuElement(
             slot,
             item,
-            GuiElementRole.ACTION,
-            interaction = MenuInteraction.Action(
-                ACTION_SELECT,
-                acceptedClicks,
-                mapOf(OPERATION to operation),
-            ),
+            if (actionable) GuiElementRole.ACTION else GuiElementRole.CONTENT,
+            interaction = if (actionable) {
+                MenuInteraction.Action(
+                    ACTION_SELECT,
+                    acceptedClicks,
+                    mapOf(OPERATION to operation),
+                )
+            } else {
+                MenuInteraction.DisplayOnly
+            },
         )
+    }
 
     private fun renderMain(
         player: Player,
@@ -356,23 +365,33 @@ class ChanponWorldSettingsMenu(
                 19,
                 mwmActionItem(player, worldData, "info", Material.NAME_TAG),
                 OPERATION_EDIT_INFO,
+                WorldSettingsAction.EDIT_INFO,
+                player,
+                worldData,
             )
             elements += settingsAction(
                 20,
                 mwmActionItem(player, worldData, "icon", Material.ANVIL),
                 OPERATION_SELECT_ICON,
+                WorldSettingsAction.SELECT_ICON,
+                player,
+                worldData,
             )
             elements += settingsAction(
                 21,
                 spawnItem(player, worldData),
                 OPERATION_SET_SPAWN,
-                MenuAcceptedClicks.LEFT_RIGHT,
+                WorldSettingsAction.SET_SPAWN,
+                player,
+                worldData,
             )
             elements += settingsAction(
                 28,
                 announcementItem(player, worldData),
                 OPERATION_ANNOUNCEMENT,
-                MenuAcceptedClicks.LEFT_RIGHT,
+                WorldSettingsAction.EDIT_ANNOUNCEMENT,
+                player,
+                worldData,
             )
             addFeature(elements, player, worldData, WorldSettingsFeature.NOTIFICATION, 29)
             elements += settingsAction(
@@ -385,6 +404,9 @@ class ChanponWorldSettingsMenu(
                     "gui.tour.worldmenu",
                 ),
                 OPERATION_TOUR,
+                WorldSettingsAction.MANAGE_TOUR,
+                player,
+                worldData,
             )
         }
         if (owner && !protected) {
@@ -394,6 +416,9 @@ class ChanponWorldSettingsMenu(
                 25,
                 mwmActionItem(player, worldData, "member", Material.PLAYER_HEAD),
                 OPERATION_MEMBERS,
+                WorldSettingsAction.MANAGE_MEMBERS,
+                player,
+                worldData,
             )
             addFeature(elements, player, worldData, WorldSettingsFeature.ENVIRONMENT, 32)
             addFeature(elements, player, worldData, WorldSettingsFeature.CRITICAL, 33)
@@ -405,6 +430,9 @@ class ChanponWorldSettingsMenu(
                     ChanponWorldSettingsLayout.PORTAL_MANAGEMENT_SLOT,
                     mwmActionItem(player, worldData, "portals", Material.END_PORTAL_FRAME),
                     OPERATION_PORTALS,
+                    WorldSettingsAction.MANAGE_PORTALS,
+                    player,
+                    worldData,
                 )
             }
         }
@@ -906,6 +934,12 @@ class ChanponWorldSettingsMenu(
 
     private fun worldInfoElement(player: Player, worldData: WorldData): MenuElement {
         val outside = !isCurrentWorld(player, worldData)
+        val warpContract = MyWorldManagerApi.getWorldSettingsActionContract(
+            player,
+            worldData.uuid,
+            WorldSettingsAction.WARP,
+        )
+        val actionable = outside && warpContract?.actionable == true
         val lore = CCSystem.getAPI().getLoreService().render(
             GuiLoreSpec.Blocks(
                 buildList {
@@ -938,11 +972,11 @@ class ChanponWorldSettingsMenu(
         return MenuElement(
             4,
             componentItem(worldData.icon, "§e${worldData.name}", lore),
-            if (outside) GuiElementRole.ACTION else GuiElementRole.CONTENT,
-            interaction = if (outside) {
+            if (actionable) GuiElementRole.ACTION else GuiElementRole.CONTENT,
+            interaction = if (actionable) {
                 MenuInteraction.Action(
                     ACTION_SELECT,
-                    MenuAcceptedClicks.LEFT_RIGHT,
+                    warpContract.acceptedClicks,
                     mapOf(OPERATION to OPERATION_WARP),
                 )
             } else {
@@ -1293,7 +1327,7 @@ class ChanponWorldSettingsMenu(
         if (feature == WorldSettingsFeature.PUBLISH) {
             com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger.LEFT_RIGHT
         } else {
-            com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger.ANY
+            com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger.LEFT
         }
 
     internal fun featureActionText(
