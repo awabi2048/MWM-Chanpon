@@ -491,12 +491,12 @@ class ChanponAdminWorldListMenu(
                 }
                 if (MyWorldManagerApi.getWorldService()?.loadWorld(worldData.uuid) != true) {
                     player.sendMessage(CCSystem.getAPI().getI18nString(player, "error.load_failed"))
-                    runtime.resumeFromExternal(player)
+                    runtime.finishExternal(player)
                     return@Runnable
                 }
                 val route = settingsRoute(player, worldData)
                 if (route == null) {
-                    runtime.resumeFromExternal(player)
+                    runtime.finishExternal(player)
                 } else {
                     runtime.navigate(player, route)
                 }

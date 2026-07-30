@@ -333,6 +333,7 @@ class ChanponWorldSettingsMenu(
                     ACTION_SELECT,
                     acceptedClicks,
                     mapOf(OPERATION to operation),
+                    contract.sounds,
                 )
             } else {
                 MenuInteraction.DisplayOnly
@@ -363,7 +364,7 @@ class ChanponWorldSettingsMenu(
         } else if (manager) {
             elements += settingsAction(
                 19,
-                mwmActionItem(player, worldData, "info", Material.NAME_TAG),
+                mwmActionItem(player, worldData, WorldSettingsAction.EDIT_INFO, "info", Material.NAME_TAG),
                 OPERATION_EDIT_INFO,
                 WorldSettingsAction.EDIT_INFO,
                 player,
@@ -371,7 +372,7 @@ class ChanponWorldSettingsMenu(
             )
             elements += settingsAction(
                 20,
-                mwmActionItem(player, worldData, "icon", Material.ANVIL),
+                mwmActionItem(player, worldData, WorldSettingsAction.SELECT_ICON, "icon", Material.ANVIL),
                 OPERATION_SELECT_ICON,
                 WorldSettingsAction.SELECT_ICON,
                 player,
@@ -399,6 +400,7 @@ class ChanponWorldSettingsMenu(
                 mwmActionItem(
                     player,
                     worldData,
+                    WorldSettingsAction.MANAGE_TOUR,
                     "tour",
                     Material.PALE_OAK_BOAT,
                     "gui.tour.worldmenu",
@@ -414,7 +416,7 @@ class ChanponWorldSettingsMenu(
             addFeature(elements, player, worldData, WorldSettingsFeature.PUBLISH, 24)
             elements += settingsAction(
                 25,
-                mwmActionItem(player, worldData, "member", Material.PLAYER_HEAD),
+                mwmActionItem(player, worldData, WorldSettingsAction.MANAGE_MEMBERS, "member", Material.PLAYER_HEAD),
                 OPERATION_MEMBERS,
                 WorldSettingsAction.MANAGE_MEMBERS,
                 player,
@@ -428,7 +430,7 @@ class ChanponWorldSettingsMenu(
             if (hasPortals) {
                 elements += settingsAction(
                     ChanponWorldSettingsLayout.PORTAL_MANAGEMENT_SLOT,
-                    mwmActionItem(player, worldData, "portals", Material.END_PORTAL_FRAME),
+                    mwmActionItem(player, worldData, WorldSettingsAction.MANAGE_PORTALS, "portals", Material.END_PORTAL_FRAME),
                     OPERATION_PORTALS,
                     WorldSettingsAction.MANAGE_PORTALS,
                     player,
@@ -860,6 +862,7 @@ class ChanponWorldSettingsMenu(
     private fun mwmActionItem(
         player: Player,
         worldData: WorldData,
+        action: WorldSettingsAction,
         iconKey: String,
         material: Material,
         langPrefix: String = "gui.settings.$iconKey",
@@ -868,7 +871,12 @@ class ChanponWorldSettingsMenu(
         val lore = describedStructuredLore(
             player,
             mwmDescription(player, iconKey),
-            listOf(singleClick(player, i18n(player, "mwm_action.action"))),
+            contractActionLines(
+                player,
+                worldData,
+                action,
+                listOf(i18n(player, "mwm_action.action")),
+            ),
             requireTargetWorld,
             worldData,
         )
@@ -880,20 +888,20 @@ class ChanponWorldSettingsMenu(
     }
 
     private fun spawnItem(player: Player, worldData: WorldData): ItemStack {
-        val actions = if (MyWorldManagerApi.getBedrockFormService()?.isBedrock(player) == true) {
-            listOf(singleClick(player, text(player, "gui.settings.spawn.action.select_type")))
+        val actionTexts = if (MyWorldManagerApi.getBedrockFormService()?.isBedrock(player) == true) {
+            listOf(text(player, "gui.settings.spawn.action.select_type"))
         } else {
             listOf(
-                GuiLoreLine.Action(
-                    text(player, "gui.settings.click.left"),
-                    text(player, "gui.settings.spawn.action.set_guest"),
-                ),
-                GuiLoreLine.Action(
-                    text(player, "gui.settings.click.right"),
-                    text(player, "gui.settings.spawn.action.set_member"),
-                ),
+                text(player, "gui.settings.spawn.action.set_guest"),
+                text(player, "gui.settings.spawn.action.set_member"),
             )
         }
+        val actions = contractActionLines(
+            player,
+            worldData,
+            WorldSettingsAction.SET_SPAWN,
+            actionTexts,
+        )
         return componentItem(
             MyWorldManagerApi.getConfiguredMenuIcon("world_settings", "spawn", Material.COMPASS),
             text(player, "gui.settings.spawn.display"),
@@ -918,13 +926,12 @@ class ChanponWorldSettingsMenu(
             describedStructuredLore(
                 player,
                 mwmDescription(player, "announcement"),
-                listOf(
-                    GuiLoreLine.Action(
-                        text(player, "gui.settings.click.left"),
+                contractActionLines(
+                    player,
+                    worldData,
+                    WorldSettingsAction.EDIT_ANNOUNCEMENT,
+                    listOf(
                         text(player, "gui.settings.announcement.action.set_message"),
-                    ),
-                    GuiLoreLine.Action(
-                        text(player, "gui.settings.click.right"),
                         text(player, "gui.settings.announcement.action.reset_message"),
                     ),
                 ),
@@ -958,10 +965,12 @@ class ChanponWorldSettingsMenu(
                         add(
                             GuiLoreBlock(
                                 listOf(
-                                    singleClick(
+                                    contractActionLines(
                                         player,
-                                        text(player, "gui.player_world.world_item.warp"),
-                                    ),
+                                        worldData,
+                                        WorldSettingsAction.WARP,
+                                        listOf(text(player, "gui.player_world.world_item.warp")),
+                                    ).single(),
                                 ),
                             ),
                         )
@@ -978,6 +987,7 @@ class ChanponWorldSettingsMenu(
                     ACTION_SELECT,
                     warpContract.acceptedClicks,
                     mapOf(OPERATION to OPERATION_WARP),
+                    warpContract.sounds,
                 )
             } else {
                 MenuInteraction.DisplayOnly
@@ -1238,6 +1248,28 @@ class ChanponWorldSettingsMenu(
                 mapOf("operation" to operation, "action" to action),
             ),
         )
+    }
+
+    private fun contractActionLines(
+        player: Player,
+        worldData: WorldData,
+        action: WorldSettingsAction,
+        actionTexts: List<String>,
+    ): List<GuiLoreLine> {
+        val contract = requireNotNull(
+            MyWorldManagerApi.getWorldSettingsActionContract(player, worldData.uuid, action),
+        ) { "Missing world settings action contract: $action/${worldData.uuid}" }
+        require(contract.options.size == actionTexts.size) {
+            "World settings action presentation mismatch: $action options=${contract.options.size} texts=${actionTexts.size}"
+        }
+        val actionService = CCSystem.getAPI().getGuiActionService()
+        return contract.options.zip(actionTexts).map { (option, actionText) ->
+            actionService.single(
+                player,
+                actionService.clickLabel(player, option.displayClick),
+                actionText,
+            )
+        }
     }
 
     private fun cycleAction(player: Player): GuiLoreLine.Action =
