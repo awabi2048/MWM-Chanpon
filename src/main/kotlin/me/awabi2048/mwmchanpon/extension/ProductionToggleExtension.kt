@@ -34,9 +34,7 @@ import me.awabi2048.mwmchanpon.ui.ChanponGuiElements
 import me.awabi2048.mwmchanpon.ui.ChanponLore
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.event.MwmWorldCreatedEvent
-import me.awabi2048.myworldmanager.api.extension.CreationConfirmationCapability
-import me.awabi2048.myworldmanager.api.extension.CreationConfirmationCapabilityContext
-import me.awabi2048.myworldmanager.api.extension.CreationConfirmationCapabilityView
+import me.awabi2048.myworldmanager.api.extension.CreationConfirmationCapabilityContract
 import me.awabi2048.myworldmanager.api.extension.WorldCreationDraft
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsCapabilityPlacements
 import me.awabi2048.myworldmanager.model.WorldData
@@ -55,7 +53,7 @@ class ProductionToggleExtension(
     private val globalStorage: ChanponGlobalStorage,
     private val protectionService: SubmittedWorldProtectionService,
     private val toolPermissionController: ToolPermissionController
-) : Listener, CreationConfirmationCapability {
+) : Listener {
     private val pendingProduction = ConcurrentHashMap<Pair<UUID, String>, Boolean>()
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
@@ -82,6 +80,25 @@ class ProductionToggleExtension(
                 actionAvailability =
                     MenuCapabilityAvailability { resolveCapabilityRoute(it) != null },
                 actionHandler = MenuCapabilityActionHandler(::handleCapabilityAction),
+            ),
+        )
+        CCSystem.getAPI().getMenuCapabilityService().register(
+            MenuCapabilityDefinition(
+                owner = RUNTIME_OWNER,
+                id = CREATION_CAPABILITY_LOCAL_ID,
+                placement = CreationConfirmationCapabilityContract.PLACEMENT,
+                availability = MenuCapabilityAvailability { creationDraft(it) != null },
+                presentationProvider = MenuCapabilityPresentationProvider {
+                    creationPresentation(
+                        creationDraft(it)?.getBoolean(EXTRA_KEY) ?: false,
+                    )
+                },
+                actionHandler = MenuCapabilityActionHandler {
+                    val draft = creationDraft(it)
+                        ?: return@MenuCapabilityActionHandler MenuActionResult.Ignored
+                    toggleCreationSelection(it.player, draft)
+                    MenuActionResult.Success(MenuUpdate.Refresh)
+                },
             ),
         )
     }
@@ -131,20 +148,17 @@ class ProductionToggleExtension(
             !ownerHasProductionWorld(worldData.owner, worldData.uuid)
     }
 
-    override fun getId(): String = CREATION_CAPABILITY_ID
+    private fun creationDraft(
+        context: com.awabi2048.ccsystem.api.gui.MenuCapabilityContext,
+    ): WorldCreationDraft? =
+        context.attributes[CreationConfirmationCapabilityContract.DRAFT_ATTRIBUTE]
+            as? WorldCreationDraft
 
-    override fun resolve(
-        context: CreationConfirmationCapabilityContext,
-    ): CreationConfirmationCapabilityView = CreationConfirmationCapabilityView(
-        creationPresentation(context.draft.getBoolean(EXTRA_KEY) ?: false),
-    )
-
-    override fun handlePrimaryAction(
-        context: CreationConfirmationCapabilityContext,
-    ): MenuActionResult {
-        toggleCreationSelection(context.player, context.draft)
-        return MenuActionResult.Success(MenuUpdate.Refresh)
-    }
+    private fun creationDraft(
+        context: MenuCapabilityActionContext,
+    ): WorldCreationDraft? =
+        context.attributes[CreationConfirmationCapabilityContract.DRAFT_ATTRIBUTE]
+            as? WorldCreationDraft
 
     private fun resolveCapabilityPresentation(
         context: com.awabi2048.ccsystem.api.gui.MenuCapabilityContext,
@@ -489,6 +503,7 @@ class ProductionToggleExtension(
         const val MENU_CAPABILITY_ID = "mwm-chanpon:world-production-submission"
         const val EXTRA_KEY = "chanpon.production"
         private const val RUNTIME_OWNER = "mwm-chanpon"
+        private const val CREATION_CAPABILITY_LOCAL_ID = "production-selection"
         private const val CAPABILITY_ID = "world-production-submission"
         private const val CONFIRMATION_ROUTE = "world-production-submission-confirmation"
         private const val WORLD_UUID_ARGUMENT = "world_uuid"
