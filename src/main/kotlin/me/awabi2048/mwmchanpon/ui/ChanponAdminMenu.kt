@@ -68,11 +68,9 @@ class ChanponAdminMenu(
                         MenuActionResult.Success(MenuUpdate.Navigate(worldDataExportMenu.route()))
                     },
                     ACTION_SWITCH_MWM to MenuActionHandler { context ->
-                        if (MyWorldManagerApi.openAdminMenu(context.player)) {
-                            MenuActionResult.Success(MenuUpdate.None)
-                        } else {
-                            MenuActionResult.Rejected()
-                        }
+                        MyWorldManagerApi.prepareAdminMenuRoute(context.player)
+                            ?.let { MenuActionResult.Success(MenuUpdate.Navigate(it)) }
+                            ?: MenuActionResult.Rejected()
                     },
                     ACTION_BUILDING_ALLOWED to MenuActionHandler(::toggleBuilding),
                     ACTION_WORLD_CREATION to MenuActionHandler(::cycleWorldCreation),

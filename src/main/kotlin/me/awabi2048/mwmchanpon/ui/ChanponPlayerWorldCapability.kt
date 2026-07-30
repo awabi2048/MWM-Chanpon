@@ -124,11 +124,16 @@ class ChanponPlayerWorldCapability(
             return MenuActionResult.Rejected()
         }
         if (context.click.isRightClick && !context.click.isShiftClick) {
-            startEasyCreation(player, subject.returnRoute)
-            return MenuActionResult.Success(MenuUpdate.None)
+            return startEasyCreation(player, subject.returnRoute)
         }
-        MyWorldManagerApi.openStandardWorldCreation(player, WorldPointBillingMode.NONE)
-        return MenuActionResult.Success(MenuUpdate.None)
+        return MenuActionResult.Success(
+            MenuUpdate.Navigate(
+                MyWorldManagerApi.prepareStandardWorldCreationRoute(
+                    player,
+                    WorldPointBillingMode.NONE,
+                ),
+            ),
+        )
     }
 
     private fun handleWorld(context: MenuCapabilityActionContext): MenuActionResult {
@@ -161,9 +166,8 @@ class ChanponPlayerWorldCapability(
         return MenuActionResult.Ignored
     }
 
-    private fun startEasyCreation(player: Player, returnRoute: MenuRoute) {
+    private fun startEasyCreation(player: Player, returnRoute: MenuRoute): MenuActionResult =
         easyVoidCreationService.start(player, returnRoute)
-    }
 
     private fun createWorldPresentation(
         player: Player,

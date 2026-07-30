@@ -83,12 +83,13 @@ class EasyVoidWorldCreationService(
         )
     }
 
-    fun start(player: Player, returnRoute: MenuRoute) {
-        if (!canCreate(player)) return
+    fun start(player: Player, returnRoute: MenuRoute): MenuActionResult {
+        if (!canCreate(player)) return MenuActionResult.Rejected()
         pendingCreations.remove(player.uniqueId)
         returnRoutes[player.uniqueId] = returnRoute
         player.sendMessage(i18n(player, "start"))
         showNameDialog(player)
+        return MenuActionResult.Success(MenuUpdate.None)
     }
 
     private fun cancelFlow(player: Player): MenuActionResult {
