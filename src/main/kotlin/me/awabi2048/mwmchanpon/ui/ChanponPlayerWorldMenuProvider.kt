@@ -25,6 +25,7 @@ import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
+import me.awabi2048.myworldmanager.api.extension.WorldSettingsNavigationRequest
 import me.awabi2048.myworldmanager.api.extension.PlayerWorldMenuProvider
 import me.awabi2048.myworldmanager.api.extension.PlayerWorldMenuRequest
 import me.awabi2048.myworldmanager.api.extension.WorldCreationOperation
@@ -504,12 +505,14 @@ class ChanponPlayerWorldMenuProvider(
             world.owner == player.uniqueId || world.moderators.contains(player.uniqueId) || world.members.contains(player.uniqueId)
 
     private fun openWorldSettings(player: Player, source: Source, worldData: WorldData) {
-        mwm().worldSettingsGui.open(
+        MyWorldManagerApi.openWorldSettings(
             player,
-            worldData,
-            true,
-            true,
-            source.showBackButton
+            worldData.uuid,
+            WorldSettingsNavigationRequest(
+                showBackButton = true,
+                isPlayerWorldFlow = true,
+                parentShowBackButton = source.showBackButton,
+            ),
         )
     }
 

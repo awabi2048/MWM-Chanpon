@@ -801,8 +801,7 @@ class SubmissionAdminMenu(
 
     private object JavaPluginBridge {
         fun endCoreMenuSession(player: Player) {
-            val mwm = org.bukkit.plugin.java.JavaPlugin.getPlugin(me.awabi2048.myworldmanager.MyWorldManager::class.java)
-            mwm.settingsSessionManager.endSession(player)
+            MyWorldManagerApi.closeWorldSettingsContext(player)
         }
     }
 

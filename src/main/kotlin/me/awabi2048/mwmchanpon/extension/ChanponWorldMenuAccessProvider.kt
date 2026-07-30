@@ -9,15 +9,14 @@ import com.awabi2048.ccsystem.api.gui.MenuDialogRequest
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import me.awabi2048.mwmchanpon.storage.ChanponWorldProtectionMode
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
-import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.event.MwmMemberAddSource
 import me.awabi2048.myworldmanager.api.extension.WorldMenuAccessProvider
+import me.awabi2048.myworldmanager.api.extension.WorldSettingsNavigationRequest
 import me.awabi2048.myworldmanager.model.WorldData
-import me.awabi2048.myworldmanager.session.SettingsAction
 import net.kyori.adventure.text.Component
+import org.bukkit.Bukkit
 import org.bukkit.entity.Player
-import org.bukkit.plugin.java.JavaPlugin
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -101,7 +100,7 @@ class ChanponWorldMenuAccessProvider(
             )
             true
         }.getOrElse { error ->
-            JavaPlugin.getPlugin(MyWorldManager::class.java).logger.warning(
+            Bukkit.getLogger().warning(
                 "Failed to show password dialog for ${worldData.uuid}: ${error.message}"
             )
             false
@@ -109,15 +108,14 @@ class ChanponWorldMenuAccessProvider(
     }
 
     private fun openWorldSettings(player: Player, worldData: WorldData) {
-        val mwm = JavaPlugin.getPlugin(MyWorldManager::class.java)
-        mwm.settingsSessionManager.updateSessionAction(
+        MyWorldManagerApi.openWorldSettings(
             player,
             worldData.uuid,
-            SettingsAction.VIEW_SETTINGS,
-            isGui = true,
-            isAdminFlow = false
+            WorldSettingsNavigationRequest(
+                showBackButton = true,
+                isAdminFlow = false,
+            ),
         )
-        mwm.worldSettingsGui.open(player, worldData)
     }
 
     private fun i18n(player: Player?, key: String): String =

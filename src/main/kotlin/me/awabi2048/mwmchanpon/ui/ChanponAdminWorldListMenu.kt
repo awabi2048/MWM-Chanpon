@@ -23,6 +23,7 @@ import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
+import me.awabi2048.myworldmanager.api.extension.WorldSettingsNavigationRequest
 import me.awabi2048.myworldmanager.api.extension.AdminWorldListProvider
 import me.awabi2048.myworldmanager.api.extension.AdminWorldListRequest
 import me.awabi2048.myworldmanager.model.WorldData
@@ -458,16 +459,14 @@ class ChanponAdminWorldListMenu(
             })
             return
         }
-        mwm.settingsSessionManager.updateSessionAction(
+        MyWorldManagerApi.openWorldSettings(
             player,
             worldData.uuid,
-            SettingsAction.VIEW_SETTINGS,
-            true,
-            true,
-            null,
-            null,
+            WorldSettingsNavigationRequest(
+                showBackButton = true,
+                isAdminFlow = true,
+            ),
         )
-        mwm.worldSettingsGui.open(player, worldData, true, null, null)
     }
 
     private fun sendCopyMessage(player: Player, worldData: WorldData) {

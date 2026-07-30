@@ -5,12 +5,10 @@ import com.awabi2048.ccsystem.api.gui.ManagedMenuInteraction
 import com.awabi2048.ccsystem.api.gui.ManagedMenuInteractionOutcome
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
-import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.model.WorldData
 import org.bukkit.Sound
 import org.bukkit.entity.Player
-import org.bukkit.plugin.java.JavaPlugin
 
 /** Reapplies MWM's setting guards to Chanpon-owned replacement menus and stale inventories. */
 internal class WorldSettingsAccessGuard(
@@ -24,9 +22,10 @@ internal class WorldSettingsAccessGuard(
         requireTargetWorld: Boolean,
         protectedSettings: ProtectedSettingsKind = ProtectedSettingsKind.NONE,
     ): Boolean {
-        val mwm = JavaPlugin.getPlugin(MyWorldManager::class.java)
-        val sessionAdmin = mwm.settingsSessionManager.getSession(player)?.isAdminFlow == true
-        val admin = sessionAdmin || player.hasPermission("myworldmanager.admin")
+        val mwm = org.bukkit.plugin.java.JavaPlugin.getPlugin(
+            me.awabi2048.myworldmanager.MyWorldManager::class.java,
+        )
+        val admin = MyWorldManagerApi.hasWorldSettingsAdminAccess(player)
         val owner = worldData.owner == player.uniqueId
         val moderator = worldData.moderators.contains(player.uniqueId)
         val authorized = if (ownerOnly) owner || admin else owner || moderator || admin
