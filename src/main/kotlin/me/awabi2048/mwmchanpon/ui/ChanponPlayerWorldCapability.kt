@@ -54,25 +54,6 @@ class ChanponPlayerWorldCapability(
     private val easyVoidCreationService: EasyVoidWorldCreationService
 ) : PlayerWorldCapability {
     private val legacy = LegacyComponentSerializer.legacySection()
-    private val runtime = CCSystem.getAPI().getMenuRuntimeService()
-
-    init {
-        runtime.register(
-            InventoryMenuDefinition(
-                owner = RUNTIME_OWNER,
-                id = ROUTE_PLAYER_WORLDS,
-                renderer = { context -> render(context.player, source(context.route)) },
-                actions = mapOf(
-                    ACTION_PAGE to MenuActionHandler(::changePage),
-                    ACTION_BACK to MenuActionHandler { MenuActionResult.Success(MenuUpdate.Back) },
-                    ACTION_CREATE to MenuActionHandler(::createWorld),
-                    ACTION_SETTINGS to MenuActionHandler(::openUserSettings),
-                    ACTION_PENDING to MenuActionHandler(::openPending),
-                    ACTION_WORLD to MenuActionHandler(::selectWorld),
-                ),
-            ),
-        )
-    }
 
     override fun getId(): String = PROVIDER_ID
 
