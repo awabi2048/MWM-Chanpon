@@ -13,7 +13,9 @@ import com.awabi2048.ccsystem.api.gui.GuiMenuIconAction
 import com.awabi2048.ccsystem.api.gui.GuiMenuIconData
 import com.awabi2048.ccsystem.api.gui.GuiMenuIconSpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
+import com.awabi2048.ccsystem.api.gui.GuiValueTone
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
@@ -989,51 +991,25 @@ class ChanponWorldSettingsMenu(
             WorldSettingsAction.WARP,
         )
         val actionable = outside && warpContract?.actionable == true
-        val lore = CCSystem.getAPI().getLoreService().render(
-            GuiLoreSpec.Blocks(
-                buildList {
-                    add(
-                        GuiLoreBlock(
-                            listOf(
-                                GuiLoreLine.Data(
-                                    i18n(player, "info.description_label"),
-                                    worldData.description.ifBlank { "-" },
-                                    "§f",
-                                ),
-                            ),
-                        ),
-                    )
-                    if (outside) {
-                        add(
-                            GuiLoreBlock(
-                                listOf(
-                                    contractActionLines(
-                                        player,
-                                        worldData,
-                                        WorldSettingsAction.WARP,
-                                        listOf(text(player, "gui.player_world.world_item.warp")),
-                                    ).single(),
-                                ),
-                            ),
-                        )
-                    }
-                },
-            ),
-        )
-        return MenuElement(
-            4,
-            componentItem(worldData.icon, "§e${worldData.name}", lore),
-            if (actionable) GuiElementRole.ACTION else GuiElementRole.CONTENT,
-            interaction = if (actionable) {
-                MenuInteraction.Action(
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = 4,
+                material = worldData.icon,
+                name = GuiNameSpec.Text(worldData.name, GuiNameStyle.PRIMARY),
+                role = if (actionable) GuiElementRole.ACTION else GuiElementRole.CONTENT,
+                data = listOf(GuiMenuEntryData(
+                    i18n(player, "info.description_label"),
+                    worldData.description.ifBlank { "-" },
+                )),
+                actions = if (actionable) listOf(GuiMenuEntryAction(
                     ACTION_SELECT,
-                    warpContract.acceptedClicks,
+                    requireNotNull(warpContract).acceptedClicks,
+                    text(player, "gui.player_world.world_item.warp"),
                     mapOf(OPERATION to OPERATION_WARP),
-                    warpContract.sounds,
-                )
-            } else {
-                MenuInteraction.DisplayOnly
-            },
+                )) else emptyList(),
+                sounds = warpContract?.sounds,
+            ),
         )
     }
 
