@@ -40,8 +40,6 @@ import net.kyori.adventure.text.Component
 import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.bukkit.event.inventory.ClickType
-import org.bukkit.inventory.ItemFlag
-import org.bukkit.inventory.ItemStack
 
 class ChanponAdminMenu(
     private val plugin: MWMChanponPlugin,
@@ -139,19 +137,22 @@ class ChanponAdminMenu(
 
     private fun renderMain(player: Player): InventoryMenuView {
         val elements = mutableListOf(
-            MenuElement(19, menuItem(player, Material.LIME_BANNER, "admin.submission", ACTION_SUBMISSION), GuiElementRole.ACTION, ACTION_SUBMISSION),
-            MenuElement(21, menuItem(player, Material.CHEST, "admin.world_data", ACTION_WORLD_DATA), GuiElementRole.ACTION, ACTION_WORLD_DATA),
-            MenuElement(23, menuItem(player, Material.CLOCK, "admin.automation", ACTION_AUTOMATION), GuiElementRole.ACTION, ACTION_AUTOMATION),
-            MenuElement(25, menuItem(player, Material.DISPENSER, "admin.export", ACTION_EXPORT), GuiElementRole.ACTION, ACTION_EXPORT),
+            actionEntry(player, 19, Material.LIME_BANNER, "admin.submission", ACTION_SUBMISSION),
+            actionEntry(player, 21, Material.CHEST, "admin.world_data", ACTION_WORLD_DATA),
+            actionEntry(player, 23, Material.CLOCK, "admin.automation", ACTION_AUTOMATION),
+            actionEntry(player, 25, Material.DISPENSER, "admin.export", ACTION_EXPORT),
             buildingPermissionItem(player),
             worldCreationAvailabilityItem(player),
             switchToMwmItem(player),
         )
         currentWorldUuid(player)?.let { worldUuid ->
-            elements += MenuElement(
+            val configured = globalStorage.getSpawnWorldUuid()
+            val key = if (configured == null) "spawn_world.set" else "spawn_world.change"
+            elements += actionEntry(
+                player,
                 ChanponAdminMenuLayout.FOOTER_SPAWN_WORLD,
-                spawnWorldItem(player, worldUuid),
-                GuiElementRole.ACTION,
+                Material.COMPASS,
+                key,
                 ACTION_SET_SPAWN_WORLD,
                 mapOf(WORLD_UUID to worldUuid.toString()),
             )
@@ -197,18 +198,33 @@ class ChanponAdminMenu(
             layout.size,
             i18nComponent(player, "spawn_world.confirm.title"),
             listOf(
-                MenuElement(layout.confirmSlot, confirmButton(player, true), GuiElementRole.CONFIRM, ACTION_CONFIRM_SPAWN),
-                MenuElement(
-                    layout.previewSlot,
-                    menuItem(player, Material.COMPASS, "spawn_world.confirm.center", ACTION_NONE).also {
-                it.editMeta { meta ->
-                    meta.displayName(i18nComponent(player, "spawn_world.confirm.center.display", mapOf("world" to worldData.name)))
-                    meta.lore(ChanponLore.build(i18nList(player, "spawn_world.confirm.center.lore", mapOf("world" to worldData.name)).map(GuiLoreLine::Text)))
-                }
-            },
-                    GuiElementRole.CONTENT,
+                confirmationEntry(player, layout.confirmSlot, true, ACTION_CONFIRM_SPAWN),
+                CCSystem.getAPI().getGuiElementService().menuDisplay(
+                    com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec(
+                        layout.previewSlot,
+                        GuiItemSpec(
+                            Material.COMPASS,
+                            GuiNameSpec.Component(
+                                i18nComponent(
+                                    player,
+                                    "spawn_world.confirm.center.display",
+                                    mapOf("world" to worldData.name),
+                                ),
+                            ),
+                            GuiLoreSpec.Rich(
+                                i18nList(
+                                    player,
+                                    "spawn_world.confirm.center.lore",
+                                    mapOf("world" to worldData.name),
+                                ).map(GuiLoreLine::Text),
+                                com.awabi2048.ccsystem.api.gui.GuiLoreFrame.BOTH,
+                            ),
+                            GuiElementRole.CONTENT,
+                            1,
+                        ),
+                    ),
                 ),
-                MenuElement(layout.cancelSlot, confirmButton(player, false), GuiElementRole.CANCEL, ACTION_CANCEL_SPAWN),
+                confirmationEntry(player, layout.cancelSlot, false, ACTION_CANCEL_SPAWN),
             ),
         )
     }
@@ -227,21 +243,32 @@ class ChanponAdminMenu(
         return MenuActionResult.Success(MenuUpdate.Back)
     }
 
-    private fun menuItem(player: Player, material: Material, key: String, action: String): ItemStack {
-        val item = ItemStack(material)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "$key.display"))
-            meta.lore(ChanponLore.build(i18nList(player, "$key.lore").map(GuiLoreLine::Text)))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        return item
-    }
-
-    private fun spawnWorldItem(player: Player, worldUuid: java.util.UUID): ItemStack {
-        val configured = globalStorage.getSpawnWorldUuid()
-        val key = if (configured == null) "spawn_world.set" else "spawn_world.change"
-        return menuItem(player, Material.COMPASS, key, ACTION_SET_SPAWN_WORLD)
-    }
+    private fun actionEntry(
+        player: Player,
+        slot: Int,
+        material: Material,
+        key: String,
+        actionId: String,
+        payload: Map<String, String> = emptyMap(),
+    ): MenuElement =
+        CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = slot,
+                material = material,
+                name = GuiNameSpec.Component(i18nComponent(player, "$key.display")),
+                role = GuiElementRole.ACTION,
+                description = i18nList(player, "$key.lore"),
+                actions = listOf(
+                    GuiMenuEntryAction(
+                        actionId,
+                        MenuAcceptedClicks.LEFT_RIGHT,
+                        i18n(player, "$key.display"),
+                        payload,
+                    ),
+                ),
+            ),
+        )
 
     private fun buildingPermissionItem(player: Player): MenuElement {
         val allowed = globalStorage.isBuildingAllowed()
@@ -309,27 +336,33 @@ class ChanponAdminMenu(
         )
     }
 
-    private fun confirmButton(player: Player, confirm: Boolean): ItemStack {
-        val item = ItemStack(if (confirm) Material.LIME_CONCRETE else Material.RED_CONCRETE)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, if (confirm) "confirm.button.confirm" else "confirm.button.cancel"))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        return item
+    private fun confirmationEntry(
+        player: Player,
+        slot: Int,
+        confirm: Boolean,
+        actionId: String,
+    ): MenuElement {
+        val key = if (confirm) "confirm.button.confirm" else "confirm.button.cancel"
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = slot,
+                material = if (confirm) Material.LIME_CONCRETE else Material.RED_CONCRETE,
+                name = GuiNameSpec.Component(i18nComponent(player, key)),
+                role = if (confirm) GuiElementRole.CONFIRM else GuiElementRole.CANCEL,
+                actions = listOf(
+                    GuiMenuEntryAction(
+                        actionId,
+                        MenuAcceptedClicks.LEFT_RIGHT,
+                        i18n(player, key),
+                    ),
+                ),
+            ),
+        )
     }
 
     private fun currentWorldUuid(player: Player): java.util.UUID? {
         return MyWorldManagerApi.getWorldRepository()?.findByWorldName(player.world.name)?.uuid
-    }
-
-    private fun infoItem(player: Player): ItemStack {
-        val item = ItemStack(Material.NETHER_STAR)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "admin.info.display"))
-            meta.lore(ChanponLore.build(i18nList(player, "admin.info.lore", mapOf("version" to plugin.pluginMeta.version)).map(GuiLoreLine::Text)))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        return item
     }
 
     private fun switchToMwmItem(player: Player): MenuElement =
@@ -377,10 +410,6 @@ class ChanponAdminMenu(
         )
     }
 
-    private fun decoration(material: Material): ItemStack {
-        return ChanponGuiElements.decoration(material)
-    }
-
     private fun i18nComponent(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nComponent(player, "chanpon.backup.$key", placeholders)
 
@@ -411,7 +440,6 @@ class ChanponAdminMenu(
         private const val ACTION_BUILDING_ALLOWED = "building_allowed"
         private const val ACTION_WORLD_CREATION = "world_creation"
         private const val ACTION_SET_SPAWN_WORLD = "set_spawn_world"
-        private const val ACTION_NONE = "none"
         private const val ACTION_CONFIRM_SPAWN = "confirm_spawn"
         private const val ACTION_CANCEL_SPAWN = "cancel_spawn"
         private const val MENU_SWITCH_CAPABILITY = "admin-menu-switch"

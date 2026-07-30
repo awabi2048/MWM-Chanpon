@@ -2,15 +2,18 @@ package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiCycle
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryOption
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import com.awabi2048.ccsystem.api.gui.GuiValueTone
 import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
@@ -38,8 +41,6 @@ import org.bukkit.GameMode
 import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.bukkit.event.inventory.ClickType
-import org.bukkit.inventory.ItemFlag
-import org.bukkit.inventory.ItemStack
 
 class SubmissionAdminMenu(
     private val plugin: MWMChanponPlugin,
@@ -123,25 +124,24 @@ class SubmissionAdminMenu(
         val layout = ChanponGuiElements.pagedListLayout()
         val elements = mutableListOf<MenuElement>()
         if (safePage > 0) {
-            elements += MenuElement(
-                layout.previousPageSlot,
-                navItem(player, false),
-                GuiElementRole.NAVIGATION,
-                ACTION_PAGE,
-                statePayload(current.copy(page = safePage - 1)),
+            elements += simpleActionEntry(
+                player, layout.previousPageSlot, Material.ARROW,
+                i18n(player, "admin_menu.prev"), GuiElementRole.NAVIGATION,
+                ACTION_PAGE, statePayload(current.copy(page = safePage - 1)),
             )
         }
         if (safePage < totalPages - 1) {
-            elements += MenuElement(
-                layout.nextPageSlot,
-                navItem(player, true),
-                GuiElementRole.NAVIGATION,
-                ACTION_PAGE,
-                statePayload(current.copy(page = safePage + 1)),
+            elements += simpleActionEntry(
+                player, layout.nextPageSlot, Material.ARROW,
+                i18n(player, "admin_menu.next"), GuiElementRole.NAVIGATION,
+                ACTION_PAGE, statePayload(current.copy(page = safePage + 1)),
             )
         }
-        elements += MenuElement(layout.backSlot, backItem(player), GuiElementRole.BACK, ACTION_BACK)
-        elements += MenuElement(layout.infoSlot, statsItem(player), GuiElementRole.CONTENT)
+        elements += simpleActionEntry(
+            player, layout.backSlot, Material.REDSTONE,
+            i18n(player, "admin_menu.back.display"), GuiElementRole.BACK, ACTION_BACK,
+        )
+        elements += statsEntry(player, layout.infoSlot)
         worlds.drop(safePage * ITEMS_PER_PAGE)
             .take(ITEMS_PER_PAGE)
             .forEachIndexed { index, worldData ->
@@ -366,37 +366,36 @@ class SubmissionAdminMenu(
             .filter { storage.isProductionWorld(it.uuid) }
     }
 
-    private fun statsItem(player: Player): ItemStack {
+    private fun statsEntry(player: Player, slot: Int): MenuElement {
         val worlds = productionWorlds()
         val states = worlds.mapNotNull { runCatching { storage.getSubmissionState(it.uuid) }.getOrNull() }
         val submitted = states.count { it == SubmissionState.SUBMITTED || it == SubmissionState.COMPLETED }
         val completed = states.count { it == SubmissionState.COMPLETED }
-        val item = ItemStack(Material.WRITABLE_BOOK)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "admin_menu.stats.display"))
-            meta.lore(
-                ChanponLore.build(
-                    i18nList(
-                        player,
-                        "admin_menu.stats.lore",
-                        mapOf(
-                            "submitted" to submitted,
-                            "total" to worlds.size,
-                            "completed" to completed
-                        )
-                    ).map(GuiLoreLine::Text)
-                )
-            )
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        return item
+        return displayEntry(
+            slot,
+            Material.WRITABLE_BOOK,
+            GuiNameSpec.Component(i18nComponent(player, "admin_menu.stats.display")),
+            GuiLoreSpec.Rich(
+                i18nList(
+                    player,
+                    "admin_menu.stats.lore",
+                    mapOf(
+                        "submitted" to submitted,
+                        "total" to worlds.size,
+                        "completed" to completed,
+                    ),
+                ).map(GuiLoreLine::Text),
+                GuiLoreFrame.BOTH,
+            ),
+        )
     }
 
     private fun renderCloseSubmissionConfirmation(player: Player): InventoryMenuView =
         confirmationView(
             player,
             "confirm.close_submissions.title",
-            closeSubmissionConfirmationItem(player),
+            Material.REDSTONE_BLOCK,
+            "confirm.close_submissions",
             ACTION_CONFIRM_CLOSE,
         )
 
@@ -410,7 +409,8 @@ class SubmissionAdminMenu(
         return confirmationView(
             player,
             "$key.title",
-            productionToggleConfirmationItem(player, key),
+            Material.HEART_OF_THE_SEA,
+            key,
             ACTION_CONFIRM_PRODUCTION,
         )
     }
@@ -419,14 +419,16 @@ class SubmissionAdminMenu(
         confirmationView(
             player,
             "confirm.complete_unsubmitted.title",
-            completeUnsubmittedConfirmationItem(player),
+            Material.GOLDEN_APPLE,
+            "confirm.complete_unsubmitted",
             ACTION_CONFIRM_COMPLETE,
         )
 
     private fun confirmationView(
         player: Player,
         titleKey: String,
-        preview: ItemStack,
+        previewMaterial: Material,
+        previewKey: String,
         confirmAction: String,
     ): InventoryMenuView {
         val layout = ChanponGuiElements.confirmationLayout()
@@ -434,19 +436,17 @@ class SubmissionAdminMenu(
             layout.size,
             i18nComponent(player, titleKey),
             listOf(
-                MenuElement(layout.previewSlot, preview, GuiElementRole.CONTENT),
-                MenuElement(
-                    layout.confirmSlot,
-                    confirmButton(player, true),
-                    GuiElementRole.CONFIRM,
-                    confirmAction,
+                displayEntry(
+                    layout.previewSlot,
+                    previewMaterial,
+                    GuiNameSpec.Component(i18nComponent(player, "$previewKey.display")),
+                    GuiLoreSpec.Rich(
+                        i18nList(player, "$previewKey.lore").map(GuiLoreLine::Text),
+                        GuiLoreFrame.BOTH,
+                    ),
                 ),
-                MenuElement(
-                    layout.cancelSlot,
-                    confirmButton(player, false),
-                    GuiElementRole.CANCEL,
-                    ACTION_CANCEL,
-                ),
+                confirmationEntry(player, layout.confirmSlot, true, confirmAction),
+                confirmationEntry(player, layout.cancelSlot, false, ACTION_CANCEL),
             ),
         )
     }
@@ -569,26 +569,6 @@ class SubmissionAdminMenu(
         )
     }
 
-    private fun productionToggleConfirmationItem(player: Player, key: String): ItemStack {
-        val item = ItemStack(Material.HEART_OF_THE_SEA)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "$key.display"))
-            meta.lore(ChanponLore.build(i18nList(player, "$key.lore").map(GuiLoreLine::Text)))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        return item
-    }
-
-    private fun completeUnsubmittedConfirmationItem(player: Player): ItemStack {
-        val item = ItemStack(Material.GOLDEN_APPLE)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "confirm.complete_unsubmitted.display"))
-            meta.lore(ChanponLore.build(i18nList(player, "confirm.complete_unsubmitted.lore").map(GuiLoreLine::Text)))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        return item
-    }
-
     private fun ownerHasProductionWorld(ownerUuid: UUID, excludingWorldUuid: UUID): Boolean {
         return MyWorldManagerApi.getWorldRepository()
             ?.findAll()
@@ -631,24 +611,6 @@ class SubmissionAdminMenu(
 
     private fun playerName(uuid: UUID, fallback: String): String {
         return Bukkit.getOfflinePlayer(uuid).name ?: fallback
-    }
-
-    private fun navItem(player: Player, next: Boolean): ItemStack {
-        val item = ItemStack(Material.ARROW)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, if (next) "admin_menu.next" else "admin_menu.prev"))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        return item
-    }
-
-    private fun backItem(player: Player): ItemStack {
-        val item = ItemStack(Material.REDSTONE)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "admin_menu.back.display"))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        return item
     }
 
     private fun filterEntry(
@@ -698,46 +660,64 @@ class SubmissionAdminMenu(
         )
     }
 
-    private fun closeSubmissionConfirmationItem(player: Player): ItemStack {
-        val item = ItemStack(Material.REDSTONE_BLOCK)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "confirm.close_submissions.display"))
-            meta.lore(ChanponLore.build(i18nList(player, "confirm.close_submissions.lore").map(GuiLoreLine::Text)))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        return item
-    }
-
-    private fun confirmButton(player: Player, confirm: Boolean): ItemStack {
-        val item = ItemStack(if (confirm) Material.LIME_CONCRETE else Material.RED_CONCRETE)
-        val key = if (confirm) "confirm.button.confirm" else "confirm.button.cancel"
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "$key.display"))
-            meta.lore(ChanponLore.build(i18nList(player, "$key.lore").map(GuiLoreLine::Text)))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        return item
-    }
-
-    private fun extensionItem(
+    private fun confirmationEntry(
         player: Player,
-        material: Material,
-        displayKey: String,
-        loreKey: String,
-        placeholders: Map<String, Any> = emptyMap()
-    ): ItemStack {
-        val item = ItemStack(material)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, displayKey, placeholders))
-            meta.lore(ChanponLore.build(i18nList(player, loreKey, placeholders).map(GuiLoreLine::Text)))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        return item
+        slot: Int,
+        confirm: Boolean,
+        actionId: String,
+    ): MenuElement {
+        val key = if (confirm) "confirm.button.confirm" else "confirm.button.cancel"
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = slot,
+                material = if (confirm) Material.LIME_CONCRETE else Material.RED_CONCRETE,
+                name = GuiNameSpec.Component(i18nComponent(player, "$key.display")),
+                role = if (confirm) GuiElementRole.CONFIRM else GuiElementRole.CANCEL,
+                description = i18nList(player, "$key.lore"),
+                actions = listOf(
+                    GuiMenuEntryAction(
+                        actionId,
+                        MenuAcceptedClicks.LEFT_RIGHT,
+                        i18n(player, "$key.display"),
+                    ),
+                ),
+            ),
+        )
     }
 
-    private fun decoration(material: Material): ItemStack {
-        return ChanponGuiElements.decoration(material)
-    }
+    private fun simpleActionEntry(
+        player: Player,
+        slot: Int,
+        material: Material,
+        text: String,
+        role: GuiElementRole,
+        actionId: String,
+        payload: Map<String, String> = emptyMap(),
+    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+        player,
+        GuiMenuEntrySpec(
+            slot = slot,
+            material = material,
+            name = GuiNameSpec.Text(text, GuiNameStyle.DEFAULT),
+            role = role,
+            actions = listOf(
+                GuiMenuEntryAction(actionId, MenuAcceptedClicks.LEFT_RIGHT, text, payload),
+            ),
+        ),
+    )
+
+    private fun displayEntry(
+        slot: Int,
+        material: Material,
+        name: GuiNameSpec,
+        lore: GuiLoreSpec,
+    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuDisplay(
+        GuiMenuDisplaySpec(
+            slot,
+            GuiItemSpec(material, name, lore, GuiElementRole.CONTENT, 1),
+        ),
+    )
 
     private fun structuredLore(lines: List<GuiLoreLine>): List<Component> {
         return CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(lines, GuiLoreFrame.BOTH))

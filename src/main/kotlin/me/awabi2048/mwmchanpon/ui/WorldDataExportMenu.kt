@@ -1,15 +1,18 @@
 package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
-import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
+import com.awabi2048.ccsystem.api.gui.GuiItemSpec
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryOption
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import com.awabi2048.ccsystem.api.gui.GuiValueTone
 import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
@@ -28,8 +31,6 @@ import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
-import org.bukkit.inventory.ItemFlag
-import org.bukkit.inventory.ItemStack
 
 class WorldDataExportMenu(
     private val plugin: MWMChanponPlugin,
@@ -82,10 +83,21 @@ class WorldDataExportMenu(
         val safeSelected = selection(route).filter { it in exportableIds }
         val layout = ChanponGuiElements.pagedListLayout()
         val elements = mutableListOf<MenuElement>()
-        if (safePage > 0) elements += actionElement(45, navItem(player, false, safePage - 1), GuiElementRole.NAVIGATION, ACTION_PAGE, mapOf(PAGE to (safePage - 1).toString()))
-        elements += actionElement(49, backItem(player), GuiElementRole.BACK, ACTION_BACK)
-        elements += MenuElement(50, infoItem(player, worlds.size, safeSelected.size, safePage + 1, pages), GuiElementRole.CONTENT)
-        if (safePage < pages - 1) elements += actionElement(53, navItem(player, true, safePage + 1), GuiElementRole.NAVIGATION, ACTION_PAGE, mapOf(PAGE to (safePage + 1).toString()))
+        if (safePage > 0) elements += simpleActionEntry(
+            player, 45, Material.ARROW, i18n(player, "common.prev"),
+            GuiElementRole.NAVIGATION, ACTION_PAGE,
+            mapOf(PAGE to (safePage - 1).toString()),
+        )
+        elements += simpleActionEntry(
+            player, 49, Material.REDSTONE, i18n(player, "common.back"),
+            GuiElementRole.BACK, ACTION_BACK,
+        )
+        elements += infoEntry(player, 50, worlds.size, safeSelected.size, safePage + 1, pages)
+        if (safePage < pages - 1) elements += simpleActionEntry(
+            player, 53, Material.ARROW, i18n(player, "common.next"),
+            GuiElementRole.NAVIGATION, ACTION_PAGE,
+            mapOf(PAGE to (safePage + 1).toString()),
+        )
         worlds.drop(safePage * ITEMS_PER_PAGE).take(ITEMS_PER_PAGE).forEachIndexed { index, world ->
             elements += worldItem(
                 player,
@@ -111,10 +123,9 @@ class WorldDataExportMenu(
         }.getOrDefault("-")
         val layout = ChanponGuiElements.confirmationLayout()
         val elements = listOf(
-            MenuElement(
-                layout.previewSlot,
-                confirmationInfoItem(player, primary?.name ?: "-", selectedWorlds.size, fileName),
-                GuiElementRole.CONTENT,
+            confirmationInfoEntry(
+                player, layout.previewSlot,
+                primary?.name ?: "-", selectedWorlds.size, fileName,
             ),
             controlEntry(
                 player,
@@ -125,7 +136,10 @@ class WorldDataExportMenu(
                 GuiElementRole.CONFIRM,
                 primary != null,
             ),
-            actionElement(layout.cancelSlot, backItem(player), GuiElementRole.CANCEL, ACTION_BACK),
+            simpleActionEntry(
+                player, layout.cancelSlot, Material.REDSTONE, i18n(player, "common.back"),
+                GuiElementRole.CANCEL, ACTION_BACK,
+            ),
         )
         return InventoryMenuView(layout.size, i18nComponent(player, "export_menu.confirm.title"), elements)
     }
@@ -265,37 +279,26 @@ class WorldDataExportMenu(
         ),
     )
 
-    private fun confirmationInfoItem(
+    private fun confirmationInfoEntry(
         player: Player,
+        slot: Int,
         primaryName: String,
         selectedCount: Int,
         fileName: String,
-    ): ItemStack {
-        val item = ItemStack(Material.BOOK)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "export_menu.confirm.info.display"))
-            meta.lore(
-                ChanponLore.build(
+    ): MenuElement = displayEntry(
+        slot,
+        Material.BOOK,
+        GuiNameSpec.Component(i18nComponent(player, "export_menu.confirm.info.display")),
+        GuiLoreSpec.Rich(
                     listOf(
                         GuiLoreLine.Data(i18n(player, "export_menu.confirm.info.primary_label"), primaryName, "§f"),
                         GuiLoreLine.Data(i18n(player, "export_menu.confirm.info.count_label"), selectedCount, "§f"),
                         GuiLoreLine.Data(i18n(player, "export_menu.confirm.info.file_label"), fileName, "§f"),
                         GuiLoreLine.Warning(i18n(player, "export_menu.confirm.info.warning")),
                     ),
-                ),
-            )
-        }
-        return item
-    }
-
-    private fun actionElement(
-        slot: Int,
-        item: ItemStack,
-        role: GuiElementRole,
-        actionId: String,
-        payload: Map<String, String> = emptyMap(),
-        enabled: Boolean = true,
-    ) = MenuElement(slot, item, role, actionId, payload, enabled)
+            GuiLoreFrame.BOTH,
+        ),
+    )
 
     private fun listRoute(page: Int, selected: List<UUID>) =
         MenuRoute(OWNER, ROUTE_LIST, mapOf(PAGE to page.toString(), SELECTION to selected.joinToString(",")))
@@ -313,38 +316,59 @@ class WorldDataExportMenu(
             .mapNotNull { runCatching { UUID.fromString(it) }.getOrNull() }
             .distinct()
 
-    private fun infoItem(
+    private fun infoEntry(
         player: Player,
+        slot: Int,
         count: Int,
         selectedCount: Int,
         page: Int,
         pages: Int
-    ): ItemStack {
-        val item = ItemStack(Material.BOOK)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "export_menu.info.display"))
-            meta.lore(
-                ChanponLore.build(
+    ): MenuElement = displayEntry(
+        slot,
+        Material.BOOK,
+        GuiNameSpec.Component(i18nComponent(player, "export_menu.info.display")),
+        GuiLoreSpec.Rich(
                     i18nList(
                         player,
                         "export_menu.info.lore",
                         mapOf("count" to count, "selected" to selectedCount, "page" to page, "pages" to pages)
-                    ).map(GuiLoreLine::Text)
-                )
-            )
-        }
-        return item
-    }
+                    ).map(GuiLoreLine::Text),
+            GuiLoreFrame.BOTH,
+        ),
+    )
 
-    private fun navItem(player: Player, next: Boolean, page: Int): ItemStack {
-        val item = ChanponGuiElements.navigation(i18n(player, if (next) "common.next" else "common.prev"), next)
-        return item
-    }
+    private fun simpleActionEntry(
+        player: Player,
+        slot: Int,
+        material: Material,
+        text: String,
+        role: GuiElementRole,
+        actionId: String,
+        payload: Map<String, String> = emptyMap(),
+    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+        player,
+        GuiMenuEntrySpec(
+            slot = slot,
+            material = material,
+            name = GuiNameSpec.Text(text, GuiNameStyle.DEFAULT),
+            role = role,
+            actions = listOf(
+                GuiMenuEntryAction(actionId, MenuAcceptedClicks.LEFT_RIGHT, text, payload),
+            ),
+        ),
+    )
 
-    private fun backItem(player: Player): ItemStack {
-        val item = ChanponGuiElements.back(i18n(player, "common.back"))
-        return item
-    }
+    private fun displayEntry(
+        slot: Int,
+        material: Material,
+        name: GuiNameSpec,
+        lore: GuiLoreSpec,
+    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuDisplay(
+        GuiMenuDisplaySpec(
+            slot,
+            GuiItemSpec(material, name, lore, GuiElementRole.CONTENT, 1),
+        ),
+    )
 
     private fun resultMessage(player: Player, success: Boolean, fileName: String?): Component =
         i18nComponent(
@@ -361,9 +385,6 @@ class WorldDataExportMenu(
 
     private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
-
-    private fun structuredBlocks(blocks: List<GuiLoreBlock>): List<Component> =
-        CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(blocks))
 
     companion object {
         private const val OWNER = "mwm-chanpon"

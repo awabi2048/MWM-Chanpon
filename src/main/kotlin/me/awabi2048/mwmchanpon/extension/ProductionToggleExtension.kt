@@ -5,7 +5,10 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.GuiStructuredMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
@@ -47,8 +50,6 @@ import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
-import org.bukkit.inventory.ItemFlag
-import org.bukkit.inventory.ItemStack
 
 class ProductionToggleExtension(
     private val plugin: MWMChanponPlugin,
@@ -251,25 +252,74 @@ class ProductionToggleExtension(
         val action = confirmationAction(route)
         val layout = ChanponGuiElements.confirmationLayout()
         val title = i18nComponent(player, "confirm.${action.key}.title")
-        val centerItem = ItemStack(Material.PAPER).apply {
-            editMeta {
-                it.displayName(title)
-                it.lore(i18nList(player, "confirm.${action.key}.lore").map(Component::text))
-            }
-        }
-        val confirmItem = ItemStack(Material.LIME_CONCRETE).apply {
-            editMeta { it.displayName(i18nComponent(player, "confirm.button.confirm.display")) }
-        }
-        val cancelItem = ItemStack(Material.RED_CONCRETE).apply {
-            editMeta { it.displayName(i18nComponent(player, "confirm.button.cancel.display")) }
-        }
+        val gui = CCSystem.getAPI().getGuiElementService()
         return InventoryMenuView(
             layout.size,
             title,
             listOf(
-                MenuElement(layout.previewSlot, centerItem, GuiElementRole.CONTENT),
-                MenuElement(layout.confirmSlot, confirmItem, GuiElementRole.CONFIRM, ACTION_CONFIRM),
-                MenuElement(layout.cancelSlot, cancelItem, GuiElementRole.CANCEL, ACTION_CANCEL),
+                gui.menuDisplay(
+                    GuiMenuDisplaySpec(
+                        layout.previewSlot,
+                        GuiItemSpec(
+                            Material.PAPER,
+                            GuiNameSpec.Component(title),
+                            GuiLoreSpec.Rich(
+                                i18nList(player, "confirm.${action.key}.lore")
+                                    .map(GuiLoreLine::Text),
+                                GuiLoreFrame.NONE,
+                            ),
+                            GuiElementRole.CONTENT,
+                            1,
+                        ),
+                    ),
+                ),
+                confirmationEntry(
+                    player,
+                    layout.confirmSlot,
+                    Material.LIME_CONCRETE,
+                    "confirm.button.confirm.display",
+                    GuiElementRole.CONFIRM,
+                    ACTION_CONFIRM,
+                ),
+                confirmationEntry(
+                    player,
+                    layout.cancelSlot,
+                    Material.RED_CONCRETE,
+                    "confirm.button.cancel.display",
+                    GuiElementRole.CANCEL,
+                    ACTION_CANCEL,
+                ),
+            ),
+        )
+    }
+
+    private fun confirmationEntry(
+        player: Player,
+        slot: Int,
+        material: Material,
+        textKey: String,
+        role: GuiElementRole,
+        actionId: String,
+    ): MenuElement {
+        val text = i18n(player, textKey)
+        return CCSystem.getAPI().getGuiElementService().menuStructuredEntry(
+            player,
+            GuiStructuredMenuEntrySpec(
+                slot = slot,
+                item = GuiItemSpec(
+                    material,
+                    GuiNameSpec.Component(i18nComponent(player, textKey)),
+                    GuiLoreSpec.None,
+                    role,
+                    1,
+                ),
+                actions = listOf(
+                    GuiMenuEntryAction(
+                        actionId,
+                        MenuAcceptedClicks.LEFT_RIGHT,
+                        text,
+                    ),
+                ),
             ),
         )
     }

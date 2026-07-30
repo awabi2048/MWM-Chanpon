@@ -10,11 +10,13 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiValueTone
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
+import com.awabi2048.ccsystem.api.gui.GuiStructuredMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
@@ -22,7 +24,6 @@ import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
 import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
-import com.awabi2048.ccsystem.api.gui.MenuInteraction
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
@@ -47,8 +48,6 @@ import org.bukkit.Material
 import org.bukkit.block.BlockFace
 import org.bukkit.entity.Player
 import org.bukkit.event.inventory.ClickType
-import org.bukkit.inventory.ItemFlag
-import org.bukkit.inventory.ItemStack
 
 class ChanponWorldSettingsMenu(
     private val plugin: MWMChanponPlugin,
@@ -67,6 +66,7 @@ class ChanponWorldSettingsMenu(
                 renderer = { context -> render(context.player, source(context.route)) },
                 actions = mapOf(
                     ACTION_SELECT to MenuActionHandler(::handleAction),
+                    ACTION_CAPABILITY to MenuActionHandler(::executeCapability),
                 ),
             )
         )
@@ -237,19 +237,12 @@ class ChanponWorldSettingsMenu(
                 service.resolve(it.capabilityId, player, arguments)
             } ?: return
         val accepted = capability.acceptedClicks - ClickType.MIDDLE
-        elements += MenuElement(
+        elements += capabilityEntry(
+            player,
             slot,
-            CCSystem.getAPI().getGuiElementService().menuCapability(player, capability),
-            if (capability.actionable) GuiElementRole.ACTION else GuiElementRole.CONTENT,
-            interaction = if (capability.actionable) {
-                MenuInteraction.Capability(
-                    capabilityId = capability.capabilityId,
-                    arguments = arguments,
-                    acceptedClicks = accepted,
-                )
-            } else {
-                MenuInteraction.DisplayOnly
-            },
+            capability,
+            arguments,
+            accepted,
         )
     }
 
@@ -298,48 +291,48 @@ class ChanponWorldSettingsMenu(
             .mapNotNull { service.resolve(it.capabilityId, player, arguments) }
             .zip(slots.asSequence())
             .forEach { (capability, slot) ->
-                elements += MenuElement(
-                    slot,
-                    CCSystem.getAPI().getGuiElementService().menuCapability(player, capability),
-                    if (capability.actionable) GuiElementRole.ACTION else GuiElementRole.CONTENT,
-                    interaction = if (capability.actionable) {
-                        MenuInteraction.Capability(
-                            capabilityId = capability.capabilityId,
-                            arguments = arguments,
-                            acceptedClicks = capability.acceptedClicks,
-                        )
-                    } else {
-                        MenuInteraction.DisplayOnly
-                    },
-                )
+                elements += capabilityEntry(player, slot, capability, arguments)
             }
     }
 
-    private fun settingsAction(
-        slot: Int,
-        item: ItemStack,
-        operation: String,
-        worldAction: WorldSettingsAction,
+    private fun capabilityEntry(
         player: Player,
-        worldData: WorldData,
+        slot: Int,
+        capability: com.awabi2048.ccsystem.api.gui.ResolvedMenuCapability,
+        attributes: Map<String, String>,
+        acceptedClicks: Set<ClickType> = capability.acceptedClicks,
     ): MenuElement {
-        val contract = MyWorldManagerApi.getWorldSettingsActionContract(player, worldData.uuid, worldAction)
-        val actionable = contract?.actionable == true
-        val acceptedClicks = contract?.acceptedClicks.orEmpty()
-        return MenuElement(
-            slot,
-            item,
-            if (actionable) GuiElementRole.ACTION else GuiElementRole.CONTENT,
-            interaction = if (actionable) {
-                MenuInteraction.Action(
-                    ACTION_SELECT,
-                    acceptedClicks,
-                    mapOf(OPERATION to operation),
-                    contract.sounds,
-                )
-            } else {
-                MenuInteraction.DisplayOnly
-            },
+        val presentation = capability.presentation
+        val actions = capability.actions.mapNotNull { action ->
+            val clicks = action.trigger.clicks.intersect(acceptedClicks)
+            if (clicks.isEmpty()) null else GuiMenuEntryAction(
+                ACTION_CAPABILITY,
+                clicks,
+                action.text,
+                attributes + (CAPABILITY_ID to capability.capabilityId),
+            )
+        }
+        return CCSystem.getAPI().getGuiElementService().menuStructuredEntry(
+            player,
+            GuiStructuredMenuEntrySpec(
+                slot = slot,
+                item = presentation.item.copy(
+                    role = if (actions.isEmpty()) GuiElementRole.CONTENT else GuiElementRole.ACTION,
+                ),
+                actions = actions,
+                glint = presentation.glint,
+                playerHeadOwner = presentation.playerHeadOwner,
+            ),
+        )
+    }
+
+    private fun executeCapability(context: MenuActionContext): MenuActionResult {
+        val capabilityId = context.payload[CAPABILITY_ID] ?: return MenuActionResult.Ignored
+        return CCSystem.getAPI().getMenuCapabilityService().execute(
+            capabilityId,
+            context.player,
+            context.click,
+            arguments = context.payload - CAPABILITY_ID,
         )
     }
 
@@ -435,11 +428,13 @@ class ChanponWorldSettingsMenu(
 
         elements += worldInfoElement(player, worldData)
         if (CCSystem.getAPI().getMenuNavigationService().canGoBack(player)) {
-            elements += MenuElement(
+            elements += actionElement(
+                player,
                 ChanponGuiElements.backSlot(size),
                 returnItem(player),
+                i18n(player, "common.back"),
+                OPERATION_BACK,
                 GuiElementRole.BACK,
-                interaction = MenuInteraction.Back(),
             )
         }
         addFooterCapabilities(elements, player, worldData, size, owner, protected)
@@ -592,8 +587,10 @@ class ChanponWorldSettingsMenu(
                 "expand_menu.direction_select.action", OPERATION_EXPAND_DIRECTION,
             ),
             actionElement(
+                player,
                 ChanponGuiElements.backSlot(45),
                 returnItem(player),
+                i18n(player, "common.back"),
                 OPERATION_BACK,
                 GuiElementRole.BACK,
             ),
@@ -623,10 +620,13 @@ class ChanponWorldSettingsMenu(
             layout.size,
             i18nComponent(player, "modified_warning.title"),
             confirmationElements(
+                player,
                 layout,
                 modifiedWarningItem(player),
                 warningButton(player, true),
                 warningButton(player, false),
+                i18n(player, "modified_warning.button.continue"),
+                i18n(player, "modified_warning.button.cancel"),
             ),
         )
     }
@@ -638,10 +638,13 @@ class ChanponWorldSettingsMenu(
             layout.size,
             i18nComponent(player, "confirm.${action.key}.title"),
             confirmationElements(
+                player,
                 layout,
                 confirmCenterItem(player, worldData, action, source.direction),
                 confirmButton(player, true),
                 confirmButton(player, false),
+                i18n(player, "confirm.button.confirm"),
+                i18n(player, "confirm.button.cancel"),
             ),
         )
     }
@@ -652,8 +655,10 @@ class ChanponWorldSettingsMenu(
             i18nComponent(player, "critical.menu_title"),
             listOf(
                 actionElement(
+                    player,
                     ChanponGuiElements.backSlot(45),
                     returnItem(player),
+                    i18n(player, "common.back"),
                     OPERATION_BACK,
                     GuiElementRole.BACK,
                 ),
@@ -677,30 +682,35 @@ class ChanponWorldSettingsMenu(
     ): InventoryMenuView {
         val key = if (finalStep) "critical.final" else "critical.confirm"
         val layout = ChanponGuiElements.confirmationLayout()
-        val lore = if (finalStep) {
-            loreBlocks(listOf(GuiLoreBlock(listOf(
+        val lore = GuiLoreSpec.Blocks(if (finalStep) {
+            listOf(GuiLoreBlock(listOf(
                 GuiLoreLine.Text(i18n(player, "critical.final_description")),
                 GuiLoreLine.Danger(i18n(player, "critical.final_danger"))
-            ))))
+            )))
         } else {
-            loreBlocks(listOf(GuiLoreBlock(listOf(
+            listOf(GuiLoreBlock(listOf(
                 GuiLoreLine.Data(i18n(player, "critical.confirm_target_label"), worldData.name, "§e"),
                 GuiLoreLine.Danger(i18n(player, "critical.confirm_danger"))
-            ))))
-        }
-        val centerItem = componentItem(
-            Material.TNT,
-            i18n(player, "${key}_display"),
-            lore,
+            )))
+        })
+        val centerItem = GuiItemSpec(
+            material = Material.TNT,
+            name = GuiNameSpec.Text(i18n(player, "${key}_display"), GuiNameStyle.DEFAULT),
+            lore = lore,
+            role = GuiElementRole.CONTENT,
+            amount = 1,
         )
         return InventoryMenuView(
             layout.size,
             i18nComponent(player, "${key}_title"),
             confirmationElements(
+                player,
                 layout,
                 centerItem,
                 confirmButton(player, true),
                 confirmButton(player, false),
+                i18n(player, "confirm.button.confirm"),
+                i18n(player, "confirm.button.cancel"),
             ),
         )
     }
@@ -1043,11 +1053,11 @@ class ChanponWorldSettingsMenu(
             ),
         )
 
-    private fun modifiedWarningItem(player: Player): ItemStack =
-        componentItem(
-            Material.REDSTONE_TORCH,
-            i18n(player, "modified_warning.display"),
-            loreBlocks(
+    private fun modifiedWarningItem(player: Player): GuiItemSpec =
+        GuiItemSpec(
+            material = Material.REDSTONE_TORCH,
+            name = GuiNameSpec.Text(i18n(player, "modified_warning.display"), GuiNameStyle.DEFAULT),
+            lore = GuiLoreSpec.Blocks(
                 listOf(
                     GuiLoreBlock(
                         listOf(
@@ -1057,9 +1067,11 @@ class ChanponWorldSettingsMenu(
                     ),
                 ),
             ),
+            role = GuiElementRole.CONTENT,
+            amount = 1,
         )
 
-    private fun confirmCenterItem(player: Player, worldData: WorldData, action: ConfirmAction, direction: BlockFace?): ItemStack {
+    private fun confirmCenterItem(player: Player, worldData: WorldData, action: ConfirmAction, direction: BlockFace?): GuiItemSpec {
         val directionName = direction?.let { directionName(player, it) } ?: i18n(player, "direction.center")
         val modified = action == ConfirmAction.STEP_BACK && worldData.latestBorderExpansionRecord()?.modified == true
         val lines = when (action) {
@@ -1074,10 +1086,12 @@ class ChanponWorldSettingsMenu(
                 }
             }
         }
-        return componentItem(
-            action.material,
-            i18n(player, "confirm.${action.key}.display"),
-            loreBlocks(listOf(GuiLoreBlock(lines))),
+        return GuiItemSpec(
+            material = action.material,
+            name = GuiNameSpec.Text(i18n(player, "confirm.${action.key}.display"), GuiNameStyle.DEFAULT),
+            lore = GuiLoreSpec.Blocks(listOf(GuiLoreBlock(lines))),
+            role = GuiElementRole.CONTENT,
+            amount = 1,
         )
     }
 
@@ -1094,68 +1108,46 @@ class ChanponWorldSettingsMenu(
         }
     }
 
-    private fun confirmButton(player: Player, confirm: Boolean): ItemStack {
-        return item(
-            if (confirm) Material.LIME_CONCRETE else Material.RED_CONCRETE,
-            i18n(player, if (confirm) "confirm.button.confirm" else "confirm.button.cancel"),
-            emptyList(),
+    private fun confirmButton(player: Player, confirm: Boolean): GuiItemSpec {
+        return GuiItemSpec(
+            material = if (confirm) Material.LIME_CONCRETE else Material.RED_CONCRETE,
+            name = GuiNameSpec.Text(
+                i18n(player, if (confirm) "confirm.button.confirm" else "confirm.button.cancel"),
+                GuiNameStyle.DEFAULT,
+            ),
+            lore = GuiLoreSpec.None,
+            role = if (confirm) GuiElementRole.CONFIRM else GuiElementRole.CANCEL,
+            amount = 1,
         )
     }
 
-    private fun warningButton(player: Player, continueAction: Boolean): ItemStack {
-        return item(
-            if (continueAction) Material.LIME_CONCRETE else Material.RED_CONCRETE,
-            i18n(player, if (continueAction) "modified_warning.button.continue" else "modified_warning.button.cancel"),
-            emptyList(),
+    private fun warningButton(player: Player, continueAction: Boolean): GuiItemSpec {
+        return GuiItemSpec(
+            material = if (continueAction) Material.LIME_CONCRETE else Material.RED_CONCRETE,
+            name = GuiNameSpec.Text(
+                i18n(player, if (continueAction) "modified_warning.button.continue" else "modified_warning.button.cancel"),
+                GuiNameStyle.DEFAULT,
+            ),
+            lore = GuiLoreSpec.None,
+            role = if (continueAction) GuiElementRole.CONFIRM else GuiElementRole.CANCEL,
+            amount = 1,
         )
     }
 
-    private fun returnItem(player: Player): ItemStack {
-        return item(Material.REDSTONE, i18n(player, "common.back"), emptyList())
-    }
-
-    private fun item(
-        material: Material,
-        display: String,
-        loreLines: List<GuiLoreLine>,
-    ): ItemStack {
-        val item = ItemStack(material)
-        item.editMeta { meta ->
-            meta.displayName(CCSystem.getAPI().getGuiElementService().name(display))
-            if (loreLines.isNotEmpty()) {
-                meta.lore(ChanponLore.build(loreLines))
-            }
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
-        }
-        return item
-    }
-
-    private fun componentItem(
-        material: Material,
-        display: String,
-        loreComponents: List<Component>,
-    ): ItemStack {
-        val item = ItemStack(material)
-        item.editMeta { meta ->
-            meta.displayName(CCSystem.getAPI().getGuiElementService().name(display))
-            if (loreComponents.isNotEmpty()) {
-                // loreComponents are already the final output of CC-System's LoreService.
-                meta.lore(loreComponents)
-            }
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
-        }
-        return item
-    }
+    private fun returnItem(player: Player): GuiItemSpec =
+        GuiItemSpec(
+            material = Material.REDSTONE,
+            name = GuiNameSpec.Text(i18n(player, "common.back"), GuiNameStyle.DEFAULT),
+            lore = GuiLoreSpec.None,
+            role = GuiElementRole.BACK,
+            amount = 1,
+        )
 
     private fun isCurrentWorld(player: Player, worldData: WorldData): Boolean =
         MyWorldManagerApi.getWorldService()?.isPlayerInWorld(player, worldData) == true
 
     private fun maxExpansionLevel(): Int {
         return plugin.config.getInt("world_expansion.max_level", 3).coerceAtLeast(0)
-    }
-
-    private fun loreBlocks(blocks: List<GuiLoreBlock>): List<Component> {
-        return CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(blocks))
     }
 
     private fun directionName(player: Player, direction: BlockFace): String {
@@ -1331,43 +1323,55 @@ class ChanponWorldSettingsMenu(
     }
 
     private fun confirmationElements(
+        player: Player,
         layout: GuiConfirmationLayout,
-        center: ItemStack,
-        confirm: ItemStack,
-        cancel: ItemStack,
+        center: GuiItemSpec,
+        confirm: GuiItemSpec,
+        cancel: GuiItemSpec,
+        confirmLabel: String,
+        cancelLabel: String,
     ): List<MenuElement> = listOf(
-        MenuElement(
-            layout.previewSlot,
-            center,
-            GuiElementRole.CONTENT,
-            interaction = MenuInteraction.DisplayOnly,
+        CCSystem.getAPI().getGuiElementService().menuDisplay(
+            GuiMenuDisplaySpec(layout.previewSlot, center),
         ),
         actionElement(
+            player,
             layout.confirmSlot,
             confirm,
+            confirmLabel,
             OPERATION_CONFIRM,
             GuiElementRole.CONFIRM,
         ),
         actionElement(
+            player,
             layout.cancelSlot,
             cancel,
+            cancelLabel,
             OPERATION_BACK,
             GuiElementRole.CANCEL,
         ),
     )
 
     private fun actionElement(
+        player: Player,
         slot: Int,
-        item: ItemStack,
+        item: GuiItemSpec,
+        actionLabel: String,
         operation: String,
         role: GuiElementRole = GuiElementRole.ACTION,
-    ) = MenuElement(
-        slot = slot,
-        item = item,
-        role = role,
-        interaction = MenuInteraction.Action(
-            actionId = ACTION_SELECT,
-            payload = mapOf(OPERATION to operation),
+    ) = CCSystem.getAPI().getGuiElementService().menuStructuredEntry(
+        player,
+        GuiStructuredMenuEntrySpec(
+            slot = slot,
+            item = item.copy(role = role),
+            actions = listOf(
+                GuiMenuEntryAction(
+                    ACTION_SELECT,
+                    MenuAcceptedClicks.LEFT_RIGHT,
+                    actionLabel,
+                    mapOf(OPERATION to operation),
+                ),
+            ),
         ),
     )
 
@@ -1442,6 +1446,8 @@ class ChanponWorldSettingsMenu(
         private const val RUNTIME_OWNER = "mwm-chanpon"
         private const val ROUTE_SETTINGS = "world-settings"
         private const val ACTION_SELECT = "select"
+        private const val ACTION_CAPABILITY = "capability"
+        private const val CAPABILITY_ID = "capability_id"
         private const val WORLD_UUID = "world_uuid"
         private const val PAYLOAD_SCREEN = "screen"
         private const val PAYLOAD_WORLD_UUID = "world_uuid"

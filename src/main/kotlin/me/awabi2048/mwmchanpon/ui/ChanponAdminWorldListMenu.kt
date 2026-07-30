@@ -9,6 +9,7 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryOption
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
@@ -48,8 +49,6 @@ import org.bukkit.GameMode
 import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.bukkit.event.inventory.ClickType
-import org.bukkit.inventory.ItemFlag
-import org.bukkit.inventory.ItemStack
 
 class ChanponAdminWorldListMenu(
     private val plugin: MWMChanponPlugin,
@@ -139,30 +138,25 @@ class ChanponAdminWorldListMenu(
                 )
             }
         if (CCSystem.getAPI().getMenuNavigationService().canGoBack(player)) {
-            elements += MenuElement(45, backItem(player), GuiElementRole.BACK, ACTION_BACK)
+            elements += simpleActionEntry(
+                player, 45, Material.REDSTONE, i18n(player, "admin_list.back.display"),
+                GuiElementRole.BACK, ACTION_BACK,
+            )
         }
-        elements += MenuElement(
-            49,
-            infoItem(player, worlds.size, current.page + 1, totalPages),
-            GuiElementRole.CONTENT,
-        )
+        elements += infoEntry(player, 49, worlds.size, current.page + 1, totalPages)
         elements += visibilityFilterEntry(player, 47, current.visibilityFilter)
         elements += sortEntry(player, 51, current.sortType)
         if (current.page > 0) {
-            elements += MenuElement(
-                52,
-                navItem(player, false),
-                GuiElementRole.NAVIGATION,
-                ACTION_PAGE,
+            elements += simpleActionEntry(
+                player, 52, Material.ARROW, i18n(player, "admin_list.prev"),
+                GuiElementRole.NAVIGATION, ACTION_PAGE,
                 statePayload(current.copy(page = current.page - 1)),
             )
         }
         if (current.page < totalPages - 1) {
-            elements += MenuElement(
-                53,
-                navItem(player, true),
-                GuiElementRole.NAVIGATION,
-                ACTION_PAGE,
+            elements += simpleActionEntry(
+                player, 53, Material.ARROW, i18n(player, "admin_list.next"),
+                GuiElementRole.NAVIGATION, ACTION_PAGE,
                 statePayload(current.copy(page = current.page + 1)),
             )
         }
@@ -405,44 +399,52 @@ class ChanponAdminWorldListMenu(
         ),
     )
 
-    private fun infoItem(
+    private fun infoEntry(
         player: Player,
+        slot: Int,
         total: Int,
         page: Int,
         totalPages: Int,
-    ): ItemStack = ItemStack(Material.BOOK).also { item ->
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "admin_list.info.display"))
-            meta.lore(
-                ChanponLore.build(
+    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuDisplay(
+        GuiMenuDisplaySpec(
+            slot,
+            GuiItemSpec(
+                Material.BOOK,
+                GuiNameSpec.Component(i18nComponent(player, "admin_list.info.display")),
+                GuiLoreSpec.Rich(
                     i18nList(
                         player,
                         "admin_list.info.lore",
                         mapOf("count" to total, "page" to page, "pages" to totalPages),
                     ).map(GuiLoreLine::Text),
+                    GuiLoreFrame.BOTH,
                 ),
-            )
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-    }
+                GuiElementRole.CONTENT,
+                1,
+            ),
+        ),
+    )
 
-    private fun navItem(player: Player, next: Boolean): ItemStack =
-        ItemStack(Material.ARROW).also { item ->
-            item.editMeta { meta ->
-                meta.displayName(
-                    i18nComponent(player, if (next) "admin_list.next" else "admin_list.prev"),
-                )
-                meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-            }
-        }
-
-    private fun backItem(player: Player): ItemStack =
-        ItemStack(Material.REDSTONE).also { item ->
-            item.editMeta { meta ->
-                meta.displayName(i18nComponent(player, "admin_list.back.display"))
-                meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-            }
-        }
+    private fun simpleActionEntry(
+        player: Player,
+        slot: Int,
+        material: Material,
+        text: String,
+        role: GuiElementRole,
+        actionId: String,
+        payload: Map<String, String> = emptyMap(),
+    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+        player,
+        GuiMenuEntrySpec(
+            slot = slot,
+            material = material,
+            name = GuiNameSpec.Text(text, GuiNameStyle.DEFAULT),
+            role = role,
+            actions = listOf(
+                GuiMenuEntryAction(actionId, MenuAcceptedClicks.LEFT_RIGHT, text, payload),
+            ),
+        ),
+    )
 
     private fun openSettings(player: Player, worldData: WorldData): MenuActionResult {
         val folderName = worldDirectory(worldData)

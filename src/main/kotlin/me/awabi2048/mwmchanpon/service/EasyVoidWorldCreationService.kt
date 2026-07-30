@@ -8,6 +8,10 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
+import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiStructuredMenuEntrySpec
+import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
@@ -16,7 +20,6 @@ import com.awabi2048.ccsystem.api.gui.MenuDialogButton
 import com.awabi2048.ccsystem.api.gui.MenuDialogHandler
 import com.awabi2048.ccsystem.api.gui.MenuDialogInput
 import com.awabi2048.ccsystem.api.gui.MenuDialogRequest
-import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import java.util.UUID
@@ -201,28 +204,46 @@ class EasyVoidWorldCreationService(
             layout.size,
             component(player, "confirm_title"),
             listOf(
-                MenuElement(layout.previewSlot, preview, GuiElementRole.CONTENT),
-                MenuElement(
-                    layout.confirmSlot,
-                    guiItem(
+                CCSystem.getAPI().getGuiElementService().menuDisplay(
+                    GuiMenuDisplaySpec(layout.previewSlot, preview),
+                ),
+                CCSystem.getAPI().getGuiElementService().menuStructuredEntry(
+                    player,
+                    GuiStructuredMenuEntrySpec(
+                        slot = layout.confirmSlot,
+                        item = guiItem(
                         Material.LIME_CONCRETE,
                         i18n(player, "create"),
                         GuiLoreSpec.None,
                         GuiElementRole.CONFIRM,
+                        ),
+                        actions = listOf(
+                            GuiMenuEntryAction(
+                                ACTION_CREATE,
+                                MenuAcceptedClicks.LEFT_RIGHT,
+                                i18n(player, "create"),
+                            ),
+                        ),
                     ),
-                    GuiElementRole.CONFIRM,
-                    ACTION_CREATE,
                 ),
-                MenuElement(
-                    layout.cancelSlot,
-                    guiItem(
+                CCSystem.getAPI().getGuiElementService().menuStructuredEntry(
+                    player,
+                    GuiStructuredMenuEntrySpec(
+                        slot = layout.cancelSlot,
+                        item = guiItem(
                         Material.RED_CONCRETE,
                         i18n(player, "back"),
                         GuiLoreSpec.None,
                         GuiElementRole.CANCEL,
+                        ),
+                        actions = listOf(
+                            GuiMenuEntryAction(
+                                ACTION_BACK,
+                                MenuAcceptedClicks.LEFT_RIGHT,
+                                i18n(player, "back"),
+                            ),
+                        ),
                     ),
-                    GuiElementRole.CANCEL,
-                    ACTION_BACK,
                 ),
             ),
         )
@@ -310,15 +331,13 @@ class EasyVoidWorldCreationService(
         name: String,
         lore: GuiLoreSpec,
         role: GuiElementRole,
-    ) = CCSystem.getAPI().getGuiElementService().item(
-        GuiItemSpec(
+    ) = GuiItemSpec(
             material = material,
             name = GuiNameSpec.Text(name, GuiNameStyle.DEFAULT),
             lore = lore,
             role = role,
             amount = 1,
-        ),
-    )
+        )
 
     private fun i18n(player: Player?, key: String, vararg placeholders: Pair<String, Any>): String =
         CCSystem.getAPI().getI18nString(player, "chanpon.player_world.easy_creation.$key", placeholders.toMap())

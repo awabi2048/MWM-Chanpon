@@ -32,8 +32,6 @@ import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.Material
 import org.bukkit.entity.Player
-import org.bukkit.inventory.ItemFlag
-import org.bukkit.inventory.ItemStack
 import java.util.UUID
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponWorldProtectionMode
@@ -97,7 +95,25 @@ class ChanponEnvironmentGui(
                 directSettingEntry(player, 23, worldData.uuid, ACTION_SCALE, Material.PLAYER_HEAD, scaleDisplay(player, scale), scaleOptions(player), scale?.toString(), outsideTargetWorld),
                 directSettingEntry(player, 24, worldData.uuid, ACTION_FLIGHT, Material.ELYTRA, flightDisplay(player, allowFlight), flightOptions(player), allowFlight.toString(), outsideTargetWorld),
                 protectionSettingEntry(player, 25, worldData),
-                MenuElement(40, backItem(player), GuiElementRole.BACK, ACTION_BACK),
+                CCSystem.getAPI().getGuiElementService().menuEntry(
+                    player,
+                    GuiMenuEntrySpec(
+                        slot = 40,
+                        material = Material.REDSTONE,
+                        name = GuiNameSpec.Text(
+                            i18n(player, "common.back_to_settings"),
+                            com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT,
+                        ),
+                        role = GuiElementRole.BACK,
+                        actions = listOf(
+                            GuiMenuEntryAction(
+                                ACTION_BACK,
+                                MenuAcceptedClicks.LEFT_RIGHT,
+                                i18n(player, "common.back_to_settings"),
+                            ),
+                        ),
+                    ),
+                ),
             ),
         )
     }
@@ -428,14 +444,6 @@ class ChanponEnvironmentGui(
                 actions = actions,
             ),
         )
-    }
-
-    private fun backItem(player: Player): ItemStack {
-        val item = ItemStack(Material.REDSTONE)
-        item.editMeta { meta ->
-            meta.displayName(CCSystem.getAPI().getGuiElementService().name(i18n(player, "common.back_to_settings")))
-        }
-        return item
     }
 
     // ---- Display helpers ----

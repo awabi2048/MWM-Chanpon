@@ -2,7 +2,9 @@ package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
-import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiItemSpec
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
@@ -26,11 +28,7 @@ import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.model.WorldData
 import org.bukkit.Bukkit
 import org.bukkit.Material
-import org.bukkit.enchantments.Enchantment
 import org.bukkit.entity.Player
-import org.bukkit.inventory.ItemFlag
-import org.bukkit.inventory.ItemStack
-import org.bukkit.inventory.meta.SkullMeta
 
 class ToolPermissionMenu(
     private val plugin: MWMChanponPlugin,
@@ -74,15 +72,13 @@ class ToolPermissionMenu(
         val elements = mutableListOf<MenuElement>()
         if (targetUuid != null) {
             val targetPlayer = Bukkit.getOfflinePlayer(targetUuid)
-            val head = ItemStack(Material.PLAYER_HEAD)
-            head.editMeta { meta ->
-                if (meta is SkullMeta) meta.owningPlayer = targetPlayer
-                meta.displayName(
-                    CCSystem.getAPI().getGuiElementService()
-                        .name("§e${targetPlayer.name ?: "Unknown"}"),
-                )
-            }
-            elements += MenuElement(4, head, GuiElementRole.CONTENT)
+            elements += displayEntry(
+                4,
+                Material.PLAYER_HEAD,
+                GuiNameSpec.Text("§e${targetPlayer.name ?: "Unknown"}", GuiNameStyle.DEFAULT),
+                GuiElementRole.CONTENT,
+                targetUuid,
+            )
         }
         if (worldData != null && targetUuid != null) {
             listOf(19, 20, 21).zip(definitions).forEach { (slot, definition) ->
@@ -91,12 +87,27 @@ class ToolPermissionMenu(
             if (targetUuid != worldData.owner) {
                 elements += createRoleItem(player, 23, worldData, targetUuid)
             } else {
-                elements += MenuElement(23, decoration(), GuiElementRole.DECORATION)
+                elements += decorationEntry(23)
             }
         }
-        elements += MenuElement(24, decoration(), GuiElementRole.DECORATION)
-        elements += MenuElement(25, decoration(), GuiElementRole.DECORATION)
-        elements += MenuElement(40, backItem(), GuiElementRole.BACK, ACTION_BACK)
+        elements += decorationEntry(24)
+        elements += decorationEntry(25)
+        elements += CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = 40,
+                material = Material.REDSTONE,
+                name = GuiNameSpec.Text("§7戻る", GuiNameStyle.DEFAULT),
+                role = GuiElementRole.BACK,
+                actions = listOf(
+                    GuiMenuEntryAction(
+                        ACTION_BACK,
+                        MenuAcceptedClicks.LEFT_RIGHT,
+                        "§7戻る",
+                    ),
+                ),
+            ),
+        )
         return InventoryMenuView(
             45,
             CCSystem.getAPI().getGuiElementService().name(i18n("title")),
@@ -170,8 +181,34 @@ class ToolPermissionMenu(
         )
     }
 
-    private fun decoration(): ItemStack =
-        ChanponGuiElements.decoration(Material.WHITE_STAINED_GLASS_PANE)
+    private fun decorationEntry(slot: Int): MenuElement =
+        displayEntry(
+            slot,
+            Material.WHITE_STAINED_GLASS_PANE,
+            GuiNameSpec.Empty,
+            GuiElementRole.DECORATION,
+        )
+
+    private fun displayEntry(
+        slot: Int,
+        material: Material,
+        name: GuiNameSpec,
+        role: GuiElementRole,
+        playerHeadOwner: UUID? = null,
+    ): MenuElement =
+        CCSystem.getAPI().getGuiElementService().menuDisplay(
+            GuiMenuDisplaySpec(
+                slot = slot,
+                item = GuiItemSpec(
+                    material = material,
+                    name = name,
+                    lore = GuiLoreSpec.None,
+                    role = role,
+                    amount = 1,
+                ),
+                playerHeadOwner = playerHeadOwner,
+            ),
+        )
 
     private fun canManage(player: Player, worldData: WorldData): Boolean =
         player.uniqueId == worldData.owner || player.hasPermission("myworldmanager.admin")
@@ -206,13 +243,6 @@ class ToolPermissionMenu(
             ),
         )
     }
-
-    private fun backItem(): ItemStack =
-        ItemStack(Material.REDSTONE).also { item ->
-            item.editMeta { meta ->
-                meta.displayName(CCSystem.getAPI().getGuiElementService().name("§7戻る"))
-            }
-        }
 
     private fun world(route: MenuRoute): WorldData? =
         uuid(route.payload[WORLD_UUID])

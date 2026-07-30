@@ -2,13 +2,16 @@ package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
-import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
+import com.awabi2048.ccsystem.api.gui.GuiItemSpec
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
@@ -35,8 +38,6 @@ import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.bukkit.event.inventory.ClickType
-import org.bukkit.inventory.ItemFlag
-import org.bukkit.inventory.ItemStack
 
 class BackupListMenu(
     private val plugin: MWMChanponPlugin,
@@ -134,29 +135,24 @@ class BackupListMenu(
         val itemCount = variablePage?.itemCount ?: ITEMS_PER_PAGE
         val elements = mutableListOf<MenuElement>()
         if (safePage > 0) {
-            elements += MenuElement(
-                previousPageSlot,
-                navItem(player, false),
-                GuiElementRole.NAVIGATION,
-                ACTION_PAGE,
+            elements += simpleActionEntry(
+                player, previousPageSlot, Material.ARROW, i18n(player, "common.prev"),
+                GuiElementRole.NAVIGATION, ACTION_PAGE,
                 sourcePayload(source.copy(page = safePage - 1)),
             )
         }
         if (safePage < pages - 1) {
-            elements += MenuElement(
-                nextPageSlot,
-                navItem(player, true),
-                GuiElementRole.NAVIGATION,
-                ACTION_PAGE,
+            elements += simpleActionEntry(
+                player, nextPageSlot, Material.ARROW, i18n(player, "common.next"),
+                GuiElementRole.NAVIGATION, ACTION_PAGE,
                 sourcePayload(source.copy(page = safePage + 1)),
             )
         }
-        elements += MenuElement(backSlot, backItem(player), GuiElementRole.BACK, ACTION_BACK)
-        elements += MenuElement(
-            infoSlot,
-            infoItem(player, backups.size, safePage + 1, pages),
-            GuiElementRole.CONTENT,
+        elements += simpleActionEntry(
+            player, backSlot, Material.REDSTONE, i18n(player, "common.back"),
+            GuiElementRole.BACK, ACTION_BACK,
         )
+        elements += infoEntry(player, infoSlot, backups.size, safePage + 1, pages)
         backups.drop(startIndex).take(itemCount).forEachIndexed { index, backup ->
             elements += backupEntry(
                 player,
@@ -193,23 +189,17 @@ class BackupListMenu(
             layout.size,
             i18nComponent(player, "$key.title"),
             listOf(
-                MenuElement(
+                displayEntry(
                     layout.previewSlot,
-                    centerItem(player, material, key),
-                    GuiElementRole.CONTENT,
+                    material,
+                    GuiNameSpec.Component(i18nComponent(player, "$key.display")),
+                    GuiLoreSpec.Rich(
+                        i18nList(player, "$key.lore").map(GuiLoreLine::Text),
+                        GuiLoreFrame.BOTH,
+                    ),
                 ),
-                MenuElement(
-                    layout.confirmSlot,
-                    confirmationButton(player, true),
-                    GuiElementRole.CONFIRM,
-                    confirmAction,
-                ),
-                MenuElement(
-                    layout.cancelSlot,
-                    confirmationButton(player, false),
-                    GuiElementRole.CANCEL,
-                    ACTION_CANCEL,
-                ),
+                confirmationEntry(player, layout.confirmSlot, true, confirmAction),
+                confirmationEntry(player, layout.cancelSlot, false, ACTION_CANCEL),
             ),
         )
     }
@@ -456,44 +446,76 @@ class BackupListMenu(
         BackupKind.PRE_ROLLBACK -> Material.RECOVERY_COMPASS
     }
 
-    private fun navItem(player: Player, next: Boolean): ItemStack =
-        ChanponGuiElements.navigation(
-            i18n(player, if (next) "common.next" else "common.prev"),
-            next,
+    private fun simpleActionEntry(
+        player: Player,
+        slot: Int,
+        material: Material,
+        text: String,
+        role: GuiElementRole,
+        actionId: String,
+        payload: Map<String, String> = emptyMap(),
+    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+        player,
+        GuiMenuEntrySpec(
+            slot = slot,
+            material = material,
+            name = GuiNameSpec.Text(text, GuiNameStyle.DEFAULT),
+            role = role,
+            actions = listOf(
+                GuiMenuEntryAction(actionId, MenuAcceptedClicks.LEFT_RIGHT, text, payload),
+            ),
+        ),
+    )
+
+    private fun displayEntry(
+        slot: Int,
+        material: Material,
+        name: GuiNameSpec,
+        lore: GuiLoreSpec,
+    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuDisplay(
+        GuiMenuDisplaySpec(
+            slot,
+            GuiItemSpec(material, name, lore, GuiElementRole.CONTENT, 1),
+        ),
+    )
+
+    private fun infoEntry(
+        player: Player,
+        slot: Int,
+        count: Int,
+        page: Int,
+        pages: Int,
+    ): MenuElement = displayEntry(
+        slot,
+        Material.BOOK,
+        GuiNameSpec.Component(i18nComponent(player, "backup_list.info.display")),
+        GuiLoreSpec.Rich(
+            i18nList(
+                player,
+                "backup_list.info.lore",
+                mapOf("count" to count, "page" to page, "pages" to pages),
+            ).map(GuiLoreLine::Text),
+            GuiLoreFrame.BOTH,
+        ),
+    )
+
+    private fun confirmationEntry(
+        player: Player,
+        slot: Int,
+        confirm: Boolean,
+        actionId: String,
+    ): MenuElement {
+        val key = if (confirm) "confirm.button.confirm" else "confirm.button.cancel"
+        val text = i18n(player, key)
+        return simpleActionEntry(
+            player,
+            slot,
+            if (confirm) Material.LIME_CONCRETE else Material.RED_CONCRETE,
+            text,
+            if (confirm) GuiElementRole.CONFIRM else GuiElementRole.CANCEL,
+            actionId,
         )
-
-    private fun backItem(player: Player): ItemStack =
-        ChanponGuiElements.back(i18n(player, "common.back"))
-
-    private fun infoItem(player: Player, count: Int, page: Int, pages: Int): ItemStack =
-        ItemStack(Material.BOOK).also { item ->
-            item.editMeta { meta ->
-                meta.displayName(i18nComponent(player, "backup_list.info.display"))
-                meta.lore(
-                    ChanponLore.build(
-                        i18nList(
-                            player,
-                            "backup_list.info.lore",
-                            mapOf("count" to count, "page" to page, "pages" to pages),
-                        ).map(GuiLoreLine::Text),
-                    ),
-                )
-            }
-        }
-
-    private fun centerItem(player: Player, material: Material, key: String): ItemStack =
-        ItemStack(material).also { item ->
-            item.editMeta { meta ->
-                meta.displayName(i18nComponent(player, "$key.display"))
-                meta.lore(ChanponLore.build(i18nList(player, "$key.lore").map(GuiLoreLine::Text)))
-            }
-        }
-
-    private fun confirmationButton(player: Player, confirm: Boolean): ItemStack =
-        ChanponGuiElements.confirm(
-            i18n(player, if (confirm) "confirm.button.confirm" else "confirm.button.cancel"),
-            confirm,
-        )
+    }
 
     private fun formatBytes(bytes: Long): String {
         if (bytes < 1024) return "${bytes}B"
@@ -518,9 +540,6 @@ class BackupListMenu(
         key: String,
         placeholders: Map<String, Any> = emptyMap(),
     ) = CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
-
-    private fun structuredBlocks(blocks: List<GuiLoreBlock>): List<Component> =
-        CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(blocks))
 
     enum class BackupListMode {
         ALL,

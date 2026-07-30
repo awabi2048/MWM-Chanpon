@@ -2,10 +2,15 @@ package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiItemSpec
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.GuiStructuredMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
@@ -23,8 +28,6 @@ import me.awabi2048.mwmchanpon.service.BackupAutomationService
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
-import org.bukkit.inventory.ItemFlag
-import org.bukkit.inventory.ItemStack
 
 class AutomationSettingsMenu(
     private val plugin: MWMChanponPlugin,
@@ -107,7 +110,14 @@ class AutomationSettingsMenu(
                 plugin.config.getBoolean("backup.auto_rollback.enabled", false),
                 ACTION_AUTO_ROLLBACK,
             ),
-            MenuElement(40, backItem(player), GuiElementRole.BACK, ACTION_BACK),
+            simpleActionEntry(
+                player,
+                40,
+                Material.REDSTONE,
+                i18n(player, "common.back"),
+                GuiElementRole.BACK,
+                ACTION_BACK,
+            ),
         )
         if (plugin.config.getBoolean("backup.auto_rollback.enabled", false)) {
             elements += CCSystem.getAPI().getGuiElementService().menuEntry(
@@ -140,25 +150,27 @@ class AutomationSettingsMenu(
             layout.size,
             i18nComponent(player, "$translationKey.title"),
             listOf(
-                MenuElement(
+                centerEntry(
+                    player,
                     layout.previewSlot,
-                    centerItem(
                         player,
                         Material.LEVER,
                         translationKey,
                         mapOf("state" to i18n(player, if (!current) "common.on" else "common.off")),
-                    ),
-                    GuiElementRole.CONTENT,
                 ),
-                MenuElement(
+                simpleActionEntry(
+                    player,
                     layout.confirmSlot,
-                    confirmationButton(player, true),
+                    Material.LIME_CONCRETE,
+                    i18n(player, "confirm.button.confirm"),
                     GuiElementRole.CONFIRM,
                     ACTION_CONFIRM_TOGGLE,
                 ),
-                MenuElement(
+                simpleActionEntry(
+                    player,
                     layout.cancelSlot,
-                    confirmationButton(player, false),
+                    Material.RED_CONCRETE,
+                    i18n(player, "confirm.button.cancel"),
                     GuiElementRole.CANCEL,
                     ACTION_CANCEL,
                 ),
@@ -172,20 +184,20 @@ class AutomationSettingsMenu(
             layout.size,
             i18nComponent(player, "confirm.restore_point.title"),
             listOf(
-                MenuElement(
-                    layout.previewSlot,
-                    centerItem(player, Material.END_CRYSTAL, "confirm.restore_point"),
-                    GuiElementRole.CONTENT,
-                ),
-                MenuElement(
+                centerEntry(player, layout.previewSlot, player, Material.END_CRYSTAL, "confirm.restore_point"),
+                simpleActionEntry(
+                    player,
                     layout.confirmSlot,
-                    confirmationButton(player, true),
+                    Material.LIME_CONCRETE,
+                    i18n(player, "confirm.button.confirm"),
                     GuiElementRole.CONFIRM,
                     ACTION_CONFIRM_RESTORE_POINT,
                 ),
-                MenuElement(
+                simpleActionEntry(
+                    player,
                     layout.cancelSlot,
-                    confirmationButton(player, false),
+                    Material.RED_CONCRETE,
+                    i18n(player, "confirm.button.cancel"),
                     GuiElementRole.CANCEL,
                     ACTION_CANCEL,
                 ),
@@ -251,24 +263,6 @@ class AutomationSettingsMenu(
         return MenuActionResult.Success(MenuUpdate.Close)
     }
 
-    private fun toggleItem(
-        player: Player,
-        material: Material,
-        key: String,
-        enabled: Boolean,
-    ): ItemStack {
-        val item = controlItem(
-            player,
-            material,
-            key,
-            mapOf("state" to i18n(player, if (enabled) "common.on" else "common.off")),
-        )
-        if (enabled) {
-            item.addUnsafeEnchantment(org.bukkit.enchantments.Enchantment.UNBREAKING, 1)
-        }
-        return item
-    }
-
     private fun toggleEntry(
         player: Player,
         slot: Int,
@@ -297,48 +291,52 @@ class AutomationSettingsMenu(
         ),
     )
 
-    private fun controlItem(
+    private fun centerEntry(
+        viewer: Player,
+        slot: Int,
         player: Player,
         material: Material,
         key: String,
         placeholders: Map<String, Any> = emptyMap(),
-    ): ItemStack = ItemStack(material).also { item ->
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "$key.display", placeholders))
-            meta.lore(
-                ChanponLore.build(
-                    i18nList(player, "$key.lore", placeholders).map(GuiLoreLine::Text),
+    ): MenuElement =
+        CCSystem.getAPI().getGuiElementService().menuDisplay(
+            GuiMenuDisplaySpec(
+                slot,
+                GuiItemSpec(
+                    material,
+                    GuiNameSpec.Component(i18nComponent(player, "$key.display", placeholders)),
+                    GuiLoreSpec.Rich(
+                        i18nList(player, "$key.lore", placeholders).map(GuiLoreLine::Text),
+                        GuiLoreFrame.BOTH,
+                    ),
+                    GuiElementRole.CONTENT,
+                    1,
                 ),
-            )
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
-        }
-    }
-
-    private fun centerItem(
-        player: Player,
-        material: Material,
-        key: String,
-        placeholders: Map<String, Any> = emptyMap(),
-    ): ItemStack = ItemStack(material).also { item ->
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "$key.display", placeholders))
-            meta.lore(
-                ChanponLore.build(
-                    i18nList(player, "$key.lore", placeholders).map(GuiLoreLine::Text),
-                ),
-            )
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-    }
-
-    private fun confirmationButton(player: Player, confirm: Boolean): ItemStack =
-        ChanponGuiElements.confirm(
-            i18n(player, if (confirm) "confirm.button.confirm" else "confirm.button.cancel"),
-            confirm,
+            ),
         )
 
-    private fun backItem(player: Player): ItemStack =
-        ChanponGuiElements.back(i18n(player, "common.back"))
+    private fun simpleActionEntry(
+        player: Player,
+        slot: Int,
+        material: Material,
+        text: String,
+        role: GuiElementRole,
+        actionId: String,
+    ): MenuElement =
+        CCSystem.getAPI().getGuiElementService().menuStructuredEntry(
+            player,
+            GuiStructuredMenuEntrySpec(
+                slot,
+                GuiItemSpec(
+                    material,
+                    GuiNameSpec.Text(text, com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT),
+                    GuiLoreSpec.None,
+                    role,
+                    1,
+                ),
+                listOf(GuiMenuEntryAction(actionId, MenuAcceptedClicks.LEFT_RIGHT, text)),
+            ),
+        )
 
     private fun i18n(player: Player?, key: String) =
         CCSystem.getAPI().getI18nString(player, "chanpon.backup.$key")

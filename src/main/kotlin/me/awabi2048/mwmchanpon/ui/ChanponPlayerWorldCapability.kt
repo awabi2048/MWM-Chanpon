@@ -7,6 +7,8 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuCapabilitySpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
@@ -25,12 +27,12 @@ import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentationProvider
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
+import java.util.UUID
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuElement
-import com.awabi2048.ccsystem.api.gui.MenuInteraction
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.service.EasyVoidWorldCreationService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
@@ -185,6 +187,10 @@ class ChanponPlayerWorldCapability(
                     ACTION_PAGE to MenuActionHandler(::changePage),
                     ACTION_SETTINGS to MenuActionHandler(::openUserSettings),
                     ACTION_PENDING to MenuActionHandler(::openPending),
+                    ACTION_CAPABILITY to MenuActionHandler(::executeCapability),
+                    ACTION_BACK to MenuActionHandler {
+                        MenuActionResult.Success(MenuUpdate.Back)
+                    },
                 ),
             ),
         )
@@ -221,15 +227,16 @@ class ChanponPlayerWorldCapability(
                     player,
                     attributes = attributes,
                 ) ?: return@forEachIndexed
-                elements += MenuElement(
-                    layout.layout.itemSlots[index],
-                    CCSystem.getAPI().getGuiElementService()
-                        .menuCapability(player, capability),
-                    GuiElementRole.ACTION,
-                    interaction = MenuInteraction.Capability(
-                        capability.capabilityId,
-                        attributes = attributes,
-                        acceptedClicks = capability.acceptedClicks,
+                elements += CCSystem.getAPI().getGuiElementService().menuCapabilityEntry(
+                    player,
+                    GuiMenuCapabilitySpec(
+                        slot = layout.layout.itemSlots[index],
+                        capability = capability,
+                        actionId = ACTION_CAPABILITY,
+                        actionPayload = mapOf(
+                            PAYLOAD_CAPABILITY to capability.capabilityId,
+                            PAYLOAD_WORLD_UUID to worldData.uuid.toString(),
+                        ),
                     ),
                 )
             }
@@ -240,20 +247,15 @@ class ChanponPlayerWorldCapability(
                 player,
                 attributes = attributes(subject),
             )?.let { capability ->
-                elements += MenuElement(
-                    layout.layout.actionSlot - 2,
-                    CCSystem.getAPI().getGuiElementService()
-                        .menuCapability(player, capability),
-                    if (capability.actionable) GuiElementRole.ACTION else GuiElementRole.CONTENT,
-                    interaction = if (capability.actionable) {
-                        MenuInteraction.Capability(
-                            capability.capabilityId,
-                            attributes = attributes(subject),
-                            acceptedClicks = capability.acceptedClicks,
-                        )
-                    } else {
-                        MenuInteraction.DisplayOnly
-                    },
+                val capabilityAttributes = attributes(subject)
+                elements += CCSystem.getAPI().getGuiElementService().menuCapabilityEntry(
+                    player,
+                    GuiMenuCapabilitySpec(
+                        slot = layout.layout.actionSlot - 2,
+                        capability = capability,
+                        actionId = ACTION_CAPABILITY,
+                        actionPayload = mapOf(PAYLOAD_CAPABILITY to capability.capabilityId),
+                    ),
                 )
             }
         }
@@ -262,12 +264,14 @@ class ChanponPlayerWorldCapability(
             player,
             attributes = attributes(subject),
         )?.let { capability ->
-            elements += MenuElement(
-                layout.layout.actionSlot,
-                CCSystem.getAPI().getGuiElementService()
-                    .menuCapability(player, capability),
-                GuiElementRole.CONTENT,
-                interaction = MenuInteraction.DisplayOnly,
+            elements += CCSystem.getAPI().getGuiElementService().menuCapabilityEntry(
+                player,
+                GuiMenuCapabilitySpec(
+                    slot = layout.layout.actionSlot,
+                    capability = capability,
+                    actionId = ACTION_CAPABILITY,
+                    actionPayload = mapOf(PAYLOAD_CAPABILITY to capability.capabilityId),
+                ),
             )
         }
         if (request.targetPlayerUuid == player.uniqueId) {
@@ -290,11 +294,24 @@ class ChanponPlayerWorldCapability(
             )
         }
         if (CCSystem.getAPI().getMenuNavigationService().canGoBack(player)) {
-            elements += MenuElement(
-                layout.layout.backSlot,
-                ChanponGuiElements.back(text(player, "gui.common.return")),
-                GuiElementRole.BACK,
-                interaction = MenuInteraction.Back(),
+            elements += CCSystem.getAPI().getGuiElementService().menuEntry(
+                player,
+                GuiMenuEntrySpec(
+                    slot = layout.layout.backSlot,
+                    material = Material.REDSTONE,
+                    name = GuiNameSpec.Text(
+                        text(player, "gui.common.return"),
+                        com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT,
+                    ),
+                    role = GuiElementRole.BACK,
+                    actions = listOf(
+                        GuiMenuEntryAction(
+                            ACTION_BACK,
+                            MenuAcceptedClicks.LEFT_RIGHT,
+                            text(player, "gui.common.return"),
+                        ),
+                    ),
+                ),
             )
         }
         if (layout.page + 1 < layout.totalPages) {
@@ -666,31 +683,55 @@ class ChanponPlayerWorldCapability(
         )
     }
 
+    private fun executeCapability(context: MenuActionContext): MenuActionResult {
+        val capabilityId = context.payload[PAYLOAD_CAPABILITY]
+            ?: return MenuActionResult.Ignored
+        val worldData = context.payload[PAYLOAD_WORLD_UUID]
+            ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+            ?.let { MyWorldManagerApi.getWorldRepository()?.findByUuid(it) }
+        return CCSystem.getAPI().getMenuCapabilityService().execute(
+            capabilityId,
+            context.player,
+            context.click,
+            attributes = attributes(subject(context.player, context.route), worldData),
+        )
+    }
+
     private fun navigationElement(
         slot: Int,
         player: Player,
         next: Boolean,
         request: PlayerWorldRouteRequest,
-    ): MenuElement =
-        MenuElement(
-            slot,
-            ChanponGuiElements.navigation(
-                text(player, if (next) "gui.common.next_page" else "gui.common.prev_page"),
-                next,
-            ),
-            GuiElementRole.NAVIGATION,
-            interaction = MenuInteraction.Action(
-                ACTION_PAGE,
-                payload = mapOf(PAYLOAD_PAGE to request.page.toString()),
+    ): MenuElement {
+        val label = text(player, if (next) "gui.common.next_page" else "gui.common.prev_page")
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = slot,
+                material = Material.ARROW,
+                name = GuiNameSpec.Text(
+                    label,
+                    com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT,
+                ),
+                role = GuiElementRole.NAVIGATION,
+                actions = listOf(
+                    GuiMenuEntryAction(
+                        ACTION_PAGE,
+                        MenuAcceptedClicks.LEFT_RIGHT,
+                        label,
+                        mapOf(PAYLOAD_PAGE to request.page.toString()),
+                    ),
+                ),
             ),
         )
+    }
 
     private fun pendingElement(slot: Int, player: Player): MenuElement {
         val summary = MyWorldManagerApi.getPendingInteractionSummary(player.uniqueId)
         if (summary.count == 0) {
-            return MenuElement(
-                slot,
-                CCSystem.getAPI().getGuiElementService().item(
+            return CCSystem.getAPI().getGuiElementService().menuDisplay(
+                GuiMenuDisplaySpec(
+                    slot,
                     GuiItemSpec(
                         material = Material.BARRIER,
                         name = GuiNameSpec.Component(
@@ -711,8 +752,6 @@ class ChanponPlayerWorldCapability(
                         amount = 1,
                     ),
                 ),
-                GuiElementRole.CONTENT,
-                interaction = MenuInteraction.DisplayOnly,
             )
         }
         val latest = summary.latestCreatedAt?.let {
@@ -824,6 +863,10 @@ class ChanponPlayerWorldCapability(
         const val ACTION_PAGE = "page"
         const val ACTION_SETTINGS = "settings"
         const val ACTION_PENDING = "pending"
+        const val ACTION_CAPABILITY = "capability"
+        const val ACTION_BACK = "back"
+        const val PAYLOAD_CAPABILITY = "capability_id"
+        const val PAYLOAD_WORLD_UUID = "capability_world_uuid"
         const val PAYLOAD_PAGE = "page"
         const val PAYLOAD_SHOW_BACK = "show_back"
         const val PAYLOAD_TARGET_UUID = "target_uuid"

@@ -3,13 +3,16 @@ package me.awabi2048.mwmchanpon.extension
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import com.awabi2048.ccsystem.api.gui.GuiValueTone
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
@@ -42,7 +45,6 @@ import me.awabi2048.mwmchanpon.service.BackupAutomationService
 import me.awabi2048.mwmchanpon.service.ManualRollbackService
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
-import me.awabi2048.mwmchanpon.ui.ChanponLore
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.model.WorldData
 import net.kyori.adventure.text.Component
@@ -51,8 +53,6 @@ import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.bukkit.event.inventory.ClickType
-import org.bukkit.inventory.ItemFlag
-import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.Plugin
 import java.util.UUID
 
@@ -152,35 +152,25 @@ class WorldBackupCapability(
         val layout = me.awabi2048.mwmchanpon.ui.ChanponGuiElements.pagedListLayout()
         val elements = mutableListOf<MenuElement>()
         if (safePage > 0) {
-            elements += MenuElement(
-                layout.previousPageSlot,
-                navItem(player, false, safePage - 1),
-                GuiElementRole.NAVIGATION,
-                ACTION_RUNTIME_PAGE,
-                payload(source.copy(page = safePage - 1)),
+            elements += simpleActionEntry(
+                player, layout.previousPageSlot, Material.ARROW,
+                i18n(player, "common.prev"), GuiElementRole.NAVIGATION,
+                ACTION_RUNTIME_PAGE, payload(source.copy(page = safePage - 1)),
             )
         }
         if (safePage < pages - 1) {
-            elements += MenuElement(
-                layout.nextPageSlot,
-                navItem(player, true, safePage + 1),
-                GuiElementRole.NAVIGATION,
-                ACTION_RUNTIME_PAGE,
-                payload(source.copy(page = safePage + 1)),
+            elements += simpleActionEntry(
+                player, layout.nextPageSlot, Material.ARROW,
+                i18n(player, "common.next"), GuiElementRole.NAVIGATION,
+                ACTION_RUNTIME_PAGE, payload(source.copy(page = safePage + 1)),
             )
         }
-        elements += MenuElement(
-            layout.backSlot,
-            backItem(player),
-            GuiElementRole.BACK,
-            ACTION_RUNTIME_BACK,
-            payload(source),
+        elements += simpleActionEntry(
+            player, layout.backSlot, Material.REDSTONE,
+            i18n(player, "common.back"), GuiElementRole.BACK,
+            ACTION_RUNTIME_BACK, payload(source),
         )
-        elements += MenuElement(
-            layout.infoSlot,
-            infoItem(player, world, backups.size, safePage + 1, pages),
-            GuiElementRole.CONTENT,
-        )
+        elements += infoEntry(player, layout.infoSlot, world, backups.size, safePage + 1, pages)
         backups.drop(safePage * ITEMS_PER_PAGE).take(ITEMS_PER_PAGE).forEachIndexed { index, backup ->
             elements += backupEntry(
                 player,
@@ -418,33 +408,24 @@ class WorldBackupCapability(
         body: List<String>,
     ): InventoryMenuView {
         val layout = me.awabi2048.mwmchanpon.ui.ChanponGuiElements.confirmationLayout()
-        val preview = ItemStack(Material.PAPER).apply {
-            editMeta { meta ->
-                meta.displayName(title)
-                meta.lore(body.map(Component::text))
-            }
-        }
-        val confirm = ItemStack(Material.LIME_CONCRETE).apply {
-            editMeta { it.displayName(Component.text(i18n(player, "confirm.button.confirm"))) }
-        }
-        val cancel = ItemStack(Material.RED_CONCRETE).apply {
-            editMeta { it.displayName(Component.text(i18n(player, "confirm.button.cancel"))) }
-        }
         return InventoryMenuView(
             layout.size,
             title,
             listOf(
-                MenuElement(
-                    layout.confirmSlot,
-                    confirm,
-                    GuiElementRole.CONFIRM,
+                simpleActionEntry(
+                    player, layout.confirmSlot, Material.LIME_CONCRETE,
+                    i18n(player, "confirm.button.confirm"), GuiElementRole.CONFIRM,
                     ACTION_RUNTIME_CONFIRM,
                 ),
-                MenuElement(layout.previewSlot, preview, GuiElementRole.CONTENT),
-                MenuElement(
-                    layout.cancelSlot,
-                    cancel,
-                    GuiElementRole.CANCEL,
+                displayEntry(
+                    layout.previewSlot,
+                    Material.PAPER,
+                    GuiNameSpec.Component(title),
+                    GuiLoreSpec.Rich(body.map(GuiLoreLine::Text), GuiLoreFrame.NONE),
+                ),
+                simpleActionEntry(
+                    player, layout.cancelSlot, Material.RED_CONCRETE,
+                    i18n(player, "confirm.button.cancel"), GuiElementRole.CANCEL,
                     ACTION_RUNTIME_CANCEL,
                 ),
             ),
@@ -555,35 +536,61 @@ class WorldBackupCapability(
         )
     }
 
-    private fun infoItem(player: Player, world: WorldData, count: Int, page: Int, pages: Int): ItemStack {
-        val item = ItemStack(world.icon)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "owner_backup.info.display", mapOf("world" to world.name)))
-            meta.lore(ChanponLore.build(i18nList(player, "owner_backup.info.lore", mapOf(
-                "count" to count,
-                "page" to page,
-                "pages" to pages
-            )).map(GuiLoreLine::Text)))
-        }
-        return item
-    }
+    private fun simpleActionEntry(
+        player: Player,
+        slot: Int,
+        material: Material,
+        text: String,
+        role: GuiElementRole,
+        actionId: String,
+        payload: Map<String, String> = emptyMap(),
+    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+        player,
+        GuiMenuEntrySpec(
+            slot = slot,
+            material = material,
+            name = GuiNameSpec.Text(text, GuiNameStyle.DEFAULT),
+            role = role,
+            actions = listOf(
+                GuiMenuEntryAction(actionId, MenuAcceptedClicks.LEFT_RIGHT, text, payload),
+            ),
+        ),
+    )
 
-    private fun navItem(player: Player, next: Boolean, page: Int): ItemStack {
-        val item = me.awabi2048.mwmchanpon.ui.ChanponGuiElements.navigation(
-            i18n(player, if (next) "common.next" else "common.prev"),
-            next
-        )
-        return item
-    }
+    private fun displayEntry(
+        slot: Int,
+        material: Material,
+        name: GuiNameSpec,
+        lore: GuiLoreSpec,
+    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuDisplay(
+        GuiMenuDisplaySpec(
+            slot,
+            GuiItemSpec(material, name, lore, GuiElementRole.CONTENT, 1),
+        ),
+    )
 
-    private fun backItem(player: Player): ItemStack {
-        val item = me.awabi2048.mwmchanpon.ui.ChanponGuiElements.back(i18n(player, "common.back"))
-        return item
-    }
-
-    private fun decoration(material: Material): ItemStack {
-        return me.awabi2048.mwmchanpon.ui.ChanponGuiElements.decoration(material)
-    }
+    private fun infoEntry(
+        player: Player,
+        slot: Int,
+        world: WorldData,
+        count: Int,
+        page: Int,
+        pages: Int,
+    ): MenuElement = displayEntry(
+        slot,
+        world.icon,
+        GuiNameSpec.Component(
+            i18nComponent(player, "owner_backup.info.display", mapOf("world" to world.name)),
+        ),
+        GuiLoreSpec.Rich(
+            i18nList(
+                player,
+                "owner_backup.info.lore",
+                mapOf("count" to count, "page" to page, "pages" to pages),
+            ).map(GuiLoreLine::Text),
+            GuiLoreFrame.BOTH,
+        ),
+    )
 
     private fun ownedProductionWorld(player: Player, worldUuid: UUID): WorldData? {
         val world = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return null

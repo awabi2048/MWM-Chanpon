@@ -2,6 +2,10 @@ package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
+import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
@@ -28,7 +32,6 @@ import org.bukkit.event.EventPriority
 import org.bukkit.event.HandlerList
 import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerQuitEvent
-import org.bukkit.inventory.ItemStack
 
 class AnnualArchiveFlow(
     private val plugin: MWMChanponPlugin,
@@ -162,20 +165,49 @@ class AnnualArchiveFlow(
         27,
         i18nComponent(player, titleKey, titlePlaceholders),
         listOf(
-            MenuElement(
+            confirmationEntry(
+                player,
                 CONFIRM_SLOT,
-                menuItem(Material.LIME_CONCRETE, i18nComponent(player, confirmKey)),
+                Material.LIME_CONCRETE,
+                confirmKey,
                 GuiElementRole.CONFIRM,
                 confirmAction,
             ),
-            MenuElement(
+            confirmationEntry(
+                player,
                 CANCEL_SLOT,
-                menuItem(Material.BARRIER, i18nComponent(player, "message.cancelled")),
+                Material.BARRIER,
+                "message.cancelled",
                 GuiElementRole.CANCEL,
                 ACTION_CANCEL,
             ),
         ),
     )
+
+    private fun confirmationEntry(
+        player: Player,
+        slot: Int,
+        material: Material,
+        textKey: String,
+        role: GuiElementRole,
+        actionId: String,
+    ): MenuElement =
+        CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = slot,
+                material = material,
+                name = GuiNameSpec.Component(i18nComponent(player, textKey)),
+                role = role,
+                actions = listOf(
+                    GuiMenuEntryAction(
+                        actionId,
+                        MenuAcceptedClicks.LEFT_RIGHT,
+                        i18n(player, textKey),
+                    ),
+                ),
+            ),
+        )
 
     private fun confirmName(context: MenuActionContext): MenuActionResult {
         val session = sessions[context.player.uniqueId]
@@ -245,11 +277,6 @@ class AnnualArchiveFlow(
             unregisterWhenIdle()
         }
     }
-
-    private fun menuItem(material: Material, name: Component): ItemStack =
-        ItemStack(material).also { item ->
-            item.editMeta { meta -> meta.displayName(name) }
-        }
 
     private fun i18n(
         player: Player,

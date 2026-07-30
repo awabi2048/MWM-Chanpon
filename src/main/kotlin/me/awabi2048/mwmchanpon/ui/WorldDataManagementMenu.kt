@@ -2,12 +2,15 @@ package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
-import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
+import com.awabi2048.ccsystem.api.gui.GuiItemSpec
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
@@ -25,12 +28,9 @@ import me.awabi2048.mwmchanpon.backup.BackupService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.model.WorldData
-import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
-import org.bukkit.inventory.ItemFlag
-import org.bukkit.inventory.ItemStack
 
 class WorldDataManagementMenu(
     private val plugin: MWMChanponPlugin,
@@ -94,29 +94,24 @@ class WorldDataManagementMenu(
         val layout = ChanponGuiElements.pagedListLayout()
         val elements = mutableListOf<MenuElement>()
         if (safePage > 0) {
-            elements += MenuElement(
-                layout.previousPageSlot,
-                navItem(player, false),
-                GuiElementRole.NAVIGATION,
-                ACTION_PAGE,
-                mapOf(PAGE to (safePage - 1).toString()),
+            elements += simpleActionEntry(
+                player, layout.previousPageSlot, Material.ARROW,
+                i18n(player, "common.prev"), GuiElementRole.NAVIGATION,
+                ACTION_PAGE, mapOf(PAGE to (safePage - 1).toString()),
             )
         }
         if (safePage < pages - 1) {
-            elements += MenuElement(
-                layout.nextPageSlot,
-                navItem(player, true),
-                GuiElementRole.NAVIGATION,
-                ACTION_PAGE,
-                mapOf(PAGE to (safePage + 1).toString()),
+            elements += simpleActionEntry(
+                player, layout.nextPageSlot, Material.ARROW,
+                i18n(player, "common.next"), GuiElementRole.NAVIGATION,
+                ACTION_PAGE, mapOf(PAGE to (safePage + 1).toString()),
             )
         }
-        elements += MenuElement(layout.backSlot, backItem(player), GuiElementRole.BACK, ACTION_BACK)
-        elements += MenuElement(
-            layout.infoSlot,
-            infoItem(player, worlds.size, safePage + 1, pages),
-            GuiElementRole.CONTENT,
+        elements += simpleActionEntry(
+            player, layout.backSlot, Material.REDSTONE,
+            i18n(player, "common.back"), GuiElementRole.BACK, ACTION_BACK,
         )
+        elements += infoEntry(player, layout.infoSlot, worlds.size, safePage + 1, pages)
         worlds.drop(safePage * ITEMS_PER_PAGE).take(ITEMS_PER_PAGE).forEachIndexed { index, world ->
             elements += worldEntry(
                 player,
@@ -155,7 +150,8 @@ class WorldDataManagementMenu(
         return confirmationView(
             player,
             "$key.title",
-            centerItem(player, Material.CHEST, key),
+            Material.CHEST,
+            key,
             ACTION_CONFIRM_BACKUP,
         )
     }
@@ -164,14 +160,16 @@ class WorldDataManagementMenu(
         confirmationView(
             player,
             "confirm.rollback_all.title",
-            centerItem(player, Material.RECOVERY_COMPASS, "confirm.rollback_all"),
+            Material.RECOVERY_COMPASS,
+            "confirm.rollback_all",
             ACTION_CONFIRM_ROLLBACK,
         )
 
     private fun confirmationView(
         player: Player,
         titleKey: String,
-        preview: ItemStack,
+        previewMaterial: Material,
+        previewKey: String,
         confirmAction: String,
     ): InventoryMenuView {
         val layout = ChanponGuiElements.confirmationLayout()
@@ -179,17 +177,23 @@ class WorldDataManagementMenu(
             layout.size,
             i18nComponent(player, titleKey),
             listOf(
-                MenuElement(layout.previewSlot, preview, GuiElementRole.CONTENT),
-                MenuElement(
-                    layout.confirmSlot,
-                    confirmationButton(player, true),
-                    GuiElementRole.CONFIRM,
+                displayEntry(
+                    layout.previewSlot,
+                    previewMaterial,
+                    GuiNameSpec.Component(i18nComponent(player, "$previewKey.display")),
+                    GuiLoreSpec.Rich(
+                        i18nList(player, "$previewKey.lore").map(GuiLoreLine::Text),
+                        GuiLoreFrame.BOTH,
+                    ),
+                ),
+                simpleActionEntry(
+                    player, layout.confirmSlot, Material.LIME_CONCRETE,
+                    i18n(player, "confirm.button.confirm"), GuiElementRole.CONFIRM,
                     confirmAction,
                 ),
-                MenuElement(
-                    layout.cancelSlot,
-                    confirmationButton(player, false),
-                    GuiElementRole.CANCEL,
+                simpleActionEntry(
+                    player, layout.cancelSlot, Material.RED_CONCRETE,
+                    i18n(player, "confirm.button.cancel"), GuiElementRole.CANCEL,
                     ACTION_CANCEL,
                 ),
             ),
@@ -355,31 +359,6 @@ class WorldDataManagementMenu(
         ),
     )
 
-    private fun controlItem(
-        player: Player,
-        material: Material,
-        key: String,
-        warning: Boolean,
-    ): ItemStack = ItemStack(material).also { item ->
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "$key.display"))
-            meta.lore(
-                structuredBlocks(
-                    listOf(
-                        GuiLoreBlock(
-                            buildList {
-                                add(GuiLoreLine.Text(i18n(player, "$key.description")))
-                                if (warning) {
-                                    add(GuiLoreLine.Warning(i18n(player, "$key.warning")))
-                                }
-                            },
-                        ),
-                    ),
-                ),
-            )
-        }
-    }
-
     private fun controlEntry(
         player: Player,
         slot: Int,
@@ -406,44 +385,58 @@ class WorldDataManagementMenu(
         ),
     )
 
-    private fun centerItem(player: Player, material: Material, key: String): ItemStack =
-        ItemStack(material).also { item ->
-            item.editMeta { meta ->
-                meta.displayName(i18nComponent(player, "$key.display"))
-                meta.lore(ChanponLore.build(i18nList(player, "$key.lore").map(GuiLoreLine::Text)))
-            }
-        }
+    private fun simpleActionEntry(
+        player: Player,
+        slot: Int,
+        material: Material,
+        text: String,
+        role: GuiElementRole,
+        actionId: String,
+        payload: Map<String, String> = emptyMap(),
+    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+        player,
+        GuiMenuEntrySpec(
+            slot = slot,
+            material = material,
+            name = GuiNameSpec.Text(text, GuiNameStyle.DEFAULT),
+            role = role,
+            actions = listOf(
+                GuiMenuEntryAction(actionId, MenuAcceptedClicks.LEFT_RIGHT, text, payload),
+            ),
+        ),
+    )
 
-    private fun confirmationButton(player: Player, confirm: Boolean): ItemStack =
-        ChanponGuiElements.confirm(
-            i18n(player, if (confirm) "confirm.button.confirm" else "confirm.button.cancel"),
-            confirm,
-        )
+    private fun displayEntry(
+        slot: Int,
+        material: Material,
+        name: GuiNameSpec,
+        lore: GuiLoreSpec,
+    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuDisplay(
+        GuiMenuDisplaySpec(
+            slot,
+            GuiItemSpec(material, name, lore, GuiElementRole.CONTENT, 1),
+        ),
+    )
 
-    private fun navItem(player: Player, next: Boolean): ItemStack =
-        ChanponGuiElements.navigation(
-            i18n(player, if (next) "common.next" else "common.prev"),
-            next,
-        )
-
-    private fun backItem(player: Player): ItemStack =
-        ChanponGuiElements.back(i18n(player, "common.back"))
-
-    private fun infoItem(player: Player, count: Int, page: Int, pages: Int): ItemStack =
-        ItemStack(Material.BOOK).also { item ->
-            item.editMeta { meta ->
-                meta.displayName(i18nComponent(player, "world_data.info.display"))
-                meta.lore(
-                    ChanponLore.build(
-                        i18nList(
-                            player,
-                            "world_data.info.lore",
-                            mapOf("count" to count, "page" to page, "pages" to pages),
-                        ).map(GuiLoreLine::Text),
-                    ),
-                )
-            }
-        }
+    private fun infoEntry(
+        player: Player,
+        slot: Int,
+        count: Int,
+        page: Int,
+        pages: Int,
+    ): MenuElement = displayEntry(
+        slot,
+        Material.BOOK,
+        GuiNameSpec.Component(i18nComponent(player, "world_data.info.display")),
+        GuiLoreSpec.Rich(
+            i18nList(
+                player,
+                "world_data.info.lore",
+                mapOf("count" to count, "page" to page, "pages" to pages),
+            ).map(GuiLoreLine::Text),
+            GuiLoreFrame.BOTH,
+        ),
+    )
 
     private fun i18nComponent(
         player: Player?,
@@ -462,9 +455,6 @@ class WorldDataManagementMenu(
         key: String,
         placeholders: Map<String, Any> = emptyMap(),
     ) = CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
-
-    private fun structuredBlocks(blocks: List<GuiLoreBlock>): List<Component> =
-        CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(blocks))
 
     companion object {
         private const val OWNER = "mwm-chanpon"
