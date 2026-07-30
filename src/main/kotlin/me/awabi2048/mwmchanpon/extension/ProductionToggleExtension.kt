@@ -4,6 +4,8 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiItemSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
@@ -13,7 +15,8 @@ import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
-import com.awabi2048.ccsystem.api.gui.MenuCapabilityItemRenderer
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentationProvider
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
@@ -78,7 +81,8 @@ class ProductionToggleExtension(
                 id = CAPABILITY_ID,
                 placement = WorldSettingsCapabilityPlacements.FOOTER_ACTIONS,
                 availability = MenuCapabilityAvailability(::isCapabilityAvailable),
-                itemRenderer = MenuCapabilityItemRenderer(::renderCapabilityItem),
+                presentationProvider =
+                    MenuCapabilityPresentationProvider(::resolveCapabilityPresentation),
                 actionAvailability =
                     MenuCapabilityAvailability { resolveCapabilityRoute(it) != null },
                 actionHandler = MenuCapabilityActionHandler(::handleCapabilityAction),
@@ -146,17 +150,22 @@ class ProductionToggleExtension(
         return MenuActionResult.Success(MenuUpdate.Refresh)
     }
 
-    private fun renderCapabilityItem(
+    private fun resolveCapabilityPresentation(
         context: com.awabi2048.ccsystem.api.gui.MenuCapabilityContext,
-    ): ItemStack {
+    ): MenuCapabilityPresentation {
         val worldData = requireNotNull(worldData(context.arguments))
         if (plugin.isSubmissionClosed()) {
-            return createDecorationItem(Material.GRAY_STAINED_GLASS_PANE)
+            return capabilityPresentation(
+                Material.GRAY_STAINED_GLASS_PANE,
+                Component.empty(),
+                emptyList(),
+                GuiElementRole.DECORATION,
+            )
         }
         return if (storage.isProductionWorld(worldData.uuid)) {
-            createSubmissionItem(context.player, worldData.uuid)
+            submissionPresentation(context.player, worldData.uuid)
         } else {
-            createProductionItem(context.player)
+            productionPresentation(context.player)
         }
     }
 
@@ -377,6 +386,71 @@ class ProductionToggleExtension(
         }
         return item
     }
+
+    private fun productionPresentation(player: Player): MenuCapabilityPresentation =
+        capabilityPresentation(
+            Material.HEART_OF_THE_SEA,
+            i18nComponent(player, "production.display"),
+            structuredLore(
+                listOf(
+                    GuiLoreActions.singleClick(
+                        mwm().languageManager,
+                        player,
+                        i18n(player, "production.lore.action"),
+                    ),
+                    GuiLoreLine.Warning(i18n(player, "production.lore.limit_warning")),
+                ),
+            ),
+        )
+
+    private fun submissionPresentation(
+        player: Player,
+        worldUuid: UUID,
+    ): MenuCapabilityPresentation {
+        val state = runCatching { storage.getSubmissionState(worldUuid) }
+            .getOrElse {
+                return capabilityPresentation(
+                    Material.BARRIER,
+                    i18nComponent(player, "error.display"),
+                    ChanponLore.build(i18nList(player, "error.lore").map(GuiLoreLine::Text)),
+                    GuiElementRole.CONTENT,
+                )
+            }
+        val material = when (state) {
+            SubmissionState.UNSUBMITTED -> Material.BRICKS
+            SubmissionState.SUBMITTED -> Material.FLOW_BANNER_PATTERN
+            SubmissionState.COMPLETED -> Material.BOOK
+        }
+        return capabilityPresentation(
+            material,
+            i18nComponent(player, "submission.display"),
+            createSubmissionLore(player, state),
+            if (state == SubmissionState.UNSUBMITTED) {
+                GuiElementRole.ACTION
+            } else {
+                GuiElementRole.CONTENT
+            },
+        )
+    }
+
+    private fun capabilityPresentation(
+        material: Material,
+        name: Component,
+        lore: List<Component>,
+        role: GuiElementRole = GuiElementRole.ACTION,
+    ) = MenuCapabilityPresentation(
+        GuiItemSpec(
+            material = material,
+            name = GuiNameSpec.Component(name),
+            lore = if (lore.isEmpty()) {
+                GuiLoreSpec.None
+            } else {
+                GuiLoreSpec.Rich(lore.map(GuiLoreLine::Component), GuiLoreFrame.NONE)
+            },
+            role = role,
+            amount = 1,
+        ),
+    )
 
     private fun createSubmissionItem(player: Player, worldUuid: UUID): ItemStack {
         val state = try {

@@ -1,22 +1,23 @@
 package me.awabi2048.mwmchanpon.extension
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiItemSpec
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
-import com.awabi2048.ccsystem.api.gui.MenuCapabilityItemRenderer
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentationProvider
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
-import me.awabi2048.mwmchanpon.ui.ChanponLore
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsCapabilityPlacements
 import me.awabi2048.myworldmanager.model.WorldData
-import net.kyori.adventure.text.Component
 import org.bukkit.Material
 import org.bukkit.entity.Player
-import org.bukkit.inventory.ItemFlag
-import org.bukkit.inventory.ItemStack
 
 class LinkedPortalCapability {
     init {
@@ -31,8 +32,8 @@ class LinkedPortalCapability {
                         world.members.contains(context.player.uniqueId) ||
                         context.player.hasPermission("myworldmanager.admin")
                 },
-                itemRenderer = MenuCapabilityItemRenderer { context ->
-                    portalItem(context.player, requireNotNull(worldData(context.arguments)))
+                presentationProvider = MenuCapabilityPresentationProvider { context ->
+                    portalPresentation(context.player)
                 },
                 actionHandler = MenuCapabilityActionHandler(::receivePortal),
             ),
@@ -57,15 +58,15 @@ class LinkedPortalCapability {
         return MenuActionResult.Success(MenuUpdate.None)
     }
 
-    private fun portalItem(player: Player, worldData: WorldData): ItemStack {
-        val item = ItemStack(Material.END_PORTAL_FRAME)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "linked_portal.display"))
-            meta.lore(null)
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        return item
-    }
+    private fun portalPresentation(player: Player) = MenuCapabilityPresentation(
+        GuiItemSpec(
+            material = Material.END_PORTAL_FRAME,
+            name = GuiNameSpec.Component(i18nComponent(player, "linked_portal.display")),
+            lore = GuiLoreSpec.None,
+            role = GuiElementRole.ACTION,
+            amount = 1,
+        ),
+    )
 
     private fun worldData(arguments: Map<String, String>): WorldData? =
         arguments[WORLD_UUID]

@@ -2,9 +2,11 @@ package me.awabi2048.mwmchanpon.extension
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
@@ -14,7 +16,8 @@ import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
-import com.awabi2048.ccsystem.api.gui.MenuCapabilityItemRenderer
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentationProvider
 import com.awabi2048.ccsystem.api.gui.MenuDialogButton
 import com.awabi2048.ccsystem.api.gui.MenuDialogHandler
 import com.awabi2048.ccsystem.api.gui.MenuDialogInput
@@ -106,8 +109,8 @@ class WorldBackupCapability(
                         ?: return@MenuCapabilityAvailability false
                     !protectionService.isProtected(world)
                 },
-                itemRenderer = MenuCapabilityItemRenderer { context ->
-                    entryItem(context.player)
+                presentationProvider = MenuCapabilityPresentationProvider { context ->
+                    entryPresentation(context.player)
                 },
                 actionHandler = MenuCapabilityActionHandler(::openFromCapability),
             ),
@@ -458,18 +461,30 @@ class WorldBackupCapability(
     private fun cancelConfirmation(@Suppress("UNUSED_PARAMETER") context: MenuActionContext): MenuActionResult =
         MenuActionResult.Success(MenuUpdate.Back)
 
-    private fun entryItem(player: Player): ItemStack {
-        val item = ItemStack(Material.CHEST)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "owner_backup.display"))
-            meta.lore(structuredBlocks(listOf(
-                GuiLoreBlock(listOf(GuiLoreLine.Text(i18n(player, "owner_backup.description")))),
-                GuiLoreBlock(listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "owner_backup.action"))))
-            )))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        return item
-    }
+    private fun entryPresentation(player: Player) = MenuCapabilityPresentation(
+        GuiItemSpec(
+            material = Material.CHEST,
+            name = GuiNameSpec.Component(i18nComponent(player, "owner_backup.display")),
+            lore = GuiLoreSpec.Blocks(
+                listOf(
+                    GuiLoreBlock(
+                        listOf(GuiLoreLine.Text(i18n(player, "owner_backup.description"))),
+                    ),
+                    GuiLoreBlock(
+                        listOf(
+                            GuiLoreActions.singleClick(
+                                mwm().languageManager,
+                                player,
+                                i18n(player, "owner_backup.action"),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            role = GuiElementRole.ACTION,
+            amount = 1,
+        ),
+    )
 
     private fun backupItem(player: Player, backup: BackupEntry): ItemStack {
         val item = ItemStack(materialFor(backup))

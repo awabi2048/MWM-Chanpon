@@ -3,10 +3,13 @@ package me.awabi2048.mwmchanpon.ui
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiCycle
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
@@ -15,7 +18,8 @@ import com.awabi2048.ccsystem.api.gui.MenuActionResult
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
-import com.awabi2048.ccsystem.api.gui.MenuCapabilityItemRenderer
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentationProvider
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
@@ -76,8 +80,8 @@ class ChanponAdminWorldListMenu(
                 availability = MenuCapabilityAvailability {
                     it.player.hasPermission("mwmchanpon.admin")
                 },
-                itemRenderer = MenuCapabilityItemRenderer {
-                    adminMenuWorldListItem(it.player)
+                presentationProvider = MenuCapabilityPresentationProvider {
+                    adminMenuWorldListPresentation(it.player)
                 },
                 actionHandler = MenuCapabilityActionHandler { context ->
                     val previous = sessions[context.player.uniqueId] ?: ListState()
@@ -179,29 +183,35 @@ class ChanponAdminWorldListMenu(
         )
     }
 
-    private fun adminMenuWorldListItem(player: Player): ItemStack {
+    private fun adminMenuWorldListPresentation(player: Player): MenuCapabilityPresentation {
         val language = mwm().languageManager
-        return GuiItemFactory.item(
-            Material.FILLED_MAP,
-            language.getMessage(player, "gui.admin_menu.info.display"),
-            GuiLoreSpec.Blocks(
-                listOf(
-                    GuiLoreBlock(
-                        language.getMessageList(player, "gui.admin_menu.info.lore")
-                            .map(GuiLoreLine::Text),
-                    ),
-                    GuiLoreBlock(
-                        listOf(
-                            GuiLoreActions.singleClick(
-                                language,
-                                player,
-                                language.getMessage(player, "gui.admin_menu.info.action"),
+        return MenuCapabilityPresentation(
+            GuiItemSpec(
+                material = Material.FILLED_MAP,
+                name = GuiNameSpec.Text(
+                    language.getMessage(player, "gui.admin_menu.info.display"),
+                    GuiNameStyle.DEFAULT,
+                ),
+                lore = GuiLoreSpec.Blocks(
+                    listOf(
+                        GuiLoreBlock(
+                            language.getMessageList(player, "gui.admin_menu.info.lore")
+                                .map(GuiLoreLine::Text),
+                        ),
+                        GuiLoreBlock(
+                            listOf(
+                                GuiLoreActions.singleClick(
+                                    language,
+                                    player,
+                                    language.getMessage(player, "gui.admin_menu.info.action"),
+                                ),
                             ),
                         ),
                     ),
                 ),
+                role = GuiElementRole.ACTION,
+                amount = 1,
             ),
-            ItemTag.TYPE_GUI_ADMIN_INFO,
         )
     }
 

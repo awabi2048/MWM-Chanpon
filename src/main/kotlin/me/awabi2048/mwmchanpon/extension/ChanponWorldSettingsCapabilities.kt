@@ -6,7 +6,7 @@ import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
-import com.awabi2048.ccsystem.api.gui.MenuCapabilityItemRenderer
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentationProvider
 import me.awabi2048.mwmchanpon.ui.ChanponWorldSettingsMenu
 import me.awabi2048.mwmchanpon.ui.WorldSettingsFeature
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
@@ -50,7 +50,7 @@ internal class ChanponWorldSettingsCapabilities(
                         menu.isFeatureVisible(context.player, it, feature)
                     } == true
                 },
-                itemRenderer = MenuCapabilityItemRenderer { context ->
+                presentationProvider = MenuCapabilityPresentationProvider { context ->
                     menu.renderFeature(
                         context.player,
                         requireNotNull(worldData(context)),

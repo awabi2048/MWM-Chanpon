@@ -4,6 +4,7 @@ import com.awabi2048.ccsystem.api.gui.GuiCycle
 import com.awabi2048.ccsystem.api.gui.GuiCycleDirection
 import com.awabi2048.ccsystem.api.gui.GuiConfirmationLayout
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
@@ -18,6 +19,7 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
 import com.awabi2048.ccsystem.api.gui.MenuInteraction
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
@@ -464,7 +466,10 @@ class ChanponWorldSettingsMenu(
         )
     }
 
-    private fun publishItem(player: Player, worldData: WorldData): ItemStack {
+    private fun publishPresentation(
+        player: Player,
+        worldData: WorldData,
+    ): MenuCapabilityPresentation {
         val visibility = storage.getVisibility(worldData.uuid)
         val display = visibilityName(player, visibility)
         val options = listOf(
@@ -494,10 +499,13 @@ class ChanponWorldSettingsMenu(
                 add(cycleAction(player))
             }, GuiLoreFrame.BOTH)
         )
-        return componentItem(Material.OAK_SIGN, i18n(player, "publish.title"), lore, ItemTag.TYPE_GUI_SETTING_PUBLISH)
+        return capabilityPresentation(Material.OAK_SIGN, i18n(player, "publish.title"), lore)
     }
 
-    private fun expansionItem(player: Player, worldData: WorldData): ItemStack {
+    private fun expansionPresentation(
+        player: Player,
+        worldData: WorldData,
+    ): MenuCapabilityPresentation {
         val level = worldData.borderExpansionLevel
         val max = maxExpansionLevel()
         val lines = if (level >= max) {
@@ -507,7 +515,7 @@ class ChanponWorldSettingsMenu(
                 singleClick(player, text(player, "gui.settings.expand.action.open_menu")),
             )
         }
-        return componentItem(
+        return capabilityPresentation(
             Material.FILLED_MAP,
             i18n(player, "expand.display"),
             describedStructuredLore(
@@ -517,47 +525,55 @@ class ChanponWorldSettingsMenu(
                 requireTargetWorld = true,
                 worldData = worldData
             ),
-            ItemTag.TYPE_GUI_SETTING_EXPAND
         )
     }
 
-    private fun notificationItem(player: Player, worldData: WorldData): ItemStack {
+    private fun notificationPresentation(
+        player: Player,
+        worldData: WorldData,
+    ): MenuCapabilityPresentation {
         val status = i18n(player, if (worldData.notificationEnabled) "common.on" else "common.off")
         val singleAction = singleClick(player, i18n(player, "notification.action"))
-        val item = CCSystem.getAPI().getGuiElementService().menuIcon(
-            GuiMenuIconSpec(
-                Material.BELL,
-                GuiNameSpec.Text(
+        return MenuCapabilityPresentation(
+            GuiItemSpec(
+                material = Material.BELL,
+                name = GuiNameSpec.Text(
                     text(player, "gui.settings.notification.display"),
-                    GuiNameStyle.DEFAULT
+                    GuiNameStyle.DEFAULT,
                 ),
-                GuiElementRole.CONTENT,
-                1,
-                textList(player, "gui.settings.notification.blocks.description"),
-                listOf(GuiMenuIconData(i18n(player, "notification.current_label"), status, "§e")),
-                emptyList(),
-                emptyList(),
-                emptyList(),
-                listOf(
-                    GuiMenuIconAction(
-                        singleAction.operation,
-                        singleAction.action,
-                        singleAction.resolvedText,
-                        true
-                    )
+                lore = GuiLoreSpec.Blocks(
+                    listOf(
+                        GuiLoreBlock(
+                            textList(player, "gui.settings.notification.blocks.description")
+                                .map(GuiLoreLine::Text),
+                        ),
+                        GuiLoreBlock(
+                            listOf(
+                                GuiLoreLine.Data(
+                                    i18n(player, "notification.current_label"),
+                                    status,
+                                    "§e",
+                                ),
+                            ),
+                        ),
+                        GuiLoreBlock(listOf(singleAction)),
+                    ),
                 ),
-                worldData.notificationEnabled
-            )
+                role = GuiElementRole.ACTION,
+                amount = 1,
+            ),
+            glint = worldData.notificationEnabled,
         )
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_SETTING_NOTIFICATION)
-        return item
     }
 
-    private fun criticalItem(player: Player, worldData: WorldData): ItemStack {
+    private fun criticalPresentation(
+        player: Player,
+        worldData: WorldData,
+    ): MenuCapabilityPresentation {
         criticalUnavailableLoreKey(player, worldData)?.let { loreKey ->
-            return criticalUnavailableItem(player, loreKey)
+            return criticalUnavailablePresentation(player, loreKey)
         }
-        return componentItem(
+        return capabilityPresentation(
             Material.TNT,
             i18n(player, "critical.display"),
             describedStructuredLore(
@@ -565,9 +581,8 @@ class ChanponWorldSettingsMenu(
                 textList(player, "gui.settings.critical.blocks.summary").map(GuiLoreLine::Text),
                 listOf(singleClick(player, i18n(player, "critical.action"))),
                 requireTargetWorld = true,
-                worldData = worldData
+                worldData = worldData,
             ),
-            ItemTag.TYPE_GUI_SETTING_CRITICAL
         )
     }
 
@@ -591,40 +606,60 @@ class ChanponWorldSettingsMenu(
         return componentItem(Material.TNT, i18n(player, "critical.delete_display"), lore, ItemTag.TYPE_GUI_SETTING_DELETE_WORLD)
     }
 
-    private fun criticalUnavailableItem(player: Player, loreKey: String): ItemStack {
-        return componentItem(
+    private fun criticalUnavailablePresentation(
+        player: Player,
+        loreKey: String,
+    ): MenuCapabilityPresentation {
+        return capabilityPresentation(
             Material.BARRIER,
             i18n(player, "critical.unavailable_display"),
             describedStructuredLore(
                 player,
                 textList(player, "gui.settings.critical.blocks.summary").map(GuiLoreLine::Text),
-                listOf(GuiLoreLine.Warning(i18n(player, loreKey)))
+                listOf(GuiLoreLine.Warning(i18n(player, loreKey))),
             ),
-            ItemTag.TYPE_GUI_INFO
+            role = GuiElementRole.CONTENT,
         )
     }
 
-
-    private fun mwmItem(
+    private fun mwmPresentation(
         player: Player,
         worldData: WorldData,
         iconKey: String,
         material: Material,
-        type: String,
         langPrefix: String = "gui.settings.$iconKey",
-        requireTargetWorld: Boolean = false
-    ): ItemStack {
+        requireTargetWorld: Boolean = false,
+    ): MenuCapabilityPresentation {
         val display = text(player, "$langPrefix.display")
         val lore = describedStructuredLore(
             player,
             mwmDescription(player, iconKey),
             listOf(singleClick(player, i18n(player, "mwm_action.action"))),
             requireTargetWorld = requireTargetWorld,
-            worldData = worldData
+            worldData = worldData,
         )
         val icon = MyWorldManagerApi.getConfiguredMenuIcon("world_settings", iconKey, material)
-        return componentItem(icon, display, lore, type)
+        return capabilityPresentation(icon, display, lore)
     }
+
+    private fun capabilityPresentation(
+        material: Material,
+        display: String,
+        lore: List<Component>,
+        role: GuiElementRole = GuiElementRole.ACTION,
+    ) = MenuCapabilityPresentation(
+        GuiItemSpec(
+            material = material,
+            name = GuiNameSpec.Text(display, GuiNameStyle.DEFAULT),
+            lore = if (lore.isEmpty()) {
+                GuiLoreSpec.None
+            } else {
+                GuiLoreSpec.Rich(lore.map(GuiLoreLine::Component), GuiLoreFrame.NONE)
+            },
+            role = role,
+            amount = 1,
+        ),
+    )
 
     /**
      * アイコンの表示案内と受理するクリックを同じ定義に保持する。
@@ -955,19 +990,18 @@ class ChanponWorldSettingsMenu(
         player: Player,
         worldData: WorldData,
         feature: WorldSettingsFeature,
-    ): ItemStack = when (feature) {
-        WorldSettingsFeature.EXPANSION -> expansionItem(player, worldData)
-        WorldSettingsFeature.PUBLISH -> publishItem(player, worldData)
-        WorldSettingsFeature.NOTIFICATION -> notificationItem(player, worldData)
-        WorldSettingsFeature.ENVIRONMENT -> mwmItem(
+    ): MenuCapabilityPresentation = when (feature) {
+        WorldSettingsFeature.EXPANSION -> expansionPresentation(player, worldData)
+        WorldSettingsFeature.PUBLISH -> publishPresentation(player, worldData)
+        WorldSettingsFeature.NOTIFICATION -> notificationPresentation(player, worldData)
+        WorldSettingsFeature.ENVIRONMENT -> mwmPresentation(
             player,
             worldData,
             "environment",
             Material.GRASS_BLOCK,
-            ItemTag.TYPE_GUI_SETTING_ENVIRONMENT,
             requireTargetWorld = true,
         )
-        WorldSettingsFeature.CRITICAL -> criticalItem(player, worldData)
+        WorldSettingsFeature.CRITICAL -> criticalPresentation(player, worldData)
     }
 
     internal fun handleFeature(

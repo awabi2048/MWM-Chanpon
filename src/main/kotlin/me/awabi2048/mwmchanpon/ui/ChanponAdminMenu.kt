@@ -3,6 +3,7 @@ import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiCycle
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiMenuIconAction
@@ -18,7 +19,8 @@ import com.awabi2048.ccsystem.api.gui.MenuActionResult
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
-import com.awabi2048.ccsystem.api.gui.MenuCapabilityItemRenderer
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentationProvider
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
@@ -96,8 +98,8 @@ class ChanponAdminMenu(
                 availability = MenuCapabilityAvailability {
                     it.player.hasPermission("mwmchanpon.admin")
                 },
-                itemRenderer = MenuCapabilityItemRenderer {
-                    switchToChanponItem(it.player)
+                presentationProvider = MenuCapabilityPresentationProvider {
+                    switchToChanponPresentation(it.player)
                 },
                 actionHandler = MenuCapabilityActionHandler {
                     open(it.player)
@@ -387,32 +389,38 @@ class ChanponAdminMenu(
         return item
     }
 
-    private fun switchToChanponItem(player: Player): ItemStack {
+    private fun switchToChanponPresentation(player: Player): MenuCapabilityPresentation {
         val language = mwm().languageManager
-        return GuiItemFactory.item(
-            Material.NETHER_STAR,
-            language.getMessage(player, "gui.admin_menu.menu_switch.display"),
-            GuiLoreSpec.Blocks(
-                listOf(
-                    GuiLoreBlock(
-                        language.getMessageList(
-                            player,
-                            "gui.admin_menu.menu_switch.lore",
-                            mapOf("next" to i18n(player, "admin.provider_display")),
-                        ).map(GuiLoreLine::Text),
-                    ),
-                    GuiLoreBlock(
-                        listOf(
-                            GuiLoreActions.singleClick(
-                                language,
+        return MenuCapabilityPresentation(
+            GuiItemSpec(
+                material = Material.NETHER_STAR,
+                name = GuiNameSpec.Text(
+                    language.getMessage(player, "gui.admin_menu.menu_switch.display"),
+                    GuiNameStyle.DEFAULT,
+                ),
+                lore = GuiLoreSpec.Blocks(
+                    listOf(
+                        GuiLoreBlock(
+                            language.getMessageList(
                                 player,
-                                language.getMessage(player, "gui.admin_menu.menu_switch.action"),
+                                "gui.admin_menu.menu_switch.lore",
+                                mapOf("next" to i18n(player, "admin.provider_display")),
+                            ).map(GuiLoreLine::Text),
+                        ),
+                        GuiLoreBlock(
+                            listOf(
+                                GuiLoreActions.singleClick(
+                                    language,
+                                    player,
+                                    language.getMessage(player, "gui.admin_menu.menu_switch.action"),
+                                ),
                             ),
                         ),
                     ),
                 ),
+                role = GuiElementRole.NAVIGATION,
+                amount = 1,
             ),
-            ItemTag.TYPE_GUI_ADMIN_MENU_SWITCH,
         )
     }
 
