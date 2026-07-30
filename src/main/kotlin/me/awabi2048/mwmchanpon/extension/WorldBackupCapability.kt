@@ -7,12 +7,17 @@ import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.GuiValueTone
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
@@ -178,19 +183,17 @@ class WorldBackupCapability(
             GuiElementRole.CONTENT,
         )
         backups.drop(safePage * ITEMS_PER_PAGE).take(ITEMS_PER_PAGE).forEachIndexed { index, backup ->
-            elements += MenuElement(
+            elements += backupEntry(
+                player,
                 layout.itemSlots[index],
-                backupItem(player, backup),
-                GuiElementRole.ACTION,
-                ACTION_RUNTIME_RESTORE,
+                backup,
                 payload(source.copy(page = safePage)) + (BACKUP_ID_KEY to backup.id),
             )
         }
-        elements += MenuElement(
+        elements += backupControlEntry(
+            player,
             47,
-            backupControlItem(player, source.worldUuid),
-            GuiElementRole.ACTION,
-            ACTION_RUNTIME_CREATE,
+            source.worldUuid,
             payload(source.copy(page = safePage)),
         )
         return InventoryMenuView(
@@ -485,6 +488,73 @@ class WorldBackupCapability(
             amount = 1,
         ),
     )
+
+    private fun backupEntry(
+        player: Player,
+        slot: Int,
+        backup: BackupEntry,
+        payload: Map<String, String>,
+    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+        player,
+        GuiMenuEntrySpec(
+            slot = slot,
+            material = materialFor(backup),
+            name = GuiNameSpec.Component(
+                i18nComponent(player, "owner_backup.item.display", mapOf("name" to BackupDisplay.displayName(backup))),
+            ),
+            role = GuiElementRole.ACTION,
+            data = listOf(
+                GuiMenuEntryData(
+                    i18n(player, "owner_backup.item.created_label"),
+                    BackupDisplay.formatCreatedAt(backup.createdAt),
+                ),
+                GuiMenuEntryData(
+                    i18n(player, "owner_backup.item.actor_label"),
+                    BackupDisplay.actorName(backup),
+                ),
+            ),
+            actions = listOf(GuiMenuEntryAction(
+                ACTION_RUNTIME_RESTORE,
+                MenuAcceptedClicks.LEFT_RIGHT,
+                i18n(player, "owner_backup.item.rollback_action"),
+                payload,
+            )),
+        ),
+    )
+
+    private fun backupControlEntry(
+        player: Player,
+        slot: Int,
+        worldUuid: UUID,
+        payload: Map<String, String>,
+    ): MenuElement {
+        val remaining = backupService.ownerBackupCooldownRemainingSeconds(worldUuid)
+        val key = if (remaining > 0) "owner_backup.cooldown" else "owner_backup.create"
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = slot,
+                material = if (remaining > 0) Material.CLOCK else Material.CHEST,
+                name = GuiNameSpec.Component(i18nComponent(
+                    player,
+                    "$key.display",
+                    mapOf("remaining" to BackupDisplay.formatDuration(remaining)),
+                )),
+                role = if (remaining > 0) GuiElementRole.CONTENT else GuiElementRole.ACTION,
+                description = listOf(i18n(
+                    player,
+                    "$key.description",
+                    mapOf("remaining" to BackupDisplay.formatDuration(remaining)),
+                )),
+                actions = if (remaining > 0) emptyList() else listOf(GuiMenuEntryAction(
+                    ACTION_RUNTIME_CREATE,
+                    MenuAcceptedClicks.LEFT_RIGHT,
+                    i18n(player, "$key.action"),
+                    payload,
+                )),
+            ),
+        )
+    }
 
     private fun backupItem(player: Player, backup: BackupEntry): ItemStack {
         val item = ItemStack(materialFor(backup))
