@@ -3,6 +3,7 @@ package me.awabi2048.mwmchanpon.ui
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiCycle
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
@@ -11,6 +12,10 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityItemRenderer
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
@@ -24,11 +29,12 @@ import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsNavigationRequest
-import me.awabi2048.myworldmanager.api.extension.AdminWorldListProvider
-import me.awabi2048.myworldmanager.api.extension.AdminWorldListRequest
+import me.awabi2048.myworldmanager.api.extension.AdminMenuCapabilityPlacements
 import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.session.SettingsAction
 import me.awabi2048.myworldmanager.util.GuiLoreActions
+import me.awabi2048.myworldmanager.util.GuiItemFactory
+import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.event.ClickEvent
 import org.bukkit.Bukkit
@@ -43,7 +49,7 @@ import org.bukkit.plugin.java.JavaPlugin
 class ChanponAdminWorldListMenu(
     private val plugin: MWMChanponPlugin,
     private val storage: ChanponWorldStorage,
-) : AdminWorldListProvider {
+) {
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
     private val sessions = ConcurrentHashMap<UUID, ListState>()
 
@@ -62,18 +68,24 @@ class ChanponAdminWorldListMenu(
                 ),
             ),
         )
-    }
-
-    override fun getId(): String = PROVIDER_ID
-
-    override fun open(player: Player, request: AdminWorldListRequest): Boolean {
-        val previous = sessions[player.uniqueId] ?: ListState()
-        return open(
-            player,
-            page = request.page ?: previous.page,
-            visibilityFilter = previous.visibilityFilter,
-            sortType = previous.sortType,
-            fromAdminMenu = request.fromAdminMenu ?: previous.fromAdminMenu,
+        CCSystem.getAPI().getMenuCapabilityService().register(
+            MenuCapabilityDefinition(
+                owner = OWNER,
+                id = WORLD_LIST_CAPABILITY,
+                placement = AdminMenuCapabilityPlacements.WORLD_LIST_ACTION,
+                availability = MenuCapabilityAvailability {
+                    it.player.hasPermission("mwmchanpon.admin")
+                },
+                itemRenderer = MenuCapabilityItemRenderer {
+                    adminMenuWorldListItem(it.player)
+                },
+                actionHandler = MenuCapabilityActionHandler { context ->
+                    val previous = sessions[context.player.uniqueId] ?: ListState()
+                    val state = previous.copy(fromAdminMenu = true)
+                    sessions[context.player.uniqueId] = state
+                    MenuActionResult.Success(MenuUpdate.Navigate(listRoute(state)))
+                },
+            ),
         )
     }
 
@@ -164,6 +176,32 @@ class ChanponAdminWorldListMenu(
             layout.size,
             i18nComponent(player, "admin_list.title"),
             elements,
+        )
+    }
+
+    private fun adminMenuWorldListItem(player: Player): ItemStack {
+        val language = mwm().languageManager
+        return GuiItemFactory.item(
+            Material.FILLED_MAP,
+            language.getMessage(player, "gui.admin_menu.info.display"),
+            GuiLoreSpec.Blocks(
+                listOf(
+                    GuiLoreBlock(
+                        language.getMessageList(player, "gui.admin_menu.info.lore")
+                            .map(GuiLoreLine::Text),
+                    ),
+                    GuiLoreBlock(
+                        listOf(
+                            GuiLoreActions.singleClick(
+                                language,
+                                player,
+                                language.getMessage(player, "gui.admin_menu.info.action"),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            ItemTag.TYPE_GUI_ADMIN_INFO,
         )
     }
 
@@ -585,7 +623,7 @@ class ChanponAdminWorldListMenu(
     }
 
     companion object {
-        private const val PROVIDER_ID = "chanpon.admin_world_list"
+        private const val WORLD_LIST_CAPABILITY = "admin-world-list"
         private const val OWNER = "mwm-chanpon"
         private const val ROUTE_LIST = "admin-world-list"
         private const val ACTION_BACK = "back"

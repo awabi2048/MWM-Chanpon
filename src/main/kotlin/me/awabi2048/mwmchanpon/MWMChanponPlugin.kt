@@ -269,7 +269,6 @@ class MWMChanponPlugin : JavaPlugin() {
         MyWorldManagerApi.registerWorldSettingsPresentationPolicy(worldSettingsPresentationPolicy)
         MyWorldManagerApi.registerWorldDeleteGuard(productionWorldGuard)
         MyWorldManagerApi.registerCreationConfirmationCapability(productionToggleExtension)
-        MyWorldManagerApi.registerAdminWorldListProvider(chanponAdminWorldListMenu)
         MyWorldManagerApi.registerPlayerWorldCapability(playerWorldCapability)
         // Discovery / favorite / visit menus stay on MWM standard providers; Chanpon only supplies policies.
         MyWorldManagerApi.registerWorldEvacuationProvider(spawnWorldService)
@@ -344,9 +343,6 @@ class MWMChanponPlugin : JavaPlugin() {
         runCatching { CCSystem.getAPI().getMenuRuntimeService().unregisterOwner("mwm-chanpon") }
         if (::productionToggleExtension.isInitialized) {
             MyWorldManagerApi.unregisterCreationConfirmationCapability(productionToggleExtension)
-        }
-        if (::chanponAdminWorldListMenu.isInitialized) {
-            MyWorldManagerApi.unregisterAdminWorldListProvider(chanponAdminWorldListMenu)
         }
         if (::playerWorldCapability.isInitialized) {
             MyWorldManagerApi.unregisterPlayerWorldCapability(playerWorldCapability)
