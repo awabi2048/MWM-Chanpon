@@ -265,11 +265,7 @@ class ChanponWorldSettingsMenu(
     private fun openBedrockConfirmForm(player: Player, worldData: WorldData, action: ConfirmAction, direction: BlockFace?): Boolean {
         val directionName = direction?.let { directionName(player, it) } ?: i18n(player, "direction.center")
         val modified = action == ConfirmAction.STEP_BACK && worldData.latestBorderExpansionRecord()?.modified == true
-        runtime.suspendForExternal(player)
-        val forms = MyWorldManagerApi.getBedrockFormService() ?: run {
-            runtime.resumeFromExternal(player)
-            return false
-        }
+        val forms = MyWorldManagerApi.getBedrockFormService() ?: return false
         val opened = forms.sendSimpleForm(
             player = player,
             title = i18n(player, "confirm.${action.key}.title"),
@@ -279,23 +275,16 @@ class ChanponWorldSettingsMenu(
                 i18n(player, "confirm.button.cancel")
             ),
             onSelect = { index ->
-                Bukkit.getScheduler().runTask(plugin, Runnable {
-                    val latest = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldData.uuid) ?: return@Runnable
-                    if (index == 0) {
-                        applyExternalResult(executeConfirmAction(player, latest, action, direction, external = true), player)
-                    } else {
-                        runtime.resumeFromExternal(player)
-                    }
-                })
+                val latest = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldData.uuid)
+                    ?: return@sendSimpleForm MenuActionResult.Success(MenuUpdate.Close)
+                if (index == 0) {
+                    executeConfirmAction(player, latest, action, direction, external = true)
+                } else {
+                    MenuActionResult.Success(MenuUpdate.Resume)
+                }
             },
-            onClosed = {
-                Bukkit.getScheduler().runTask(plugin, Runnable {
-                    if (MyWorldManagerApi.getWorldRepository()?.findByUuid(worldData.uuid) == null) return@Runnable
-                    runtime.resumeFromExternal(player)
-                })
-            }
+            onClosed = { MenuActionResult.Success(MenuUpdate.Resume) },
         )
-        if (!opened) runtime.resumeFromExternal(player)
         return opened
     }
 
@@ -319,22 +308,6 @@ class ChanponWorldSettingsMenu(
             }
             external -> return MenuActionResult.Success(MenuUpdate.Resume)
             else -> return MenuActionResult.Success(MenuUpdate.Back)
-        }
-    }
-
-    private fun applyExternalResult(result: MenuActionResult, player: Player) {
-        when (result) {
-            MenuActionResult.Ignored -> Unit
-            is MenuActionResult.Rejected -> result.message?.let(player::sendMessage)
-            is MenuActionResult.Success -> when (val update = result.update) {
-                MenuUpdate.None -> runtime.completeExternal(player)
-                MenuUpdate.Close -> runtime.close(player)
-                MenuUpdate.Refresh,
-                MenuUpdate.Resume -> runtime.resumeFromExternal(player)
-                MenuUpdate.Back -> runtime.back(player)
-                is MenuUpdate.Navigate -> runtime.navigate(player, update.route)
-                is MenuUpdate.Replace -> runtime.replace(player, update.route)
-            }
         }
     }
 
