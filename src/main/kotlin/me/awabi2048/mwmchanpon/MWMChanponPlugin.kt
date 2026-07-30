@@ -306,7 +306,6 @@ class MWMChanponPlugin : JavaPlugin() {
             manualRollbackService,
         )
         linkedPortalCapability = LinkedPortalCapability()
-        MyWorldManagerApi.registerMemberManagementCapability(toolPermissionCapability)
         productionToggleExtension.syncForcedTagsForProductionWorlds()
         server.pluginManager.registerEvents(MemberPermissionSyncListener(toolController, chanponStorage), this)
         server.pluginManager.registerEvents(PlayerJoinListener(toolController, spawnWorldService), this)
@@ -341,9 +340,6 @@ class MWMChanponPlugin : JavaPlugin() {
         runCatching { CCSystem.getAPI().getMenuRuntimeService().unregisterOwner("mwm-chanpon") }
         if (::spawnWorldService.isInitialized) {
             MyWorldManagerApi.unregisterWorldEvacuationProvider(spawnWorldService)
-        }
-        if (::toolPermissionCapability.isInitialized) {
-            MyWorldManagerApi.unregisterMemberManagementCapability(toolPermissionCapability)
         }
         if (::productionWorldGuard.isInitialized) {
             MyWorldManagerApi.unregisterWorldDeleteGuard(productionWorldGuard)

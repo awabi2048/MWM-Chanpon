@@ -2,7 +2,20 @@ package me.awabi2048.mwmchanpon.extension
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiItemSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameStyle
+import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityContext
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentationProvider
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import java.time.Instant
 import java.time.ZoneId
@@ -10,43 +23,54 @@ import java.time.format.DateTimeFormatter
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.mwmchanpon.tool.ToolPermissionDefinition
 import me.awabi2048.mwmchanpon.ui.ToolPermissionMenu
-import me.awabi2048.myworldmanager.api.extension.MemberManagementCapability
-import me.awabi2048.myworldmanager.api.extension.MemberManagementCapabilityContext
-import me.awabi2048.myworldmanager.api.extension.MemberManagementCapabilityView
+import me.awabi2048.myworldmanager.api.extension.MemberManagementCapabilityContract
+import me.awabi2048.myworldmanager.api.extension.MemberManagementCapabilitySubject
 import me.awabi2048.myworldmanager.model.WorldData
 import org.bukkit.Bukkit
+import org.bukkit.Material
 import org.bukkit.entity.Player
 
 class ToolPermissionCapability(
     private val menu: ToolPermissionMenu,
     private val controller: ToolPermissionController,
     private val definitions: List<ToolPermissionDefinition>,
-) : MemberManagementCapability {
-    override fun getId(): String = ToolPermissionMenu.EXTENSION_ID
-
-    override fun resolve(
-        context: MemberManagementCapabilityContext,
-    ): MemberManagementCapabilityView? {
-        if (!canManage(context.player, context.worldData)) return null
-        val states = controller.getMemberToolStates(
-            context.worldData,
-            context.memberUuid,
-        )
-        return buildView(
-            context.player,
-            context.worldData,
-            context.memberUuid,
-            states,
+) {
+    init {
+        CCSystem.getAPI().getMenuCapabilityService().register(
+            MenuCapabilityDefinition(
+                owner = CAPABILITY_OWNER,
+                id = CAPABILITY_ID,
+                placement = MemberManagementCapabilityContract.PLACEMENT,
+                availability = MenuCapabilityAvailability {
+                    subject(it)?.let { subject ->
+                        canManage(it.player, subject.worldData)
+                    } == true
+                },
+                presentationProvider = MenuCapabilityPresentationProvider {
+                    val subject = requireNotNull(subject(it))
+                    buildPresentation(
+                        it.player,
+                        subject.worldData,
+                        subject.memberUuid,
+                        controller.getMemberToolStates(
+                            subject.worldData,
+                            subject.memberUuid,
+                        ),
+                    )
+                },
+                actionHandler = MenuCapabilityActionHandler(::handlePrimaryAction),
+            ),
         )
     }
 
-    override fun handlePrimaryAction(
-        context: MemberManagementCapabilityContext,
+    private fun handlePrimaryAction(
+        context: MenuCapabilityActionContext,
     ): MenuActionResult {
-        if (resolve(context) == null) return MenuActionResult.Ignored
+        val subject = subject(context) ?: return MenuActionResult.Ignored
+        if (!canManage(context.player, subject.worldData)) return MenuActionResult.Ignored
         return MenuActionResult.Success(
             MenuUpdate.Navigate(
-                menu.route(context.worldData.uuid, context.memberUuid),
+                menu.route(subject.worldData.uuid, subject.memberUuid),
             ),
         )
     }
@@ -55,12 +79,12 @@ class ToolPermissionCapability(
         player.uniqueId == worldData.owner ||
             player.hasPermission("myworldmanager.admin")
 
-    private fun buildView(
+    private fun buildPresentation(
         player: Player,
         worldData: WorldData,
         memberUuid: java.util.UUID,
         states: Map<String, Boolean>,
-    ): MemberManagementCapabilityView {
+    ): MenuCapabilityPresentation {
         val offlinePlayer = Bukkit.getOfflinePlayer(memberUuid)
         val detailLines = mutableListOf<GuiLoreLine>()
 
@@ -113,9 +137,35 @@ class ToolPermissionCapability(
             )
         }
 
-        return MemberManagementCapabilityView(detailLines, actionLines)
+        val blocks = listOf(
+            GuiLoreBlock(detailLines),
+            GuiLoreBlock(actionLines),
+        )
+        return MenuCapabilityPresentation(
+            item = GuiItemSpec(
+                material = Material.PLAYER_HEAD,
+                name = GuiNameSpec.Text("", GuiNameStyle.DEFAULT),
+                lore = GuiLoreSpec.Blocks(blocks),
+                role = GuiElementRole.ACTION,
+                amount = 1,
+            ),
+            embeddedLoreBlocks = blocks,
+        )
     }
+
+    private fun subject(context: MenuCapabilityContext): MemberManagementCapabilitySubject? =
+        context.attributes[MemberManagementCapabilityContract.SUBJECT_ATTRIBUTE]
+            as? MemberManagementCapabilitySubject
+
+    private fun subject(context: MenuCapabilityActionContext): MemberManagementCapabilitySubject? =
+        context.attributes[MemberManagementCapabilityContract.SUBJECT_ATTRIBUTE]
+            as? MemberManagementCapabilitySubject
 
     private fun i18n(player: Player, key: String): String =
         CCSystem.getAPI().getI18nString(player, "chanpon.member_lore.$key")
+
+    private companion object {
+        const val CAPABILITY_OWNER = "mwm-chanpon"
+        const val CAPABILITY_ID = "member-tool-permissions"
+    }
 }
