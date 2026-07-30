@@ -239,7 +239,7 @@ class ChanponWorldSettingsMenu(
         val accepted = capability.acceptedClicks - ClickType.MIDDLE
         elements += MenuElement(
             slot,
-            CCSystem.getAPI().getGuiElementService().menuCapability(capability.presentation),
+            CCSystem.getAPI().getGuiElementService().menuCapability(player, capability),
             if (capability.actionable) GuiElementRole.ACTION else GuiElementRole.CONTENT,
             interaction = if (capability.actionable) {
                 MenuInteraction.Capability(
@@ -300,7 +300,7 @@ class ChanponWorldSettingsMenu(
             .forEach { (capability, slot) ->
                 elements += MenuElement(
                     slot,
-                    CCSystem.getAPI().getGuiElementService().menuCapability(capability.presentation),
+                    CCSystem.getAPI().getGuiElementService().menuCapability(player, capability),
                     if (capability.actionable) GuiElementRole.ACTION else GuiElementRole.CONTENT,
                     interaction = if (capability.actionable) {
                         MenuInteraction.Capability(

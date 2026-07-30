@@ -224,7 +224,7 @@ class ChanponPlayerWorldCapability(
                 elements += MenuElement(
                     layout.layout.itemSlots[index],
                     CCSystem.getAPI().getGuiElementService()
-                        .menuCapability(capability.presentation),
+                        .menuCapability(player, capability),
                     GuiElementRole.ACTION,
                     interaction = MenuInteraction.Capability(
                         capability.capabilityId,
@@ -243,7 +243,7 @@ class ChanponPlayerWorldCapability(
                 elements += MenuElement(
                     layout.layout.actionSlot - 2,
                     CCSystem.getAPI().getGuiElementService()
-                        .menuCapability(capability.presentation),
+                        .menuCapability(player, capability),
                     if (capability.actionable) GuiElementRole.ACTION else GuiElementRole.CONTENT,
                     interaction = if (capability.actionable) {
                         MenuInteraction.Capability(
@@ -265,7 +265,7 @@ class ChanponPlayerWorldCapability(
             elements += MenuElement(
                 layout.layout.actionSlot,
                 CCSystem.getAPI().getGuiElementService()
-                    .menuCapability(capability.presentation),
+                    .menuCapability(player, capability),
                 GuiElementRole.CONTENT,
                 interaction = MenuInteraction.DisplayOnly,
             )
