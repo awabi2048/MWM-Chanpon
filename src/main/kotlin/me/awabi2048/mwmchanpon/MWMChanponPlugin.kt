@@ -14,6 +14,8 @@ import me.awabi2048.mwmchanpon.extension.ChanponWorldPublishPolicy
 import me.awabi2048.mwmchanpon.extension.ChanponWorldRuntimePolicy
 import me.awabi2048.mwmchanpon.extension.ChanponWorldPlayerStatePolicy
 import me.awabi2048.mwmchanpon.extension.ChanponWorldWorkPermissionPolicy
+import me.awabi2048.mwmchanpon.extension.ChanponWorldSettingsPresentationPolicy
+import me.awabi2048.mwmchanpon.extension.ChanponWorldSettingsCapabilities
 import me.awabi2048.mwmchanpon.extension.LinkedPortalCapability
 import me.awabi2048.mwmchanpon.extension.ProductionToggleExtension
 import me.awabi2048.mwmchanpon.extension.ProductionWorldGuard
@@ -94,6 +96,8 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var commandExtension: ChanponCommandExtension
     private lateinit var worldCreationGuard: ChanponWorldCreationGuard
     private lateinit var worldPlayerStatePolicy: ChanponWorldPlayerStatePolicy
+    private lateinit var worldSettingsPresentationPolicy: ChanponWorldSettingsPresentationPolicy
+    private lateinit var worldSettingsCapabilities: ChanponWorldSettingsCapabilities
     private lateinit var globalStorage: ChanponGlobalStorage
     private lateinit var adminCommand: ChanponAdminCommand
     private lateinit var spawnWorldService: ChanponSpawnWorldService
@@ -244,6 +248,9 @@ class MWMChanponPlugin : JavaPlugin() {
         chanponAdminWorldListMenu = ChanponAdminWorldListMenu(this, chanponStorage)
         environmentGui = ChanponEnvironmentGui(this, chanponStorage, submittedProtectionService, buildPermissionService)
         chanponWorldSettingsMenuProvider = ChanponWorldSettingsMenuProvider(this, chanponStorage, submittedProtectionService, environmentGui)
+        worldSettingsCapabilities = ChanponWorldSettingsCapabilities(
+            chanponWorldSettingsMenuProvider,
+        )
         easyVoidWorldCreationService = EasyVoidWorldCreationService(this)
         val archiveOperationGuard = ArchiveOperationGuard(globalStorage)
         playerWorldCapability = ChanponPlayerWorldCapability(this, chanponStorage, easyVoidWorldCreationService)
@@ -255,12 +262,14 @@ class MWMChanponPlugin : JavaPlugin() {
         commandExtension = ChanponCommandExtension(archiveOperationGuard)
         worldCreationGuard = ChanponWorldCreationGuard(this, globalStorage)
         worldPlayerStatePolicy = ChanponWorldPlayerStatePolicy(globalStorage)
+        worldSettingsPresentationPolicy =
+            ChanponWorldSettingsPresentationPolicy(chanponStorage, submittedProtectionService)
         MyWorldManagerApi.registerWorldCreationGuard(worldCreationGuard)
         MyWorldManagerApi.registerWorldPlayerStatePolicy(worldPlayerStatePolicy)
+        MyWorldManagerApi.registerWorldSettingsPresentationPolicy(worldSettingsPresentationPolicy)
         MyWorldManagerApi.registerWorldDeleteGuard(productionWorldGuard)
         MyWorldManagerApi.registerCreationConfirmationCapability(productionToggleExtension)
         MyWorldManagerApi.registerAdminWorldListProvider(chanponAdminWorldListMenu)
-        MyWorldManagerApi.registerWorldSettingsMenuProvider(chanponWorldSettingsMenuProvider)
         MyWorldManagerApi.registerPlayerWorldCapability(playerWorldCapability)
         // Discovery / favorite / visit menus stay on MWM standard providers; Chanpon only supplies policies.
         MyWorldManagerApi.registerWorldEvacuationProvider(spawnWorldService)
@@ -340,9 +349,6 @@ class MWMChanponPlugin : JavaPlugin() {
         if (::chanponAdminWorldListMenu.isInitialized) {
             MyWorldManagerApi.unregisterAdminWorldListProvider(chanponAdminWorldListMenu)
         }
-        if (::chanponWorldSettingsMenuProvider.isInitialized) {
-            MyWorldManagerApi.unregisterWorldSettingsMenuProvider(chanponWorldSettingsMenuProvider)
-        }
         if (::playerWorldCapability.isInitialized) {
             MyWorldManagerApi.unregisterPlayerWorldCapability(playerWorldCapability)
         }
@@ -384,6 +390,11 @@ class MWMChanponPlugin : JavaPlugin() {
         }
         if (::worldPlayerStatePolicy.isInitialized) {
             MyWorldManagerApi.unregisterWorldPlayerStatePolicy(worldPlayerStatePolicy)
+        }
+        if (::worldSettingsPresentationPolicy.isInitialized) {
+            MyWorldManagerApi.unregisterWorldSettingsPresentationPolicy(
+                worldSettingsPresentationPolicy,
+            )
         }
         if (::automationService.isInitialized) {
             automationService.stop()

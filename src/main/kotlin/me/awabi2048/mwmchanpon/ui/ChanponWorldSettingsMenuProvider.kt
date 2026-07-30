@@ -31,8 +31,7 @@ import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
-import me.awabi2048.myworldmanager.api.extension.WorldSettingsMenuProvider
-import me.awabi2048.myworldmanager.api.extension.WorldSettingsMenuRequest
+import me.awabi2048.myworldmanager.api.extension.WorldSettingsNavigationRequest
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsCapabilityPlacements
 import me.awabi2048.myworldmanager.api.event.MwmWarpReason
 import me.awabi2048.myworldmanager.api.service.ExpansionExecutionMode
@@ -59,7 +58,7 @@ class ChanponWorldSettingsMenuProvider(
     private val storage: ChanponWorldStorage,
     private val protectionService: SubmittedWorldProtectionService,
     private val environmentGui: ChanponEnvironmentGui
-) : WorldSettingsMenuProvider {
+) {
     private val accessGuard = WorldSettingsAccessGuard(storage, protectionService)
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
@@ -83,9 +82,9 @@ class ChanponWorldSettingsMenuProvider(
         )
     }
 
-    override fun getId(): String = PROVIDER_ID
+    fun getId(): String = PROVIDER_ID
 
-    override fun open(player: Player, worldData: WorldData, request: WorldSettingsMenuRequest): Boolean {
+    fun open(player: Player, worldData: WorldData, request: WorldSettingsNavigationRequest): Boolean {
         return runtime.navigate(player, route(Source(Screen.MAIN, worldData.uuid, request)))
     }
 
@@ -102,7 +101,7 @@ class ChanponWorldSettingsMenuProvider(
         }
     }
 
-    private fun renderMain(player: Player, worldData: WorldData, request: WorldSettingsMenuRequest): InventoryMenuView {
+    private fun renderMain(player: Player, worldData: WorldData, request: WorldSettingsNavigationRequest): InventoryMenuView {
         val mwm = mwm()
         val activeSession = mwm.settingsSessionManager.getSession(player)
         val selectingIcon =
@@ -1277,12 +1276,12 @@ class ChanponWorldSettingsMenuProvider(
         return item
     }
 
-    private fun currentRequest(player: Player): WorldSettingsMenuRequest {
+    private fun currentRequest(player: Player): WorldSettingsNavigationRequest {
         val session = mwm().settingsSessionManager.getSession(player)
-        return WorldSettingsMenuRequest(
-            session?.showBackButton ?: false,
-            session?.isPlayerWorldFlow,
-            session?.parentShowBackButton
+        return WorldSettingsNavigationRequest(
+            showBackButton = session?.showBackButton ?: false,
+            isPlayerWorldFlow = session?.isPlayerWorldFlow,
+            parentShowBackButton = session?.parentShowBackButton,
         )
     }
 
@@ -1376,6 +1375,101 @@ class ChanponWorldSettingsMenuProvider(
             .execute(capabilityId, context.player, context.click, arguments)
     }
 
+    internal fun isFeatureVisible(
+        player: Player,
+        worldData: WorldData,
+        feature: WorldSettingsFeature,
+    ): Boolean {
+        if (storage.isImportedArchive(worldData.uuid)) return false
+        val owner = worldData.owner == player.uniqueId ||
+            player.hasPermission("myworldmanager.admin")
+        val moderator = worldData.moderators.contains(player.uniqueId)
+        if (protectionService.isProtected(worldData)) {
+            return owner && feature in setOf(
+                WorldSettingsFeature.PUBLISH,
+                WorldSettingsFeature.NOTIFICATION,
+            )
+        }
+        return when (feature) {
+            WorldSettingsFeature.NOTIFICATION -> owner || moderator
+            else -> owner
+        }
+    }
+
+    internal fun isFeatureActionable(
+        player: Player,
+        worldData: WorldData,
+        feature: WorldSettingsFeature,
+    ): Boolean {
+        if (!isFeatureVisible(player, worldData, feature)) return false
+        val inWorld = isCurrentWorld(player, worldData)
+        return when (feature) {
+            WorldSettingsFeature.EXPANSION ->
+                inWorld &&
+                    worldData.borderExpansionLevel != WorldData.EXPANSION_LEVEL_SPECIAL &&
+                    worldData.borderExpansionLevel < maxExpansionLevel()
+            WorldSettingsFeature.ENVIRONMENT,
+            WorldSettingsFeature.CRITICAL -> inWorld
+            WorldSettingsFeature.PUBLISH,
+            WorldSettingsFeature.NOTIFICATION -> true
+        }
+    }
+
+    internal fun renderFeature(
+        player: Player,
+        worldData: WorldData,
+        feature: WorldSettingsFeature,
+    ): ItemStack = when (feature) {
+        WorldSettingsFeature.EXPANSION -> expansionItem(player, worldData)
+        WorldSettingsFeature.PUBLISH -> publishItem(player, worldData)
+        WorldSettingsFeature.NOTIFICATION -> notificationItem(player, worldData)
+        WorldSettingsFeature.ENVIRONMENT -> mwmItem(
+            player,
+            worldData,
+            "environment",
+            Material.GRASS_BLOCK,
+            ItemTag.TYPE_GUI_SETTING_ENVIRONMENT,
+            requireTargetWorld = true,
+        )
+        WorldSettingsFeature.CRITICAL -> criticalItem(player, worldData)
+    }
+
+    internal fun handleFeature(
+        player: Player,
+        worldData: WorldData,
+        feature: WorldSettingsFeature,
+        click: org.bukkit.event.inventory.ClickType,
+    ): MenuActionResult {
+        if (!isFeatureActionable(player, worldData, feature)) return MenuActionResult.Ignored
+        return when (feature) {
+            WorldSettingsFeature.EXPANSION -> {
+                if (mwm().playerPlatformResolver.isBedrock(player)) {
+                    openConfirmByPlatform(player, worldData, ConfirmAction.EXPAND, null)
+                    MenuActionResult.Success(MenuUpdate.None)
+                } else {
+                    openExpansionMenu(player, worldData)
+                }
+            }
+            WorldSettingsFeature.PUBLISH -> {
+                val next = cycleVisibility(
+                    storage.getVisibility(worldData.uuid),
+                    GuiCycle.direction(click) ?: return MenuActionResult.Ignored,
+                )
+                storage.setVisibility(worldData.uuid, next)
+                MenuActionResult.Success(MenuUpdate.Refresh)
+            }
+            WorldSettingsFeature.NOTIFICATION -> {
+                mwm().worldSettingsGui.toggleNotification(player, worldData)
+                MenuActionResult.Success(MenuUpdate.Refresh)
+            }
+            WorldSettingsFeature.ENVIRONMENT -> {
+                environmentGui.open(player, worldData)
+                MenuActionResult.Success(MenuUpdate.None)
+            }
+            WorldSettingsFeature.CRITICAL -> openCriticalMenu(player, worldData)
+        }
+    }
+
     private fun confirmationElements(
         layout: GuiConfirmationLayout,
         center: ItemStack,
@@ -1392,7 +1486,7 @@ class ChanponWorldSettingsMenuProvider(
     private data class Source(
         val screen: Screen,
         val worldUuid: UUID,
-        val request: WorldSettingsMenuRequest,
+        val request: WorldSettingsNavigationRequest,
         val confirmAction: ConfirmAction? = null,
         val direction: BlockFace? = null,
         val finalStep: Boolean = false,
@@ -1419,7 +1513,7 @@ class ChanponWorldSettingsMenuProvider(
             worldUuid = payload[PAYLOAD_WORLD_UUID]
                 ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
                 ?: UUID(0L, 0L),
-            request = WorldSettingsMenuRequest(
+            request = WorldSettingsNavigationRequest(
                 showBackButton = payload[PAYLOAD_SHOW_BACK]?.toBooleanStrictOrNull() ?: false,
                 isPlayerWorldFlow = payload[PAYLOAD_PLAYER_FLOW]?.toBooleanStrictOrNull(),
                 parentShowBackButton = payload[PAYLOAD_PARENT_BACK]?.toBooleanStrictOrNull(),
