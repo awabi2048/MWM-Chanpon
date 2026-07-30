@@ -26,7 +26,6 @@ import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import com.awabi2048.ccsystem.api.gui.PlayerInventoryInteraction
 import java.util.UUID
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
-import me.awabi2048.mwmchanpon.extension.ProductionToggleExtension
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
@@ -35,6 +34,7 @@ import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.MenuExtensionContext
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsMenuProvider
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsMenuRequest
+import me.awabi2048.myworldmanager.api.extension.WorldSettingsCapabilityPlacements
 import me.awabi2048.myworldmanager.api.event.MwmWarpReason
 import me.awabi2048.myworldmanager.api.service.ExpansionExecutionMode
 import me.awabi2048.myworldmanager.api.service.ExpansionSequenceOptions
@@ -191,25 +191,25 @@ class ChanponWorldSettingsMenuProvider(
             worldData.owner == player.uniqueId,
         ).toMutableMap()
         val capabilityArguments = mapOf(WORLD_UUID to worldData.uuid.toString())
-        val capability = CCSystem.getAPI().getMenuCapabilityService().resolve(
-            ProductionToggleExtension.MENU_CAPABILITY_ID,
-            player,
-            capabilityArguments,
-        )
         val capabilityInteractions = mutableMapOf<Int, MenuInteraction>()
-        if (capability != null) {
-            items[WORLD_PRODUCTION_CAPABILITY_SLOT] = capability.item
-            capabilityInteractions[WORLD_PRODUCTION_CAPABILITY_SLOT] =
-                capability.targetRoute?.let {
-                    MenuInteraction.Action(
-                        ACTION_CAPABILITY,
-                        capability.acceptedClicks,
-                        capabilityArguments + (
-                            CAPABILITY_ID to ProductionToggleExtension.MENU_CAPABILITY_ID
-                        ),
-                    )
-                } ?: MenuInteraction.DisplayOnly
-        }
+        val capabilityService = CCSystem.getAPI().getMenuCapabilityService()
+        capabilityService.definitions(WorldSettingsCapabilityPlacements.FOOTER_ACTIONS)
+            .asSequence()
+            .mapNotNull { definition ->
+                capabilityService.resolve(definition.capabilityId, player, capabilityArguments)
+            }
+            .zip(WORLD_SETTINGS_CAPABILITY_SLOTS.asSequence())
+            .forEach { (capability, slot) ->
+                items[slot] = capability.item
+                capabilityInteractions[slot] =
+                    capability.targetRoute?.let {
+                        MenuInteraction.Action(
+                            ACTION_CAPABILITY,
+                            capability.acceptedClicks,
+                            capabilityArguments + (CAPABILITY_ID to capability.capabilityId),
+                        )
+                    } ?: MenuInteraction.DisplayOnly
+            }
         return InventoryMenuView(
             inventorySize,
             title,
@@ -1492,7 +1492,7 @@ class ChanponWorldSettingsMenuProvider(
         private const val ACTION_CAPABILITY = "capability"
         private const val CAPABILITY_ID = "capability_id"
         private const val WORLD_UUID = "world_uuid"
-        private const val WORLD_PRODUCTION_CAPABILITY_SLOT = 51
+        private val WORLD_SETTINGS_CAPABILITY_SLOTS = listOf(51)
         private const val PAYLOAD_SCREEN = "screen"
         private const val PAYLOAD_WORLD_UUID = "world_uuid"
         private const val PAYLOAD_SHOW_BACK = "show_back"

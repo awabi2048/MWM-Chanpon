@@ -31,6 +31,7 @@ import me.awabi2048.mwmchanpon.ui.ChanponLore
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.event.MwmWorldCreatedEvent
+import me.awabi2048.myworldmanager.api.extension.WorldSettingsCapabilityPlacements
 import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.session.WorldCreationSession
 import me.awabi2048.myworldmanager.util.GuiLoreActions
@@ -72,6 +73,7 @@ class ProductionToggleExtension(
             MenuCapabilityDefinition(
                 owner = RUNTIME_OWNER,
                 id = CAPABILITY_ID,
+                placement = WorldSettingsCapabilityPlacements.FOOTER_ACTIONS,
                 availability = MenuCapabilityAvailability(::isCapabilityAvailable),
                 itemRenderer = MenuCapabilityItemRenderer(::renderCapabilityItem),
                 routeResolver = MenuCapabilityRouteResolver(::resolveCapabilityRoute),
