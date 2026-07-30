@@ -6,7 +6,12 @@ import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.GuiValueTone
+import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
@@ -645,23 +650,19 @@ class ChanponPlayerWorldCapability(
         actionText: String,
         actionId: String,
     ): MenuElement {
-        val item = CCSystem.getAPI().getGuiElementService().item(
-            GuiItemSpec(
-                material,
-                GuiNameSpec.Text(name, com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT),
-                GuiLoreSpec.Rich(
-                    listOf(CCSystem.getAPI().getGuiActionService().singleClick(player, actionText)),
-                    com.awabi2048.ccsystem.api.gui.GuiLoreFrame.NONE,
-                ),
-                GuiElementRole.ACTION,
-                1,
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = slot,
+                material = material,
+                name = GuiNameSpec.Text(name, com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT),
+                role = GuiElementRole.ACTION,
+                actions = listOf(GuiMenuEntryAction(
+                    actionId,
+                    MenuAcceptedClicks.LEFT_RIGHT,
+                    actionText,
+                )),
             ),
-        )
-        return MenuElement(
-            slot,
-            item,
-            GuiElementRole.ACTION,
-            interaction = MenuInteraction.Action(actionId),
         )
     }
 
@@ -719,52 +720,33 @@ class ChanponPlayerWorldCapability(
                 .withZone(ZoneId.systemDefault())
                 .format(Instant.ofEpochMilli(it))
         } ?: text(player, "gui.player_world.pending_button.none")
-        val item = CCSystem.getAPI().getGuiElementService().item(
-            GuiItemSpec(
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = slot,
                 material = Material.WRITABLE_BOOK,
-                name = GuiNameSpec.Component(
-                    component(player, "gui.player_world.pending_button.display"),
-                ),
-                lore = GuiLoreSpec.Blocks(
-                    listOf(
-                        GuiLoreBlock(
-                            textList(player, "gui.player_world.pending_button.description")
-                                .map(GuiLoreLine::Text),
-                        ),
-                        GuiLoreBlock(
-                            listOf(
-                                GuiLoreLine.Data(
-                                    text(player, "gui.player_world.pending_button.count_label"),
-                                    summary.count,
-                                    if (summary.count > 0) "§e" else "§7",
-                                ),
-                                GuiLoreLine.Data(
-                                    text(player, "gui.player_world.pending_button.latest_label"),
-                                    latest,
-                                    "§b",
-                                ),
-                            ),
-                        ),
-                        GuiLoreBlock(
-                            listOf(
-                                CCSystem.getAPI().getGuiActionService().singleClick(
-                                    player,
-                                    text(player, "gui.player_world.pending_button.action"),
-                                ),
-                            ),
-                        ),
+                name = GuiNameSpec.Component(component(player, "gui.player_world.pending_button.display")),
+                role = GuiElementRole.ACTION,
+                description = textList(player, "gui.player_world.pending_button.description"),
+                data = listOf(
+                    GuiMenuEntryData(
+                        text(player, "gui.player_world.pending_button.count_label"),
+                        summary.count,
+                        GuiValueTone.PRIMARY,
+                    ),
+                    GuiMenuEntryData(
+                        text(player, "gui.player_world.pending_button.latest_label"),
+                        latest,
+                        GuiValueTone.INFO,
                     ),
                 ),
-                role = GuiElementRole.ACTION,
-                amount = 1,
+                actions = listOf(GuiMenuEntryAction(
+                    ACTION_PENDING,
+                    MenuAcceptedClicks.LEFT_RIGHT,
+                    text(player, "gui.player_world.pending_button.action"),
+                )),
+                glint = true,
             ),
-        )
-        item.editMeta { it.setEnchantmentGlintOverride(summary.count > 0) }
-        return MenuElement(
-            slot,
-            item,
-            GuiElementRole.ACTION,
-            interaction = MenuInteraction.Action(ACTION_PENDING),
         )
     }
 
