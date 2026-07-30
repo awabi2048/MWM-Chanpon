@@ -14,7 +14,8 @@ import com.awabi2048.ccsystem.api.gui.MenuActionResult
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
-import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionPresentationProvider
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionTextProvider
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
@@ -83,15 +84,9 @@ class ProductionToggleExtension(
                 actions = listOf(
                     MenuCapabilityAction(
                         id = "open-confirmation",
-                        clicks = MenuAcceptedClicks.LEFT,
-                        presentationProvider = MenuCapabilityActionPresentationProvider {
-                            listOf(
-                                CCSystem.getAPI().getGuiActionService().singleClick(
-                                    it.player,
-                                    capabilityActionText(it),
-                                ),
-                            )
-                        },
+                        trigger = MenuCapabilityTrigger.LEFT,
+                        textProvider =
+                            MenuCapabilityActionTextProvider(::capabilityActionText),
                         availability =
                             MenuCapabilityAvailability { resolveCapabilityRoute(it) != null },
                         handler = MenuCapabilityActionHandler(::handleCapabilityAction),
@@ -113,14 +108,9 @@ class ProductionToggleExtension(
                 actions = listOf(
                     MenuCapabilityAction(
                         id = "toggle",
-                        clicks = MenuAcceptedClicks.LEFT,
-                        presentationProvider = MenuCapabilityActionPresentationProvider {
-                            listOf(
-                                CCSystem.getAPI().getGuiActionService().singleClick(
-                                    it.player,
-                                    i18n(it.player, "production.lore.action"),
-                                ),
-                            )
+                        trigger = MenuCapabilityTrigger.LEFT,
+                        textProvider = MenuCapabilityActionTextProvider {
+                            i18n(it.player, "production.lore.action")
                         },
                         handler = MenuCapabilityActionHandler {
                             val draft = creationDraft(it)

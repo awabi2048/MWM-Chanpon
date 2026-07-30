@@ -9,7 +9,8 @@ import com.awabi2048.ccsystem.api.gui.MenuActionResult
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
-import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionPresentationProvider
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionTextProvider
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
@@ -41,14 +42,9 @@ class LinkedPortalCapability {
                 actions = listOf(
                     MenuCapabilityAction(
                         id = "receive",
-                        clicks = setOf(ClickType.LEFT),
-                        presentationProvider = MenuCapabilityActionPresentationProvider {
-                            listOf(
-                                CCSystem.getAPI().getGuiActionService().singleClick(
-                                    it.player,
-                                    i18n(it.player, "linked_portal.display"),
-                                ),
-                            )
+                        trigger = MenuCapabilityTrigger.LEFT,
+                        textProvider = MenuCapabilityActionTextProvider {
+                            i18n(it.player, "linked_portal.display")
                         },
                         handler = MenuCapabilityActionHandler(::receivePortal),
                     ),

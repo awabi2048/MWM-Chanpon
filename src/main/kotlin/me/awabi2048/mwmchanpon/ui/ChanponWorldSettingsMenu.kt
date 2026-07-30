@@ -899,29 +899,28 @@ class ChanponWorldSettingsMenu(
         WorldSettingsFeature.CRITICAL -> criticalPresentation(player, worldData)
     }
 
-    internal fun acceptedClicks(feature: WorldSettingsFeature): Set<org.bukkit.event.inventory.ClickType> =
+    internal fun actionTrigger(feature: WorldSettingsFeature):
+        com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger =
         if (feature == WorldSettingsFeature.PUBLISH) {
-            com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks.LEFT_RIGHT
+            com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger.LEFT_RIGHT
         } else {
-            com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks.STANDARD
+            com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger.ANY
         }
 
-    internal fun renderFeatureAction(
+    internal fun featureActionText(
         player: Player,
         feature: WorldSettingsFeature,
-    ): List<GuiLoreLine> = listOf(
-        when (feature) {
-            WorldSettingsFeature.PUBLISH -> cycleAction(player)
-            WorldSettingsFeature.EXPANSION ->
-                singleClick(player, text(player, "gui.settings.expand.action.open_menu"))
-            WorldSettingsFeature.NOTIFICATION ->
-                singleClick(player, i18n(player, "notification.action"))
-            WorldSettingsFeature.ENVIRONMENT ->
-                singleClick(player, i18n(player, "mwm_action.action"))
-            WorldSettingsFeature.CRITICAL ->
-                singleClick(player, i18n(player, "critical.action"))
-        },
-    )
+    ): String = when (feature) {
+        WorldSettingsFeature.PUBLISH -> text(player, "gui.common.action.cycle")
+        WorldSettingsFeature.EXPANSION ->
+            text(player, "gui.settings.expand.action.open_menu")
+        WorldSettingsFeature.NOTIFICATION ->
+            i18n(player, "notification.action")
+        WorldSettingsFeature.ENVIRONMENT ->
+            i18n(player, "mwm_action.action")
+        WorldSettingsFeature.CRITICAL ->
+            i18n(player, "critical.action")
+    }
 
     internal fun handleFeature(
         player: Player,

@@ -18,7 +18,8 @@ import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
-import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionPresentationProvider
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionTextProvider
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
@@ -80,15 +81,10 @@ class ChanponAdminWorldListMenu(
                 actions = listOf(
                     MenuCapabilityAction(
                         id = "open",
-                        clicks = setOf(ClickType.LEFT),
-                        presentationProvider = MenuCapabilityActionPresentationProvider {
-                            listOf(
-                                CCSystem.getAPI().getGuiActionService().singleClick(
-                                    it.player,
-                                    CCSystem.getAPI()
-                                        .getI18nString(it.player, "gui.admin_menu.info.action"),
-                                ),
-                            )
+                        trigger = MenuCapabilityTrigger.LEFT,
+                        textProvider = MenuCapabilityActionTextProvider {
+                            CCSystem.getAPI()
+                                .getI18nString(it.player, "gui.admin_menu.info.action")
                         },
                         handler = MenuCapabilityActionHandler { context ->
                             val state = ListState(fromAdminMenu = true)

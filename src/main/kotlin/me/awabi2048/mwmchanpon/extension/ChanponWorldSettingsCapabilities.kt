@@ -4,7 +4,8 @@ import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
-import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionPresentationProvider
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionTextProvider
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
@@ -63,9 +64,9 @@ internal class ChanponWorldSettingsCapabilities(
                 actions = listOf(
                     MenuCapabilityAction(
                         id = feature.name.lowercase(),
-                        clicks = menu.acceptedClicks(feature),
-                        presentationProvider = MenuCapabilityActionPresentationProvider { context ->
-                            menu.renderFeatureAction(context.player, feature)
+                        trigger = menu.actionTrigger(feature),
+                        textProvider = MenuCapabilityActionTextProvider { context ->
+                            menu.featureActionText(context.player, feature)
                         },
                         availability = MenuCapabilityAvailability { context ->
                             worldData(context)?.let {

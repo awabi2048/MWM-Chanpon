@@ -12,7 +12,8 @@ import com.awabi2048.ccsystem.api.gui.MenuActionResult
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
-import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionPresentationProvider
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionTextProvider
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
@@ -64,14 +65,9 @@ class ToolPermissionCapability(
                 actions = listOf(
                     MenuCapabilityAction(
                         id = "edit",
-                        clicks = setOf(ClickType.LEFT),
-                        presentationProvider = MenuCapabilityActionPresentationProvider {
-                            listOf(
-                                GuiLoreLine.Action(
-                                    i18n(it.player, "click_edit_operation"),
-                                    i18n(it.player, "click_edit_action"),
-                                ),
-                            )
+                        trigger = MenuCapabilityTrigger.LEFT,
+                        textProvider = MenuCapabilityActionTextProvider {
+                            i18n(it.player, "click_edit_action")
                         },
                         handler = MenuCapabilityActionHandler(::handlePrimaryAction),
                     ),

@@ -11,7 +11,8 @@ import com.awabi2048.ccsystem.api.gui.MenuActionResult
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
-import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionPresentationProvider
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionTextProvider
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
@@ -63,9 +64,39 @@ class ChanponPlayerWorldCapability(
                 },
                 actions = listOf(
                     MenuCapabilityAction(
-                        id = "world",
-                        clicks = setOf(ClickType.LEFT, ClickType.RIGHT, ClickType.SHIFT_LEFT),
-                        presentationProvider = MenuCapabilityActionPresentationProvider(::worldActionLore),
+                        id = "primary",
+                        trigger = MenuCapabilityTrigger.LEFT,
+                        textProvider = MenuCapabilityActionTextProvider(::primaryWorldActionText),
+                        availability = MenuCapabilityAvailability {
+                            world(it)?.let { world ->
+                                !world.isArchived &&
+                                    (!isCurrentWorld(it.player, world) || canOpenSettings(it.player, world))
+                            } == true
+                        },
+                        handler = MenuCapabilityActionHandler(::handleWorld),
+                    ),
+                    MenuCapabilityAction(
+                        id = "settings",
+                        trigger = MenuCapabilityTrigger.RIGHT,
+                        textProvider = MenuCapabilityActionTextProvider {
+                            text(it.player, "gui.player_world.world_item.settings")
+                        },
+                        availability = MenuCapabilityAvailability {
+                            world(it)?.let { world ->
+                                !isCurrentWorld(it.player, world) && canOpenSettings(it.player, world)
+                            } == true
+                        },
+                        handler = MenuCapabilityActionHandler(::handleWorld),
+                    ),
+                    MenuCapabilityAction(
+                        id = "prioritize",
+                        trigger = MenuCapabilityTrigger.SHIFT_LEFT,
+                        textProvider = MenuCapabilityActionTextProvider {
+                            text(it.player, "gui.player_world.world_item.move_to_top")
+                        },
+                        availability = MenuCapabilityAvailability {
+                            subject(it)?.targetPlayerUuid == it.player.uniqueId
+                        },
                         handler = MenuCapabilityActionHandler(::handleWorld),
                     ),
                 ),
@@ -101,10 +132,25 @@ class ChanponPlayerWorldCapability(
                 },
                 actions = listOf(
                     MenuCapabilityAction(
-                        id = "create",
-                        clicks = setOf(ClickType.LEFT, ClickType.RIGHT),
-                        presentationProvider =
-                            MenuCapabilityActionPresentationProvider(::creationActionLore),
+                        id = "standard-create",
+                        trigger = MenuCapabilityTrigger.LEFT,
+                        textProvider = MenuCapabilityActionTextProvider {
+                            text(it.player, "gui.player_world.creation_button.action")
+                        },
+                        availability = MenuCapabilityAvailability {
+                            creationBlockReason(it) == null && hasCreatePermission(it.player)
+                        },
+                        handler = MenuCapabilityActionHandler(::handleCreate),
+                    ),
+                    MenuCapabilityAction(
+                        id = "easy-create",
+                        trigger = MenuCapabilityTrigger.RIGHT,
+                        textProvider = MenuCapabilityActionTextProvider {
+                            plugin.getMessage(
+                                it.player,
+                                "chanpon.player_world.easy_creation.action",
+                            )
+                        },
                         availability = MenuCapabilityAvailability {
                             creationBlockReason(it) == null && hasCreatePermission(it.player)
                         },
@@ -188,53 +234,14 @@ class ChanponPlayerWorldCapability(
     private fun startEasyCreation(player: Player, returnRoute: MenuRoute): MenuActionResult =
         easyVoidCreationService.start(player, returnRoute)
 
-    private fun worldActionLore(context: MenuCapabilityContext): List<GuiLoreLine> {
+    private fun primaryWorldActionText(context: MenuCapabilityContext): String {
         val world = requireNotNull(world(context))
         return if (isCurrentWorld(context.player, world)) {
-            listOf(
-                CCSystem.getAPI().getGuiActionService().singleClick(
-                    context.player,
-                    text(context.player, "gui.player_world.world_item.settings"),
-                ),
-            )
+            text(context.player, "gui.player_world.world_item.settings")
         } else {
-            listOf(
-                GuiLoreLine.Action(
-                    CCSystem.getAPI().getGuiActionService()
-                        .clickLabel(
-                            context.player,
-                            com.awabi2048.ccsystem.api.gui.GuiClickLabel.LEFT,
-                        ),
-                    text(context.player, "gui.player_world.world_item.warp"),
-                ),
-                GuiLoreLine.Action(
-                    CCSystem.getAPI().getGuiActionService()
-                        .clickLabel(
-                            context.player,
-                            com.awabi2048.ccsystem.api.gui.GuiClickLabel.RIGHT,
-                        ),
-                    text(context.player, "gui.player_world.world_item.settings"),
-                ),
-            )
+            text(context.player, "gui.player_world.world_item.warp")
         }
     }
-
-    private fun creationActionLore(context: MenuCapabilityContext): List<GuiLoreLine> =
-        listOf(
-            GuiLoreLine.Action(
-                CCSystem.getAPI().getGuiActionService()
-                    .clickLabel(context.player, com.awabi2048.ccsystem.api.gui.GuiClickLabel.LEFT),
-                text(context.player, "gui.player_world.creation_button.action"),
-            ),
-            GuiLoreLine.Action(
-                CCSystem.getAPI().getGuiActionService()
-                    .clickLabel(context.player, com.awabi2048.ccsystem.api.gui.GuiClickLabel.RIGHT),
-                plugin.getMessage(
-                    context.player,
-                    "chanpon.player_world.easy_creation.action",
-                ),
-            ),
-        )
 
     private fun createWorldPresentation(
         player: Player,
