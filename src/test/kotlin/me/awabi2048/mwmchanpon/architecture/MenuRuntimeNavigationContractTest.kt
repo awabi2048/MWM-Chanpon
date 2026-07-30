@@ -37,7 +37,7 @@ class MenuRuntimeNavigationContractTest {
     fun `creation transitions leave the newly opened surface active`() {
         val source = uiRoot.resolve("ChanponPlayerWorldCapability.kt").readText()
         val body = functionBody(source, "handleCreate")
-        assertTrue("startEasyCreation(player, returnRoute)" in body)
+        assertTrue("startEasyCreation(player, subject.returnRoute)" in body)
         assertTrue("MenuUpdate.None" in body)
         assertFalse("runTask" in body)
     }

@@ -8,7 +8,13 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityContext
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentationProvider
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
@@ -16,9 +22,8 @@ import me.awabi2048.mwmchanpon.service.EasyVoidWorldCreationService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
-import me.awabi2048.myworldmanager.api.extension.PlayerWorldCapability
-import me.awabi2048.myworldmanager.api.extension.PlayerWorldCapabilityContext
-import me.awabi2048.myworldmanager.api.extension.PlayerWorldCreationView
+import me.awabi2048.myworldmanager.api.extension.PlayerWorldCapabilityContract
+import me.awabi2048.myworldmanager.api.extension.PlayerWorldCapabilitySubject
 import me.awabi2048.myworldmanager.api.extension.WorldCreationOperation
 import me.awabi2048.myworldmanager.api.extension.WorldCreationRequest
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsNavigationRequest
@@ -38,84 +43,111 @@ class ChanponPlayerWorldCapability(
     private val plugin: MWMChanponPlugin,
     private val storage: ChanponWorldStorage,
     private val easyVoidCreationService: EasyVoidWorldCreationService,
-) : PlayerWorldCapability {
+) {
 
-    override fun getId(): String = CAPABILITY_ID
-
-    override fun renderWorldItem(
-        context: PlayerWorldCapabilityContext,
-        worldData: WorldData,
-    ): MenuCapabilityPresentation = createWorldPresentation(context.player, worldData)
-
-    override fun renderSummaryItem(
-        context: PlayerWorldCapabilityContext,
-    ): MenuCapabilityPresentation =
-        createPlayerInfoPresentation(
-            context.player,
-            context.targetPlayerUuid,
-            context.targetPlayerName,
+    init {
+        val service = CCSystem.getAPI().getMenuCapabilityService()
+        service.register(
+            MenuCapabilityDefinition(
+                owner = CAPABILITY_OWNER,
+                id = WORLD_CAPABILITY_ID,
+                placement = PlayerWorldCapabilityContract.WORLD_ITEM_PLACEMENT,
+                availability = MenuCapabilityAvailability {
+                    subject(it) != null && world(it) != null
+                },
+                presentationProvider = MenuCapabilityPresentationProvider {
+                    createWorldPresentation(it.player, requireNotNull(world(it)))
+                },
+                actionHandler = MenuCapabilityActionHandler(::handleWorld),
+            ),
         )
+        service.register(
+            MenuCapabilityDefinition(
+                owner = CAPABILITY_OWNER,
+                id = SUMMARY_CAPABILITY_ID,
+                placement = PlayerWorldCapabilityContract.SUMMARY_PLACEMENT,
+                availability = MenuCapabilityAvailability { subject(it) != null },
+                presentationProvider = MenuCapabilityPresentationProvider {
+                    val subject = requireNotNull(subject(it))
+                    createPlayerInfoPresentation(
+                        it.player,
+                        subject.targetPlayerUuid,
+                        subject.targetPlayerName,
+                    )
+                },
+            ),
+        )
+        service.register(
+            MenuCapabilityDefinition(
+                owner = CAPABILITY_OWNER,
+                id = CREATION_CAPABILITY_ID,
+                placement = PlayerWorldCapabilityContract.CREATION_PLACEMENT,
+                availability = MenuCapabilityAvailability {
+                    subject(it)?.targetPlayerUuid == it.player.uniqueId
+                },
+                presentationProvider = MenuCapabilityPresentationProvider {
+                    creationPresentation(it)
+                },
+                actionAvailability = MenuCapabilityAvailability {
+                    creationBlockReason(it) == null && hasCreatePermission(it.player)
+                },
+                actionHandler = MenuCapabilityActionHandler(::handleCreate),
+            ),
+        )
+    }
 
-    override fun renderCreationItem(
-        context: PlayerWorldCapabilityContext,
-    ): PlayerWorldCreationView? {
-        if (context.targetPlayerUuid != context.player.uniqueId) return null
+    private fun creationPresentation(
+        context: MenuCapabilityContext,
+    ): MenuCapabilityPresentation {
+        val subject = requireNotNull(subject(context))
         val reason = creationBlockReason(
             context.player,
-            context.worlds.count { it.owner == context.targetPlayerUuid },
+            subject.worlds.count { it.owner == subject.targetPlayerUuid },
             plugin.config.getInt("creation.max_worlds_per_player", 50),
         )
         return if (reason == null && hasCreatePermission(context.player)) {
-            PlayerWorldCreationView(createCreationPresentation(context.player), true)
+            createCreationPresentation(context.player)
         } else {
-            PlayerWorldCreationView(
-                createCreationUnavailablePresentation(
-                    context.player,
-                    reason ?: CreationBlockReason.NO_PERMISSION,
-                ),
-                false,
+            createCreationUnavailablePresentation(
+                context.player,
+                reason ?: CreationBlockReason.NO_PERMISSION,
             )
         }
     }
 
-    override fun handleCreate(
-        context: PlayerWorldCapabilityContext,
-        click: org.bukkit.event.inventory.ClickType,
-        returnRoute: MenuRoute,
-    ): MenuActionResult? {
+    private fun handleCreate(context: MenuCapabilityActionContext): MenuActionResult {
+        val subject = subject(context) ?: return MenuActionResult.Ignored
         val player = context.player
-        if (context.targetPlayerUuid != player.uniqueId) return MenuActionResult.Rejected()
+        if (subject.targetPlayerUuid != player.uniqueId) return MenuActionResult.Rejected()
         if (!hasCreatePermission(player)) {
             player.sendMessage(i18n(player, "message.world_creation_no_permission"))
             return MenuActionResult.Rejected()
         }
-        if (click.isRightClick && !click.isShiftClick) {
-            startEasyCreation(player, returnRoute)
+        if (context.click.isRightClick && !context.click.isShiftClick) {
+            startEasyCreation(player, subject.returnRoute)
             return MenuActionResult.Success(MenuUpdate.None)
         }
         MyWorldManagerApi.openStandardWorldCreation(player, WorldPointBillingMode.NONE)
         return MenuActionResult.Success(MenuUpdate.None)
     }
 
-    override fun handleWorld(
-        context: PlayerWorldCapabilityContext,
-        click: org.bukkit.event.inventory.ClickType,
-        worldData: WorldData,
-    ): MenuActionResult? {
+    private fun handleWorld(context: MenuCapabilityActionContext): MenuActionResult {
+        val subject = subject(context) ?: return MenuActionResult.Ignored
+        val worldData = world(context) ?: return MenuActionResult.Ignored
         val player = context.player
         if (
-            context.targetPlayerUuid == player.uniqueId &&
-            click.isShiftClick &&
-            click.isLeftClick
+            subject.targetPlayerUuid == player.uniqueId &&
+            context.click.isShiftClick &&
+            context.click.isLeftClick
         ) {
             MyWorldManagerApi.prioritizePlayerWorld(player.uniqueId, worldData.uuid)
             return MenuActionResult.Success(MenuUpdate.Refresh)
         }
-        if (click.isLeftClick && !click.isShiftClick) {
+        if (context.click.isLeftClick && !context.click.isShiftClick) {
             if (worldData.isArchived) return MenuActionResult.Rejected()
             if (isCurrentWorld(player, worldData)) {
                 if (!canOpenSettings(player, worldData)) return MenuActionResult.Rejected()
-                openWorldSettings(context, worldData)
+                openWorldSettings(subject, worldData)
                 return MenuActionResult.Success(MenuUpdate.None)
             }
             MyWorldManagerApi.getWorldService()?.teleportToWorld(player, worldData.uuid)
@@ -124,8 +156,8 @@ class ChanponPlayerWorldCapability(
             )
             return MenuActionResult.Success(MenuUpdate.Close)
         }
-        if (click.isRightClick && !click.isShiftClick && canOpenSettings(player, worldData)) {
-            openWorldSettings(context, worldData)
+        if (context.click.isRightClick && !context.click.isShiftClick && canOpenSettings(player, worldData)) {
+            openWorldSettings(subject, worldData)
             return MenuActionResult.Success(MenuUpdate.None)
         }
         return MenuActionResult.Ignored
@@ -327,7 +359,7 @@ class ChanponPlayerWorldCapability(
             world.members.contains(player.uniqueId)
 
     private fun openWorldSettings(
-        context: PlayerWorldCapabilityContext,
+        context: PlayerWorldCapabilitySubject,
         worldData: WorldData,
     ) {
         MyWorldManagerApi.openWorldSettings(
@@ -356,6 +388,17 @@ class ChanponPlayerWorldCapability(
             player.hasPermission("craftercrossing.test")
 
     private fun creationBlockReason(
+        context: MenuCapabilityContext,
+    ): CreationBlockReason? {
+        val subject = subject(context) ?: return CreationBlockReason.POLICY_DENIED
+        return creationBlockReason(
+            context.player,
+            subject.worlds.count { it.owner == subject.targetPlayerUuid },
+            plugin.config.getInt("creation.max_worlds_per_player", 50),
+        )
+    }
+
+    private fun creationBlockReason(
         player: Player,
         currentCreateCount: Int,
         maxCreateCount: Int,
@@ -369,6 +412,20 @@ class ChanponPlayerWorldCapability(
         if (currentCreateCount >= maxCreateCount) return CreationBlockReason.NO_SLOT
         return null
     }
+
+    private fun subject(context: MenuCapabilityContext): PlayerWorldCapabilitySubject? =
+        context.attributes[PlayerWorldCapabilityContract.SUBJECT_ATTRIBUTE]
+            as? PlayerWorldCapabilitySubject
+
+    private fun subject(context: MenuCapabilityActionContext): PlayerWorldCapabilitySubject? =
+        context.attributes[PlayerWorldCapabilityContract.SUBJECT_ATTRIBUTE]
+            as? PlayerWorldCapabilitySubject
+
+    private fun world(context: MenuCapabilityContext): WorldData? =
+        context.attributes[PlayerWorldCapabilityContract.WORLD_ATTRIBUTE] as? WorldData
+
+    private fun world(context: MenuCapabilityActionContext): WorldData? =
+        context.attributes[PlayerWorldCapabilityContract.WORLD_ATTRIBUTE] as? WorldData
 
     private fun text(
         player: Player,
@@ -407,6 +464,9 @@ class ChanponPlayerWorldCapability(
     }
 
     private companion object {
-        const val CAPABILITY_ID = "chanpon.player_world_menu"
+        const val CAPABILITY_OWNER = "mwm-chanpon"
+        const val WORLD_CAPABILITY_ID = "player-world-item"
+        const val SUMMARY_CAPABILITY_ID = "player-world-summary"
+        const val CREATION_CAPABILITY_ID = "player-world-creation"
     }
 }
