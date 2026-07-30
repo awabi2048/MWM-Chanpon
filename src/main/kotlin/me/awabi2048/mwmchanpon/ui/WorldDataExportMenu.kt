@@ -281,9 +281,9 @@ class WorldDataExportMenu(
             meta.lore(
                 ChanponLore.build(
                     listOf(
-                        GuiLoreLine.Data(i18n(player, "export_menu.confirm.info.primary_label"), primaryName, "ﾂｧf"),
-                        GuiLoreLine.Data(i18n(player, "export_menu.confirm.info.count_label"), selectedCount, "ﾂｧf"),
-                        GuiLoreLine.Data(i18n(player, "export_menu.confirm.info.file_label"), fileName, "ﾂｧf"),
+                        GuiLoreLine.Data(i18n(player, "export_menu.confirm.info.primary_label"), primaryName, "§f"),
+                        GuiLoreLine.Data(i18n(player, "export_menu.confirm.info.count_label"), selectedCount, "§f"),
+                        GuiLoreLine.Data(i18n(player, "export_menu.confirm.info.file_label"), fileName, "§f"),
                         GuiLoreLine.Warning(i18n(player, "export_menu.confirm.info.warning")),
                     ),
                 ),

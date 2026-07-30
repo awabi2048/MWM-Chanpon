@@ -1263,12 +1263,22 @@ class ChanponWorldSettingsMenu(
             "World settings action presentation mismatch: $action options=${contract.options.size} texts=${actionTexts.size}"
         }
         val actionService = CCSystem.getAPI().getGuiActionService()
-        return contract.options.zip(actionTexts).map { (option, actionText) ->
-            actionService.single(
-                player,
-                actionService.clickLabel(player, option.displayClick),
-                actionText,
-            )
+        val resolved = contract.options.zip(actionTexts)
+        return if (resolved.size == 1) {
+            resolved.map { (option, actionText) ->
+                actionService.single(
+                    player,
+                    actionService.clickLabel(player, option.displayClick),
+                    actionText,
+                )
+            }
+        } else {
+            resolved.map { (option, actionText) ->
+                GuiLoreLine.Action(
+                    actionService.clickLabel(player, option.displayClick),
+                    actionText,
+                )
+            }
         }
     }
 
@@ -1356,7 +1366,12 @@ class ChanponWorldSettingsMenu(
 
     internal fun actionTrigger(feature: WorldSettingsFeature):
         com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger =
-        if (feature == WorldSettingsFeature.PUBLISH) {
+        if (feature in setOf(
+                WorldSettingsFeature.PUBLISH,
+                WorldSettingsFeature.EXPANSION,
+                WorldSettingsFeature.NOTIFICATION,
+            )
+        ) {
             com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger.LEFT_RIGHT
         } else {
             com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger.LEFT

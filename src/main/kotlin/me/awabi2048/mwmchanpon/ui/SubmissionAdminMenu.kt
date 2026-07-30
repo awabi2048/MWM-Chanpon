@@ -7,6 +7,10 @@ import com.awabi2048.ccsystem.api.gui.GuiClickLabel
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
+import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
@@ -159,12 +163,7 @@ class SubmissionAdminMenu(
             GuiElementRole.ACTION,
             ACTION_SORT,
         )
-        elements += MenuElement(
-            52,
-            closeSubmissionItem(player),
-            GuiElementRole.ACTION,
-            ACTION_CLOSE_SUBMISSIONS,
-        )
+        elements += closeSubmissionItem(player)
         return InventoryMenuView(
             layout.size,
             i18nComponent(player, "admin_menu.title"),
@@ -702,17 +701,26 @@ class SubmissionAdminMenu(
         return item
     }
 
-    private fun closeSubmissionItem(player: Player): ItemStack {
+    private fun closeSubmissionItem(player: Player): MenuElement {
         val key = if (plugin.isSubmissionClosed()) {
             "admin_menu.close.closed"
         } else {
             "admin_menu.close.open"
         }
-        return extensionItem(
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
             player,
-            if (plugin.isSubmissionClosed()) Material.BARRIER else Material.REDSTONE_BLOCK,
-            "$key.display",
-            "$key.lore",
+            GuiMenuEntrySpec(
+                slot = 52,
+                material = if (plugin.isSubmissionClosed()) Material.BARRIER else Material.REDSTONE_BLOCK,
+                name = GuiNameSpec.Component(i18nComponent(player, "$key.display")),
+                role = GuiElementRole.ACTION,
+                description = i18nList(player, "$key.lore"),
+                actions = listOf(GuiMenuEntryAction(
+                    ACTION_CLOSE_SUBMISSIONS,
+                    MenuAcceptedClicks.LEFT_RIGHT,
+                    i18n(player, "$key.action"),
+                )),
+            ),
         )
     }
 

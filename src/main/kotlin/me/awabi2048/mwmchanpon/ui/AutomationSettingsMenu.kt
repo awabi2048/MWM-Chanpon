@@ -3,6 +3,10 @@ package me.awabi2048.mwmchanpon.ui
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
+import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
@@ -93,36 +97,33 @@ class AutomationSettingsMenu(
 
     private fun renderMain(player: Player): InventoryMenuView {
         val elements = mutableListOf(
-            MenuElement(
-                20,
-                toggleItem(
-                    player,
-                    Material.CLOCK,
-                    "automation.auto_backup",
-                    plugin.config.getBoolean("backup.auto_backup.enabled", false),
-                ),
-                GuiElementRole.ACTION,
+            toggleEntry(
+                player, 20, Material.CLOCK, "automation.auto_backup",
+                plugin.config.getBoolean("backup.auto_backup.enabled", false),
                 ACTION_AUTO_BACKUP,
             ),
-            MenuElement(
-                24,
-                toggleItem(
-                    player,
-                    Material.RECOVERY_COMPASS,
-                    "automation.auto_rollback",
-                    plugin.config.getBoolean("backup.auto_rollback.enabled", false),
-                ),
-                GuiElementRole.ACTION,
+            toggleEntry(
+                player, 24, Material.RECOVERY_COMPASS, "automation.auto_rollback",
+                plugin.config.getBoolean("backup.auto_rollback.enabled", false),
                 ACTION_AUTO_ROLLBACK,
             ),
-            MenuElement(36, backItem(player), GuiElementRole.BACK, ACTION_BACK),
+            MenuElement(40, backItem(player), GuiElementRole.BACK, ACTION_BACK),
         )
         if (plugin.config.getBoolean("backup.auto_rollback.enabled", false)) {
-            elements += MenuElement(
-                40,
-                controlItem(player, Material.END_CRYSTAL, "automation.restore_point"),
-                GuiElementRole.ACTION,
-                ACTION_RESTORE_POINT,
+            elements += CCSystem.getAPI().getGuiElementService().menuEntry(
+                player,
+                GuiMenuEntrySpec(
+                    slot = 36,
+                    material = Material.END_CRYSTAL,
+                    name = GuiNameSpec.Component(i18nComponent(player, "automation.restore_point.display")),
+                    role = GuiElementRole.ACTION,
+                    description = i18nList(player, "automation.restore_point.lore"),
+                    actions = listOf(GuiMenuEntryAction(
+                        ACTION_RESTORE_POINT,
+                        MenuAcceptedClicks.LEFT_RIGHT,
+                        i18n(player, "automation.restore_point.action"),
+                    )),
+                ),
             )
         }
         return InventoryMenuView(45, i18nComponent(player, "automation.title"), elements)
@@ -267,6 +268,34 @@ class AutomationSettingsMenu(
         }
         return item
     }
+
+    private fun toggleEntry(
+        player: Player,
+        slot: Int,
+        material: Material,
+        key: String,
+        enabled: Boolean,
+        actionId: String,
+    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+        player,
+        GuiMenuEntrySpec(
+            slot = slot,
+            material = material,
+            name = GuiNameSpec.Component(i18nComponent(player, "$key.display")),
+            role = GuiElementRole.ACTION,
+            description = i18nList(
+                player,
+                "$key.lore",
+                mapOf("state" to i18n(player, if (enabled) "common.on" else "common.off")),
+            ),
+            actions = listOf(GuiMenuEntryAction(
+                actionId,
+                MenuAcceptedClicks.LEFT_RIGHT,
+                i18n(player, "$key.action"),
+            )),
+            glint = enabled,
+        ),
+    )
 
     private fun controlItem(
         player: Player,

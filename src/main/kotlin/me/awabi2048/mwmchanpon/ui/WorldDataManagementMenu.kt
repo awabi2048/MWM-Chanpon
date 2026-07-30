@@ -6,6 +6,10 @@ import com.awabi2048.ccsystem.api.gui.GuiClickLabel
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
+import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
@@ -126,25 +130,17 @@ class WorldDataManagementMenu(
                 ),
             )
         }
-        elements += MenuElement(
-            47,
-            controlItem(player, Material.CHEST, "world_data.bulk_backup", false),
-            GuiElementRole.ACTION,
-            ACTION_BULK_BACKUP,
-            mapOf(PAGE to safePage.toString()),
+        elements += controlEntry(
+            player, 47, Material.CHEST, "world_data.bulk_backup",
+            ACTION_BULK_BACKUP, mapOf(PAGE to safePage.toString()),
         )
-        elements += MenuElement(
-            51,
-            controlItem(player, Material.RECOVERY_COMPASS, "world_data.bulk_rollback", false),
-            GuiElementRole.ACTION,
-            ACTION_BULK_ROLLBACK,
-            mapOf(PAGE to safePage.toString()),
+        elements += controlEntry(
+            player, 51, Material.RECOVERY_COMPASS, "world_data.bulk_rollback",
+            ACTION_BULK_ROLLBACK, mapOf(PAGE to safePage.toString()),
         )
-        elements += MenuElement(
-            53,
-            controlItem(player, Material.ENDER_CHEST, "world_data.annual_archive", true),
-            GuiElementRole.ACTION,
-            ACTION_ANNUAL_ARCHIVE,
+        elements += controlEntry(
+            player, 53, Material.ENDER_CHEST, "world_data.annual_archive",
+            ACTION_ANNUAL_ARCHIVE, warning = true,
         )
         return InventoryMenuView(
             layout.size,
@@ -403,6 +399,32 @@ class WorldDataManagementMenu(
             )
         }
     }
+
+    private fun controlEntry(
+        player: Player,
+        slot: Int,
+        material: Material,
+        key: String,
+        actionId: String,
+        payload: Map<String, String> = emptyMap(),
+        warning: Boolean = false,
+    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+        player,
+        GuiMenuEntrySpec(
+            slot = slot,
+            material = material,
+            name = GuiNameSpec.Component(i18nComponent(player, "$key.display")),
+            role = GuiElementRole.ACTION,
+            description = listOf(i18n(player, "$key.description")),
+            warnings = if (warning) listOf(i18n(player, "$key.warning")) else emptyList(),
+            actions = listOf(GuiMenuEntryAction(
+                actionId,
+                MenuAcceptedClicks.LEFT_RIGHT,
+                i18n(player, "$key.action"),
+                payload,
+            )),
+        ),
+    )
 
     private fun centerItem(player: Player, material: Material, key: String): ItemStack =
         ItemStack(material).also { item ->

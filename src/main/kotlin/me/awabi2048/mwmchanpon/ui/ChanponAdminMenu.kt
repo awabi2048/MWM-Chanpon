@@ -10,6 +10,12 @@ import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiMenuIconAction
 import com.awabi2048.ccsystem.api.gui.GuiMenuIconOption
 import com.awabi2048.ccsystem.api.gui.GuiMenuIconSpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryOption
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
+import com.awabi2048.ccsystem.api.gui.GuiValueTone
+import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
@@ -147,12 +153,7 @@ class ChanponAdminMenu(
             GuiElementRole.ACTION,
             ACTION_BUILDING_ALLOWED,
             ),
-            MenuElement(
-            ChanponAdminMenuLayout.FOOTER_WORLD_CREATION,
             worldCreationAvailabilityItem(player),
-            GuiElementRole.ACTION,
-            ACTION_WORLD_CREATION,
-            ),
             MenuElement(
             ChanponAdminMenuLayout.FOOTER_MAIN_SWITCH,
             switchToMwmItem(player),
@@ -291,64 +292,44 @@ class ChanponAdminMenu(
         return item
     }
 
-    private fun worldCreationAvailabilityItem(player: Player): ItemStack {
+    private fun worldCreationAvailabilityItem(player: Player): MenuElement {
         val availability = globalStorage.getWorldCreationAvailability()
         val key = availability.name.lowercase()
-        val nextAction = CCSystem.getAPI().getGuiActionService().single(
-            player,
-            CCSystem.getAPI().getGuiActionService().clickLabel(player, GuiClickLabel.LEFT),
-            controlsI18n(player, "creation.next_action")
-        )
-        val previousAction = CCSystem.getAPI().getGuiActionService().single(
-            player,
-            CCSystem.getAPI().getGuiActionService().clickLabel(player, GuiClickLabel.RIGHT),
-            controlsI18n(player, "creation.previous_action")
-        )
         val material = when (availability) {
             WorldCreationAvailability.DENIED -> Material.BARRIER
             WorldCreationAvailability.NON_PRODUCTION -> Material.CRAFTING_TABLE
             WorldCreationAvailability.PRODUCTION -> Material.NETHER_STAR
         }
-        val item = CCSystem.getAPI().getGuiElementService().menuIcon(
-            GuiMenuIconSpec(
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = ChanponAdminMenuLayout.FOOTER_WORLD_CREATION,
                 material = material,
                 name = GuiNameSpec.Text(controlsI18n(player, "creation.display"), GuiNameStyle.PRIMARY),
                 role = GuiElementRole.ACTION,
                 amount = 1,
                 description = listOf(controlsI18n(player, "creation.$key.description")),
-                data = listOf(com.awabi2048.ccsystem.api.gui.GuiMenuIconData(
+                data = listOf(GuiMenuEntryData(
                     controlsI18n(player, "creation.current"),
                     controlsI18n(player, "creation.$key.display"),
-                    "§e"
+                    GuiValueTone.PRIMARY,
                 )),
                 options = WorldCreationAvailability.entries.map { option ->
-                    GuiMenuIconOption(
+                    GuiMenuEntryOption(
                         label = controlsI18n(player, "creation.${option.name.lowercase()}.display"),
                         selected = option == availability,
-                        selectedColor = "§a",
-                        inactiveColor = "§7"
                     )
                 },
                 warnings = emptyList(),
                 dangers = emptyList(),
-                actions = listOf(
-                    GuiMenuIconAction(
-                        operation = nextAction.operation,
-                        action = nextAction.action,
-                        resolvedText = nextAction.resolvedText,
-                        enabled = true
-                    ),
-                    GuiMenuIconAction(
-                        operation = previousAction.operation,
-                        action = previousAction.action,
-                        resolvedText = previousAction.resolvedText,
-                        enabled = true
-                    )
-                ),
+                actions = listOf(GuiMenuEntryAction(
+                    ACTION_WORLD_CREATION,
+                    MenuAcceptedClicks.LEFT_RIGHT,
+                    controlsI18n(player, "creation.cycle_action"),
+                )),
                 glint = null
-            )
+            ),
         )
-        return item
     }
 
     private fun confirmButton(player: Player, confirm: Boolean): ItemStack {
