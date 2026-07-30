@@ -14,7 +14,7 @@ import me.awabi2048.mwmchanpon.extension.ChanponWorldPublishPolicy
 import me.awabi2048.mwmchanpon.extension.ChanponWorldRuntimePolicy
 import me.awabi2048.mwmchanpon.extension.ChanponWorldPlayerStatePolicy
 import me.awabi2048.mwmchanpon.extension.ChanponWorldWorkPermissionPolicy
-import me.awabi2048.mwmchanpon.extension.ChanponWorldSettingsPresentationPolicy
+import me.awabi2048.mwmchanpon.extension.ChanponWorldSettingsStatePolicy
 import me.awabi2048.mwmchanpon.extension.ChanponWorldSettingsCapabilities
 import me.awabi2048.mwmchanpon.extension.LinkedPortalCapability
 import me.awabi2048.mwmchanpon.extension.ProductionToggleExtension
@@ -96,7 +96,7 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var commandExtension: ChanponCommandExtension
     private lateinit var worldCreationGuard: ChanponWorldCreationGuard
     private lateinit var worldPlayerStatePolicy: ChanponWorldPlayerStatePolicy
-    private lateinit var worldSettingsPresentationPolicy: ChanponWorldSettingsPresentationPolicy
+    private lateinit var worldSettingsStatePolicy: ChanponWorldSettingsStatePolicy
     private lateinit var worldSettingsCapabilities: ChanponWorldSettingsCapabilities
     private lateinit var globalStorage: ChanponGlobalStorage
     private lateinit var adminCommand: ChanponAdminCommand
@@ -262,11 +262,11 @@ class MWMChanponPlugin : JavaPlugin() {
         commandExtension = ChanponCommandExtension(archiveOperationGuard)
         worldCreationGuard = ChanponWorldCreationGuard(this, globalStorage)
         worldPlayerStatePolicy = ChanponWorldPlayerStatePolicy(globalStorage)
-        worldSettingsPresentationPolicy =
-            ChanponWorldSettingsPresentationPolicy(chanponStorage, submittedProtectionService)
+        worldSettingsStatePolicy =
+            ChanponWorldSettingsStatePolicy(chanponStorage, submittedProtectionService)
         MyWorldManagerApi.registerWorldCreationGuard(worldCreationGuard)
         MyWorldManagerApi.registerWorldPlayerStatePolicy(worldPlayerStatePolicy)
-        MyWorldManagerApi.registerWorldSettingsPresentationPolicy(worldSettingsPresentationPolicy)
+        MyWorldManagerApi.registerWorldSettingsStatePolicy(worldSettingsStatePolicy)
         MyWorldManagerApi.registerWorldDeleteGuard(productionWorldGuard)
         // Discovery / favorite / visit menus stay on MWM standard providers; Chanpon only supplies policies.
         MyWorldManagerApi.registerWorldEvacuationProvider(spawnWorldService)
@@ -371,9 +371,9 @@ class MWMChanponPlugin : JavaPlugin() {
         if (::worldPlayerStatePolicy.isInitialized) {
             MyWorldManagerApi.unregisterWorldPlayerStatePolicy(worldPlayerStatePolicy)
         }
-        if (::worldSettingsPresentationPolicy.isInitialized) {
-            MyWorldManagerApi.unregisterWorldSettingsPresentationPolicy(
-                worldSettingsPresentationPolicy,
+        if (::worldSettingsStatePolicy.isInitialized) {
+            MyWorldManagerApi.unregisterWorldSettingsStatePolicy(
+                worldSettingsStatePolicy,
             )
         }
         if (::automationService.isInitialized) {
