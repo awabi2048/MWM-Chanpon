@@ -480,15 +480,25 @@ class ChanponAdminWorldListMenu(
         val folderName = worldDirectory(worldData)
         if (!worldData.isArchived && Bukkit.getWorld(folderName) == null) {
             player.sendMessage(CCSystem.getAPI().getI18nString(player, "messages.world_loading"))
+            runtime.suspendForExternal(player)
             Bukkit.getScheduler().runTask(plugin, Runnable {
-                if (!player.isOnline) return@Runnable
-                if (MyWorldManagerApi.getWorldService()?.loadWorld(worldData.uuid) != true) {
-                    player.sendMessage(CCSystem.getAPI().getI18nString(player, "error.load_failed"))
+                if (!player.isOnline) {
+                    runtime.completeExternal(player)
                     return@Runnable
                 }
-                settingsRoute(player, worldData)?.let { runtime.navigate(player, it) }
+                if (MyWorldManagerApi.getWorldService()?.loadWorld(worldData.uuid) != true) {
+                    player.sendMessage(CCSystem.getAPI().getI18nString(player, "error.load_failed"))
+                    runtime.resumeFromExternal(player)
+                    return@Runnable
+                }
+                val route = settingsRoute(player, worldData)
+                if (route == null) {
+                    runtime.resumeFromExternal(player)
+                } else {
+                    runtime.navigate(player, route)
+                }
             })
-            return MenuActionResult.Success(MenuUpdate.Close)
+            return MenuActionResult.Success(MenuUpdate.None)
         }
         val route = settingsRoute(player, worldData) ?: return MenuActionResult.Rejected()
         return MenuActionResult.Success(MenuUpdate.Navigate(route))
