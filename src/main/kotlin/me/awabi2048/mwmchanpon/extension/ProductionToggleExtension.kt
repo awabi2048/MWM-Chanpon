@@ -38,7 +38,6 @@ import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.SubmissionState
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.mwmchanpon.ui.ChanponGuiElements
-import me.awabi2048.mwmchanpon.ui.ChanponLore
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.event.MwmWorldCreatedEvent
 import me.awabi2048.myworldmanager.api.extension.CreationConfirmationCapabilityContract
@@ -189,7 +188,7 @@ class ProductionToggleExtension(
             return capabilityPresentation(
                 Material.GRAY_STAINED_GLASS_PANE,
                 Component.empty(),
-                emptyList(),
+                GuiLoreSpec.None,
                 GuiElementRole.DECORATION,
             )
         }
@@ -488,7 +487,10 @@ class ProductionToggleExtension(
                 return capabilityPresentation(
                     Material.BARRIER,
                     i18nComponent(player, "error.display"),
-                    ChanponLore.build(i18nList(player, "error.lore").map(GuiLoreLine::Text)),
+                    GuiLoreSpec.Rich(
+                        i18nList(player, "error.lore").map(GuiLoreLine::Text),
+                        GuiLoreFrame.BOTH,
+                    ),
                     GuiElementRole.CONTENT,
                 )
             }
@@ -512,23 +514,19 @@ class ProductionToggleExtension(
     private fun capabilityPresentation(
         material: Material,
         name: Component,
-        lore: List<Component>,
+        lore: GuiLoreSpec,
         role: GuiElementRole = GuiElementRole.ACTION,
     ) = MenuCapabilityPresentation(
         GuiItemSpec(
             material = material,
             name = GuiNameSpec.Component(name),
-            lore = if (lore.isEmpty()) {
-                GuiLoreSpec.None
-            } else {
-                GuiLoreSpec.Rich(lore.map(GuiLoreLine::Component), GuiLoreFrame.NONE)
-            },
+            lore = lore,
             role = role,
             amount = 1,
         ),
     )
 
-    private fun createSubmissionLore(player: Player, state: SubmissionState): List<Component> {
+    private fun createSubmissionLore(player: Player, state: SubmissionState): GuiLoreSpec {
         val key = when (state) {
             SubmissionState.UNSUBMITTED -> "submission.lore.unsubmitted"
             SubmissionState.SUBMITTED -> "submission.lore.submitted"
@@ -557,9 +555,8 @@ class ProductionToggleExtension(
         }
     }
 
-    private fun structuredLore(lines: List<GuiLoreLine>): List<Component> {
-        return CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(lines, GuiLoreFrame.BOTH))
-    }
+    private fun structuredLore(lines: List<GuiLoreLine>): GuiLoreSpec =
+        GuiLoreSpec.Rich(lines, GuiLoreFrame.BOTH)
 
     private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): String {
         return CCSystem.getAPI().getI18nString(player, "chanpon.submission.$key", placeholders)
