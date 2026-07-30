@@ -26,6 +26,7 @@ import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import com.awabi2048.ccsystem.api.gui.PlayerInventoryInteraction
 import java.util.UUID
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
+import me.awabi2048.mwmchanpon.extension.ProductionToggleExtension
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
@@ -71,6 +72,7 @@ class ChanponWorldSettingsMenuProvider(
                 renderer = { context -> render(context.player, source(context.route)) },
                 actions = mapOf(
                     ACTION_SELECT to MenuActionHandler(::handleAction),
+                    ACTION_CAPABILITY to MenuActionHandler(::handleCapability),
                     MenuRuntimeActions.PLAYER_INVENTORY_CLICK to MenuActionHandler { context ->
                         mwm().worldSettingsGui.handleIconSelection(context.player, context.item)
                     },
@@ -103,11 +105,6 @@ class ChanponWorldSettingsMenuProvider(
 
     private fun renderMain(player: Player, worldData: WorldData, request: WorldSettingsMenuRequest): InventoryMenuView {
         val mwm = mwm()
-        mwm.logWorldSettingsDebug(
-            "chanpon_open=request player=${player.name}/${player.uniqueId} world=${worldData.uuid} " +
-                "showBack=${request.showBackButton} playerFlow=${request.isPlayerWorldFlow} " +
-                "currentHolder=${player.openInventory.topInventory.holder?.javaClass?.name ?: "none"}"
-        )
         val activeSession = mwm.settingsSessionManager.getSession(player)
         val selectingIcon =
             activeSession?.worldUuid == worldData.uuid &&
@@ -193,10 +190,26 @@ class ChanponWorldSettingsMenuProvider(
             inventorySize,
             worldData.owner == player.uniqueId,
         ).toMutableMap()
-        mwm.logWorldSettingsDebug(
-            "chanpon_open=inventory player=${player.name}/${player.uniqueId} world=${worldData.uuid} " +
-                "size=$inventorySize protected=$isProtected"
+        val capabilityArguments = mapOf(WORLD_UUID to worldData.uuid.toString())
+        val capability = CCSystem.getAPI().getMenuCapabilityService().resolve(
+            ProductionToggleExtension.MENU_CAPABILITY_ID,
+            player,
+            capabilityArguments,
         )
+        val capabilityInteractions = mutableMapOf<Int, MenuInteraction>()
+        if (capability != null) {
+            items[WORLD_PRODUCTION_CAPABILITY_SLOT] = capability.item
+            capabilityInteractions[WORLD_PRODUCTION_CAPABILITY_SLOT] =
+                capability.targetRoute?.let {
+                    MenuInteraction.Action(
+                        ACTION_CAPABILITY,
+                        capability.acceptedClicks,
+                        capabilityArguments + (
+                            CAPABILITY_ID to ProductionToggleExtension.MENU_CAPABILITY_ID
+                        ),
+                    )
+                } ?: MenuInteraction.DisplayOnly
+        }
         return InventoryMenuView(
             inventorySize,
             title,
@@ -204,6 +217,7 @@ class ChanponWorldSettingsMenuProvider(
                 items,
                 displayOnlyInfoWorldUuid =
                     worldData.uuid.takeIf { isCurrentWorld(player, worldData) },
+                semanticInteractions = capabilityInteractions,
             ),
             playerInventoryInteraction =
                 if (selectingIcon) {
@@ -267,9 +281,6 @@ class ChanponWorldSettingsMenuProvider(
         val worldUuid = source.worldUuid
         val mwm = mwm()
         if (mwm.settingsSessionManager.getSession(player) == null) {
-            mwm.logWorldSettingsDebug(
-                "chanpon_click=session_recovery player=${player.name}/${player.uniqueId} world=$worldUuid"
-            )
             mwm.settingsSessionManager.updateSessionAction(
                 player,
                 worldUuid,
@@ -281,10 +292,6 @@ class ChanponWorldSettingsMenuProvider(
             ?: return MenuActionResult.Rejected()
         val session = mwm.settingsSessionManager.getSession(player)
         val type = ItemTag.getType(item)
-        mwm.logWorldSettingsDebug(
-            "chanpon_click=dispatch player=${player.name}/${player.uniqueId} world=$worldUuid " +
-                "itemType=${type ?: "none"} sessionAction=${session?.action ?: "none"}"
-        )
         // オーバーレイはMWM公開APIで表現できる設定だけを処理し、未公開のタグ編集入口を再公開しない。
         if (type == ItemTag.TYPE_GUI_INFO && ItemTag.getWorldUuid(item) == worldData.uuid) {
             if (isCurrentWorld(player, worldData)) return MenuActionResult.Ignored
@@ -294,10 +301,6 @@ class ChanponWorldSettingsMenuProvider(
                 worldData.uuid,
                 MwmWarpReason.DIRECT,
                 Runnable {
-                    mwm.logWorldSettingsDebug(
-                        "chanpon_warp=callback player=${player.name}/${player.uniqueId} world=${worldData.uuid} " +
-                            "currentWorld=${player.world.name} holder=${player.openInventory.topInventory.holder?.javaClass?.name ?: "none"}"
-                    )
                     if (player.isOnline) {
                         player.sendMessage(
                             mwm.languageManager.getMessage(
@@ -307,10 +310,6 @@ class ChanponWorldSettingsMenuProvider(
                             )
                         )
                         runtime.resumeFromExternal(player)
-                        mwm.logWorldSettingsDebug(
-                            "chanpon_warp=reopened player=${player.name}/${player.uniqueId} world=${worldData.uuid} " +
-                                "holder=${player.openInventory.topInventory.holder?.javaClass?.name ?: "none"}"
-                        )
                     }
                 }
             )
@@ -1365,6 +1364,7 @@ class ChanponWorldSettingsMenuProvider(
     private fun menuElements(
         items: Map<Int, ItemStack>,
         displayOnlyInfoWorldUuid: UUID? = null,
+        semanticInteractions: Map<Int, MenuInteraction> = emptyMap(),
     ): List<MenuElement> =
         items.map { (slot, item) ->
             val type = ItemTag.getType(item)
@@ -1381,7 +1381,7 @@ class ChanponWorldSettingsMenuProvider(
                     ItemTag.getWorldUuid(item) != null &&
                     ItemTag.getWorldUuid(item) != displayOnlyInfoWorldUuid
             val effectiveRole = if (clickableInfo) GuiElementRole.ACTION else role
-            val interaction = when {
+            val interaction = semanticInteractions[slot] ?: when {
                 effectiveRole == GuiElementRole.BACK -> MenuInteraction.Back()
                 role == GuiElementRole.DECORATION ||
                     (role == GuiElementRole.CONTENT && !clickableInfo) ->
@@ -1395,6 +1395,17 @@ class ChanponWorldSettingsMenuProvider(
                 interaction = interaction,
             )
         }
+
+    private fun handleCapability(context: MenuActionContext): MenuActionResult {
+        val capabilityId = context.payload[CAPABILITY_ID] ?: return MenuActionResult.Ignored
+        val arguments = context.payload - CAPABILITY_ID
+        val capability = CCSystem.getAPI().getMenuCapabilityService()
+            .resolve(capabilityId, context.player, arguments)
+            ?: return MenuActionResult.Ignored
+        if (context.click !in capability.acceptedClicks) return MenuActionResult.Ignored
+        val target = capability.targetRoute ?: return MenuActionResult.Ignored
+        return MenuActionResult.Success(MenuUpdate.Navigate(target))
+    }
 
     private fun confirmationElements(
         layout: GuiConfirmationLayout,
@@ -1478,6 +1489,10 @@ class ChanponWorldSettingsMenuProvider(
         private const val RUNTIME_OWNER = "mwm-chanpon"
         private const val ROUTE_SETTINGS = "world-settings"
         private const val ACTION_SELECT = "select"
+        private const val ACTION_CAPABILITY = "capability"
+        private const val CAPABILITY_ID = "capability_id"
+        private const val WORLD_UUID = "world_uuid"
+        private const val WORLD_PRODUCTION_CAPABILITY_SLOT = 51
         private const val PAYLOAD_SCREEN = "screen"
         private const val PAYLOAD_WORLD_UUID = "world_uuid"
         private const val PAYLOAD_SHOW_BACK = "show_back"

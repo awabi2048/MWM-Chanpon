@@ -264,7 +264,6 @@ class MWMChanponPlugin : JavaPlugin() {
         MyWorldManagerApi.registerWorldCreationGuard(worldCreationGuard)
         MyWorldManagerApi.registerWorldPlayerStatePolicy(worldPlayerStatePolicy)
         MyWorldManagerApi.registerWorldDeleteGuard(productionWorldGuard)
-        MyWorldManagerApi.registerMenuExtension(productionToggleExtension)
         MyWorldManagerApi.registerCreationConfirmationMenuProvider(creationConfirmationMenuProvider)
         MyWorldManagerApi.registerAdminWorldListProvider(chanponAdminWorldListMenu)
         MyWorldManagerApi.registerWorldSettingsMenuProvider(submittedWorldMenuProvider)
@@ -334,10 +333,8 @@ class MWMChanponPlugin : JavaPlugin() {
     override fun onDisable() {
         runCatching { CCSystem.getAPI().getConfigSchemaService().unregister("mwm-chanpon") }
         runCatching { CCSystem.getAPI().getMenuCommandService().unregisterOwner("mwm-chanpon") }
+        runCatching { CCSystem.getAPI().getMenuCapabilityService().unregisterOwner("mwm-chanpon") }
         runCatching { CCSystem.getAPI().getMenuRuntimeService().unregisterOwner("mwm-chanpon") }
-        if (::productionToggleExtension.isInitialized) {
-            MyWorldManagerApi.unregisterMenuExtension(productionToggleExtension)
-        }
         if (::creationConfirmationMenuProvider.isInitialized) {
             MyWorldManagerApi.unregisterCreationConfirmationMenuProvider(creationConfirmationMenuProvider)
         }
