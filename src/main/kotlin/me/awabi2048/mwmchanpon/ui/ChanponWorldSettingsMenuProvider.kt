@@ -239,6 +239,25 @@ class ChanponWorldSettingsMenuProvider(
                         MenuInteraction.DisplayOnly
                     }
             }
+        capabilityService.definitions(WorldSettingsCapabilityPlacements.FOOTER_RIGHT_ACTIONS)
+            .asSequence()
+            .mapNotNull { definition ->
+                capabilityService.resolve(definition.capabilityId, player, capabilityArguments)
+            }
+            .zip(listOf(inventorySize - 4).asSequence())
+            .forEach { (capability, slot) ->
+                items[slot] = capability.item
+                capabilityInteractions[slot] =
+                    if (capability.actionable) {
+                        MenuInteraction.Action(
+                            ACTION_CAPABILITY,
+                            capability.acceptedClicks,
+                            capabilityArguments + (CAPABILITY_ID to capability.capabilityId),
+                        )
+                    } else {
+                        MenuInteraction.DisplayOnly
+                    }
+            }
         return InventoryMenuView(
             inventorySize,
             title,

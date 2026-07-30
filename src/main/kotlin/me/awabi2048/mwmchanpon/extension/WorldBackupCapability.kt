@@ -10,6 +10,11 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityItemRenderer
 import com.awabi2048.ccsystem.api.gui.MenuDialogButton
 import com.awabi2048.ccsystem.api.gui.MenuDialogHandler
 import com.awabi2048.ccsystem.api.gui.MenuDialogInput
@@ -24,13 +29,12 @@ import me.awabi2048.mwmchanpon.backup.BackupService
 import me.awabi2048.mwmchanpon.backup.RestoreOperationResult
 import me.awabi2048.mwmchanpon.service.BackupAutomationService
 import me.awabi2048.mwmchanpon.service.ManualRollbackService
+import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.ui.ChanponLore
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
-import me.awabi2048.myworldmanager.api.extension.WorldSettingsMenuRequest
-import me.awabi2048.myworldmanager.api.extension.MenuExtension
-import me.awabi2048.myworldmanager.api.extension.MenuExtensionContext
+import me.awabi2048.myworldmanager.api.extension.WorldSettingsCapabilityPlacements
 import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.util.GuiLoreActions
 import me.awabi2048.myworldmanager.util.ItemTag
@@ -39,20 +43,20 @@ import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
-import org.bukkit.event.inventory.ClickType
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.Plugin
 import org.bukkit.plugin.java.JavaPlugin
 import java.util.UUID
 
-class WorldBackupMenuExtension(
+class WorldBackupCapability(
     private val plugin: Plugin,
     private val storage: ChanponWorldStorage,
+    private val protectionService: SubmittedWorldProtectionService,
     private val backupService: BackupService,
     private val automationService: BackupAutomationService,
     private val manualRollbackService: ManualRollbackService
-) : MenuExtension {
+) {
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
     init {
@@ -69,28 +73,58 @@ class WorldBackupMenuExtension(
                 ),
             ),
         )
-    }
-
-    override fun getId(): String = EXTENSION_ID
-
-    override fun onRender(items: Map<Int, ItemStack>, player: Player, context: MenuExtensionContext): Map<Int, ItemStack> {
-        if (context.menuType != "world_settings") return items
-        if (context.get<Boolean>("isProtected") == true) return items
-        val worldData = context.get<WorldData>("worldData") ?: return items
-        if (!canManage(player, worldData)) return items
-        return items + (WORLD_MENU_SLOT to entryItem(player, worldData.uuid))
-    }
-
-    override fun onClick(click: ClickType, item: ItemStack, player: Player, context: MenuExtensionContext): Boolean {
-        if (ItemTag.getExtensionId(item) != EXTENSION_ID) return false
-        val worldUuid = ItemTag.getWorldUuid(item) ?: return false
-        if (ownedProductionWorld(player, worldUuid) == null) return true
-        return open(player, worldUuid)
+        runtime.register(
+            InventoryMenuDefinition(
+                owner = RUNTIME_OWNER,
+                id = ROUTE_OWNER_BACKUP_CONFIRM,
+                renderer = { context -> renderBackupConfirmation(context.player, context.route) },
+                actions = mapOf(
+                    ACTION_RUNTIME_CONFIRM to MenuActionHandler(::confirmOwnerBackup),
+                    ACTION_RUNTIME_CANCEL to MenuActionHandler(::cancelConfirmation),
+                ),
+            ),
+        )
+        runtime.register(
+            InventoryMenuDefinition(
+                owner = RUNTIME_OWNER,
+                id = ROUTE_RESTORE_CONFIRM,
+                renderer = { context -> renderRestoreConfirmation(context.player, context.route) },
+                actions = mapOf(
+                    ACTION_RUNTIME_CONFIRM to MenuActionHandler(::confirmRestore),
+                    ACTION_RUNTIME_CANCEL to MenuActionHandler(::cancelConfirmation),
+                ),
+            ),
+        )
+        CCSystem.getAPI().getMenuCapabilityService().register(
+            MenuCapabilityDefinition(
+                owner = RUNTIME_OWNER,
+                id = CAPABILITY_ID,
+                placement = WorldSettingsCapabilityPlacements.FOOTER_RIGHT_ACTIONS,
+                availability = MenuCapabilityAvailability { context ->
+                    val world = worldUuid(context.arguments)
+                        ?.let { ownedProductionWorld(context.player, it) }
+                        ?: return@MenuCapabilityAvailability false
+                    !protectionService.isProtected(world)
+                },
+                itemRenderer = MenuCapabilityItemRenderer { context ->
+                    entryItem(context.player)
+                },
+                actionHandler = MenuCapabilityActionHandler(::openFromCapability),
+            ),
+        )
     }
 
     fun open(player: Player, worldUuid: UUID, page: Int = 0): Boolean {
         if (ownedProductionWorld(player, worldUuid) == null) return false
-        return runtime.navigate(player, route(worldUuid, page, currentRequest(player)))
+        return runtime.navigate(player, route(worldUuid, page))
+    }
+
+    private fun openFromCapability(context: MenuCapabilityActionContext): MenuActionResult {
+        val worldUuid = worldUuid(context.arguments) ?: return MenuActionResult.Ignored
+        if (ownedProductionWorld(context.player, worldUuid) == null) {
+            return MenuActionResult.Rejected()
+        }
+        return MenuActionResult.Success(MenuUpdate.Navigate(route(worldUuid, 0)))
     }
 
     private fun render(player: Player, source: Holder): InventoryMenuView {
@@ -161,7 +195,7 @@ class WorldBackupMenuExtension(
     private fun changePage(context: MenuActionContext): MenuActionResult {
         val source = source(context.payload)
         return MenuActionResult.Success(
-            MenuUpdate.Replace(route(source.worldUuid, source.page, source.request)),
+            MenuUpdate.Replace(route(source.worldUuid, source.page)),
         )
     }
 
@@ -172,8 +206,9 @@ class WorldBackupMenuExtension(
         val backup = backupService.listBackupsForWorld(source.worldUuid)
             .firstOrNull { it.id == backupId }
             ?: return MenuActionResult.Rejected()
-        openRestoreConfirm(context.player, backup, source)
-        return MenuActionResult.Success(MenuUpdate.Close)
+        return MenuActionResult.Success(
+            MenuUpdate.Navigate(restoreConfirmationRoute(source, backup.id)),
+        )
     }
 
     private fun createBackup(context: MenuActionContext): MenuActionResult {
@@ -328,55 +363,102 @@ class WorldBackupMenuExtension(
                     i18nComponent(player, "owner_backup.name_input.submit"),
                     MenuDialogHandler { target, response ->
                         val name = BackupDisplay.normalizeManualName(response.textValue("backup_name"))
-                        openBackupConfirm(target, sourceSnapshot, name)
-                        MenuActionResult.Success(MenuUpdate.None)
+                        MenuActionResult.Success(
+                            MenuUpdate.Navigate(backupConfirmationRoute(sourceSnapshot, name)),
+                        )
                     },
                 ),
                 cancel = MenuDialogButton(
                     i18nComponent(player, "owner_backup.name_input.cancel"),
-                    MenuDialogHandler { target, _ ->
-                        runtime.replace(
-                            target,
-                            route(sourceSnapshot.worldUuid, sourceSnapshot.page, sourceSnapshot.request),
-                        )
-                        MenuActionResult.Success(MenuUpdate.None)
+                    MenuDialogHandler { _, _ ->
+                        MenuActionResult.Success(MenuUpdate.Resume)
                     },
                 ),
             ),
         )
     }
 
-    private fun openBackupConfirm(player: Player, source: Holder, backupName: String) {
-        val sourceSnapshot = source.copy()
-        mwm().confirmationMenuGui.openSimple(
-            player = player,
-            menuId = "owner-backup-confirmation",
-            title = i18nComponent(player, "confirm.owner_backup.title"),
-            bodyLines = i18nList(
+    private fun renderBackupConfirmation(player: Player, route: MenuRoute): InventoryMenuView {
+        val backupName = route.payload[BACKUP_NAME_KEY].orEmpty()
+        return confirmationView(
+            player,
+            i18nComponent(player, "confirm.owner_backup.title"),
+            i18nList(
                 player,
                 "confirm.owner_backup.lore",
                 mapOf("name" to backupName),
-            ).map(Component::text),
-            confirmLabel = Component.text(i18n(player, "confirm.button.confirm")),
-            cancelLabel = Component.text(i18n(player, "confirm.button.cancel")),
-            onConfirm = { executeOwnerBackup(player, sourceSnapshot, backupName) },
+            ),
         )
     }
 
-    private fun openRestoreConfirm(player: Player, backup: BackupEntry, source: Holder) {
-        val sourceSnapshot = source.copy()
-        mwm().confirmationMenuGui.openSimple(
-            player = player,
-            menuId = "restore-confirmation",
-            title = i18nComponent(player, "confirm.restore.title"),
-            bodyLines = i18nList(player, "confirm.restore.lore").map(Component::text),
-            confirmLabel = Component.text(i18n(player, "confirm.button.confirm")),
-            cancelLabel = Component.text(i18n(player, "confirm.button.cancel")),
-            onConfirm = { executeRestore(player, backup, sourceSnapshot) },
+    private fun renderRestoreConfirmation(player: Player, route: MenuRoute): InventoryMenuView =
+        confirmationView(
+            player,
+            i18nComponent(player, "confirm.restore.title"),
+            i18nList(player, "confirm.restore.lore"),
+        )
+
+    private fun confirmationView(
+        player: Player,
+        title: Component,
+        body: List<String>,
+    ): InventoryMenuView {
+        val layout = me.awabi2048.mwmchanpon.ui.ChanponGuiElements.confirmationLayout()
+        val preview = ItemStack(Material.PAPER).apply {
+            editMeta { meta ->
+                meta.displayName(title)
+                meta.lore(body.map(Component::text))
+            }
+        }
+        val confirm = ItemStack(Material.LIME_CONCRETE).apply {
+            editMeta { it.displayName(Component.text(i18n(player, "confirm.button.confirm"))) }
+        }
+        val cancel = ItemStack(Material.RED_CONCRETE).apply {
+            editMeta { it.displayName(Component.text(i18n(player, "confirm.button.cancel"))) }
+        }
+        return InventoryMenuView(
+            layout.size,
+            title,
+            listOf(
+                MenuElement(
+                    layout.confirmSlot,
+                    confirm,
+                    GuiElementRole.CONFIRM,
+                    ACTION_RUNTIME_CONFIRM,
+                ),
+                MenuElement(layout.previewSlot, preview, GuiElementRole.CONTENT),
+                MenuElement(
+                    layout.cancelSlot,
+                    cancel,
+                    GuiElementRole.CANCEL,
+                    ACTION_RUNTIME_CANCEL,
+                ),
+            ),
         )
     }
 
-    private fun entryItem(player: Player, worldUuid: UUID): ItemStack {
+    private fun confirmOwnerBackup(context: MenuActionContext): MenuActionResult {
+        val source = source(context.payload)
+        val backupName = context.payload[BACKUP_NAME_KEY]
+            ?: return MenuActionResult.Rejected()
+        executeOwnerBackup(context.player, source, backupName)
+        return MenuActionResult.Success(MenuUpdate.Close)
+    }
+
+    private fun confirmRestore(context: MenuActionContext): MenuActionResult {
+        val source = source(context.payload)
+        val backupId = context.payload[BACKUP_ID_KEY] ?: return MenuActionResult.Rejected()
+        val backup = backupService.listBackupsForWorld(source.worldUuid)
+            .firstOrNull { it.id == backupId }
+            ?: return MenuActionResult.Rejected()
+        executeRestore(context.player, backup, source)
+        return MenuActionResult.Success(MenuUpdate.Close)
+    }
+
+    private fun cancelConfirmation(@Suppress("UNUSED_PARAMETER") context: MenuActionContext): MenuActionResult =
+        MenuActionResult.Success(MenuUpdate.Back)
+
+    private fun entryItem(player: Player): ItemStack {
         val item = ItemStack(Material.CHEST)
         item.editMeta { meta ->
             meta.displayName(i18nComponent(player, "owner_backup.display"))
@@ -386,9 +468,6 @@ class WorldBackupMenuExtension(
             )))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
-        ItemTag.setExtensionId(item, EXTENSION_ID)
-        ItemTag.setWorldUuid(item, worldUuid)
         return item
     }
 
@@ -485,21 +564,32 @@ class WorldBackupMenuExtension(
         else -> Material.RECOVERY_COMPASS
     }
 
-    private fun route(worldUuid: UUID, page: Int, request: WorldSettingsMenuRequest): MenuRoute {
+    private fun route(worldUuid: UUID, page: Int): MenuRoute {
         return MenuRoute(
             RUNTIME_OWNER,
             ROUTE_OWNER_BACKUPS,
-            payload(Holder(worldUuid, page, request)),
+            payload(Holder(worldUuid, page)),
         )
     }
 
     private fun payload(source: Holder): Map<String, String> = mapOf(
         PAYLOAD_WORLD_UUID to source.worldUuid.toString(),
         PAYLOAD_PAGE to source.page.toString(),
-        PAYLOAD_SHOW_BACK to source.request.showBackButton.toString(),
-        PAYLOAD_PLAYER_FLOW to source.request.isPlayerWorldFlow?.toString().orEmpty(),
-        PAYLOAD_PARENT_BACK to source.request.parentShowBackButton?.toString().orEmpty(),
     )
+
+    private fun backupConfirmationRoute(source: Holder, backupName: String): MenuRoute =
+        MenuRoute(
+            RUNTIME_OWNER,
+            ROUTE_OWNER_BACKUP_CONFIRM,
+            payload(source) + (BACKUP_NAME_KEY to backupName),
+        )
+
+    private fun restoreConfirmationRoute(source: Holder, backupId: String): MenuRoute =
+        MenuRoute(
+            RUNTIME_OWNER,
+            ROUTE_RESTORE_CONFIRM,
+            payload(source) + (BACKUP_ID_KEY to backupId),
+        )
 
     private fun source(route: MenuRoute): Holder = source(route.payload)
 
@@ -510,24 +600,12 @@ class WorldBackupMenuExtension(
         return Holder(
             worldUuid,
             payload[PAYLOAD_PAGE]?.toIntOrNull() ?: 0,
-            WorldSettingsMenuRequest(
-                payload[PAYLOAD_SHOW_BACK].toBoolean(),
-                payload[PAYLOAD_PLAYER_FLOW]?.takeIf(String::isNotEmpty)?.toBoolean(),
-                payload[PAYLOAD_PARENT_BACK]?.takeIf(String::isNotEmpty)?.toBoolean(),
-            ),
         )
     }
 
-    private fun currentRequest(player: Player): WorldSettingsMenuRequest {
-        val session = org.bukkit.plugin.java.JavaPlugin.getPlugin(MyWorldManager::class.java)
-            .settingsSessionManager
-            .getSession(player)
-        return WorldSettingsMenuRequest(
-            session?.showBackButton ?: false,
-            session?.isPlayerWorldFlow,
-            session?.parentShowBackButton
-        )
-    }
+    private fun worldUuid(arguments: Map<String, String>): UUID? =
+        arguments[PAYLOAD_WORLD_UUID]
+            ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
 
     private fun i18nComponent(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nComponent(player, "chanpon.backup.$key", placeholders)
@@ -539,28 +617,29 @@ class WorldBackupMenuExtension(
         CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(blocks))
     private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)
 
-    data class Holder(val worldUuid: UUID, val page: Int, val request: WorldSettingsMenuRequest)
+    data class Holder(val worldUuid: UUID, val page: Int)
 
     companion object {
         private const val ITEMS_PER_PAGE = 36
-        private const val EXTENSION_ID = "chanpon.world_backup"
+        private const val CAPABILITY_ID = "world-backup"
         private const val TYPE_BACKUP_ITEM = "chanpon_owner_backup_item"
         private const val TYPE_CONTROL = "chanpon_owner_backup_control"
         private const val BACKUP_ID_KEY = "chanpon_backup_id"
         private const val ACTION_KEY = "chanpon_action"
         private const val ACTION_BACKUP = "backup"
-        private const val WORLD_MENU_SLOT = 52
         private const val MAX_BACKUP_NAME_LENGTH = 32
         private const val RUNTIME_OWNER = "mwm-chanpon"
         private const val ROUTE_OWNER_BACKUPS = "owner-backups"
+        private const val ROUTE_OWNER_BACKUP_CONFIRM = "owner-backup-confirm"
+        private const val ROUTE_RESTORE_CONFIRM = "owner-backup-restore-confirm"
         private const val ACTION_RUNTIME_BACK = "back"
         private const val ACTION_RUNTIME_PAGE = "page"
         private const val ACTION_RUNTIME_RESTORE = "restore"
         private const val ACTION_RUNTIME_CREATE = "create"
+        private const val ACTION_RUNTIME_CONFIRM = "confirm"
+        private const val ACTION_RUNTIME_CANCEL = "cancel"
         private const val PAYLOAD_WORLD_UUID = "world_uuid"
         private const val PAYLOAD_PAGE = "page"
-        private const val PAYLOAD_SHOW_BACK = "show_back"
-        private const val PAYLOAD_PLAYER_FLOW = "player_flow"
-        private const val PAYLOAD_PARENT_BACK = "parent_back"
+        private const val BACKUP_NAME_KEY = "backup_name"
     }
 }

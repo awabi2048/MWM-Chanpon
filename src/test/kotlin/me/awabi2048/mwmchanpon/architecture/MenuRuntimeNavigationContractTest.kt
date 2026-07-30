@@ -83,7 +83,7 @@ class MenuRuntimeNavigationContractTest {
     @Test
     fun `owner backup back action pops runtime history without reopening settings`() {
         val source = Path.of(
-            "src/main/kotlin/me/awabi2048/mwmchanpon/extension/WorldBackupMenuExtension.kt",
+            "src/main/kotlin/me/awabi2048/mwmchanpon/extension/WorldBackupCapability.kt",
         ).readText()
         val body = functionBody(source, "back")
 
@@ -138,10 +138,10 @@ class MenuRuntimeNavigationContractTest {
     @Test
     fun `dialog cancellation replaces its source menu without adding history`() {
         val backup = Path.of(
-            "src/main/kotlin/me/awabi2048/mwmchanpon/extension/WorldBackupMenuExtension.kt",
+            "src/main/kotlin/me/awabi2048/mwmchanpon/extension/WorldBackupCapability.kt",
         ).readText()
-        assertTrue("runtime.replace(" in backup)
-        assertTrue("sourceSnapshot.request" in backup)
+        assertTrue("MenuUpdate.Resume" in backup)
+        assertFalse("sourceSnapshot.request" in backup)
 
         val environment = uiRoot.resolve("ChanponEnvironmentGui.kt").readText()
         assertTrue("replaceCurrent: Boolean = false" in environment)
