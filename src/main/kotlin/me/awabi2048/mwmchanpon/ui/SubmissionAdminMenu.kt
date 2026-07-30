@@ -102,6 +102,12 @@ class SubmissionAdminMenu(
         runtime.navigate(player, listRoute(SubmissionViewState(page, progressFilter, sortType)))
     }
 
+    internal fun route(
+        page: Int = 0,
+        progressFilter: ProgressFilter = ProgressFilter.ALL,
+        sortType: SortType = SortType.CREATED_DESC,
+    ): MenuRoute = listRoute(SubmissionViewState(page, progressFilter, sortType))
+
     private fun renderList(player: Player, route: MenuRoute): InventoryMenuView {
         val requested = state(route)
         val worlds = filteredWorlds(requested.progressFilter, requested.sortType)

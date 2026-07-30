@@ -578,7 +578,7 @@ class ChanponEnvironmentGui(
         return CCSystem.getAPI().getI18nComponent(player, "chanpon.environment.$key", placeholders)
     }
 
-    private fun route(worldUuid: UUID): MenuRoute = MenuRoute(
+    internal fun route(worldUuid: UUID): MenuRoute = MenuRoute(
         RUNTIME_OWNER,
         ROUTE_ENVIRONMENT,
         mapOf(PAYLOAD_WORLD_UUID to worldUuid.toString()),

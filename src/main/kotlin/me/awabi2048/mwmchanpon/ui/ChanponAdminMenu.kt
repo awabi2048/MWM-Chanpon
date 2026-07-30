@@ -56,16 +56,16 @@ class ChanponAdminMenu(
                 renderer = { context -> renderMain(context.player) },
                 actions = mapOf(
                     ACTION_SUBMISSION to MenuActionHandler { context ->
-                        openChild { submissionAdminMenu.open(context.player) }
+                        MenuActionResult.Success(MenuUpdate.Navigate(submissionAdminMenu.route()))
                     },
                     ACTION_WORLD_DATA to MenuActionHandler { context ->
-                        openChild { worldDataManagementMenu.open(context.player) }
+                        MenuActionResult.Success(MenuUpdate.Navigate(worldDataManagementMenu.route()))
                     },
                     ACTION_AUTOMATION to MenuActionHandler { context ->
-                        openChild { automationSettingsMenu.open(context.player) }
+                        MenuActionResult.Success(MenuUpdate.Navigate(automationSettingsMenu.route()))
                     },
                     ACTION_EXPORT to MenuActionHandler { context ->
-                        openChild { worldDataExportMenu.open(context.player) }
+                        MenuActionResult.Success(MenuUpdate.Navigate(worldDataExportMenu.route()))
                     },
                     ACTION_SWITCH_MWM to MenuActionHandler { context ->
                         if (MyWorldManagerApi.openAdminMenu(context.player)) {
@@ -103,8 +103,11 @@ class ChanponAdminMenu(
                     switchToChanponPresentation(it.player)
                 },
                 actionHandler = MenuCapabilityActionHandler {
-                    open(it.player)
-                    MenuActionResult.Success(MenuUpdate.None)
+                    if (!it.player.hasPermission("mwmchanpon.admin")) {
+                        MenuActionResult.Rejected(i18nComponent(it.player, "admin.no_permission"))
+                    } else {
+                        MenuActionResult.Success(MenuUpdate.Navigate(MenuRoute(OWNER, ROUTE_MAIN)))
+                    }
                 },
             ),
         )
@@ -221,11 +224,6 @@ class ChanponAdminMenu(
         }
         context.player.sendMessage(i18nComponent(context.player, "spawn_world.set_success"))
         return MenuActionResult.Success(MenuUpdate.Back)
-    }
-
-    private fun openChild(opener: () -> Unit): MenuActionResult {
-        opener()
-        return MenuActionResult.Success(MenuUpdate.None)
     }
 
     private fun menuItem(player: Player, material: Material, key: String, action: String): ItemStack {

@@ -59,7 +59,7 @@ class MenuRuntimeNavigationContractTest {
             "src/main/kotlin/me/awabi2048/mwmchanpon/service/EasyVoidWorldCreationService.kt",
         ).readText()
         assertTrue("returnRoutes[player.uniqueId] = returnRoute" in source)
-        assertTrue("runtime.replace(player, returnRoute)" in source)
+        assertTrue("returnRoute?.let(MenuUpdate::Replace)" in source)
         assertTrue("InventoryMenuDefinition(" in source)
         assertTrue("id = CONFIRM_ROUTE" in source)
         assertFalse("CONFIRM_DIALOG" in source)

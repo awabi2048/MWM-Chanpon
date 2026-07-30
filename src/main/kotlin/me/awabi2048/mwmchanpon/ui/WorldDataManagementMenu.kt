@@ -82,6 +82,8 @@ class WorldDataManagementMenu(
         runtime.navigate(player, listRoute(page))
     }
 
+    internal fun route(page: Int = 0): MenuRoute = listRoute(page)
+
     private fun renderList(player: Player, route: MenuRoute): InventoryMenuView {
         val worlds = productionWorlds()
         val pages = pageCount(worlds.size)

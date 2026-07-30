@@ -93,8 +93,7 @@ class ChanponWorldMenuAccessPolicy(
             detail = "password"
         )
         player.sendMessage(i18n(player, "protection.password_success"))
-        openWorldSettings(player, worldData)
-        return MenuActionResult.Success(MenuUpdate.None)
+        return openWorldSettings(player, worldData)
     }
 
     private fun showPasswordDialog(player: Player, worldData: WorldData): Boolean {
@@ -137,15 +136,16 @@ class ChanponWorldMenuAccessPolicy(
         }
     }
 
-    private fun openWorldSettings(player: Player, worldData: WorldData) {
-        MyWorldManagerApi.openWorldSettings(
+    private fun openWorldSettings(player: Player, worldData: WorldData): MenuActionResult {
+        val route = MyWorldManagerApi.prepareWorldSettingsRoute(
             player,
             worldData.uuid,
             WorldSettingsNavigationRequest(
                 showBackButton = true,
                 isAdminFlow = false,
             ),
-        )
+        ) ?: return MenuActionResult.Rejected()
+        return MenuActionResult.Success(MenuUpdate.Navigate(route))
     }
 
     private fun i18n(player: Player?, key: String): String =

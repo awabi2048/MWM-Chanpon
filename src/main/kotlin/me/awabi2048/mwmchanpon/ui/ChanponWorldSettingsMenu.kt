@@ -215,26 +215,6 @@ class ChanponWorldSettingsMenu(
         )
     }
 
-    private fun openConfirmByPlatform(player: Player, worldData: WorldData, action: ConfirmAction, direction: BlockFace?) {
-        if (
-            MyWorldManagerApi.getBedrockFormService()?.isBedrock(player) == true &&
-            openBedrockConfirmForm(player, worldData, action, direction)
-        ) {
-            return
-        }
-        runtime.navigate(
-            player,
-            route(
-                Source(
-                    Screen.CONFIRM,
-                    worldData.uuid,
-                    confirmAction = action,
-                    direction = direction,
-                ),
-            ),
-        )
-    }
-
     private fun confirmResultByPlatform(
         player: Player,
         worldData: WorldData,
@@ -935,8 +915,7 @@ class ChanponWorldSettingsMenu(
         return when (feature) {
             WorldSettingsFeature.EXPANSION -> {
                 if (MyWorldManagerApi.getBedrockFormService()?.isBedrock(player) == true) {
-                    openConfirmByPlatform(player, worldData, ConfirmAction.EXPAND, null)
-                    MenuActionResult.Success(MenuUpdate.None)
+                    confirmResultByPlatform(player, worldData, ConfirmAction.EXPAND, null)
                 } else {
                     openExpansionMenu(player, worldData)
                 }
@@ -957,8 +936,9 @@ class ChanponWorldSettingsMenu(
                 }
             }
             WorldSettingsFeature.ENVIRONMENT -> {
-                environmentGui.open(player, worldData)
-                MenuActionResult.Success(MenuUpdate.None)
+                MenuActionResult.Success(
+                    MenuUpdate.Navigate(environmentGui.route(worldData.uuid)),
+                )
             }
             WorldSettingsFeature.CRITICAL -> openCriticalMenu(player, worldData)
         }

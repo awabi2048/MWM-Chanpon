@@ -94,10 +94,9 @@ class EasyVoidWorldCreationService(
     private fun cancelFlow(player: Player): MenuActionResult {
         pendingCreations.remove(player.uniqueId)
         val returnRoute = returnRoutes.remove(player.uniqueId)
-        if (returnRoute != null) {
-            runtime.replace(player, returnRoute)
-        }
-        return MenuActionResult.Success(MenuUpdate.None)
+        return MenuActionResult.Success(
+            returnRoute?.let(MenuUpdate::Replace) ?: MenuUpdate.Close,
+        )
     }
 
     private fun handleNameSubmit(
@@ -133,8 +132,9 @@ class EasyVoidWorldCreationService(
         }
 
         pendingCreations[player.uniqueId] = PendingCreation(name)
-        runtime.navigate(player, MenuRoute(OWNER, CONFIRM_ROUTE))
-        return MenuActionResult.Success(MenuUpdate.None)
+        return MenuActionResult.Success(
+            MenuUpdate.Navigate(MenuRoute(OWNER, CONFIRM_ROUTE)),
+        )
     }
 
     private fun showNameDialog(

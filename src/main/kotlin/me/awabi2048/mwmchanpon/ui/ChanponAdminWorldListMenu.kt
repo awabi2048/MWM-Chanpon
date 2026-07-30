@@ -262,7 +262,6 @@ class ChanponAdminWorldListMenu(
             }
             context.click.isRightClick -> {
                 openSettings(context.player, worldData)
-                MenuActionResult.Success(MenuUpdate.None)
             }
             else -> MenuActionResult.Ignored
         }
@@ -477,10 +476,9 @@ class ChanponAdminWorldListMenu(
             }
         }
 
-    private fun openSettings(player: Player, worldData: WorldData) {
+    private fun openSettings(player: Player, worldData: WorldData): MenuActionResult {
         val folderName = worldDirectory(worldData)
         if (!worldData.isArchived && Bukkit.getWorld(folderName) == null) {
-            runtime.close(player)
             player.sendMessage(CCSystem.getAPI().getI18nString(player, "messages.world_loading"))
             Bukkit.getScheduler().runTask(plugin, Runnable {
                 if (!player.isOnline) return@Runnable
@@ -488,11 +486,16 @@ class ChanponAdminWorldListMenu(
                     player.sendMessage(CCSystem.getAPI().getI18nString(player, "error.load_failed"))
                     return@Runnable
                 }
-                openSettings(player, worldData)
+                settingsRoute(player, worldData)?.let { runtime.navigate(player, it) }
             })
-            return
+            return MenuActionResult.Success(MenuUpdate.Close)
         }
-        MyWorldManagerApi.openWorldSettings(
+        val route = settingsRoute(player, worldData) ?: return MenuActionResult.Rejected()
+        return MenuActionResult.Success(MenuUpdate.Navigate(route))
+    }
+
+    private fun settingsRoute(player: Player, worldData: WorldData): MenuRoute? =
+        MyWorldManagerApi.prepareWorldSettingsRoute(
             player,
             worldData.uuid,
             WorldSettingsNavigationRequest(
@@ -500,7 +503,6 @@ class ChanponAdminWorldListMenu(
                 isAdminFlow = true,
             ),
         )
-    }
 
     private fun sendCopyMessage(player: Player, worldData: WorldData) {
         val directory = worldDirectory(worldData)

@@ -147,8 +147,7 @@ class ChanponPlayerWorldCapability(
             if (worldData.isArchived) return MenuActionResult.Rejected()
             if (isCurrentWorld(player, worldData)) {
                 if (!canOpenSettings(player, worldData)) return MenuActionResult.Rejected()
-                openWorldSettings(subject, worldData)
-                return MenuActionResult.Success(MenuUpdate.None)
+                return openWorldSettings(subject, worldData)
             }
             MyWorldManagerApi.getWorldService()?.teleportToWorld(player, worldData.uuid)
             player.sendMessage(
@@ -157,8 +156,7 @@ class ChanponPlayerWorldCapability(
             return MenuActionResult.Success(MenuUpdate.Close)
         }
         if (context.click.isRightClick && !context.click.isShiftClick && canOpenSettings(player, worldData)) {
-            openWorldSettings(subject, worldData)
-            return MenuActionResult.Success(MenuUpdate.None)
+            return openWorldSettings(subject, worldData)
         }
         return MenuActionResult.Ignored
     }
@@ -361,8 +359,8 @@ class ChanponPlayerWorldCapability(
     private fun openWorldSettings(
         context: PlayerWorldCapabilitySubject,
         worldData: WorldData,
-    ) {
-        MyWorldManagerApi.openWorldSettings(
+    ): MenuActionResult {
+        val route = MyWorldManagerApi.prepareWorldSettingsRoute(
             context.player,
             worldData.uuid,
             WorldSettingsNavigationRequest(
@@ -370,7 +368,8 @@ class ChanponPlayerWorldCapability(
                 isPlayerWorldFlow = true,
                 parentShowBackButton = context.showBackButton,
             ),
-        )
+        ) ?: return MenuActionResult.Rejected()
+        return MenuActionResult.Success(MenuUpdate.Navigate(route))
     }
 
     private fun isCurrentWorld(player: Player, world: WorldData): Boolean =

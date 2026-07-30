@@ -64,6 +64,9 @@ class WorldDataExportMenu(
         runtime.navigate(player, listRoute(page, selected.toList()))
     }
 
+    internal fun route(page: Int = 0, selected: Set<UUID> = emptySet()): MenuRoute =
+        listRoute(page, selected.toList())
+
     private fun renderList(player: Player, route: MenuRoute): InventoryMenuView {
         val worlds = exportService.productionWorlds()
         val pages = if (worlds.isEmpty()) 1 else (worlds.size + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE

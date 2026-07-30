@@ -86,8 +86,10 @@ class AutomationSettingsMenu(
 
     fun open(player: Player) {
         if (!player.hasPermission("mwmchanpon.admin")) return
-        runtime.navigate(player, MenuRoute(OWNER, ROUTE_MAIN))
+        runtime.navigate(player, route())
     }
+
+    internal fun route(): MenuRoute = MenuRoute(OWNER, ROUTE_MAIN)
 
     private fun renderMain(player: Player): InventoryMenuView {
         val elements = mutableListOf(
