@@ -7,11 +7,18 @@ import com.awabi2048.ccsystem.api.gui.GuiCycleDirection
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryOption
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
+import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.GuiValueTone
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import com.awabi2048.ccsystem.api.gui.MenuDialogButton
 import com.awabi2048.ccsystem.api.gui.MenuDialogHandler
 import com.awabi2048.ccsystem.api.gui.MenuDialogInput
@@ -49,7 +56,7 @@ class ChanponEnvironmentGui(
                 id = ROUTE_ENVIRONMENT,
                 renderer = { context -> render(context.player, world(context.route)) },
                 actions = mapOf(
-                    ACTION_SETTING to MenuActionHandler(::changeSetting),
+                    ACTION_SETTING to MenuActionHandler(::setting),
                     ACTION_BACK to MenuActionHandler { MenuActionResult.Success(MenuUpdate.Back) },
                 ),
             ),
@@ -79,30 +86,23 @@ class ChanponEnvironmentGui(
         val allowFreecam = storage.isFreecamAllowed(worldData.uuid)
         val outsideTargetWorld = !isInTargetWorld(player, worldData)
 
-        fun setting(slot: Int, key: String, item: ItemStack) = MenuElement(
-            slot,
-            item,
-            GuiElementRole.ACTION,
-            ACTION_SETTING,
-            mapOf(PAYLOAD_WORLD_UUID to worldData.uuid.toString(), PAYLOAD_SETTING to key),
-        )
         return InventoryMenuView(
             45,
             i18nComponent(player, "title"),
             listOf(
-                setting(19, ACTION_WEATHER, directSettingItem(player, ACTION_WEATHER, Material.LIGHT_BLUE_WOOL, weatherDisplay(player, weather), weatherOptions(player), weather ?: NONE_KEY, outsideTargetWorld)),
-                setting(20, ACTION_TIME, directSettingItem(player, ACTION_TIME, Material.CLOCK, timeDisplay(player, time), timeOptions(player, time), timeOptionKey(time), outsideTargetWorld, customTimeAction = true)),
-                setting(21, ACTION_GRAVITY, directSettingItem(player, ACTION_GRAVITY, Material.FEATHER, gravityDisplay(player, gravity), gravityOptions(player), (gravity ?: DEFAULT_GRAVITY).toString(), outsideTargetWorld)),
-                setting(22, ACTION_FREECAM, directSettingItem(player, ACTION_FREECAM, Material.ENDER_EYE, freecamDisplay(player, allowFreecam), freecamOptions(player), allowFreecam.toString(), outsideTargetWorld)),
-                setting(23, ACTION_SCALE, directSettingItem(player, ACTION_SCALE, Material.PLAYER_HEAD, scaleDisplay(player, scale), scaleOptions(player), scale?.toString(), outsideTargetWorld)),
-                setting(24, ACTION_FLIGHT, directSettingItem(player, ACTION_FLIGHT, Material.ELYTRA, flightDisplay(player, allowFlight), flightOptions(player), allowFlight.toString(), outsideTargetWorld)),
-                setting(25, ACTION_PROTECTION, protectionSettingItem(player, worldData)),
+                directSettingEntry(player, 19, worldData.uuid, ACTION_WEATHER, Material.LIGHT_BLUE_WOOL, weatherDisplay(player, weather), weatherOptions(player), weather ?: NONE_KEY, outsideTargetWorld),
+                directSettingEntry(player, 20, worldData.uuid, ACTION_TIME, Material.CLOCK, timeDisplay(player, time), timeOptions(player, time), timeOptionKey(time), outsideTargetWorld, customTimeAction = true),
+                directSettingEntry(player, 21, worldData.uuid, ACTION_GRAVITY, Material.FEATHER, gravityDisplay(player, gravity), gravityOptions(player), (gravity ?: DEFAULT_GRAVITY).toString(), outsideTargetWorld),
+                directSettingEntry(player, 22, worldData.uuid, ACTION_FREECAM, Material.ENDER_EYE, freecamDisplay(player, allowFreecam), freecamOptions(player), allowFreecam.toString(), outsideTargetWorld),
+                directSettingEntry(player, 23, worldData.uuid, ACTION_SCALE, Material.PLAYER_HEAD, scaleDisplay(player, scale), scaleOptions(player), scale?.toString(), outsideTargetWorld),
+                directSettingEntry(player, 24, worldData.uuid, ACTION_FLIGHT, Material.ELYTRA, flightDisplay(player, allowFlight), flightOptions(player), allowFlight.toString(), outsideTargetWorld),
+                protectionSettingEntry(player, 25, worldData),
                 MenuElement(40, backItem(player), GuiElementRole.BACK, ACTION_BACK),
             ),
         )
     }
 
-    private fun changeSetting(context: MenuActionContext): MenuActionResult {
+    private fun setting(context: MenuActionContext): MenuActionResult {
         val worldData = world(context.route) ?: return MenuActionResult.Rejected()
         if (!accessGuard.allow(
                 context.player,
@@ -311,6 +311,124 @@ class ChanponEnvironmentGui(
     }
 
     // ---- Item helpers ----
+
+    private fun directSettingEntry(
+        player: Player,
+        slot: Int,
+        worldUuid: UUID,
+        key: String,
+        material: Material,
+        currentValue: String,
+        options: List<SettingOption>,
+        currentKey: String?,
+        showWorldRequiredWarning: Boolean,
+        customTimeAction: Boolean = false,
+    ): MenuElement {
+        val payload = mapOf(
+            PAYLOAD_WORLD_UUID to worldUuid.toString(),
+            PAYLOAD_SETTING to key,
+        )
+        val actions = buildList {
+            add(GuiMenuEntryAction(
+                ACTION_SETTING,
+                MenuAcceptedClicks.PLAIN_LEFT_RIGHT,
+                i18n(player, "common.action_next"),
+                payload,
+            ))
+            if (customTimeAction) {
+                add(GuiMenuEntryAction(
+                    ACTION_SETTING,
+                    MenuAcceptedClicks.SHIFT_LEFT,
+                    i18n(player, "time.custom.action"),
+                    payload,
+                ))
+            }
+        }
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = slot,
+                material = material,
+                name = GuiNameSpec.Component(i18nComponent(player, "$key.display")),
+                role = GuiElementRole.ACTION,
+                description = listOf(i18n(player, "$key.description")),
+                data = listOf(GuiMenuEntryData(
+                    i18n(player, "common.current_label"),
+                    currentValue,
+                    GuiValueTone.PRIMARY,
+                )),
+                options = options.map { GuiMenuEntryOption(it.display, it.key == currentKey) },
+                warnings = if (showWorldRequiredWarning) {
+                    listOf(i18n(player, "common.must_be_in_world_warning"))
+                } else {
+                    emptyList()
+                },
+                actions = actions,
+            ),
+        )
+    }
+
+    private fun protectionSettingEntry(
+        player: Player,
+        slot: Int,
+        worldData: WorldData,
+    ): MenuElement {
+        val mode = storage.getProtectionMode(worldData.uuid)
+        val password = if (mode == ChanponWorldProtectionMode.PASSWORD) {
+            storage.getProtectionPassword(worldData.uuid)
+        } else {
+            null
+        }
+        val payload = mapOf(
+            PAYLOAD_WORLD_UUID to worldData.uuid.toString(),
+            PAYLOAD_SETTING to ACTION_PROTECTION,
+        )
+        val actions = buildList {
+            add(GuiMenuEntryAction(
+                ACTION_SETTING,
+                MenuAcceptedClicks.PLAIN_LEFT_RIGHT,
+                i18n(player, "common.action_next"),
+                payload,
+            ))
+            if (mode == ChanponWorldProtectionMode.PASSWORD) {
+                add(GuiMenuEntryAction(
+                    ACTION_SETTING,
+                    MenuAcceptedClicks.SHIFT_LEFT,
+                    i18n(player, "protection.password_change_action"),
+                    payload,
+                ))
+            }
+        }
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = slot,
+                material = Material.IRON_DOOR,
+                name = GuiNameSpec.Component(i18nComponent(player, "protection.display")),
+                role = GuiElementRole.ACTION,
+                description = listOf(i18n(player, "protection.description")),
+                data = buildList {
+                    add(GuiMenuEntryData(
+                        i18n(player, "common.current_label"),
+                        protectionDisplay(player, mode),
+                        GuiValueTone.PRIMARY,
+                    ))
+                    if (password != null) {
+                        add(GuiMenuEntryData(i18n(player, "protection.password_label"), password))
+                    }
+                },
+                options = protectionOptions(player).map {
+                    GuiMenuEntryOption(it.display, it.key == mode.storageValue)
+                },
+                warnings = if (mode == ChanponWorldProtectionMode.PASSWORD && password == null) {
+                    listOf(i18n(player, "protection.password_missing_warning"))
+                } else {
+                    emptyList()
+                },
+                actions = actions,
+            ),
+        )
+    }
 
     private fun directSettingItem(
         player: Player,
