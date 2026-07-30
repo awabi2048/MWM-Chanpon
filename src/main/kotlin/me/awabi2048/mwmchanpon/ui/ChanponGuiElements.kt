@@ -11,7 +11,6 @@ import com.awabi2048.ccsystem.api.gui.GuiPagedListLayout
 import com.awabi2048.ccsystem.api.gui.GuiSettingsLayout
 import com.awabi2048.ccsystem.api.gui.GuiThreeChoiceLayout
 import org.bukkit.Material
-import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemStack
 
 /** Keeps Chanpon UI calls local while delegating shared layout and visual construction to CC-System. */
@@ -20,10 +19,6 @@ internal object ChanponGuiElements {
         get() = CCSystem.getAPI().getGuiElementService()
     private val layouts
         get() = CCSystem.getAPI().getGuiLayoutService()
-
-    fun applyStandardFrame(inventory: Inventory) {
-        layouts.applyStandardFrame(inventory)
-    }
 
     fun confirmationLayout(): GuiConfirmationLayout = layouts.confirmation45()
 
@@ -37,46 +32,6 @@ internal object ChanponGuiElements {
         45 -> layouts.backSlot45()
         54 -> layouts.backSlot54()
         else -> error("Unsupported inventory size for a centered back button: $inventorySize")
-    }
-
-    fun applyConfirmationFrame(inventory: Inventory) {
-        applyStandardFrame(inventory)
-    }
-
-    fun setConfirmationItems(
-        inventory: Inventory,
-        centerItem: ItemStack,
-        confirmItem: ItemStack,
-        cancelItem: ItemStack
-    ) {
-        val layout = confirmationLayout()
-        inventory.setItem(layout.previewSlot, centerItem)
-        inventory.setItem(layout.confirmSlot, confirmItem)
-        inventory.setItem(layout.cancelSlot, cancelItem)
-    }
-
-    fun setPagedListNavigation(
-        inventory: Inventory,
-        previousItem: ItemStack?,
-        nextItem: ItemStack?,
-        backItem: ItemStack?,
-        infoItem: ItemStack?
-    ) {
-        val layout = pagedListLayout()
-        previousItem?.let { inventory.setItem(layout.previousPageSlot, it) }
-        nextItem?.let { inventory.setItem(layout.nextPageSlot, it) }
-        backItem?.let { inventory.setItem(layout.backSlot, it) }
-        infoItem?.let { inventory.setItem(layout.infoSlot, it) }
-    }
-
-    fun setSettingsFooter(inventory: Inventory, backItem: ItemStack?, infoItem: ItemStack?) {
-        val layout = settingsLayout()
-        backItem?.let { inventory.setItem(layout.backSlot, it) }
-        infoItem?.let { inventory.setItem(layout.infoSlot, it) }
-    }
-
-    fun fill(inventory: Inventory, material: Material = Material.GRAY_STAINED_GLASS_PANE) {
-        elements.fillEmpty(inventory, decorationSpec(material))
     }
 
     fun decoration(material: Material): ItemStack = elements.item(decorationSpec(material))
