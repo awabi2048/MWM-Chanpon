@@ -52,7 +52,7 @@ import me.awabi2048.mwmchanpon.ui.ChanponAdminMenu
 import me.awabi2048.mwmchanpon.ui.ChanponAdminWorldListMenu
 import me.awabi2048.mwmchanpon.ui.ChanponEnvironmentGui
 import me.awabi2048.mwmchanpon.ui.ChanponPlayerWorldCapability
-import me.awabi2048.mwmchanpon.ui.ChanponWorldSettingsMenuProvider
+import me.awabi2048.mwmchanpon.ui.ChanponWorldSettingsMenu
 import me.awabi2048.mwmchanpon.ui.SubmissionAdminMenu
 import me.awabi2048.mwmchanpon.ui.ToolPermissionMenu
 import me.awabi2048.mwmchanpon.ui.WorldDataExportMenu
@@ -68,7 +68,7 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var productionToggleExtension: ProductionToggleExtension
     private lateinit var productionWorldGuard: ProductionWorldGuard
     private lateinit var submittedProtectionService: SubmittedWorldProtectionService
-    private lateinit var chanponWorldSettingsMenuProvider: ChanponWorldSettingsMenuProvider
+    private lateinit var chanponWorldSettingsMenu: ChanponWorldSettingsMenu
     private lateinit var playerWorldCapability: ChanponPlayerWorldCapability
     private lateinit var chanponAdminWorldListMenu: ChanponAdminWorldListMenu
     private lateinit var submissionAdminMenu: SubmissionAdminMenu
@@ -247,9 +247,9 @@ class MWMChanponPlugin : JavaPlugin() {
         )
         chanponAdminWorldListMenu = ChanponAdminWorldListMenu(this, chanponStorage)
         environmentGui = ChanponEnvironmentGui(this, chanponStorage, submittedProtectionService, buildPermissionService)
-        chanponWorldSettingsMenuProvider = ChanponWorldSettingsMenuProvider(this, chanponStorage, submittedProtectionService, environmentGui)
+        chanponWorldSettingsMenu = ChanponWorldSettingsMenu(this, chanponStorage, submittedProtectionService, environmentGui)
         worldSettingsCapabilities = ChanponWorldSettingsCapabilities(
-            chanponWorldSettingsMenuProvider,
+            chanponWorldSettingsMenu,
         )
         easyVoidWorldCreationService = EasyVoidWorldCreationService(this)
         val archiveOperationGuard = ArchiveOperationGuard(globalStorage)

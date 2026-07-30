@@ -94,7 +94,7 @@ class MenuRuntimeNavigationContractTest {
 
     @Test
     fun `world settings child menus rely on runtime navigation without manual duplicate push`() {
-        val source = uiRoot.resolve("ChanponWorldSettingsMenuProvider.kt").readText()
+        val source = uiRoot.resolve("ChanponWorldSettingsMenu.kt").readText()
         val body = functionBody(source, "handleSettingsClick")
 
         listOf(
@@ -113,7 +113,7 @@ class MenuRuntimeNavigationContractTest {
 
     @Test
     fun `split world setting interactions share one display and dispatch definition`() {
-        val source = uiRoot.resolve("ChanponWorldSettingsMenuProvider.kt").readText()
+        val source = uiRoot.resolve("ChanponWorldSettingsMenu.kt").readText()
         val actions = functionBody(source, "settingIconActions")
         val dispatch = functionBody(source, "settingIconIntent")
 

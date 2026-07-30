@@ -53,7 +53,7 @@ import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
 
-class ChanponWorldSettingsMenuProvider(
+class ChanponWorldSettingsMenu(
     private val plugin: MWMChanponPlugin,
     private val storage: ChanponWorldStorage,
     private val protectionService: SubmittedWorldProtectionService,
@@ -71,28 +71,15 @@ class ChanponWorldSettingsMenuProvider(
                 actions = mapOf(
                     ACTION_SELECT to MenuActionHandler(::handleAction),
                     ACTION_CAPABILITY to MenuActionHandler(::handleCapability),
-                    MenuRuntimeActions.PLAYER_INVENTORY_CLICK to MenuActionHandler { context ->
-                        mwm().worldSettingsGui.handleIconSelection(context.player, context.item)
-                    },
                 ),
-                onClose = { context ->
-                    mwm().worldSettingsGui.handleManagedMenuClose(context.player, context.reason)
-                },
             )
         )
-    }
-
-    fun getId(): String = PROVIDER_ID
-
-    fun open(player: Player, worldData: WorldData, request: WorldSettingsNavigationRequest): Boolean {
-        return runtime.navigate(player, route(Source(Screen.MAIN, worldData.uuid, request)))
     }
 
     private fun render(player: Player, source: Source): InventoryMenuView {
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(source.worldUuid)
             ?: return InventoryMenuView(9, Component.text("World settings"), emptyList())
         return when (source.screen) {
-            Screen.MAIN -> renderMain(player, worldData, source.request)
             Screen.EXPANSION -> renderExpansion(player, worldData)
             Screen.MODIFIED_WARNING -> renderModifiedWarning(player)
             Screen.CONFIRM -> renderConfirmation(player, worldData, source)
@@ -266,7 +253,6 @@ class ChanponWorldSettingsMenuProvider(
     private fun handleAction(context: MenuActionContext): MenuActionResult {
         val source = source(context.route)
         return when (source.screen) {
-            Screen.MAIN -> handleSettingsClick(context.player, source, context.item, context.click)
             Screen.EXPANSION -> handleExpansionClick(context.player, source, context.item)
             Screen.MODIFIED_WARNING -> handleWarningClick(context.player, source, context.item)
             Screen.CONFIRM -> handleConfirmClick(context.player, source, context.item)
@@ -1062,13 +1048,21 @@ class ChanponWorldSettingsMenuProvider(
                     when (index) {
                         0 -> mwm().worldSettingsGui.enterSpawnSetting(player, worldData, true)
                         1 -> mwm().worldSettingsGui.enterSpawnSetting(player, worldData, false)
-                        else -> open(player, worldData, currentRequest(player))
+                        else -> MyWorldManagerApi.openWorldSettings(
+                            player,
+                            worldData.uuid,
+                            currentRequest(player),
+                        )
                     }
                 })
             },
             onClosed = {
                 Bukkit.getScheduler().runTask(plugin, Runnable {
-                    open(player, worldData, currentRequest(player))
+                    MyWorldManagerApi.openWorldSettings(
+                        player,
+                        worldData.uuid,
+                        currentRequest(player),
+                    )
                 })
             },
         )
@@ -1493,7 +1487,6 @@ class ChanponWorldSettingsMenuProvider(
     )
 
     private enum class Screen {
-        MAIN,
         EXPANSION,
         MODIFIED_WARNING,
         CONFIRM,
@@ -1509,7 +1502,7 @@ class ChanponWorldSettingsMenuProvider(
         return Source(
             screen = payload[PAYLOAD_SCREEN]
                 ?.let { runCatching { Screen.valueOf(it) }.getOrNull() }
-                ?: Screen.MAIN,
+                ?: Screen.EXPANSION,
             worldUuid = payload[PAYLOAD_WORLD_UUID]
                 ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
                 ?: UUID(0L, 0L),
@@ -1548,7 +1541,6 @@ class ChanponWorldSettingsMenuProvider(
     }
 
     companion object {
-        private const val PROVIDER_ID = "chanpon.world_settings"
         private const val RUNTIME_OWNER = "mwm-chanpon"
         private const val ROUTE_SETTINGS = "world-settings"
         private const val ACTION_SELECT = "select"

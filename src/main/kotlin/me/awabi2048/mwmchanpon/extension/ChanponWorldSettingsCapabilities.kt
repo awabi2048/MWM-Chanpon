@@ -7,14 +7,14 @@ import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityItemRenderer
-import me.awabi2048.mwmchanpon.ui.ChanponWorldSettingsMenuProvider
+import me.awabi2048.mwmchanpon.ui.ChanponWorldSettingsMenu
 import me.awabi2048.mwmchanpon.ui.WorldSettingsFeature
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsCapabilityPlacements
 import me.awabi2048.myworldmanager.model.WorldData
 
 internal class ChanponWorldSettingsCapabilities(
-    private val menu: ChanponWorldSettingsMenuProvider,
+    private val menu: ChanponWorldSettingsMenu,
 ) {
     init {
         register(
