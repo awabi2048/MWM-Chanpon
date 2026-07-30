@@ -4,6 +4,8 @@ import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
@@ -17,7 +19,6 @@ import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentationProvider
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
-import me.awabi2048.myworldmanager.api.extension.WorldSettingsCapabilityPlacements
 import me.awabi2048.myworldmanager.model.WorldData
 import org.bukkit.Material
 import org.bukkit.entity.Player
@@ -29,7 +30,7 @@ class LinkedPortalCapability {
             MenuCapabilityDefinition(
                 owner = OWNER,
                 id = CAPABILITY_ID,
-                placement = WorldSettingsCapabilityPlacements.FOOTER_LEFT_ACTIONS,
+                placement = ChanponWorldSettingsPlacements.FOOTER_LEFT,
                 availability = MenuCapabilityAvailability { context ->
                     val world = worldData(context.arguments) ?: return@MenuCapabilityAvailability false
                     context.player.uniqueId == world.owner ||
@@ -44,7 +45,7 @@ class LinkedPortalCapability {
                         id = "receive",
                         trigger = MenuCapabilityTrigger.LEFT,
                         textProvider = MenuCapabilityActionTextProvider {
-                            i18n(it.player, "linked_portal.display")
+                            i18n(it.player, "linked_portal.action")
                         },
                         handler = MenuCapabilityActionHandler(::receivePortal),
                     ),
@@ -75,7 +76,14 @@ class LinkedPortalCapability {
         GuiItemSpec(
             material = Material.END_PORTAL_FRAME,
             name = GuiNameSpec.Component(i18nComponent(player, "linked_portal.display")),
-            lore = GuiLoreSpec.None,
+            lore = GuiLoreSpec.Blocks(
+                listOf(
+                    GuiLoreBlock(
+                        i18nList(player, "linked_portal.description")
+                            .map(GuiLoreLine::Text),
+                    ),
+                ),
+            ),
             role = GuiElementRole.ACTION,
             amount = 1,
         ),

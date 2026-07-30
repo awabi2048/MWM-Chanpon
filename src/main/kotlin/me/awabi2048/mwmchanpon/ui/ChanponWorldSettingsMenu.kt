@@ -19,6 +19,7 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
 import com.awabi2048.ccsystem.api.gui.MenuInteraction
 import com.awabi2048.ccsystem.api.gui.MenuElement
@@ -26,10 +27,15 @@ import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import java.util.UUID
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
+import me.awabi2048.mwmchanpon.extension.ChanponWorldSettingsPlacements
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
+import me.awabi2048.myworldmanager.api.extension.WorldSettingsAction
+import me.awabi2048.myworldmanager.api.extension.WorldSettingsActionRequest
+import me.awabi2048.myworldmanager.api.extension.WorldSettingsNavigationRequest
+import me.awabi2048.myworldmanager.api.extension.WorldSettingsRouteProvider
 import me.awabi2048.myworldmanager.api.service.ExpansionExecutionMode
 import me.awabi2048.myworldmanager.api.service.ExpansionSequenceOptions
 import me.awabi2048.myworldmanager.api.service.ExpansionSequencePhase
@@ -39,6 +45,7 @@ import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.block.BlockFace
 import org.bukkit.entity.Player
+import org.bukkit.event.inventory.ClickType
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 
@@ -47,7 +54,7 @@ class ChanponWorldSettingsMenu(
     private val storage: ChanponWorldStorage,
     private val protectionService: SubmittedWorldProtectionService,
     private val environmentGui: ChanponEnvironmentGui
-) {
+) : WorldSettingsRouteProvider {
     private val accessGuard = WorldSettingsAccessGuard(storage, protectionService)
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
@@ -64,10 +71,18 @@ class ChanponWorldSettingsMenu(
         )
     }
 
+    override fun prepare(
+        player: Player,
+        worldData: WorldData,
+        request: WorldSettingsNavigationRequest,
+    ): MenuRoute =
+        route(Source(Screen.MAIN, worldData.uuid, request))
+
     private fun render(player: Player, source: Source): InventoryMenuView {
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(source.worldUuid)
             ?: return InventoryMenuView(9, Component.text("World settings"), emptyList())
         return when (source.screen) {
+            Screen.MAIN -> renderMain(player, worldData, source.request)
             Screen.EXPANSION -> renderExpansion(player, worldData)
             Screen.MODIFIED_WARNING -> renderModifiedWarning(player)
             Screen.CONFIRM -> renderConfirmation(player, worldData, source)
@@ -83,6 +98,22 @@ class ChanponWorldSettingsMenu(
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(source.worldUuid)
             ?: return MenuActionResult.Rejected()
         return when (context.payload[OPERATION]) {
+            OPERATION_EDIT_INFO ->
+                executeMwmAction(player, worldData, WorldSettingsAction.EDIT_INFO, context.click)
+            OPERATION_SELECT_ICON ->
+                executeMwmAction(player, worldData, WorldSettingsAction.SELECT_ICON, context.click)
+            OPERATION_SET_SPAWN ->
+                executeMwmAction(player, worldData, WorldSettingsAction.SET_SPAWN, context.click)
+            OPERATION_MEMBERS ->
+                executeMwmAction(player, worldData, WorldSettingsAction.MANAGE_MEMBERS, context.click)
+            OPERATION_ANNOUNCEMENT ->
+                executeMwmAction(player, worldData, WorldSettingsAction.EDIT_ANNOUNCEMENT, context.click)
+            OPERATION_TOUR ->
+                executeMwmAction(player, worldData, WorldSettingsAction.MANAGE_TOUR, context.click)
+            OPERATION_PORTALS ->
+                executeMwmAction(player, worldData, WorldSettingsAction.MANAGE_PORTALS, context.click)
+            OPERATION_WARP ->
+                executeMwmAction(player, worldData, WorldSettingsAction.WARP, context.click)
             OPERATION_BACK -> MenuActionResult.Success(MenuUpdate.Back)
             OPERATION_EXPAND_CENTER -> {
                 if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) {
@@ -167,6 +198,239 @@ class ChanponWorldSettingsMenu(
             }
             else -> MenuActionResult.Ignored
         }
+    }
+
+    private fun executeMwmAction(
+        player: Player,
+        worldData: WorldData,
+        action: WorldSettingsAction,
+        click: ClickType,
+    ): MenuActionResult =
+        MyWorldManagerApi.executeWorldSettingsAction(
+            WorldSettingsActionRequest(player, worldData.uuid, action, click),
+        )
+
+    private fun addFeature(
+        elements: MutableList<MenuElement>,
+        player: Player,
+        worldData: WorldData,
+        feature: WorldSettingsFeature,
+        slot: Int,
+    ) {
+        val placement = when (feature) {
+            WorldSettingsFeature.EXPANSION ->
+                ChanponWorldSettingsPlacements.EXPANSION
+            WorldSettingsFeature.PUBLISH ->
+                ChanponWorldSettingsPlacements.PUBLISH
+            WorldSettingsFeature.NOTIFICATION ->
+                ChanponWorldSettingsPlacements.NOTIFICATION
+            WorldSettingsFeature.ENVIRONMENT ->
+                ChanponWorldSettingsPlacements.ENVIRONMENT
+            WorldSettingsFeature.CRITICAL ->
+                ChanponWorldSettingsPlacements.CRITICAL
+        }
+        val service = CCSystem.getAPI().getMenuCapabilityService()
+        val arguments = mapOf(WORLD_UUID to worldData.uuid.toString())
+        val capability = service.definitions(placement)
+            .firstNotNullOfOrNull {
+                service.resolve(it.capabilityId, player, arguments)
+            } ?: return
+        val accepted = capability.acceptedClicks - ClickType.MIDDLE
+        elements += MenuElement(
+            slot,
+            CCSystem.getAPI().getGuiElementService().menuCapability(capability.presentation),
+            if (capability.actionable) GuiElementRole.ACTION else GuiElementRole.CONTENT,
+            interaction = if (capability.actionable) {
+                MenuInteraction.Capability(
+                    capabilityId = capability.capabilityId,
+                    arguments = arguments,
+                    acceptedClicks = accepted,
+                )
+            } else {
+                MenuInteraction.DisplayOnly
+            },
+        )
+    }
+
+    private fun addFooterCapabilities(
+        elements: MutableList<MenuElement>,
+        player: Player,
+        worldData: WorldData,
+        size: Int,
+        owner: Boolean,
+        protected: Boolean,
+    ) {
+        val arguments = mapOf(WORLD_UUID to worldData.uuid.toString())
+        addCapabilitiesAt(
+            elements,
+            player,
+            ChanponWorldSettingsPlacements.FOOTER,
+            listOf(51),
+            arguments,
+        )
+        addCapabilitiesAt(
+            elements,
+            player,
+            ChanponWorldSettingsPlacements.FOOTER_LEFT,
+            listOf(ChanponWorldSettingsLayout.linkedPortalSlot(size, owner, protected)),
+            arguments,
+        )
+        addCapabilitiesAt(
+            elements,
+            player,
+            ChanponWorldSettingsPlacements.FOOTER_RIGHT,
+            listOf(size - 4),
+            arguments,
+        )
+    }
+
+    private fun addCapabilitiesAt(
+        elements: MutableList<MenuElement>,
+        player: Player,
+        placement: String,
+        slots: List<Int>,
+        arguments: Map<String, String>,
+    ) {
+        val service = CCSystem.getAPI().getMenuCapabilityService()
+        service.definitions(placement)
+            .asSequence()
+            .mapNotNull { service.resolve(it.capabilityId, player, arguments) }
+            .zip(slots.asSequence())
+            .forEach { (capability, slot) ->
+                elements += MenuElement(
+                    slot,
+                    CCSystem.getAPI().getGuiElementService().menuCapability(capability.presentation),
+                    if (capability.actionable) GuiElementRole.ACTION else GuiElementRole.CONTENT,
+                    interaction = if (capability.actionable) {
+                        MenuInteraction.Capability(
+                            capabilityId = capability.capabilityId,
+                            arguments = arguments,
+                            acceptedClicks = capability.acceptedClicks,
+                        )
+                    } else {
+                        MenuInteraction.DisplayOnly
+                    },
+                )
+            }
+    }
+
+    private fun settingsAction(
+        slot: Int,
+        item: ItemStack,
+        operation: String,
+        acceptedClicks: Set<ClickType> = MenuAcceptedClicks.LEFT_RIGHT,
+    ): MenuElement =
+        MenuElement(
+            slot,
+            item,
+            GuiElementRole.ACTION,
+            interaction = MenuInteraction.Action(
+                ACTION_SELECT,
+                acceptedClicks,
+                mapOf(OPERATION to operation),
+            ),
+        )
+
+    private fun renderMain(
+        player: Player,
+        worldData: WorldData,
+        request: WorldSettingsNavigationRequest,
+    ): InventoryMenuView {
+        val admin = MyWorldManagerApi.hasWorldSettingsAdminAccess(player)
+        val actualOwner = worldData.owner == player.uniqueId || admin
+        val moderator = player.uniqueId in worldData.moderators
+        val member = player.uniqueId in worldData.members
+        val imported = storage.isImportedArchive(worldData.uuid)
+        val owner = actualOwner && !imported
+        val manager = (owner || moderator) && !imported
+        val protected = protectionService.isProtected(worldData)
+        val memberLayout = member && !manager
+        val size = if (protected || memberLayout) PROTECTED_SETTINGS_SIZE else 54
+        val elements = mutableListOf<MenuElement>()
+
+        if (protected && owner) {
+            addFeature(elements, player, worldData, WorldSettingsFeature.PUBLISH, 21)
+            addFeature(elements, player, worldData, WorldSettingsFeature.NOTIFICATION, 22)
+        } else if (manager) {
+            elements += settingsAction(
+                19,
+                mwmActionItem(player, worldData, "info", Material.NAME_TAG),
+                OPERATION_EDIT_INFO,
+            )
+            elements += settingsAction(
+                20,
+                mwmActionItem(player, worldData, "icon", Material.ANVIL),
+                OPERATION_SELECT_ICON,
+            )
+            elements += settingsAction(
+                21,
+                spawnItem(player, worldData),
+                OPERATION_SET_SPAWN,
+                MenuAcceptedClicks.LEFT_RIGHT,
+            )
+            elements += settingsAction(
+                28,
+                announcementItem(player, worldData),
+                OPERATION_ANNOUNCEMENT,
+                MenuAcceptedClicks.LEFT_RIGHT,
+            )
+            addFeature(elements, player, worldData, WorldSettingsFeature.NOTIFICATION, 29)
+            elements += settingsAction(
+                47,
+                mwmActionItem(
+                    player,
+                    worldData,
+                    "tour",
+                    Material.PALE_OAK_BOAT,
+                    "gui.tour.worldmenu",
+                ),
+                OPERATION_TOUR,
+            )
+        }
+        if (owner && !protected) {
+            addFeature(elements, player, worldData, WorldSettingsFeature.EXPANSION, 23)
+            addFeature(elements, player, worldData, WorldSettingsFeature.PUBLISH, 24)
+            elements += settingsAction(
+                25,
+                mwmActionItem(player, worldData, "member", Material.PLAYER_HEAD),
+                OPERATION_MEMBERS,
+            )
+            addFeature(elements, player, worldData, WorldSettingsFeature.ENVIRONMENT, 32)
+            addFeature(elements, player, worldData, WorldSettingsFeature.CRITICAL, 33)
+            val hasPortals = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldData.uuid) != null &&
+                MyWorldManagerApi.getWorldService() != null &&
+                hasWorldPortals(worldData)
+            if (hasPortals) {
+                elements += settingsAction(
+                    ChanponWorldSettingsLayout.PORTAL_MANAGEMENT_SLOT,
+                    mwmActionItem(player, worldData, "portals", Material.END_PORTAL_FRAME),
+                    OPERATION_PORTALS,
+                )
+            }
+        }
+
+        elements += worldInfoElement(player, worldData)
+        if (CCSystem.getAPI().getMenuNavigationService().canGoBack(player)) {
+            elements += MenuElement(
+                ChanponGuiElements.backSlot(size),
+                returnItem(player),
+                GuiElementRole.BACK,
+                interaction = MenuInteraction.Back(),
+            )
+        }
+        addFooterCapabilities(elements, player, worldData, size, owner, protected)
+
+        return InventoryMenuView(
+            size,
+            CCSystem.getAPI().getI18nComponent(
+                player,
+                "gui.settings.title",
+                mapOf("world" to worldData.name),
+            ),
+            elements,
+            playerInventoryInteraction =
+                com.awabi2048.ccsystem.api.gui.PlayerInventoryInteraction.INTERACTIVE,
+        )
     }
 
     private fun confirmDelete(
@@ -564,6 +828,131 @@ class ChanponWorldSettingsMenu(
         val icon = MyWorldManagerApi.getConfiguredMenuIcon("world_settings", iconKey, material)
         return capabilityPresentation(icon, display, lore)
     }
+
+    private fun mwmActionItem(
+        player: Player,
+        worldData: WorldData,
+        iconKey: String,
+        material: Material,
+        langPrefix: String = "gui.settings.$iconKey",
+        requireTargetWorld: Boolean = false,
+    ): ItemStack {
+        val lore = describedStructuredLore(
+            player,
+            mwmDescription(player, iconKey),
+            listOf(singleClick(player, i18n(player, "mwm_action.action"))),
+            requireTargetWorld,
+            worldData,
+        )
+        return componentItem(
+            MyWorldManagerApi.getConfiguredMenuIcon("world_settings", iconKey, material),
+            text(player, "$langPrefix.display"),
+            lore,
+        )
+    }
+
+    private fun spawnItem(player: Player, worldData: WorldData): ItemStack {
+        val actions = if (MyWorldManagerApi.getBedrockFormService()?.isBedrock(player) == true) {
+            listOf(singleClick(player, text(player, "gui.settings.spawn.action.select_type")))
+        } else {
+            listOf(
+                GuiLoreLine.Action(
+                    text(player, "gui.settings.click.left"),
+                    text(player, "gui.settings.spawn.action.set_guest"),
+                ),
+                GuiLoreLine.Action(
+                    text(player, "gui.settings.click.right"),
+                    text(player, "gui.settings.spawn.action.set_member"),
+                ),
+            )
+        }
+        return componentItem(
+            MyWorldManagerApi.getConfiguredMenuIcon("world_settings", "spawn", Material.COMPASS),
+            text(player, "gui.settings.spawn.display"),
+            describedStructuredLore(
+                player,
+                mwmDescription(player, "spawn"),
+                actions,
+                requireTargetWorld = true,
+                worldData = worldData,
+            ),
+        )
+    }
+
+    private fun announcementItem(player: Player, worldData: WorldData): ItemStack =
+        componentItem(
+            MyWorldManagerApi.getConfiguredMenuIcon(
+                "world_settings",
+                "announcement",
+                Material.OAK_SIGN,
+            ),
+            text(player, "gui.settings.announcement.display"),
+            describedStructuredLore(
+                player,
+                mwmDescription(player, "announcement"),
+                listOf(
+                    GuiLoreLine.Action(
+                        text(player, "gui.settings.click.left"),
+                        text(player, "gui.settings.announcement.action.set_message"),
+                    ),
+                    GuiLoreLine.Action(
+                        text(player, "gui.settings.click.right"),
+                        text(player, "gui.settings.announcement.action.reset_message"),
+                    ),
+                ),
+                worldData = worldData,
+            ),
+        )
+
+    private fun worldInfoElement(player: Player, worldData: WorldData): MenuElement {
+        val outside = !isCurrentWorld(player, worldData)
+        val lore = CCSystem.getAPI().getLoreService().render(
+            GuiLoreSpec.Blocks(
+                buildList {
+                    add(
+                        GuiLoreBlock(
+                            listOf(
+                                GuiLoreLine.Data(
+                                    i18n(player, "info.description_label"),
+                                    worldData.description.ifBlank { "-" },
+                                    "§f",
+                                ),
+                            ),
+                        ),
+                    )
+                    if (outside) {
+                        add(
+                            GuiLoreBlock(
+                                listOf(
+                                    singleClick(
+                                        player,
+                                        text(player, "gui.player_world.world_item.warp"),
+                                    ),
+                                ),
+                            ),
+                        )
+                    }
+                },
+            ),
+        )
+        return MenuElement(
+            4,
+            componentItem(worldData.icon, "§e${worldData.name}", lore),
+            if (outside) GuiElementRole.ACTION else GuiElementRole.CONTENT,
+            interaction = if (outside) {
+                MenuInteraction.Action(
+                    ACTION_SELECT,
+                    MenuAcceptedClicks.LEFT_RIGHT,
+                    mapOf(OPERATION to OPERATION_WARP),
+                )
+            } else {
+                MenuInteraction.DisplayOnly
+            },
+        )
+    }
+
+    private fun hasWorldPortals(worldData: WorldData): Boolean =
+        MyWorldManagerApi.hasWorldPortals(worldData.uuid)
 
     private fun capabilityPresentation(
         material: Material,
@@ -1005,12 +1394,14 @@ class ChanponWorldSettingsMenu(
     private data class Source(
         val screen: Screen,
         val worldUuid: UUID,
+        val request: WorldSettingsNavigationRequest = WorldSettingsNavigationRequest(),
         val confirmAction: ConfirmAction? = null,
         val direction: BlockFace? = null,
         val finalStep: Boolean = false,
     )
 
     private enum class Screen {
+        MAIN,
         EXPANSION,
         MODIFIED_WARNING,
         CONFIRM,
@@ -1030,6 +1421,13 @@ class ChanponWorldSettingsMenu(
             worldUuid = payload[PAYLOAD_WORLD_UUID]
                 ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
                 ?: UUID(0L, 0L),
+            request = WorldSettingsNavigationRequest(
+                showBackButton = payload[PAYLOAD_SHOW_BACK]?.toBooleanStrictOrNull() ?: false,
+                isAdminFlow =
+                    payload[PAYLOAD_ADMIN_FLOW]?.toBooleanStrictOrNull() ?: false,
+                isPlayerWorldFlow = payload[PAYLOAD_PLAYER_FLOW]?.toBooleanStrictOrNull(),
+                parentShowBackButton = payload[PAYLOAD_PARENT_BACK]?.toBooleanStrictOrNull(),
+            ),
             confirmAction = payload[PAYLOAD_CONFIRM_ACTION]
                 ?.let { runCatching { ConfirmAction.valueOf(it) }.getOrNull() },
             direction = payload[PAYLOAD_DIRECTION]
@@ -1041,6 +1439,10 @@ class ChanponWorldSettingsMenu(
     private fun payload(source: Source): Map<String, String> = buildMap {
         put(PAYLOAD_SCREEN, source.screen.name)
         put(PAYLOAD_WORLD_UUID, source.worldUuid.toString())
+        put(PAYLOAD_SHOW_BACK, source.request.showBackButton.toString())
+        put(PAYLOAD_ADMIN_FLOW, source.request.isAdminFlow.toString())
+        source.request.isPlayerWorldFlow?.let { put(PAYLOAD_PLAYER_FLOW, it.toString()) }
+        source.request.parentShowBackButton?.let { put(PAYLOAD_PARENT_BACK, it.toString()) }
         source.confirmAction?.let { put(PAYLOAD_CONFIRM_ACTION, it.name) }
         source.direction?.let { put(PAYLOAD_DIRECTION, it.name) }
         put(PAYLOAD_FINAL_STEP, source.finalStep.toString())
@@ -1060,8 +1462,13 @@ class ChanponWorldSettingsMenu(
         private const val RUNTIME_OWNER = "mwm-chanpon"
         private const val ROUTE_SETTINGS = "world-settings"
         private const val ACTION_SELECT = "select"
+        private const val WORLD_UUID = "world_uuid"
         private const val PAYLOAD_SCREEN = "screen"
         private const val PAYLOAD_WORLD_UUID = "world_uuid"
+        private const val PAYLOAD_SHOW_BACK = "show_back"
+        private const val PAYLOAD_ADMIN_FLOW = "admin_flow"
+        private const val PAYLOAD_PLAYER_FLOW = "player_flow"
+        private const val PAYLOAD_PARENT_BACK = "parent_back"
         private const val PAYLOAD_CONFIRM_ACTION = "confirm_action"
         private const val PAYLOAD_DIRECTION = "direction"
         private const val PAYLOAD_FINAL_STEP = "final_step"
@@ -1072,5 +1479,14 @@ class ChanponWorldSettingsMenu(
         private const val OPERATION_EXPAND_CENTER = "expand-center"
         private const val OPERATION_EXPAND_DIRECTION = "expand-direction"
         private const val OPERATION_STEP_BACK = "step-back"
+        private const val OPERATION_EDIT_INFO = "edit-info"
+        private const val OPERATION_SELECT_ICON = "select-icon"
+        private const val OPERATION_SET_SPAWN = "set-spawn"
+        private const val OPERATION_MEMBERS = "members"
+        private const val OPERATION_ANNOUNCEMENT = "announcement"
+        private const val OPERATION_TOUR = "tour"
+        private const val OPERATION_PORTALS = "portals"
+        private const val OPERATION_WARP = "warp"
+        private const val PROTECTED_SETTINGS_SIZE = 45
     }
 }

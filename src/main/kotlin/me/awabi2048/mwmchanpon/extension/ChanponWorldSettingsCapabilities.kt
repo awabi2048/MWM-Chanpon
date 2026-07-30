@@ -14,7 +14,6 @@ import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import me.awabi2048.mwmchanpon.ui.ChanponWorldSettingsMenu
 import me.awabi2048.mwmchanpon.ui.WorldSettingsFeature
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
-import me.awabi2048.myworldmanager.api.extension.WorldSettingsCapabilityPlacements
 import me.awabi2048.myworldmanager.model.WorldData
 
 internal class ChanponWorldSettingsCapabilities(
@@ -23,23 +22,23 @@ internal class ChanponWorldSettingsCapabilities(
     init {
         register(
             WorldSettingsFeature.EXPANSION,
-            WorldSettingsCapabilityPlacements.EXPANSION_ACTION,
+            ChanponWorldSettingsPlacements.EXPANSION,
         )
         register(
             WorldSettingsFeature.PUBLISH,
-            WorldSettingsCapabilityPlacements.PUBLISH_ACTION,
+            ChanponWorldSettingsPlacements.PUBLISH,
         )
         register(
             WorldSettingsFeature.NOTIFICATION,
-            WorldSettingsCapabilityPlacements.NOTIFICATION_ACTION,
+            ChanponWorldSettingsPlacements.NOTIFICATION,
         )
         register(
             WorldSettingsFeature.ENVIRONMENT,
-            WorldSettingsCapabilityPlacements.ENVIRONMENT_ACTION,
+            ChanponWorldSettingsPlacements.ENVIRONMENT,
         )
         register(
             WorldSettingsFeature.CRITICAL,
-            WorldSettingsCapabilityPlacements.CRITICAL_ACTION,
+            ChanponWorldSettingsPlacements.CRITICAL,
         )
     }
 

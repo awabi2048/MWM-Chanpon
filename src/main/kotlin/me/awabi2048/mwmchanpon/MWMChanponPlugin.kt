@@ -248,12 +248,14 @@ class MWMChanponPlugin : JavaPlugin() {
         chanponAdminWorldListMenu = ChanponAdminWorldListMenu(this, chanponStorage)
         environmentGui = ChanponEnvironmentGui(this, chanponStorage, submittedProtectionService, buildPermissionService)
         chanponWorldSettingsMenu = ChanponWorldSettingsMenu(this, chanponStorage, submittedProtectionService, environmentGui)
+        MyWorldManagerApi.registerWorldSettingsRouteProvider(chanponWorldSettingsMenu)
         worldSettingsCapabilities = ChanponWorldSettingsCapabilities(
             chanponWorldSettingsMenu,
         )
         easyVoidWorldCreationService = EasyVoidWorldCreationService(this)
         val archiveOperationGuard = ArchiveOperationGuard(globalStorage)
         playerWorldCapability = ChanponPlayerWorldCapability(this, chanponStorage, easyVoidWorldCreationService)
+        MyWorldManagerApi.registerPlayerWorldRouteProvider(playerWorldCapability)
         worldAccessPolicy = ChanponWorldAccessPolicy(archiveOperationGuard, chanponStorage)
         worldMenuAccessPolicy = ChanponWorldMenuAccessPolicy(chanponStorage)
         worldPortalPolicy = ChanponWorldPortalPolicy(chanponStorage)
@@ -334,6 +336,12 @@ class MWMChanponPlugin : JavaPlugin() {
     }
 
     override fun onDisable() {
+        if (::chanponWorldSettingsMenu.isInitialized) {
+            MyWorldManagerApi.unregisterWorldSettingsRouteProvider(chanponWorldSettingsMenu)
+        }
+        if (::playerWorldCapability.isInitialized) {
+            MyWorldManagerApi.unregisterPlayerWorldRouteProvider(playerWorldCapability)
+        }
         runCatching { CCSystem.getAPI().getConfigSchemaService().unregister("mwm-chanpon") }
         runCatching { CCSystem.getAPI().getMenuCommandService().unregisterOwner("mwm-chanpon") }
         runCatching { CCSystem.getAPI().getMenuCapabilityService().unregisterOwner("mwm-chanpon") }

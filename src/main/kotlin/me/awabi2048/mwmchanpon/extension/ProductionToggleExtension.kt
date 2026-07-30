@@ -40,7 +40,6 @@ import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.event.MwmWorldCreatedEvent
 import me.awabi2048.myworldmanager.api.extension.CreationConfirmationCapabilityContract
 import me.awabi2048.myworldmanager.api.extension.WorldCreationDraft
-import me.awabi2048.myworldmanager.api.extension.WorldSettingsCapabilityPlacements
 import me.awabi2048.myworldmanager.model.WorldData
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
@@ -77,7 +76,7 @@ class ProductionToggleExtension(
             MenuCapabilityDefinition(
                 owner = RUNTIME_OWNER,
                 id = CAPABILITY_ID,
-                placement = WorldSettingsCapabilityPlacements.FOOTER_ACTIONS,
+                placement = ChanponWorldSettingsPlacements.FOOTER,
                 availability = MenuCapabilityAvailability(::isCapabilityAvailable),
                 presentationProvider =
                     MenuCapabilityPresentationProvider(::resolveCapabilityPresentation),

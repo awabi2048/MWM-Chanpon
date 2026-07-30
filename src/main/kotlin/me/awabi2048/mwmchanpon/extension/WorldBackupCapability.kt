@@ -40,7 +40,6 @@ import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.ui.ChanponLore
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
-import me.awabi2048.myworldmanager.api.extension.WorldSettingsCapabilityPlacements
 import me.awabi2048.myworldmanager.model.WorldData
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
@@ -103,7 +102,7 @@ class WorldBackupCapability(
             MenuCapabilityDefinition(
                 owner = RUNTIME_OWNER,
                 id = CAPABILITY_ID,
-                placement = WorldSettingsCapabilityPlacements.FOOTER_RIGHT_ACTIONS,
+                placement = ChanponWorldSettingsPlacements.FOOTER_RIGHT,
                 availability = MenuCapabilityAvailability { context ->
                     val world = worldUuid(context.arguments)
                         ?.let { ownedProductionWorld(context.player, it) }
