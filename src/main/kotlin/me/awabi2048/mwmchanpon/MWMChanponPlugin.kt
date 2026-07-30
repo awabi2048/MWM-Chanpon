@@ -8,7 +8,7 @@ import me.awabi2048.mwmchanpon.bridge.CoreApiBridge
 import me.awabi2048.mwmchanpon.extension.ChanponCommandExtension
 import me.awabi2048.mwmchanpon.extension.ChanponWorldCreationGuard
 import me.awabi2048.mwmchanpon.extension.ChanponWorldAccessPolicy
-import me.awabi2048.mwmchanpon.extension.ChanponWorldMenuAccessProvider
+import me.awabi2048.mwmchanpon.extension.ChanponWorldMenuAccessPolicy
 import me.awabi2048.mwmchanpon.extension.ChanponWorldPortalPolicy
 import me.awabi2048.mwmchanpon.extension.ChanponWorldPublishPolicy
 import me.awabi2048.mwmchanpon.extension.ChanponWorldRuntimePolicy
@@ -88,7 +88,7 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var archiveService: ArchiveService
     private lateinit var annualArchiveFlow: AnnualArchiveFlow
     private lateinit var worldAccessPolicy: ChanponWorldAccessPolicy
-    private lateinit var worldMenuAccessProvider: ChanponWorldMenuAccessProvider
+    private lateinit var worldMenuAccessPolicy: ChanponWorldMenuAccessPolicy
     private lateinit var worldPortalPolicy: ChanponWorldPortalPolicy
     private lateinit var worldPublishPolicy: ChanponWorldPublishPolicy
     private lateinit var worldRuntimePolicy: ChanponWorldRuntimePolicy
@@ -255,7 +255,7 @@ class MWMChanponPlugin : JavaPlugin() {
         val archiveOperationGuard = ArchiveOperationGuard(globalStorage)
         playerWorldCapability = ChanponPlayerWorldCapability(this, chanponStorage, easyVoidWorldCreationService)
         worldAccessPolicy = ChanponWorldAccessPolicy(archiveOperationGuard, chanponStorage)
-        worldMenuAccessProvider = ChanponWorldMenuAccessProvider(chanponStorage)
+        worldMenuAccessPolicy = ChanponWorldMenuAccessPolicy(chanponStorage)
         worldPortalPolicy = ChanponWorldPortalPolicy(chanponStorage)
         worldPublishPolicy = ChanponWorldPublishPolicy(chanponStorage)
         worldRuntimePolicy = ChanponWorldRuntimePolicy()
@@ -273,7 +273,7 @@ class MWMChanponPlugin : JavaPlugin() {
         // Discovery / favorite / visit menus stay on MWM standard providers; Chanpon only supplies policies.
         MyWorldManagerApi.registerWorldEvacuationProvider(spawnWorldService)
         MyWorldManagerApi.registerWorldAccessPolicy(worldAccessPolicy)
-        MyWorldManagerApi.registerWorldMenuAccessProvider(worldMenuAccessProvider)
+        MyWorldManagerApi.registerWorldMenuAccessPolicy(worldMenuAccessPolicy)
         MyWorldManagerApi.registerWorldPortalPolicy(worldPortalPolicy)
         MyWorldManagerApi.registerWorldWorkPermissionPolicy(worldWorkPermissionPolicy)
         MyWorldManagerApi.registerWorldPublishPolicy(worldPublishPolicy)
@@ -359,8 +359,8 @@ class MWMChanponPlugin : JavaPlugin() {
         if (::worldAccessPolicy.isInitialized) {
             MyWorldManagerApi.unregisterWorldAccessPolicy(worldAccessPolicy)
         }
-        if (::worldMenuAccessProvider.isInitialized) {
-            MyWorldManagerApi.unregisterWorldMenuAccessProvider(worldMenuAccessProvider)
+        if (::worldMenuAccessPolicy.isInitialized) {
+            MyWorldManagerApi.unregisterWorldMenuAccessPolicy(worldMenuAccessPolicy)
         }
         if (::worldPortalPolicy.isInitialized) {
             MyWorldManagerApi.unregisterWorldPortalPolicy(worldPortalPolicy)

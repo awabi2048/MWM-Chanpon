@@ -7,11 +7,16 @@ import com.awabi2048.ccsystem.api.gui.MenuDialogHandler
 import com.awabi2048.ccsystem.api.gui.MenuDialogInput
 import com.awabi2048.ccsystem.api.gui.MenuDialogRequest
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
+import com.awabi2048.ccsystem.api.gui.MenuTargetPolicy
+import com.awabi2048.ccsystem.api.gui.PublicMenuDefinition
+import com.awabi2048.ccsystem.api.gui.PublicMenuOpener
 import me.awabi2048.mwmchanpon.storage.ChanponWorldProtectionMode
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.event.MwmMemberAddSource
-import me.awabi2048.myworldmanager.api.extension.WorldMenuAccessProvider
+import me.awabi2048.myworldmanager.api.extension.WorldMenuAccessChallenge
+import me.awabi2048.myworldmanager.api.extension.WorldMenuAccessContext
+import me.awabi2048.myworldmanager.api.extension.WorldMenuAccessPolicy
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsNavigationRequest
 import me.awabi2048.myworldmanager.model.WorldData
 import net.kyori.adventure.text.Component
@@ -20,17 +25,42 @@ import org.bukkit.entity.Player
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
-class ChanponWorldMenuAccessProvider(
+class ChanponWorldMenuAccessPolicy(
     private val storage: ChanponWorldStorage
-) : WorldMenuAccessProvider {
+) : WorldMenuAccessPolicy {
     private val pendingPasswordInputs = ConcurrentHashMap<UUID, PasswordRequest>()
+
+    init {
+        CCSystem.getAPI().getMenuCommandService().register(
+            PublicMenuDefinition(
+                owner = OWNER,
+                id = PUBLIC_MENU_ID,
+                permission = null,
+                targetPolicy = MenuTargetPolicy.SELF_ONLY,
+                argumentKeys = setOf(WORLD_UUID),
+                opener = PublicMenuOpener(::openChallenge),
+            ),
+        )
+    }
 
     override fun getId(): String = "mwmchanpon.world_menu_access"
 
-    override fun open(player: Player, worldData: WorldData, showBackButton: Boolean): Boolean {
+    override fun challenge(context: WorldMenuAccessContext): WorldMenuAccessChallenge? {
+        val worldData = context.worldData
         if (storage.getProtectionMode(worldData.uuid) != ChanponWorldProtectionMode.PASSWORD) {
-            return false
+            return null
         }
+        return WorldMenuAccessChallenge(
+            publicMenuRouteId = "$OWNER:$PUBLIC_MENU_ID",
+            arguments = mapOf(WORLD_UUID to worldData.uuid.toString()),
+        )
+    }
+
+    private fun openChallenge(player: Player, arguments: Map<String, String>): Boolean {
+        val worldData = arguments[WORLD_UUID]
+            ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+            ?.let { MyWorldManagerApi.getWorldRepository()?.findByUuid(it) }
+            ?: return false
         if (!storage.hasProtectionPassword(worldData.uuid)) {
             player.sendMessage(i18n(player, "protection.password_not_configured"))
             return true
@@ -128,7 +158,9 @@ class ChanponWorldMenuAccessProvider(
 
     private companion object {
         private const val OWNER = "mwm-chanpon"
+        private const val PUBLIC_MENU_ID = "world-menu-password"
         private const val PASSWORD_DIALOG = "protection-password"
         private const val PASSWORD_INPUT = "protection_password"
+        private const val WORLD_UUID = "world_uuid"
     }
 }
