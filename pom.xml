@@ -5,7 +5,7 @@
 
     <groupId>me.awabi2048</groupId>
     <artifactId>MWM-Chanpon</artifactId>
-    <version>26.730.10</version>
+    <version>26.730.11</version>
     <packaging>jar</packaging>
 
     <name>MWM-Chanpon</name>
@@ -69,7 +69,7 @@
         <dependency>
             <groupId>awabi2048</groupId>
             <artifactId>my-world-manager</artifactId>
-            <version>26.730.31</version>
+            <version>26.730.32</version>
             <scope>provided</scope>
         </dependency>
         <dependency>

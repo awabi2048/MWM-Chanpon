@@ -26,8 +26,9 @@ import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsNavigationRequest
-import me.awabi2048.myworldmanager.api.extension.PlayerWorldMenuProvider
-import me.awabi2048.myworldmanager.api.extension.PlayerWorldMenuRequest
+import me.awabi2048.myworldmanager.api.extension.PlayerWorldCapability
+import me.awabi2048.myworldmanager.api.extension.PlayerWorldCapabilityContext
+import me.awabi2048.myworldmanager.api.extension.PlayerWorldCreationView
 import me.awabi2048.myworldmanager.api.extension.WorldCreationOperation
 import me.awabi2048.myworldmanager.api.extension.WorldCreationRequest
 import me.awabi2048.myworldmanager.api.service.WorldPointBillingMode
@@ -47,11 +48,11 @@ import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.meta.SkullMeta
 import org.bukkit.plugin.java.JavaPlugin
 
-class ChanponPlayerWorldMenuProvider(
+class ChanponPlayerWorldCapability(
     private val plugin: MWMChanponPlugin,
     private val storage: ChanponWorldStorage,
     private val easyVoidCreationService: EasyVoidWorldCreationService
-) : PlayerWorldMenuProvider {
+) : PlayerWorldCapability {
     private val legacy = LegacyComponentSerializer.legacySection()
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
@@ -75,33 +76,103 @@ class ChanponPlayerWorldMenuProvider(
 
     override fun getId(): String = PROVIDER_ID
 
-    override fun open(player: Player, request: PlayerWorldMenuRequest): Boolean {
-        val mwm = mwm()
-        if (mwm.playerPlatformResolver.isBedrock(player)) return false
-        val targetPlayerUuid = request.targetPlayerUuid ?: player.uniqueId
-        val targetPlayerName = request.targetPlayerName ?: player.name
-        val opened = if (request.showBackButton) runtime.navigate(
-            player,
-            route(
-                Source(
-                    request.page,
-                    request.showBackButton,
-                    targetPlayerUuid,
-                    targetPlayerName,
-                ),
-            ),
-        ) else runtime.open(
-            player,
-            route(
-                Source(
-                    request.page,
-                    request.showBackButton,
-                    targetPlayerUuid,
-                    targetPlayerName,
-                ),
-            ),
+    override fun renderWorldItem(
+        context: PlayerWorldCapabilityContext,
+        worldData: WorldData,
+    ): ItemStack = createWorldItem(context.player, worldData)
+
+    override fun renderSummaryItem(
+        context: PlayerWorldCapabilityContext,
+    ): ItemStack = createPlayerInfoItem(
+        context.player,
+        context.targetPlayerUuid,
+        context.targetPlayerName,
+    )
+
+    override fun renderCreationItem(
+        context: PlayerWorldCapabilityContext,
+    ): PlayerWorldCreationView? {
+        if (context.targetPlayerUuid != context.player.uniqueId) return null
+        val worlds = mwm().playerWorldGui.getPlayerWorlds(context.targetPlayerUuid)
+        val reason = creationBlockReason(
+            context.player,
+            worlds.count { it.owner == context.targetPlayerUuid },
+            plugin.config.getInt("creation.max_worlds_per_player", 50),
         )
-        return opened
+        return if (reason == null && hasCreatePermission(context.player)) {
+            PlayerWorldCreationView(createCreationButton(context.player), true)
+        } else {
+            PlayerWorldCreationView(
+                createCreationUnavailableButton(
+                    context.player,
+                    reason ?: CreationBlockReason.NO_PERMISSION,
+                ),
+                false,
+            )
+        }
+    }
+
+    override fun handleCreate(
+        context: PlayerWorldCapabilityContext,
+        click: org.bukkit.event.inventory.ClickType,
+        returnRoute: MenuRoute,
+    ): MenuActionResult? {
+        val player = context.player
+        if (context.targetPlayerUuid != player.uniqueId) return MenuActionResult.Rejected()
+        if (!hasCreatePermission(player)) {
+            player.sendMessage(i18n(player, "message.world_creation_no_permission"))
+            return MenuActionResult.Rejected()
+        }
+        if (click.isRightClick && !click.isShiftClick) {
+            startEasyCreation(player, returnRoute)
+            return MenuActionResult.Success(MenuUpdate.None)
+        }
+        val session = mwm().creationSessionManager.startSession(player.uniqueId)
+        session.isDialogMode = true
+        session.billingMode = WorldPointBillingMode.NONE
+        player.sendMessage(mwm().languageManager.getMessage(player, "messages.wizard_start"))
+        mwm().creationGui.openTypeSelection(player)
+        return MenuActionResult.Success(MenuUpdate.None)
+    }
+
+    override fun handleWorld(
+        context: PlayerWorldCapabilityContext,
+        click: org.bukkit.event.inventory.ClickType,
+        worldData: WorldData,
+    ): MenuActionResult? {
+        val player = context.player
+        if (context.targetPlayerUuid == player.uniqueId &&
+            click.isShiftClick &&
+            click.isLeftClick
+        ) {
+            val stats = mwm().playerStatsRepository.findByUuid(player.uniqueId)
+            stats.worldDisplayOrder.remove(worldData.uuid)
+            stats.worldDisplayOrder.add(0, worldData.uuid)
+            mwm().playerStatsRepository.save(stats)
+            return MenuActionResult.Success(MenuUpdate.Refresh)
+        }
+        if (click.isLeftClick && !click.isShiftClick) {
+            if (worldData.isArchived) return MenuActionResult.Rejected()
+            if (isCurrentWorld(player, worldData)) {
+                if (!canOpenSettings(player, worldData)) return MenuActionResult.Rejected()
+                openWorldSettingsFromCapability(player, worldData)
+                return MenuActionResult.Success(MenuUpdate.None)
+            }
+            MyWorldManagerApi.getWorldService()?.teleportToWorld(player, worldData.uuid)
+            player.sendMessage(
+                mwm().languageManager.getMessage(
+                    player,
+                    "messages.warp_success",
+                    mapOf("world" to worldData.name),
+                ),
+            )
+            return MenuActionResult.Success(MenuUpdate.Close)
+        }
+        if (click.isRightClick && !click.isShiftClick && canOpenSettings(player, worldData)) {
+            openWorldSettingsFromCapability(player, worldData)
+            return MenuActionResult.Success(MenuUpdate.None)
+        }
+        return MenuActionResult.Ignored
     }
 
     private fun render(player: Player, source: Source): InventoryMenuView {
@@ -512,6 +583,19 @@ class ChanponPlayerWorldMenuProvider(
                 showBackButton = true,
                 isPlayerWorldFlow = true,
                 parentShowBackButton = source.showBackButton,
+            ),
+        )
+    }
+
+    private fun openWorldSettingsFromCapability(player: Player, worldData: WorldData) {
+        val session = mwm().playerWorldSessionManager.getSession(player.uniqueId)
+        MyWorldManagerApi.openWorldSettings(
+            player,
+            worldData.uuid,
+            WorldSettingsNavigationRequest(
+                showBackButton = true,
+                isPlayerWorldFlow = true,
+                parentShowBackButton = session.showBackButton,
             ),
         )
     }

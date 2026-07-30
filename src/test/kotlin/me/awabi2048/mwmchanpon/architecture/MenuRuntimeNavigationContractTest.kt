@@ -35,9 +35,9 @@ class MenuRuntimeNavigationContractTest {
 
     @Test
     fun `creation transitions leave the newly opened surface active`() {
-        val source = uiRoot.resolve("ChanponPlayerWorldMenuProvider.kt").readText()
-        val body = functionBody(source, "createWorld")
-        assertTrue("startEasyCreation(player, context.route)" in body)
+        val source = uiRoot.resolve("ChanponPlayerWorldCapability.kt").readText()
+        val body = functionBody(source, "handleCreate")
+        assertTrue("startEasyCreation(player, returnRoute)" in body)
         assertTrue("MenuUpdate.None" in body)
         assertFalse("runTask" in body)
     }
@@ -145,12 +145,6 @@ class MenuRuntimeNavigationContractTest {
         assertTrue("runtime.navigate(player, route(worldData.uuid))" in environment)
         assertFalse("runtime.open(player, route(worldData.uuid))" in environment)
 
-        listOf("ChanponPlayerWorldMenuProvider.kt").forEach { file ->
-            val source = uiRoot.resolve(file).readText()
-            assertTrue("runtime.navigate(" in source, file)
-            assertTrue("runtime.open(" in source, file)
-            assertTrue("return opened" in source, file)
-        }
     }
 
     private fun functionBody(source: String, name: String): String {
