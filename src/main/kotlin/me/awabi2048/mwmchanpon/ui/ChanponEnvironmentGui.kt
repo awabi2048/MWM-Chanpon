@@ -19,18 +19,14 @@ import com.awabi2048.ccsystem.api.gui.MenuDialogRequest
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
-import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.model.WorldData
-import me.awabi2048.myworldmanager.util.GuiLoreActions
-import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
-import org.bukkit.plugin.java.JavaPlugin
 import java.util.UUID
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponWorldProtectionMode
@@ -354,8 +350,6 @@ class ChanponEnvironmentGui(
             }, GuiLoreFrame.BOTH)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
-        ItemTag.setString(item, ACTION_KEY, key)
         return item
     }
 
@@ -398,8 +392,6 @@ class ChanponEnvironmentGui(
             }, GuiLoreFrame.BOTH)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
-        ItemTag.setString(item, ACTION_KEY, ACTION_PROTECTION)
         return item
     }
 
@@ -417,12 +409,11 @@ class ChanponEnvironmentGui(
             meta.displayName(i18nComponent(player, "$key.display"))
             meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(listOf(
                 GuiLoreLine.Data(i18n(player, "common.current_label"), currentValue, "§e"),
-                GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "common.action_next"))
+                CCSystem.getAPI().getGuiActionService()
+                    .singleClick(player, i18n(player, "common.action_next"))
             ), GuiLoreFrame.BOTH)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
-        ItemTag.setString(item, ACTION_KEY, key)
         return item
     }
 
@@ -431,7 +422,6 @@ class ChanponEnvironmentGui(
         item.editMeta { meta ->
             meta.displayName(CCSystem.getAPI().getGuiElementService().name(i18n(player, "common.back_to_settings")))
         }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_RETURN)
         return item
     }
 
@@ -572,8 +562,6 @@ class ChanponEnvironmentGui(
             else -> "\u00A7f"
         }
     }
-
-    private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)
 
     private fun isInTargetWorld(player: Player, worldData: WorldData): Boolean =
         MyWorldManagerApi.getWorldService()?.isPlayerInWorld(player, worldData) == true

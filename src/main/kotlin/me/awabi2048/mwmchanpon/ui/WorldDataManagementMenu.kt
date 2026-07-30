@@ -2,6 +2,7 @@ package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiClickLabel
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
@@ -14,7 +15,6 @@ import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.backup.BackupKind
 import me.awabi2048.mwmchanpon.backup.BackupOperationStatus
@@ -37,8 +37,6 @@ class WorldDataManagementMenu(
     private val annualArchiveFlow: AnnualArchiveFlow,
 ) {
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
-    private val childReturnPages = ConcurrentHashMap<UUID, Int>()
-
     init {
         runtime.register(
             InventoryMenuDefinition(
@@ -82,10 +80,6 @@ class WorldDataManagementMenu(
     fun open(player: Player, page: Int = 0) {
         if (!player.hasPermission("mwmchanpon.admin")) return
         runtime.navigate(player, listRoute(page))
-    }
-
-    fun reopenFromChild(player: Player) {
-        runtime.replace(player, listRoute(childReturnPages.remove(player.uniqueId) ?: 0))
     }
 
     private fun renderList(player: Player, route: MenuRoute): InventoryMenuView {
@@ -235,9 +229,9 @@ class WorldDataManagementMenu(
             )
         }
         if (context.click.isRightClick) {
-            childReturnPages[context.player.uniqueId] = currentPage
-            backupListMenu.openWorld(context.player, worldUuid)
-            return MenuActionResult.Success(MenuUpdate.None)
+            return MenuActionResult.Success(
+                MenuUpdate.Navigate(backupListMenu.routeForWorld(worldUuid)),
+            )
         }
         return MenuActionResult.Ignored
     }
@@ -304,9 +298,9 @@ class WorldDataManagementMenu(
     }
 
     private fun confirmBulkRollback(context: MenuActionContext): MenuActionResult {
-        childReturnPages[context.player.uniqueId] = page(context.route)
-        backupListMenu.openAll(context.player)
-        return MenuActionResult.Success(MenuUpdate.None)
+        return MenuActionResult.Success(
+            MenuUpdate.Navigate(backupListMenu.routeForAll()),
+        )
     }
 
     private fun startAnnualArchive(context: MenuActionContext): MenuActionResult {
@@ -365,17 +359,13 @@ class WorldDataManagementMenu(
                             GuiLoreBlock(
                                 listOf(
                                     GuiLoreLine.Action(
-                                        mwm().languageManager.getMessage(
-                                            player,
-                                            "gui.settings.click.left",
-                                        ),
+                                        CCSystem.getAPI().getGuiActionService()
+                                            .clickLabel(player, GuiClickLabel.LEFT),
                                         i18n(player, "world_data.world.backup_action"),
                                     ),
                                     GuiLoreLine.Action(
-                                        mwm().languageManager.getMessage(
-                                            player,
-                                            "gui.settings.click.right",
-                                        ),
+                                        CCSystem.getAPI().getGuiActionService()
+                                            .clickLabel(player, GuiClickLabel.RIGHT),
                                         i18n(player, "world_data.world.list_action"),
                                     ),
                                 ),
@@ -471,11 +461,6 @@ class WorldDataManagementMenu(
 
     private fun structuredBlocks(blocks: List<GuiLoreBlock>): List<Component> =
         CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(blocks))
-
-    private fun mwm(): me.awabi2048.myworldmanager.MyWorldManager =
-        org.bukkit.plugin.java.JavaPlugin.getPlugin(
-            me.awabi2048.myworldmanager.MyWorldManager::class.java,
-        )
 
     companion object {
         private const val OWNER = "mwm-chanpon"

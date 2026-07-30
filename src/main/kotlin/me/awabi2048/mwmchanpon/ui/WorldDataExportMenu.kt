@@ -17,8 +17,6 @@ import java.util.UUID
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.service.WorldDataExportService
 import me.awabi2048.myworldmanager.model.WorldData
-import me.awabi2048.myworldmanager.util.GuiLoreActions
-import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
 import org.bukkit.Material
@@ -194,8 +192,7 @@ class WorldDataExportMenu(
                     )
                 )),
                 GuiLoreBlock(listOf(
-                    GuiLoreActions.singleClick(
-                        mwm().languageManager,
+                    CCSystem.getAPI().getGuiActionService().singleClick(
                         player,
                         i18n(player, "export_menu.world.action")
                     )
@@ -204,8 +201,6 @@ class WorldDataExportMenu(
             meta.setEnchantmentGlintOverride(selected)
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_WORLD_ITEM)
-        ItemTag.setWorldUuid(item, world.uuid)
         return item
     }
 
@@ -237,12 +232,11 @@ class WorldDataExportMenu(
             meta.lore(structuredBlocks(listOf(
                 GuiLoreBlock(listOf(GuiLoreLine.Text(i18n(player, "$key.description")))),
                 GuiLoreBlock(listOf(
-                    GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "$key.action"))
+                    CCSystem.getAPI().getGuiActionService()
+                        .singleClick(player, i18n(player, "$key.action"))
                 ))
             )))
         }
-        ItemTag.tagItem(item, TYPE_CONTROL)
-        ItemTag.setString(item, ACTION_KEY, action)
         return item
     }
 
@@ -262,16 +256,13 @@ class WorldDataExportMenu(
             meta.lore(structuredBlocks(listOf(
                 GuiLoreBlock(status),
                 GuiLoreBlock(listOf(
-                    GuiLoreActions.singleClick(
-                        mwm().languageManager,
+                    CCSystem.getAPI().getGuiActionService().singleClick(
                         player,
                         i18n(player, "export_menu.execute.action")
                     )
                 ))
             )))
         }
-        ItemTag.tagItem(item, TYPE_CONTROL)
-        ItemTag.setString(item, ACTION_KEY, ACTION_EXPORT_SELECTION)
         return item
     }
 
@@ -346,20 +337,16 @@ class WorldDataExportMenu(
                 )
             )
         }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
         return item
     }
 
     private fun navItem(player: Player, next: Boolean, page: Int): ItemStack {
         val item = ChanponGuiElements.navigation(i18n(player, if (next) "common.next" else "common.prev"), next)
-        ItemTag.tagItem(item, if (next) ItemTag.TYPE_GUI_NAV_NEXT else ItemTag.TYPE_GUI_NAV_PREV)
-        ItemTag.setTargetPage(item, page)
         return item
     }
 
     private fun backItem(player: Player): ItemStack {
         val item = ChanponGuiElements.back(i18n(player, "common.back"))
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_RETURN)
         return item
     }
 
@@ -381,9 +368,6 @@ class WorldDataExportMenu(
 
     private fun structuredBlocks(blocks: List<GuiLoreBlock>): List<Component> =
         CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(blocks))
-
-    private fun mwm(): me.awabi2048.myworldmanager.MyWorldManager =
-        org.bukkit.plugin.java.JavaPlugin.getPlugin(me.awabi2048.myworldmanager.MyWorldManager::class.java)
 
     companion object {
         private const val OWNER = "mwm-chanpon"

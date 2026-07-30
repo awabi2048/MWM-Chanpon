@@ -34,8 +34,6 @@ import me.awabi2048.myworldmanager.api.service.ExpansionExecutionMode
 import me.awabi2048.myworldmanager.api.service.ExpansionSequenceOptions
 import me.awabi2048.myworldmanager.api.service.ExpansionSequencePhase
 import me.awabi2048.myworldmanager.model.WorldData
-import me.awabi2048.myworldmanager.util.GuiItemFactory
-import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
 import org.bukkit.Material
@@ -81,50 +79,39 @@ class ChanponWorldSettingsMenu(
 
     private fun handleAction(context: MenuActionContext): MenuActionResult {
         val source = source(context.route)
-        return when (source.screen) {
-            Screen.EXPANSION -> handleExpansionClick(context.player, source, context.item)
-            Screen.MODIFIED_WARNING -> handleWarningClick(context.player, source, context.item)
-            Screen.CONFIRM -> handleConfirmClick(context.player, source, context.item)
-            Screen.CRITICAL -> handleCriticalClick(context.player, source, context.item)
-            Screen.DELETE_CONFIRM -> handleDeleteConfirmClick(context.player, source, context.item)
-        }
-    }
-
-
-    private fun handleExpansionClick(player: Player, source: Source, item: ItemStack): MenuActionResult {
-        val worldUuid = source.worldUuid
-        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
+        val player = context.player
+        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(source.worldUuid)
             ?: return MenuActionResult.Rejected()
-        return when (ItemTag.getType(item)) {
-            ItemTag.TYPE_GUI_RETURN -> MenuActionResult.Success(MenuUpdate.Back)
-            TYPE_EXPAND_DIRECTION -> {
+        return when (context.payload[OPERATION]) {
+            OPERATION_BACK -> MenuActionResult.Success(MenuUpdate.Back)
+            OPERATION_EXPAND_CENTER -> {
                 if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) {
                     return MenuActionResult.Rejected()
                 }
-                when (ItemTag.getString(item, DIRECTION_KEY)) {
-                    ACTION_CENTER -> confirmResultByPlatform(player, worldData, ConfirmAction.EXPAND, null)
-                    ACTION_SELECT_DIRECTION -> {
-                        val started = MyWorldManagerApi.getWorldService()?.startWorldBorderExpansionSequence(
-                            player,
-                            worldUuid,
-                            ExpansionSequenceOptions(
-                                ExpansionSequencePhase.DIRECTION_SELECT,
-                                null,
-                                ExpansionExecutionMode.IMMEDIATE_NO_COST,
-                                setOf(ExpansionSequencePhase.METHOD_SELECT)
-                            )
-                        ) == true
-                        if (!started) {
-                            player.sendMessage(i18nComponent(player, "message.expand_failed"))
-                            MenuActionResult.Rejected()
-                        } else {
-                            MenuActionResult.Success(MenuUpdate.None)
-                        }
-                    }
-                    else -> MenuActionResult.Ignored
+                confirmResultByPlatform(player, worldData, ConfirmAction.EXPAND, null)
+            }
+            OPERATION_EXPAND_DIRECTION -> {
+                if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) {
+                    return MenuActionResult.Rejected()
+                }
+                val started = MyWorldManagerApi.getWorldService()?.startWorldBorderExpansionSequence(
+                    player,
+                    source.worldUuid,
+                    ExpansionSequenceOptions(
+                        ExpansionSequencePhase.DIRECTION_SELECT,
+                        null,
+                        ExpansionExecutionMode.IMMEDIATE_NO_COST,
+                        setOf(ExpansionSequencePhase.METHOD_SELECT),
+                    ),
+                ) == true
+                if (!started) {
+                    player.sendMessage(i18nComponent(player, "message.expand_failed"))
+                    MenuActionResult.Rejected()
+                } else {
+                    MenuActionResult.Success(MenuUpdate.None)
                 }
             }
-            ItemTag.TYPE_GUI_SETTING_STEP_BACK_EXPANSION -> {
+            OPERATION_STEP_BACK -> {
                 if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) {
                     return MenuActionResult.Rejected()
                 }
@@ -144,98 +131,73 @@ class ChanponWorldSettingsMenu(
                     confirmResultByPlatform(player, worldData, ConfirmAction.STEP_BACK, null)
                 }
             }
-            else -> MenuActionResult.Ignored
-        }
-    }
-
-    private fun handleWarningClick(player: Player, source: Source, item: ItemStack): MenuActionResult {
-        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(source.worldUuid)
-            ?: return MenuActionResult.Rejected()
-        return when (ItemTag.getType(item)) {
-            ItemTag.TYPE_GUI_CANCEL -> MenuActionResult.Success(MenuUpdate.Back)
-            ItemTag.TYPE_GUI_CONFIRM -> {
-                if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) {
-                    return MenuActionResult.Rejected()
+            OPERATION_CONFIRM -> when (source.screen) {
+                Screen.MODIFIED_WARNING -> {
+                    if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) {
+                        return MenuActionResult.Rejected()
+                    }
+                    val action = source.confirmAction ?: return MenuActionResult.Rejected()
+                    confirmResultByPlatform(player, worldData, action, null)
                 }
-                val action = source.confirmAction ?: return MenuActionResult.Rejected()
-                confirmResultByPlatform(player, worldData, action, null)
+                Screen.CONFIRM -> {
+                    if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) {
+                        return MenuActionResult.Rejected()
+                    }
+                    executeConfirmAction(
+                        player,
+                        worldData,
+                        source.confirmAction ?: return MenuActionResult.Rejected(),
+                        source.direction,
+                        external = false,
+                    )
+                }
+                Screen.DELETE_CONFIRM -> confirmDelete(player, source, worldData)
+                else -> MenuActionResult.Ignored
             }
-            else -> MenuActionResult.Ignored
-        }
-    }
-
-    private fun handleConfirmClick(player: Player, source: Source, item: ItemStack): MenuActionResult {
-        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(source.worldUuid)
-            ?: return MenuActionResult.Rejected()
-        return when (ItemTag.getType(item)) {
-            ItemTag.TYPE_GUI_CANCEL -> MenuActionResult.Success(MenuUpdate.Back)
-            ItemTag.TYPE_GUI_CONFIRM -> {
+            OPERATION_DELETE -> {
                 if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) {
                     return MenuActionResult.Rejected()
                 }
-                executeConfirmAction(
-                    player,
-                    worldData,
-                    source.confirmAction ?: return MenuActionResult.Rejected(),
-                    source.direction,
-                    external = false,
-                )
-            }
-            else -> MenuActionResult.Ignored
-        }
-    }
-
-    private fun handleCriticalClick(player: Player, source: Source, item: ItemStack): MenuActionResult {
-        val worldUuid = source.worldUuid
-        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
-            ?: return MenuActionResult.Rejected()
-        return when (ItemTag.getType(item)) {
-            ItemTag.TYPE_GUI_RETURN -> MenuActionResult.Success(MenuUpdate.Back)
-            ItemTag.TYPE_GUI_SETTING_DELETE_WORLD -> {
-                if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) {
-                    return MenuActionResult.Rejected()
-                }
-                if (storage.isProductionWorld(worldUuid)) return MenuActionResult.Rejected()
+                if (storage.isProductionWorld(source.worldUuid)) return MenuActionResult.Rejected()
                 MenuActionResult.Success(
                     MenuUpdate.Navigate(
-                        route(Source(Screen.DELETE_CONFIRM, worldData.uuid, finalStep = false))
-                    )
+                        route(Source(Screen.DELETE_CONFIRM, worldData.uuid, finalStep = false)),
+                    ),
                 )
             }
             else -> MenuActionResult.Ignored
         }
     }
 
-    private fun handleDeleteConfirmClick(player: Player, source: Source, item: ItemStack): MenuActionResult {
-        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(source.worldUuid)
-            ?: return MenuActionResult.Rejected()
-        return when (ItemTag.getType(item)) {
-            ItemTag.TYPE_GUI_CANCEL -> MenuActionResult.Success(MenuUpdate.Back)
-            ItemTag.TYPE_GUI_CONFIRM -> {
-                if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) {
-                    return MenuActionResult.Rejected()
-                }
-                if (!source.finalStep) {
-                    return MenuActionResult.Success(
-                        MenuUpdate.Navigate(
-                            route(Source(Screen.DELETE_CONFIRM, worldData.uuid, finalStep = true))
-                        )
-                    )
-                }
-                val worldService =
-                    MyWorldManagerApi.getWorldService() ?: return MenuActionResult.Rejected()
-                worldService.deleteWorld(source.worldUuid).thenAccept { success ->
-                    Bukkit.getScheduler().runTask(plugin, Runnable {
-                        player.sendMessage(i18nComponent(player, if (success) "critical.deleted" else "critical.delete_failed"))
-                        if (success) {
-                            MyWorldManagerApi.closeWorldSettingsContext(player)
-                        }
-                    })
-                }
-                MenuActionResult.Success(MenuUpdate.Close)
-            }
-            else -> MenuActionResult.Ignored
+    private fun confirmDelete(
+        player: Player,
+        source: Source,
+        worldData: WorldData,
+    ): MenuActionResult {
+        if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) {
+            return MenuActionResult.Rejected()
         }
+        if (!source.finalStep) {
+            return MenuActionResult.Success(
+                MenuUpdate.Navigate(
+                    route(Source(Screen.DELETE_CONFIRM, worldData.uuid, finalStep = true)),
+                ),
+            )
+        }
+        val worldService = MyWorldManagerApi.getWorldService()
+            ?: return MenuActionResult.Rejected()
+        worldService.deleteWorld(source.worldUuid).thenAccept { success ->
+            Bukkit.getScheduler().runTask(plugin, Runnable {
+                player.sendMessage(
+                    i18nComponent(
+                        player,
+                        if (success) "critical.deleted" else "critical.delete_failed",
+                    ),
+                )
+                if (success) MyWorldManagerApi.closeWorldSettingsContext(player)
+            })
+        }
+        return MenuActionResult.Success(MenuUpdate.Close)
     }
 
     private fun openExpansionMenu(player: Player, worldData: WorldData): MenuActionResult =
@@ -377,15 +339,28 @@ class ChanponWorldSettingsMenu(
     }
 
     private fun renderExpansion(player: Player, worldData: WorldData): InventoryMenuView {
-        val items = mutableMapOf(
-            20 to expansionOptionItem(player, "center", Material.MAP, ACTION_CENTER),
-            24 to expansionOptionItem(player, "direction_select", Material.COMPASS, ACTION_SELECT_DIRECTION),
-            ChanponGuiElements.backSlot(45) to returnItem(player),
+        val elements = mutableListOf(
+            actionElement(
+                20,
+                expansionOptionItem(player, "center", Material.MAP),
+                OPERATION_EXPAND_CENTER,
+            ),
+            actionElement(
+                24,
+                expansionOptionItem(player, "direction_select", Material.COMPASS),
+                OPERATION_EXPAND_DIRECTION,
+            ),
+            actionElement(
+                ChanponGuiElements.backSlot(45),
+                returnItem(player),
+                OPERATION_BACK,
+                GuiElementRole.BACK,
+            ),
         )
         if (worldData.latestBorderExpansionRecord() != null) {
-            items[42] = stepBackItem(player, worldData)
+            elements += actionElement(42, stepBackItem(player, worldData), OPERATION_STEP_BACK)
         }
-        return InventoryMenuView(45, i18nComponent(player, "expand_menu.title"), menuElements(items))
+        return InventoryMenuView(45, i18nComponent(player, "expand_menu.title"), elements)
     }
 
     private fun renderModifiedWarning(player: Player): InventoryMenuView {
@@ -421,11 +396,14 @@ class ChanponWorldSettingsMenu(
         InventoryMenuView(
             45,
             i18nComponent(player, "critical.menu_title"),
-            menuElements(
-                mapOf(
-                    ChanponGuiElements.backSlot(45) to returnItem(player),
-                    22 to deleteWorldItem(player),
+            listOf(
+                actionElement(
+                    ChanponGuiElements.backSlot(45),
+                    returnItem(player),
+                    OPERATION_BACK,
+                    GuiElementRole.BACK,
                 ),
+                actionElement(22, deleteWorldItem(player), OPERATION_DELETE),
             ),
         )
 
@@ -447,13 +425,11 @@ class ChanponWorldSettingsMenu(
                 GuiLoreLine.Danger(i18n(player, "critical.confirm_danger"))
             ))))
         }
-        val centerItem =
-            componentItem(
-                Material.TNT,
-                i18n(player, "${key}_display"),
-                lore,
-                ItemTag.TYPE_GUI_INFO
-            )
+        val centerItem = componentItem(
+            Material.TNT,
+            i18n(player, "${key}_display"),
+            lore,
+        )
         return InventoryMenuView(
             layout.size,
             i18nComponent(player, "${key}_title"),
@@ -603,7 +579,7 @@ class ChanponWorldSettingsMenu(
             )),
             GuiLoreBlock(listOf(singleClick(player, i18n(player, "critical.delete_action"))))
         )))
-        return componentItem(Material.TNT, i18n(player, "critical.delete_display"), lore, ItemTag.TYPE_GUI_SETTING_DELETE_WORLD)
+        return componentItem(Material.TNT, i18n(player, "critical.delete_display"), lore)
     }
 
     private fun criticalUnavailablePresentation(
@@ -709,19 +685,19 @@ class ChanponWorldSettingsMenu(
         )
     }
 
-    private fun expansionOptionItem(player: Player, key: String, material: Material, action: String): ItemStack {
-        val item = componentItem(
+    private fun expansionOptionItem(
+        player: Player,
+        key: String,
+        material: Material,
+    ): ItemStack =
+        componentItem(
             material,
             i18n(player, "expand_menu.$key.display"),
             loreBlocks(listOf(
                 GuiLoreBlock(listOf(GuiLoreLine.Text(i18n(player, "expand_menu.$key.description")))),
                 GuiLoreBlock(listOf(singleClick(player, i18n(player, "expand_menu.$key.action"))))
             )),
-            TYPE_EXPAND_DIRECTION
         )
-        ItemTag.setString(item, DIRECTION_KEY, action)
-        return item
-    }
 
     private fun stepBackItem(player: Player, worldData: WorldData): ItemStack {
         val modified = worldData.latestBorderExpansionRecord()?.modified == true
@@ -736,7 +712,6 @@ class ChanponWorldSettingsMenu(
                 GuiLoreBlock(lines),
                 GuiLoreBlock(listOf(singleClick(player, i18n(player, "step_back.action"))))
             )),
-            ItemTag.TYPE_GUI_SETTING_STEP_BACK_EXPANSION
         )
     }
 
@@ -751,7 +726,6 @@ class ChanponWorldSettingsMenu(
                 )),
                 GuiLoreBlock(listOf(singleClick(player, i18n(player, "modified_warning.action"))))
             )),
-            ItemTag.TYPE_GUI_INFO
         )
     }
 
@@ -770,7 +744,11 @@ class ChanponWorldSettingsMenu(
                 }
             }
         }
-        return componentItem(action.material, i18n(player, "confirm.${action.key}.display"), loreBlocks(listOf(GuiLoreBlock(lines))), ItemTag.TYPE_GUI_INFO)
+        return componentItem(
+            action.material,
+            i18n(player, "confirm.${action.key}.display"),
+            loreBlocks(listOf(GuiLoreBlock(lines))),
+        )
     }
 
     private fun confirmContentLines(player: Player, action: ConfirmAction, directionName: String, modified: Boolean): List<String> {
@@ -791,7 +769,6 @@ class ChanponWorldSettingsMenu(
             if (confirm) Material.LIME_CONCRETE else Material.RED_CONCRETE,
             i18n(player, if (confirm) "confirm.button.confirm" else "confirm.button.cancel"),
             emptyList(),
-            if (confirm) ItemTag.TYPE_GUI_CONFIRM else ItemTag.TYPE_GUI_CANCEL
         )
     }
 
@@ -800,15 +777,18 @@ class ChanponWorldSettingsMenu(
             if (continueAction) Material.LIME_CONCRETE else Material.RED_CONCRETE,
             i18n(player, if (continueAction) "modified_warning.button.continue" else "modified_warning.button.cancel"),
             emptyList(),
-            if (continueAction) ItemTag.TYPE_GUI_CONFIRM else ItemTag.TYPE_GUI_CANCEL
         )
     }
 
     private fun returnItem(player: Player): ItemStack {
-        return item(Material.REDSTONE, i18n(player, "common.back"), emptyList(), ItemTag.TYPE_GUI_RETURN)
+        return item(Material.REDSTONE, i18n(player, "common.back"), emptyList())
     }
 
-    private fun item(material: Material, display: String, loreLines: List<GuiLoreLine>, type: String): ItemStack {
+    private fun item(
+        material: Material,
+        display: String,
+        loreLines: List<GuiLoreLine>,
+    ): ItemStack {
         val item = ItemStack(material)
         item.editMeta { meta ->
             meta.displayName(CCSystem.getAPI().getGuiElementService().name(display))
@@ -817,11 +797,14 @@ class ChanponWorldSettingsMenu(
             }
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         }
-        ItemTag.tagItem(item, type)
         return item
     }
 
-    private fun componentItem(material: Material, display: String, loreComponents: List<Component>, type: String): ItemStack {
+    private fun componentItem(
+        material: Material,
+        display: String,
+        loreComponents: List<Component>,
+    ): ItemStack {
         val item = ItemStack(material)
         item.editMeta { meta ->
             meta.displayName(CCSystem.getAPI().getGuiElementService().name(display))
@@ -831,7 +814,6 @@ class ChanponWorldSettingsMenu(
             }
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         }
-        ItemTag.tagItem(item, type)
         return item
     }
 
@@ -911,40 +893,6 @@ class ChanponWorldSettingsMenu(
     private fun i18nComponent(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): Component {
         return CCSystem.getAPI().getI18nComponent(player, "chanpon.settings.$key", placeholders)
     }
-
-    private fun menuElements(
-        items: Map<Int, ItemStack>,
-        displayOnlyInfoWorldUuid: UUID? = null,
-    ): List<MenuElement> =
-        items.map { (slot, item) ->
-            val type = ItemTag.getType(item)
-            val role = when (type) {
-                ItemTag.TYPE_GUI_DECORATION -> GuiElementRole.DECORATION
-                ItemTag.TYPE_GUI_CONFIRM -> GuiElementRole.CONFIRM
-                ItemTag.TYPE_GUI_CANCEL -> GuiElementRole.CANCEL
-                ItemTag.TYPE_GUI_RETURN -> GuiElementRole.BACK
-                ItemTag.TYPE_GUI_INFO -> GuiElementRole.CONTENT
-                else -> GuiElementRole.ACTION
-            }
-            val clickableInfo =
-                type == ItemTag.TYPE_GUI_INFO &&
-                    ItemTag.getWorldUuid(item) != null &&
-                    ItemTag.getWorldUuid(item) != displayOnlyInfoWorldUuid
-            val effectiveRole = if (clickableInfo) GuiElementRole.ACTION else role
-            val interaction = when {
-                effectiveRole == GuiElementRole.BACK -> MenuInteraction.Back()
-                role == GuiElementRole.DECORATION ||
-                    (role == GuiElementRole.CONTENT && !clickableInfo) ->
-                    MenuInteraction.DisplayOnly
-                else -> MenuInteraction.Action(ACTION_SELECT)
-            }
-            MenuElement(
-                slot,
-                item,
-                effectiveRole,
-                interaction = interaction,
-            )
-        }
 
     internal fun isFeatureVisible(
         player: Player,
@@ -1048,11 +996,39 @@ class ChanponWorldSettingsMenu(
         center: ItemStack,
         confirm: ItemStack,
         cancel: ItemStack,
-    ): List<MenuElement> = menuElements(
-        mapOf(
-            layout.previewSlot to center,
-            layout.confirmSlot to confirm,
-            layout.cancelSlot to cancel,
+    ): List<MenuElement> = listOf(
+        MenuElement(
+            layout.previewSlot,
+            center,
+            GuiElementRole.CONTENT,
+            interaction = MenuInteraction.DisplayOnly,
+        ),
+        actionElement(
+            layout.confirmSlot,
+            confirm,
+            OPERATION_CONFIRM,
+            GuiElementRole.CONFIRM,
+        ),
+        actionElement(
+            layout.cancelSlot,
+            cancel,
+            OPERATION_BACK,
+            GuiElementRole.CANCEL,
+        ),
+    )
+
+    private fun actionElement(
+        slot: Int,
+        item: ItemStack,
+        operation: String,
+        role: GuiElementRole = GuiElementRole.ACTION,
+    ) = MenuElement(
+        slot = slot,
+        item = item,
+        role = role,
+        interaction = MenuInteraction.Action(
+            actionId = ACTION_SELECT,
+            payload = mapOf(OPERATION to operation),
         ),
     )
 
@@ -1119,9 +1095,12 @@ class ChanponWorldSettingsMenu(
         private const val PAYLOAD_CONFIRM_ACTION = "confirm_action"
         private const val PAYLOAD_DIRECTION = "direction"
         private const val PAYLOAD_FINAL_STEP = "final_step"
-        private const val TYPE_EXPAND_DIRECTION = "chanpon_expand_direction"
-        private const val DIRECTION_KEY = "chanpon_direction"
-        private const val ACTION_CENTER = "center"
-        private const val ACTION_SELECT_DIRECTION = "select_direction"
+        private const val OPERATION = "operation"
+        private const val OPERATION_BACK = "back"
+        private const val OPERATION_CONFIRM = "confirm"
+        private const val OPERATION_DELETE = "delete"
+        private const val OPERATION_EXPAND_CENTER = "expand-center"
+        private const val OPERATION_EXPAND_DIRECTION = "expand-direction"
+        private const val OPERATION_STEP_BACK = "step-back"
     }
 }

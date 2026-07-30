@@ -5,6 +5,7 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiCycle
+import com.awabi2048.ccsystem.api.gui.GuiClickLabel
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiMenuIconAction
 import com.awabi2048.ccsystem.api.gui.GuiMenuIconOption
@@ -30,9 +31,6 @@ import me.awabi2048.mwmchanpon.storage.WorldCreationAvailability
 import me.awabi2048.mwmchanpon.protection.SpawnWorldProtectionService
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.AdminMenuCapabilityPlacements
-import me.awabi2048.myworldmanager.util.GuiItemFactory
-import me.awabi2048.myworldmanager.util.GuiLoreActions
-import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import org.bukkit.Material
 import org.bukkit.entity.Player
@@ -70,8 +68,11 @@ class ChanponAdminMenu(
                         openChild { worldDataExportMenu.open(context.player) }
                     },
                     ACTION_SWITCH_MWM to MenuActionHandler { context ->
-                        mwm().adminCommandGui.open(context.player)
-                        MenuActionResult.Success(MenuUpdate.None)
+                        if (MyWorldManagerApi.openAdminMenu(context.player)) {
+                            MenuActionResult.Success(MenuUpdate.None)
+                        } else {
+                            MenuActionResult.Rejected()
+                        }
                     },
                     ACTION_BUILDING_ALLOWED to MenuActionHandler(::toggleBuilding),
                     ACTION_WORLD_CREATION to MenuActionHandler(::cycleWorldCreation),
@@ -234,23 +235,18 @@ class ChanponAdminMenu(
             meta.lore(ChanponLore.build(i18nList(player, "$key.lore").map(GuiLoreLine::Text)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
-        ItemTag.tagItem(item, TYPE_CONTROL)
-        ItemTag.setString(item, ACTION_KEY, action)
         return item
     }
 
     private fun spawnWorldItem(player: Player, worldUuid: java.util.UUID): ItemStack {
         val configured = globalStorage.getSpawnWorldUuid()
         val key = if (configured == null) "spawn_world.set" else "spawn_world.change"
-        return menuItem(player, Material.COMPASS, key, ACTION_SET_SPAWN_WORLD).also {
-            ItemTag.setWorldUuid(it, worldUuid)
-        }
+        return menuItem(player, Material.COMPASS, key, ACTION_SET_SPAWN_WORLD)
     }
 
     private fun buildingPermissionItem(player: Player): ItemStack {
         val allowed = globalStorage.isBuildingAllowed()
-        val buildingAction = GuiLoreActions.singleClick(
-            mwm().languageManager,
+        val buildingAction = CCSystem.getAPI().getGuiActionService().singleClick(
             player,
             controlsI18n(player, if (allowed) "build.deny_action" else "build.allow_action")
         )
@@ -280,24 +276,20 @@ class ChanponAdminMenu(
                 glint = null
             )
         )
-        ItemTag.tagItem(item, TYPE_CONTROL)
-        ItemTag.setString(item, ACTION_KEY, ACTION_BUILDING_ALLOWED)
         return item
     }
 
     private fun worldCreationAvailabilityItem(player: Player): ItemStack {
         val availability = globalStorage.getWorldCreationAvailability()
         val key = availability.name.lowercase()
-        val nextAction = GuiLoreActions.single(
-            mwm().languageManager,
+        val nextAction = CCSystem.getAPI().getGuiActionService().single(
             player,
-            mwm().languageManager.getMessage(player, "gui.settings.click.left"),
+            CCSystem.getAPI().getGuiActionService().clickLabel(player, GuiClickLabel.LEFT),
             controlsI18n(player, "creation.next_action")
         )
-        val previousAction = GuiLoreActions.single(
-            mwm().languageManager,
+        val previousAction = CCSystem.getAPI().getGuiActionService().single(
             player,
-            mwm().languageManager.getMessage(player, "gui.settings.click.right"),
+            CCSystem.getAPI().getGuiActionService().clickLabel(player, GuiClickLabel.RIGHT),
             controlsI18n(player, "creation.previous_action")
         )
         val material = when (availability) {
@@ -344,8 +336,6 @@ class ChanponAdminMenu(
                 glint = null
             )
         )
-        ItemTag.tagItem(item, TYPE_CONTROL)
-        ItemTag.setString(item, ACTION_KEY, ACTION_WORLD_CREATION)
         return item
     }
 
@@ -355,7 +345,6 @@ class ChanponAdminMenu(
             meta.displayName(i18nComponent(player, if (confirm) "confirm.button.confirm" else "confirm.button.cancel"))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
-        ItemTag.tagItem(item, if (confirm) ItemTag.TYPE_GUI_CONFIRM else ItemTag.TYPE_GUI_CANCEL)
         return item
     }
 
@@ -370,7 +359,6 @@ class ChanponAdminMenu(
             meta.lore(ChanponLore.build(i18nList(player, "admin.info.lore", mapOf("version" to plugin.pluginMeta.version)).map(GuiLoreLine::Text)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
         return item
     }
 
@@ -380,28 +368,34 @@ class ChanponAdminMenu(
             meta.displayName(i18nComponent(player, "admin.switch_mwm.display"))
             meta.lore(structuredBlocks(listOf(
                 GuiLoreBlock(listOf(GuiLoreLine.Text(i18n(player, "admin.switch_mwm.description")))),
-                GuiLoreBlock(listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "admin.switch_mwm.action"))))
+                GuiLoreBlock(
+                    listOf(
+                        CCSystem.getAPI().getGuiActionService()
+                            .singleClick(player, i18n(player, "admin.switch_mwm.action")),
+                    ),
+                )
             )))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         }
-        ItemTag.tagItem(item, TYPE_CONTROL)
-        ItemTag.setString(item, ACTION_KEY, ACTION_SWITCH_MWM)
         return item
     }
 
     private fun switchToChanponPresentation(player: Player): MenuCapabilityPresentation {
-        val language = mwm().languageManager
+        val actions = CCSystem.getAPI().getGuiActionService()
         return MenuCapabilityPresentation(
             GuiItemSpec(
                 material = Material.NETHER_STAR,
                 name = GuiNameSpec.Text(
-                    language.getMessage(player, "gui.admin_menu.menu_switch.display"),
+                    CCSystem.getAPI().getI18nString(
+                        player,
+                        "gui.admin_menu.menu_switch.display",
+                    ),
                     GuiNameStyle.DEFAULT,
                 ),
                 lore = GuiLoreSpec.Blocks(
                     listOf(
                         GuiLoreBlock(
-                            language.getMessageList(
+                            CCSystem.getAPI().getI18nStringList(
                                 player,
                                 "gui.admin_menu.menu_switch.lore",
                                 mapOf("next" to i18n(player, "admin.provider_display")),
@@ -409,10 +403,12 @@ class ChanponAdminMenu(
                         ),
                         GuiLoreBlock(
                             listOf(
-                                GuiLoreActions.singleClick(
-                                    language,
+                                actions.singleClick(
                                     player,
-                                    language.getMessage(player, "gui.admin_menu.menu_switch.action"),
+                                    CCSystem.getAPI().getI18nString(
+                                        player,
+                                        "gui.admin_menu.menu_switch.action",
+                                    ),
                                 ),
                             ),
                         ),
@@ -442,9 +438,6 @@ class ChanponAdminMenu(
 
     private fun structuredBlocks(blocks: List<GuiLoreBlock>): List<Component> =
         CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(blocks))
-
-    private fun mwm(): me.awabi2048.myworldmanager.MyWorldManager =
-        org.bukkit.plugin.java.JavaPlugin.getPlugin(me.awabi2048.myworldmanager.MyWorldManager::class.java)
 
     companion object {
         private const val OWNER = "mwm-chanpon"

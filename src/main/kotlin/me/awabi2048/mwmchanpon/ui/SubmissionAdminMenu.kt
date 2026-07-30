@@ -3,6 +3,7 @@ package me.awabi2048.mwmchanpon.ui
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiCycle
+import com.awabi2048.ccsystem.api.gui.GuiClickLabel
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
@@ -25,7 +26,6 @@ import me.awabi2048.mwmchanpon.storage.SubmissionState
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.model.WorldData
-import me.awabi2048.myworldmanager.util.GuiLoreActions
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
 import org.bukkit.GameMode
@@ -548,9 +548,21 @@ class SubmissionAdminMenu(
             ))
             add(GuiLoreLine.Data(i18n(player, "admin_menu.world.completed_label"), completed, ""))
             add(GuiLoreLine.Spacer)
-            add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.left"), i18n(player, "admin_menu.world.action_warp")))
+            add(
+                GuiLoreLine.Action(
+                    CCSystem.getAPI().getGuiActionService()
+                        .clickLabel(player, GuiClickLabel.LEFT),
+                    i18n(player, "admin_menu.world.action_warp"),
+                ),
+            )
             if (player.gameMode == GameMode.CREATIVE) {
-                add(GuiLoreLine.Action(mwm().languageManager.getMessage(player, "gui.settings.click.right"), i18n(player, "admin_menu.world.action_complete")))
+                add(
+                    GuiLoreLine.Action(
+                        CCSystem.getAPI().getGuiActionService()
+                            .clickLabel(player, GuiClickLabel.RIGHT),
+                        i18n(player, "admin_menu.world.action_complete"),
+                    ),
+                )
             }
             add(GuiLoreLine.Action(i18n(player, "common.middle_click"), i18n(player, "admin_menu.world.action_remove_production")))
         }
@@ -673,7 +685,7 @@ class SubmissionAdminMenu(
                     add(GuiLoreLine.Option(i18n(player, optionKey), selected, "\u00A7f", "\u00A77"))
                 }
                 add(GuiLoreLine.Spacer)
-                add(GuiLoreActions.cycle(mwm().languageManager, player))
+                add(CCSystem.getAPI().getGuiActionService().cycle(player))
             }, GuiLoreFrame.BOTH)
         )
         item.editMeta { meta ->
@@ -754,9 +766,6 @@ class SubmissionAdminMenu(
     private fun i18nComponent(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): Component {
         return CCSystem.getAPI().getI18nComponent(player, "chanpon.submission.$key", placeholders)
     }
-
-    private fun mwm(): me.awabi2048.myworldmanager.MyWorldManager =
-        org.bukkit.plugin.java.JavaPlugin.getPlugin(me.awabi2048.myworldmanager.MyWorldManager::class.java)
 
     enum class ProgressFilter(val key: String) {
         ALL("admin_menu.progress_filter.all"),

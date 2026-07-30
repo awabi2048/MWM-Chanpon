@@ -2,9 +2,12 @@ package me.awabi2048.mwmchanpon.service
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
@@ -19,7 +22,6 @@ import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
-import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.WorldCreationOperation
 import me.awabi2048.myworldmanager.api.extension.WorldCreationRequest
@@ -27,10 +29,6 @@ import me.awabi2048.myworldmanager.api.extension.WorldCreationType
 import me.awabi2048.myworldmanager.api.service.ManagedWorldCreationRequest
 import me.awabi2048.myworldmanager.api.service.ManagedWorldSpawn
 import me.awabi2048.myworldmanager.api.service.WorldPointBillingMode
-import me.awabi2048.myworldmanager.util.WorldNameValidation
-import me.awabi2048.myworldmanager.util.GuiHelper
-import me.awabi2048.myworldmanager.util.GuiItemFactory
-import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import org.bukkit.Bukkit
@@ -42,7 +40,6 @@ import org.bukkit.WorldType
 import org.bukkit.entity.Player
 import org.bukkit.generator.ChunkGenerator
 import org.bukkit.generator.WorldInfo
-import org.bukkit.plugin.java.JavaPlugin
 
 object EasyPlatformMaterialPolicy {
     val defaultMaterial: Material = Material.OBSIDIAN
@@ -117,17 +114,21 @@ class EasyVoidWorldCreationService(
             return MenuActionResult.Success(MenuUpdate.None)
         }
 
-        val mwm = mwm()
-        when (val validation = mwm.worldValidator.validateName(name)) {
-            is WorldNameValidation.Failure -> {
-                showNameDialog(player, name, mwm.languageManager.getComponent(player, validation.messageKey, validation.placeholders))
-                return MenuActionResult.Success(MenuUpdate.None)
-            }
-            WorldNameValidation.Ok -> Unit
+        val worldService = MyWorldManagerApi.getWorldService()
+            ?: return MenuActionResult.Rejected()
+        worldService.validateWorldName(player, name)?.let { error ->
+            showNameDialog(player, name, error)
+            return MenuActionResult.Success(MenuUpdate.None)
         }
 
-        if (mwm.worldConfigRepository.findByOwnerAndDisplayName(player.uniqueId, name) != null) {
-            showNameDialog(player, name, mwm.languageManager.getComponent(player, "messages.world_name_duplicate"))
+        if (MyWorldManagerApi.getWorldRepository()
+                ?.findByOwnerAndDisplayName(player.uniqueId, name) != null
+        ) {
+            showNameDialog(
+                player,
+                name,
+                CCSystem.getAPI().getI18nComponent(player, "messages.world_name_duplicate"),
+            )
             return MenuActionResult.Success(MenuUpdate.None)
         }
 
@@ -173,11 +174,11 @@ class EasyVoidWorldCreationService(
 
     private fun renderConfirmation(player: Player): InventoryMenuView {
         val pending = pendingCreations[player.uniqueId]
-        val layout = GuiHelper.confirmationLayout()
+        val layout = CCSystem.getAPI().getGuiLayoutService().confirmation45()
         if (pending == null) {
             return InventoryMenuView(layout.size, component(player, "confirm_title"), emptyList())
         }
-        val preview = GuiItemFactory.item(
+        val preview = guiItem(
             Material.PAPER,
             i18n(player, "confirm_title"),
             GuiLoreSpec.Rich(
@@ -193,7 +194,7 @@ class EasyVoidWorldCreationService(
                 ),
                 GuiLoreFrame.BOTH,
             ),
-            ItemTag.TYPE_GUI_INFO,
+            GuiElementRole.CONTENT,
         )
         return InventoryMenuView(
             layout.size,
@@ -202,22 +203,22 @@ class EasyVoidWorldCreationService(
                 MenuElement(layout.previewSlot, preview, GuiElementRole.CONTENT),
                 MenuElement(
                     layout.confirmSlot,
-                    GuiItemFactory.item(
+                    guiItem(
                         Material.LIME_CONCRETE,
                         i18n(player, "create"),
                         GuiLoreSpec.None,
-                        ItemTag.TYPE_GUI_CONFIRM,
+                        GuiElementRole.CONFIRM,
                     ),
                     GuiElementRole.CONFIRM,
                     ACTION_CREATE,
                 ),
                 MenuElement(
                     layout.cancelSlot,
-                    GuiItemFactory.item(
+                    guiItem(
                         Material.RED_CONCRETE,
                         i18n(player, "back"),
                         GuiLoreSpec.None,
-                        ItemTag.TYPE_GUI_CANCEL,
+                        GuiElementRole.CANCEL,
                     ),
                     GuiElementRole.CANCEL,
                     ACTION_BACK,
@@ -248,7 +249,7 @@ class EasyVoidWorldCreationService(
         val platformMaterial = configuredPlatformMaterial()
         val worldService = MyWorldManagerApi.getWorldService()
         if (worldService == null) {
-            player.sendMessage(mwm().languageManager.getMessage(player, "error.internal_error"))
+            player.sendMessage(CCSystem.getAPI().getI18nString(player, "error.internal_error"))
             return
         }
         worldService.createManagedWorld(
@@ -275,7 +276,7 @@ class EasyVoidWorldCreationService(
             !player.hasPermission("mwmchanpon.admin") &&
             !player.hasPermission("craftercrossing.test")
         ) {
-            player.sendMessage(mwm().languageManager.getMessage(player, "no_permission"))
+            player.sendMessage(CCSystem.getAPI().getI18nString(player, "no_permission"))
             return false
         }
         val decision = MyWorldManagerApi.checkWorldCreation(
@@ -303,7 +304,20 @@ class EasyVoidWorldCreationService(
             plugin.config.getString(PLATFORM_MATERIAL_CONFIG_PATH, DEFAULT_PLATFORM_MATERIAL.key.asString()).orEmpty()
         ) ?: error("$PLATFORM_MATERIAL_CONFIG_PATH contains an invalid block material")
 
-    private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)
+    private fun guiItem(
+        material: Material,
+        name: String,
+        lore: GuiLoreSpec,
+        role: GuiElementRole,
+    ) = CCSystem.getAPI().getGuiElementService().item(
+        GuiItemSpec(
+            material = material,
+            name = GuiNameSpec.Text(name, GuiNameStyle.DEFAULT),
+            lore = lore,
+            role = role,
+            amount = 1,
+        ),
+    )
 
     private fun i18n(player: Player?, key: String, vararg placeholders: Pair<String, Any>): String =
         CCSystem.getAPI().getI18nString(player, "chanpon.player_world.easy_creation.$key", placeholders.toMap())

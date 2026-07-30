@@ -1,10 +1,14 @@
 package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
@@ -20,14 +24,10 @@ import me.awabi2048.myworldmanager.api.extension.WorldCreationRequest
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsNavigationRequest
 import me.awabi2048.myworldmanager.api.service.WorldPointBillingMode
 import me.awabi2048.myworldmanager.model.WorldData
-import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.format.TextDecoration
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
-import org.bukkit.inventory.ItemFlag
-import org.bukkit.inventory.ItemStack
-import org.bukkit.inventory.meta.SkullMeta
 
 /**
  * MWMが所有するPlayerWorld画面へChanpon固有の表示値と操作だけを提供する。
@@ -45,10 +45,12 @@ class ChanponPlayerWorldCapability(
     override fun renderWorldItem(
         context: PlayerWorldCapabilityContext,
         worldData: WorldData,
-    ): ItemStack = createWorldItem(context.player, worldData)
+    ): MenuCapabilityPresentation = createWorldPresentation(context.player, worldData)
 
-    override fun renderSummaryItem(context: PlayerWorldCapabilityContext): ItemStack =
-        createPlayerInfoItem(
+    override fun renderSummaryItem(
+        context: PlayerWorldCapabilityContext,
+    ): MenuCapabilityPresentation =
+        createPlayerInfoPresentation(
             context.player,
             context.targetPlayerUuid,
             context.targetPlayerName,
@@ -64,10 +66,10 @@ class ChanponPlayerWorldCapability(
             plugin.config.getInt("creation.max_worlds_per_player", 50),
         )
         return if (reason == null && hasCreatePermission(context.player)) {
-            PlayerWorldCreationView(createCreationButton(context.player), true)
+            PlayerWorldCreationView(createCreationPresentation(context.player), true)
         } else {
             PlayerWorldCreationView(
-                createCreationUnavailableButton(
+                createCreationUnavailablePresentation(
                     context.player,
                     reason ?: CreationBlockReason.NO_PERMISSION,
                 ),
@@ -133,186 +135,178 @@ class ChanponPlayerWorldCapability(
         easyVoidCreationService.start(player, returnRoute)
     }
 
-    private fun createWorldItem(player: Player, world: WorldData): ItemStack {
-        val item = ItemStack(world.icon)
-        item.editMeta { meta ->
-            meta.displayName(
-                component(
-                    player,
-                    "gui.common.world_item_name",
-                    mapOf("world" to world.name),
-                ).decoration(TextDecoration.ITALIC, false),
-            )
-            val ownerName =
-                Bukkit.getOfflinePlayer(world.owner).name ?: text(player, "general.unknown")
-            val progressLine = SubmissionProgressDisplay.loreLine(player, storage, world.uuid)
-            val tagNames = world.tags.joinToString(", ") {
-                MyWorldManagerApi.getWorldTagService()?.getDisplayName(player, it) ?: it
-            }
-            val warpAction = text(player, "gui.player_world.world_item.warp")
-            val settingsAction = text(player, "gui.player_world.world_item.settings")
-            val currentWorld = isCurrentWorld(player, world)
-            meta.lore(
-                CCSystem.getAPI().getLoreService().render(
-                    GuiLoreSpec.Blocks(
-                        buildList {
-                            if (world.description.isNotBlank()) {
-                                add(GuiLoreBlock(listOf(GuiLoreLine.Text(world.description))))
-                            }
-                            add(
-                                GuiLoreBlock(
-                                    buildList {
-                                        add(
-                                            GuiLoreLine.Data(
-                                                CCSystem.getAPI().getI18nString(player, "gui_data.owner"),
-                                                ownerName,
-                                                "§f",
-                                            ),
-                                        )
-                                        add(
-                                            GuiLoreLine.Data(
-                                                CCSystem.getAPI().getI18nString(player, "gui_data.visibility"),
-                                                visibilityName(player, storage.getVisibility(world.uuid)),
-                                                "§e",
-                                            ),
-                                        )
-                                        progressLine?.let(::add)
-                                        tagNames.takeIf(String::isNotBlank)?.let {
-                                            add(
-                                                GuiLoreLine.Data(
-                                                    CCSystem.getAPI().getI18nString(player, "gui_data.tags"),
-                                                    it,
-                                                    "§f",
-                                                ),
-                                            )
-                                        }
-                                    },
-                                ),
-                            )
-                            if (world.isArchived) {
-                                add(
-                                    GuiLoreBlock(
-                                        listOf(
-                                            GuiLoreLine.Danger(
-                                                text(player, "gui.player_world.world_item.expired"),
-                                            ),
-                                        ),
-                                    ),
-                                )
-                            }
-                            add(
-                                GuiLoreBlock(
-                                    if (currentWorld) {
-                                        val operation = text(player, "lore.click.any")
-                                        listOf(
-                                            GuiLoreLine.SingleAction(
-                                                operation,
-                                                settingsAction,
-                                                text(
-                                                    player,
-                                                    "lore.action_single_with_operation",
-                                                    mapOf(
-                                                        "operation" to operation,
-                                                        "action" to settingsAction,
-                                                    ),
-                                                ),
-                                            ),
-                                        )
-                                    } else {
-                                        listOf(
-                                            GuiLoreLine.Action(
-                                                text(player, "gui.settings.click.left"),
-                                                warpAction,
-                                            ),
-                                            GuiLoreLine.Action(
-                                                text(player, "gui.settings.click.right"),
-                                                settingsAction,
-                                            ),
-                                        )
-                                    },
-                                ),
-                            )
-                        },
-                    ),
+    private fun createWorldPresentation(
+        player: Player,
+        world: WorldData,
+    ): MenuCapabilityPresentation {
+        val ownerName = Bukkit.getOfflinePlayer(world.owner).name
+            ?: text(player, "general.unknown")
+        val progressLine = SubmissionProgressDisplay.loreLine(player, storage, world.uuid)
+        val tagNames = world.tags.joinToString(", ") {
+            MyWorldManagerApi.getWorldTagService()?.getDisplayName(player, it) ?: it
+        }
+        val currentWorld = isCurrentWorld(player, world)
+        val information = buildList {
+            add(
+                GuiLoreLine.Data(
+                    CCSystem.getAPI().getI18nString(player, "gui_data.owner"),
+                    ownerName,
+                    "§f",
                 ),
             )
-            if (world.isArchived) meta.setEnchantmentGlintOverride(true)
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
+            add(
+                GuiLoreLine.Data(
+                    CCSystem.getAPI().getI18nString(player, "gui_data.visibility"),
+                    visibilityName(player, storage.getVisibility(world.uuid)),
+                    "§e",
+                ),
+            )
+            progressLine?.let(::add)
+            tagNames.takeIf(String::isNotBlank)?.let {
+                add(
+                    GuiLoreLine.Data(
+                        CCSystem.getAPI().getI18nString(player, "gui_data.tags"),
+                        it,
+                        "§f",
+                    ),
+                )
+            }
         }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_WORLD_ITEM)
-        ItemTag.setWorldUuid(item, world.uuid)
-        return item
+        val actions = if (currentWorld) {
+            listOf(
+                CCSystem.getAPI().getGuiActionService().singleClick(
+                    player,
+                    text(player, "gui.player_world.world_item.settings"),
+                ),
+            )
+        } else {
+            listOf(
+                GuiLoreLine.Action(
+                    CCSystem.getAPI().getGuiActionService()
+                        .clickLabel(player, com.awabi2048.ccsystem.api.gui.GuiClickLabel.LEFT),
+                    text(player, "gui.player_world.world_item.warp"),
+                ),
+                GuiLoreLine.Action(
+                    CCSystem.getAPI().getGuiActionService()
+                        .clickLabel(player, com.awabi2048.ccsystem.api.gui.GuiClickLabel.RIGHT),
+                    text(player, "gui.player_world.world_item.settings"),
+                ),
+            )
+        }
+        val blocks = buildList {
+            if (world.description.isNotBlank()) {
+                add(GuiLoreBlock(listOf(GuiLoreLine.Text(world.description))))
+            }
+            add(GuiLoreBlock(information))
+            if (world.isArchived) {
+                add(
+                    GuiLoreBlock(
+                        listOf(
+                            GuiLoreLine.Danger(
+                                text(player, "gui.player_world.world_item.expired"),
+                            ),
+                        ),
+                    ),
+                )
+            }
+            add(GuiLoreBlock(actions))
+        }
+        return MenuCapabilityPresentation(
+            item = GuiItemSpec(
+                material = world.icon,
+                name = GuiNameSpec.Component(
+                    component(
+                        player,
+                        "gui.common.world_item_name",
+                        mapOf("world" to world.name),
+                    ).decoration(TextDecoration.ITALIC, false),
+                ),
+                lore = GuiLoreSpec.Blocks(blocks),
+                role = GuiElementRole.ACTION,
+                amount = 1,
+            ),
+            glint = world.isArchived,
+        )
     }
 
-    private fun createCreationButton(player: Player): ItemStack {
-        val item = ItemStack(Material.NETHER_STAR)
-        item.editMeta { meta ->
-            meta.displayName(component(player, "gui.player_world.creation_button.display"))
-            meta.lore(
-                CCSystem.getAPI().getLoreService().render(
-                    GuiLoreSpec.Blocks(
-                        listOf(
-                            GuiLoreBlock(
-                                textList(player, "gui.player_world.creation_button.description")
-                                    .map(GuiLoreLine::Text),
-                            ),
-                            GuiLoreBlock(
-                                listOf(
-                                    GuiLoreLine.Action(
-                                        text(player, "gui.settings.click.left"),
-                                        text(player, "gui.player_world.creation_button.action"),
-                                    ),
-                                    GuiLoreLine.Action(
-                                        text(player, "gui.settings.click.right"),
-                                        plugin.getMessage(
+    private fun createCreationPresentation(player: Player): MenuCapabilityPresentation =
+        MenuCapabilityPresentation(
+            GuiItemSpec(
+                material = Material.NETHER_STAR,
+                name = GuiNameSpec.Component(
+                    component(player, "gui.player_world.creation_button.display"),
+                ),
+                lore = GuiLoreSpec.Blocks(
+                    listOf(
+                        GuiLoreBlock(
+                            textList(player, "gui.player_world.creation_button.description")
+                                .map(GuiLoreLine::Text),
+                        ),
+                        GuiLoreBlock(
+                            listOf(
+                                GuiLoreLine.Action(
+                                    CCSystem.getAPI().getGuiActionService()
+                                        .clickLabel(
                                             player,
-                                            "chanpon.player_world.easy_creation.action",
+                                            com.awabi2048.ccsystem.api.gui.GuiClickLabel.LEFT,
                                         ),
+                                    text(player, "gui.player_world.creation_button.action"),
+                                ),
+                                GuiLoreLine.Action(
+                                    CCSystem.getAPI().getGuiActionService()
+                                        .clickLabel(
+                                            player,
+                                            com.awabi2048.ccsystem.api.gui.GuiClickLabel.RIGHT,
+                                        ),
+                                    plugin.getMessage(
+                                        player,
+                                        "chanpon.player_world.easy_creation.action",
                                     ),
                                 ),
                             ),
                         ),
                     ),
                 ),
-            )
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_CREATION_BUTTON)
-        return item
-    }
+                role = GuiElementRole.ACTION,
+                amount = 1,
+            ),
+        )
 
-    private fun createCreationUnavailableButton(
+    private fun createCreationUnavailablePresentation(
         player: Player,
         reason: CreationBlockReason,
-    ): ItemStack {
-        val item = ItemStack(Material.BARRIER)
-        item.editMeta { meta ->
-            meta.displayName(component(player, reason.displayKey))
-            meta.lore(ChanponLore.build(textList(player, reason.loreKey).map(GuiLoreLine::Text)))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
-        return item
-    }
+    ): MenuCapabilityPresentation =
+        MenuCapabilityPresentation(
+            GuiItemSpec(
+                material = Material.BARRIER,
+                name = GuiNameSpec.Component(component(player, reason.displayKey)),
+                lore = GuiLoreSpec.Rich(
+                    textList(player, reason.loreKey).map(GuiLoreLine::Text),
+                    com.awabi2048.ccsystem.api.gui.GuiLoreFrame.BOTH,
+                ),
+                role = GuiElementRole.CONTENT,
+                amount = 1,
+            ),
+        )
 
-    private fun createPlayerInfoItem(
+    private fun createPlayerInfoPresentation(
         player: Player,
         targetPlayerUuid: java.util.UUID,
         targetPlayerName: String?,
-    ): ItemStack {
-        val item = ItemStack(Material.PLAYER_HEAD)
-        item.editMeta { rawMeta ->
-            val meta = rawMeta as? SkullMeta ?: return@editMeta
-            meta.owningPlayer = Bukkit.getOfflinePlayer(targetPlayerUuid)
-            meta.displayName(
-                CCSystem.getAPI().getGuiElementService()
-                    .name(targetPlayerName ?: targetPlayerUuid.toString()),
-            )
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
-        return item
-    }
+    ): MenuCapabilityPresentation =
+        MenuCapabilityPresentation(
+            item = GuiItemSpec(
+                material = Material.PLAYER_HEAD,
+                name = GuiNameSpec.Component(
+                    CCSystem.getAPI().getGuiElementService()
+                        .name(targetPlayerName ?: targetPlayerUuid.toString()),
+                ),
+                lore = GuiLoreSpec.None,
+                role = GuiElementRole.CONTENT,
+                amount = 1,
+            ),
+            playerHeadOwner = targetPlayerUuid,
+        )
 
     private fun visibilityName(
         player: Player,

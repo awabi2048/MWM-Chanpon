@@ -2,6 +2,7 @@ package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiClickLabel
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
@@ -94,16 +95,18 @@ class BackupListMenu(
     }
 
     fun openAll(player: Player, page: Int = 0) {
-        open(player, BackupListMode.ALL, null, page)
+        runtime.navigate(player, routeForAll(page))
     }
 
     fun openWorld(player: Player, worldUuid: UUID, page: Int = 0) {
-        open(player, BackupListMode.WORLD, worldUuid, page)
+        runtime.navigate(player, routeForWorld(worldUuid, page))
     }
 
-    private fun open(player: Player, mode: BackupListMode, worldUuid: UUID?, page: Int) {
-        runtime.navigate(player, listRoute(mode, worldUuid, page))
-    }
+    internal fun routeForAll(page: Int = 0): MenuRoute =
+        listRoute(BackupListMode.ALL, null, page)
+
+    internal fun routeForWorld(worldUuid: UUID, page: Int = 0): MenuRoute =
+        listRoute(BackupListMode.WORLD, worldUuid, page)
 
     private fun renderList(player: Player, route: MenuRoute): InventoryMenuView {
         val source = source(route)
@@ -455,10 +458,8 @@ class BackupListMenu(
                             GuiLoreBlock(
                                 listOf(
                                     GuiLoreLine.Action(
-                                        mwm().languageManager.getMessage(
-                                            player,
-                                            "gui.settings.click.left",
-                                        ),
+                                        CCSystem.getAPI().getGuiActionService()
+                                            .clickLabel(player, GuiClickLabel.LEFT),
                                         i18n(player, "backup_list.item.rollback_action"),
                                     ),
                                     GuiLoreLine.Action(
@@ -547,11 +548,6 @@ class BackupListMenu(
 
     private fun structuredBlocks(blocks: List<GuiLoreBlock>): List<Component> =
         CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(blocks))
-
-    private fun mwm(): me.awabi2048.myworldmanager.MyWorldManager =
-        org.bukkit.plugin.java.JavaPlugin.getPlugin(
-            me.awabi2048.myworldmanager.MyWorldManager::class.java,
-        )
 
     enum class BackupListMode {
         ALL,

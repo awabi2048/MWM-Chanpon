@@ -10,7 +10,6 @@ import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import com.awabi2048.ccsystem.api.gui.GuiPagedListLayout
 import com.awabi2048.ccsystem.api.gui.GuiSettingsLayout
 import com.awabi2048.ccsystem.api.gui.GuiThreeChoiceLayout
-import me.awabi2048.myworldmanager.util.ItemTag
 import org.bukkit.Material
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemStack
@@ -80,11 +79,7 @@ internal object ChanponGuiElements {
         elements.fillEmpty(inventory, decorationSpec(material))
     }
 
-    fun decoration(material: Material): ItemStack {
-        val item = elements.item(decorationSpec(material))
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_DECORATION)
-        return item
-    }
+    fun decoration(material: Material): ItemStack = elements.item(decorationSpec(material))
 
     fun back(name: String): ItemStack = elements.backItem(name)
 

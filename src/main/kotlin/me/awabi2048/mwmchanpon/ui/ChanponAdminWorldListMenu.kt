@@ -2,6 +2,7 @@ package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiCycle
+import com.awabi2048.ccsystem.api.gui.GuiClickLabel
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
@@ -26,19 +27,13 @@ import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
-import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsNavigationRequest
 import me.awabi2048.myworldmanager.api.extension.AdminMenuCapabilityPlacements
 import me.awabi2048.myworldmanager.model.WorldData
-import me.awabi2048.myworldmanager.session.SettingsAction
-import me.awabi2048.myworldmanager.util.GuiLoreActions
-import me.awabi2048.myworldmanager.util.GuiItemFactory
-import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.event.ClickEvent
 import org.bukkit.Bukkit
@@ -48,15 +43,12 @@ import org.bukkit.entity.Player
 import org.bukkit.event.inventory.ClickType
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
-import org.bukkit.plugin.java.JavaPlugin
 
 class ChanponAdminWorldListMenu(
     private val plugin: MWMChanponPlugin,
     private val storage: ChanponWorldStorage,
 ) {
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
-    private val sessions = ConcurrentHashMap<UUID, ListState>()
-
     init {
         runtime.register(
             InventoryMenuDefinition(
@@ -84,9 +76,7 @@ class ChanponAdminWorldListMenu(
                     adminMenuWorldListPresentation(it.player)
                 },
                 actionHandler = MenuCapabilityActionHandler { context ->
-                    val previous = sessions[context.player.uniqueId] ?: ListState()
-                    val state = previous.copy(fromAdminMenu = true)
-                    sessions[context.player.uniqueId] = state
+                    val state = ListState(fromAdminMenu = true)
                     MenuActionResult.Success(MenuUpdate.Navigate(listRoute(state)))
                 },
             ),
@@ -96,18 +86,12 @@ class ChanponAdminWorldListMenu(
     fun open(
         player: Player,
         page: Int = 0,
-        visibilityFilter: VisibilityFilter =
-            sessions[player.uniqueId]?.visibilityFilter ?: VisibilityFilter.ALL,
-        sortType: SortType =
-            sessions[player.uniqueId]?.sortType ?: SortType.CREATED_DESC,
-        fromAdminMenu: Boolean =
-            sessions[player.uniqueId]?.fromAdminMenu ?: false,
+        visibilityFilter: VisibilityFilter = VisibilityFilter.ALL,
+        sortType: SortType = SortType.CREATED_DESC,
+        fromAdminMenu: Boolean = false,
     ): Boolean {
         val state = ListState(page, visibilityFilter, sortType, fromAdminMenu)
-        sessions[player.uniqueId] = state
-        val opened = runtime.navigate(player, listRoute(state))
-        if (!opened) sessions.remove(player.uniqueId)
-        return opened
+        return runtime.navigate(player, listRoute(state))
     }
 
     private fun renderList(player: Player, route: MenuRoute): InventoryMenuView {
@@ -115,7 +99,6 @@ class ChanponAdminWorldListMenu(
         val worlds = filteredWorlds(player, requested.visibilityFilter, requested.sortType)
         val totalPages = pageCount(worlds.size)
         val current = requested.copy(page = requested.page.coerceIn(0, totalPages - 1))
-        sessions[player.uniqueId] = current
         val layout = ChanponGuiElements.pagedListLayout()
         val elements = mutableListOf<MenuElement>()
         currentWorld(player)?.let { worldData ->
@@ -184,26 +167,27 @@ class ChanponAdminWorldListMenu(
     }
 
     private fun adminMenuWorldListPresentation(player: Player): MenuCapabilityPresentation {
-        val language = mwm().languageManager
+        val actions = CCSystem.getAPI().getGuiActionService()
         return MenuCapabilityPresentation(
             GuiItemSpec(
                 material = Material.FILLED_MAP,
                 name = GuiNameSpec.Text(
-                    language.getMessage(player, "gui.admin_menu.info.display"),
+                    CCSystem.getAPI().getI18nString(player, "gui.admin_menu.info.display"),
                     GuiNameStyle.DEFAULT,
                 ),
                 lore = GuiLoreSpec.Blocks(
                     listOf(
                         GuiLoreBlock(
-                            language.getMessageList(player, "gui.admin_menu.info.lore")
+                            CCSystem.getAPI()
+                                .getI18nStringList(player, "gui.admin_menu.info.lore")
                                 .map(GuiLoreLine::Text),
                         ),
                         GuiLoreBlock(
                             listOf(
-                                GuiLoreActions.singleClick(
-                                    language,
+                                actions.singleClick(
                                     player,
-                                    language.getMessage(player, "gui.admin_menu.info.action"),
+                                    CCSystem.getAPI()
+                                        .getI18nString(player, "gui.admin_menu.info.action"),
                                 ),
                             ),
                         ),
@@ -380,7 +364,8 @@ class ChanponAdminWorldListMenu(
             add(GuiLoreLine.Spacer)
             add(
                 GuiLoreLine.Action(
-                    mwm().languageManager.getMessage(player, "gui.settings.click.left"),
+                    CCSystem.getAPI().getGuiActionService()
+                        .clickLabel(player, GuiClickLabel.LEFT),
                     i18n(player, "admin_list.world.action_warp"),
                 ),
             )
@@ -389,7 +374,8 @@ class ChanponAdminWorldListMenu(
             } else {
                 add(
                     GuiLoreLine.Action(
-                        mwm().languageManager.getMessage(player, "gui.settings.click.right"),
+                        CCSystem.getAPI().getGuiActionService()
+                            .clickLabel(player, GuiClickLabel.RIGHT),
                         i18n(player, "admin_list.world.action_settings"),
                     ),
                 )
@@ -445,7 +431,7 @@ class ChanponAdminWorldListMenu(
                 structuredLore(
                     listOf(
                         GuiLoreLine.Data(i18n(player, "$key.label"), current, "§e"),
-                    ) + GuiLoreActions.cycle(mwm().languageManager, player),
+                    ) + CCSystem.getAPI().getGuiActionService().cycle(player),
                 ),
             )
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
@@ -492,15 +478,14 @@ class ChanponAdminWorldListMenu(
         }
 
     private fun openSettings(player: Player, worldData: WorldData) {
-        val mwm = mwm()
         val folderName = worldDirectory(worldData)
         if (!worldData.isArchived && Bukkit.getWorld(folderName) == null) {
             runtime.close(player)
-            player.sendMessage(mwm.languageManager.getMessage(player, "messages.world_loading"))
-            Bukkit.getScheduler().runTask(mwm, Runnable {
+            player.sendMessage(CCSystem.getAPI().getI18nString(player, "messages.world_loading"))
+            Bukkit.getScheduler().runTask(plugin, Runnable {
                 if (!player.isOnline) return@Runnable
-                if (!mwm.worldService.loadWorld(worldData.uuid)) {
-                    player.sendMessage(mwm.languageManager.getMessage(player, "error.load_failed"))
+                if (MyWorldManagerApi.getWorldService()?.loadWorld(worldData.uuid) != true) {
+                    player.sendMessage(CCSystem.getAPI().getI18nString(player, "error.load_failed"))
                     return@Runnable
                 }
                 openSettings(player, worldData)
@@ -609,8 +594,6 @@ class ChanponAdminWorldListMenu(
         "chanpon.submission.$key",
         placeholders,
     )
-
-    private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)
 
     private data class ListState(
         val page: Int = 0,
