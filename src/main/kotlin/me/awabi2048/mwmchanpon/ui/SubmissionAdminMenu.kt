@@ -9,6 +9,7 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryOption
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiValueTone
@@ -152,16 +153,22 @@ class SubmissionAdminMenu(
                     statePayload(current) + (WORLD_UUID to worldData.uuid.toString()),
                 )
             }
-        elements += MenuElement(
+        elements += filterEntry(
+            player,
             47,
-            progressFilterItem(player, current.progressFilter),
-            GuiElementRole.ACTION,
+            Material.HOPPER,
+            "admin_menu.progress_filter.display",
+            ProgressFilter.entries.map { it.key },
+            current.progressFilter.key,
             ACTION_PROGRESS_FILTER,
         )
-        elements += MenuElement(
+        elements += filterEntry(
+            player,
             51,
-            sortItem(player, current.sortType),
-            GuiElementRole.ACTION,
+            Material.COMPARATOR,
+            "admin_menu.sort.display",
+            SortType.entries.map { it.key },
+            current.sortType.key,
             ACTION_SORT,
         )
         elements += closeSubmissionItem(player)
@@ -759,6 +766,30 @@ class SubmissionAdminMenu(
         }
         return item
     }
+
+    private fun filterEntry(
+        player: Player,
+        slot: Int,
+        material: Material,
+        displayKey: String,
+        optionKeys: List<String>,
+        selectedKey: String,
+        actionId: String,
+    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+        player,
+        GuiMenuEntrySpec(
+            slot = slot,
+            material = material,
+            name = GuiNameSpec.Component(i18nComponent(player, displayKey)),
+            role = GuiElementRole.ACTION,
+            options = optionKeys.map { GuiMenuEntryOption(i18n(player, it), it == selectedKey) },
+            actions = listOf(GuiMenuEntryAction(
+                actionId,
+                MenuAcceptedClicks.LEFT_RIGHT,
+                i18n(player, "common.action_next"),
+            )),
+        ),
+    )
 
     private fun closeSubmissionItem(player: Player): MenuElement {
         val key = if (plugin.isSubmissionClosed()) {

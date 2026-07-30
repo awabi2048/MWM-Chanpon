@@ -11,6 +11,7 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryOption
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
@@ -146,18 +147,8 @@ class ChanponAdminWorldListMenu(
             infoItem(player, worlds.size, current.page + 1, totalPages),
             GuiElementRole.CONTENT,
         )
-        elements += MenuElement(
-            47,
-            visibilityFilterItem(player, current.visibilityFilter),
-            GuiElementRole.ACTION,
-            ACTION_VISIBILITY_FILTER,
-        )
-        elements += MenuElement(
-            51,
-            sortItem(player, current.sortType),
-            GuiElementRole.ACTION,
-            ACTION_SORT,
-        )
+        elements += visibilityFilterEntry(player, 47, current.visibilityFilter)
+        elements += sortEntry(player, 51, current.sortType)
         if (current.page > 0) {
             elements += MenuElement(
                 52,
@@ -461,6 +452,58 @@ class ChanponAdminWorldListMenu(
         Material.ENDER_EYE,
         "admin_list.visibility_filter",
         i18n(player, filter.key),
+    )
+
+    private fun visibilityFilterEntry(
+        player: Player,
+        slot: Int,
+        filter: VisibilityFilter,
+    ): MenuElement = cycleEntry(
+        player,
+        slot,
+        Material.ENDER_EYE,
+        "admin_list.visibility_filter",
+        VisibilityFilter.entries.map { it.key },
+        filter.key,
+        ACTION_VISIBILITY_FILTER,
+    )
+
+    private fun sortEntry(
+        player: Player,
+        slot: Int,
+        sortType: SortType,
+    ): MenuElement = cycleEntry(
+        player,
+        slot,
+        Material.COMPARATOR,
+        "admin_list.sort",
+        SortType.entries.map { it.key },
+        sortType.key,
+        ACTION_SORT,
+    )
+
+    private fun cycleEntry(
+        player: Player,
+        slot: Int,
+        material: Material,
+        key: String,
+        optionKeys: List<String>,
+        selectedKey: String,
+        actionId: String,
+    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+        player,
+        GuiMenuEntrySpec(
+            slot = slot,
+            material = material,
+            name = GuiNameSpec.Component(i18nComponent(player, "$key.display")),
+            role = GuiElementRole.ACTION,
+            options = optionKeys.map { GuiMenuEntryOption(i18n(player, it), it == selectedKey) },
+            actions = listOf(GuiMenuEntryAction(
+                actionId,
+                MenuAcceptedClicks.LEFT_RIGHT,
+                i18n(player, "common.action_next"),
+            )),
+        ),
     )
 
     private fun sortItem(player: Player, sortType: SortType): ItemStack =
