@@ -21,28 +21,18 @@ import com.awabi2048.ccsystem.api.gui.MenuActionResult
 import com.awabi2048.ccsystem.api.gui.MenuInteraction
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
-import com.awabi2048.ccsystem.api.gui.MenuRuntimeActions
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
-import com.awabi2048.ccsystem.api.gui.PlayerInventoryInteraction
 import java.util.UUID
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
-import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
-import me.awabi2048.myworldmanager.api.extension.WorldSettingsNavigationRequest
-import me.awabi2048.myworldmanager.api.extension.WorldSettingsCapabilityPlacements
-import me.awabi2048.myworldmanager.api.event.MwmWarpReason
 import me.awabi2048.myworldmanager.api.service.ExpansionExecutionMode
 import me.awabi2048.myworldmanager.api.service.ExpansionSequenceOptions
 import me.awabi2048.myworldmanager.api.service.ExpansionSequencePhase
 import me.awabi2048.myworldmanager.model.WorldData
-import me.awabi2048.myworldmanager.session.SettingsAction
-import me.awabi2048.myworldmanager.session.MenuExternalInput
-import me.awabi2048.myworldmanager.util.GuiHelper
 import me.awabi2048.myworldmanager.util.GuiItemFactory
-import me.awabi2048.myworldmanager.util.GuiLoreActions
 import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
@@ -51,7 +41,6 @@ import org.bukkit.block.BlockFace
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
-import org.bukkit.plugin.java.JavaPlugin
 
 class ChanponWorldSettingsMenu(
     private val plugin: MWMChanponPlugin,
@@ -70,7 +59,6 @@ class ChanponWorldSettingsMenu(
                 renderer = { context -> render(context.player, source(context.route)) },
                 actions = mapOf(
                     ACTION_SELECT to MenuActionHandler(::handleAction),
-                    ACTION_CAPABILITY to MenuActionHandler(::handleCapability),
                 ),
             )
         )
@@ -88,167 +76,6 @@ class ChanponWorldSettingsMenu(
         }
     }
 
-    private fun renderMain(player: Player, worldData: WorldData, request: WorldSettingsNavigationRequest): InventoryMenuView {
-        val mwm = mwm()
-        val activeSession = mwm.settingsSessionManager.getSession(player)
-        val selectingIcon =
-            activeSession?.worldUuid == worldData.uuid &&
-                activeSession.action == SettingsAction.SELECT_ICON &&
-                activeSession.isExternalInputActive(MenuExternalInput.SELECT_ICON)
-        if (!selectingIcon) {
-            mwm.settingsSessionManager.updateSessionAction(
-                player,
-                worldData.uuid,
-                SettingsAction.VIEW_SETTINGS,
-                true,
-                null,
-                request.isPlayerWorldFlow,
-                request.parentShowBackButton
-            )
-        }
-        mwm.settingsSessionManager.getSession(player)?.showBackButton = request.showBackButton
-
-        val session = mwm.settingsSessionManager.getSession(player)
-        val isAdminFlow = session?.isAdminFlow == true
-        val isActualOwner = worldData.owner == player.uniqueId || isAdminFlow
-        val isModerator = worldData.moderators.contains(player.uniqueId)
-        val isMember = worldData.members.contains(player.uniqueId)
-        val isImportedArchive = storage.isImportedArchive(worldData.uuid)
-        val isOwner = isActualOwner && !isImportedArchive
-        val hasManagePermission = (isOwner || isModerator) && !isImportedArchive
-        val isMemberLayout = isMember && !hasManagePermission
-        val isProtected = protectionService.isProtected(worldData)
-
-        val title = GuiHelper.inventoryTitle(
-            mwm.languageManager.getComponent(
-                player,
-                "gui.settings.title",
-                mapOf("world" to worldData.name)
-            )
-        )
-        val layout = ChanponGuiElements.settingsLayout()
-        val inventorySize = if (isProtected || isMemberLayout) PROTECTED_SETTINGS_SIZE else layout.size
-        var items = mutableMapOf<Int, ItemStack>()
-
-        if (isProtected && isOwner) {
-            // 完成済み/提出済みのワールドでは、公開レベル・訪問通知・ポータル取得のみ中央行に中央寄せで配置する。
-            // それ以外の設定は事後調整の対象外のため表示しない。
-            items[21] = publishItem(player, worldData)
-            items[22] = notificationItem(player, worldData)
-        } else if (hasManagePermission) {
-            items[19] = mwmItem(player, worldData, "info", Material.NAME_TAG, ItemTag.TYPE_GUI_SETTING_INFO)
-            items[20] = mwmItem(player, worldData, "icon", Material.ANVIL, ItemTag.TYPE_GUI_SETTING_ICON)
-            items[21] = mwmItem(player, worldData, "spawn", Material.COMPASS, ItemTag.TYPE_GUI_SETTING_SPAWN, requireTargetWorld = true)
-            items[28] = mwmItem(player, worldData, "announcement", Material.OAK_SIGN, ItemTag.TYPE_GUI_SETTING_ANNOUNCEMENT)
-            items[29] = notificationItem(player, worldData)
-            items[47] = mwmItem(player, worldData, "tour", Material.PALE_OAK_BOAT, ItemTag.TYPE_GUI_SETTING_TOUR, "gui.tour.worldmenu")
-        }
-        if (isOwner && !isProtected) {
-            items[23] = expansionItem(player, worldData)
-            items[24] = publishItem(player, worldData)
-            items[25] = mwmItem(player, worldData, "member", Material.PLAYER_HEAD, ItemTag.TYPE_GUI_SETTING_MEMBER)
-            items[32] = mwmItem(player, worldData, "environment", Material.GRASS_BLOCK, ItemTag.TYPE_GUI_SETTING_ENVIRONMENT, requireTargetWorld = true)
-            items[33] = criticalItem(player, worldData)
-            if (mwm.portalRepository.findAll().any { it.worldKey == worldData.worldKey }) {
-                items[ChanponWorldSettingsLayout.PORTAL_MANAGEMENT_SLOT] = mwmItem(
-                    player,
-                    worldData,
-                    "portals",
-                    Material.END_PORTAL_FRAME,
-                    ItemTag.TYPE_GUI_SETTING_PORTALS,
-                )
-            }
-        }
-        items[4] = worldInfoItem(player, worldData)
-        if (CCSystem.getAPI().getMenuNavigationService().canGoBack(player)) {
-            items[ChanponGuiElements.backSlot(inventorySize)] = returnItem(player)
-        }
-
-        val capabilityArguments = mapOf(WORLD_UUID to worldData.uuid.toString())
-        val capabilityInteractions = mutableMapOf<Int, MenuInteraction>()
-        val capabilityService = CCSystem.getAPI().getMenuCapabilityService()
-        capabilityService.definitions(WorldSettingsCapabilityPlacements.FOOTER_ACTIONS)
-            .asSequence()
-            .mapNotNull { definition ->
-                capabilityService.resolve(definition.capabilityId, player, capabilityArguments)
-            }
-            .zip(WORLD_SETTINGS_CAPABILITY_SLOTS.asSequence())
-            .forEach { (capability, slot) ->
-                items[slot] = capability.item
-                capabilityInteractions[slot] =
-                    if (capability.actionable) {
-                        MenuInteraction.Action(
-                            ACTION_CAPABILITY,
-                            capability.acceptedClicks,
-                            capabilityArguments + (CAPABILITY_ID to capability.capabilityId),
-                        )
-                    } else {
-                        MenuInteraction.DisplayOnly
-                    }
-            }
-        capabilityService.definitions(WorldSettingsCapabilityPlacements.FOOTER_LEFT_ACTIONS)
-            .asSequence()
-            .mapNotNull { definition ->
-                capabilityService.resolve(definition.capabilityId, player, capabilityArguments)
-            }
-            .zip(
-                listOf(
-                    ChanponWorldSettingsLayout.linkedPortalSlot(
-                        inventorySize,
-                        isOwner,
-                        isProtected,
-                    ),
-                ).asSequence(),
-            )
-            .forEach { (capability, slot) ->
-                items[slot] = capability.item
-                capabilityInteractions[slot] =
-                    if (capability.actionable) {
-                        MenuInteraction.Action(
-                            ACTION_CAPABILITY,
-                            capability.acceptedClicks,
-                            capabilityArguments + (CAPABILITY_ID to capability.capabilityId),
-                        )
-                    } else {
-                        MenuInteraction.DisplayOnly
-                    }
-            }
-        capabilityService.definitions(WorldSettingsCapabilityPlacements.FOOTER_RIGHT_ACTIONS)
-            .asSequence()
-            .mapNotNull { definition ->
-                capabilityService.resolve(definition.capabilityId, player, capabilityArguments)
-            }
-            .zip(listOf(inventorySize - 4).asSequence())
-            .forEach { (capability, slot) ->
-                items[slot] = capability.item
-                capabilityInteractions[slot] =
-                    if (capability.actionable) {
-                        MenuInteraction.Action(
-                            ACTION_CAPABILITY,
-                            capability.acceptedClicks,
-                            capabilityArguments + (CAPABILITY_ID to capability.capabilityId),
-                        )
-                    } else {
-                        MenuInteraction.DisplayOnly
-                    }
-            }
-        return InventoryMenuView(
-            inventorySize,
-            title,
-            menuElements(
-                items,
-                displayOnlyInfoWorldUuid =
-                    worldData.uuid.takeIf { isCurrentWorld(player, worldData) },
-                semanticInteractions = capabilityInteractions,
-            ),
-            playerInventoryInteraction =
-                if (selectingIcon) {
-                    PlayerInventoryInteraction.SELECTION
-                } else {
-                    PlayerInventoryInteraction.INTERACTIVE
-                },
-        )
-    }
 
     private fun handleAction(context: MenuActionContext): MenuActionResult {
         val source = source(context.route)
@@ -261,173 +88,6 @@ class ChanponWorldSettingsMenu(
         }
     }
 
-    private fun handleSettingsClick(
-        player: Player,
-        source: Source,
-        item: ItemStack,
-        click: org.bukkit.event.inventory.ClickType,
-    ): MenuActionResult {
-        val worldUuid = source.worldUuid
-        val mwm = mwm()
-        if (mwm.settingsSessionManager.getSession(player) == null) {
-            mwm.settingsSessionManager.updateSessionAction(
-                player,
-                worldUuid,
-                SettingsAction.VIEW_SETTINGS,
-                isGui = false
-            )
-        }
-        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
-            ?: return MenuActionResult.Rejected()
-        val session = mwm.settingsSessionManager.getSession(player)
-        val type = ItemTag.getType(item)
-        // オーバーレイはMWM公開APIで表現できる設定だけを処理し、未公開のタグ編集入口を再公開しない。
-        if (type == ItemTag.TYPE_GUI_INFO && ItemTag.getWorldUuid(item) == worldData.uuid) {
-            if (isCurrentWorld(player, worldData)) return MenuActionResult.Ignored
-            runtime.suspendForExternal(player)
-            mwm.worldService.teleportToWorldKeepingInventory(
-                player,
-                worldData.uuid,
-                MwmWarpReason.DIRECT,
-                Runnable {
-                    if (player.isOnline) {
-                        player.sendMessage(
-                            mwm.languageManager.getMessage(
-                                player,
-                                "messages.warp_success",
-                                mapOf("world" to worldData.name)
-                            )
-                        )
-                        runtime.resumeFromExternal(player)
-                    }
-                }
-            )
-            return MenuActionResult.Success(MenuUpdate.None)
-        }
-        val ownerOnlyTypes = setOf(
-            ItemTag.TYPE_GUI_SETTING_EXPAND,
-            ItemTag.TYPE_GUI_SETTING_CRITICAL,
-            ItemTag.TYPE_GUI_SETTING_ENVIRONMENT,
-            ItemTag.TYPE_GUI_SETTING_PUBLISH,
-            ItemTag.TYPE_GUI_SETTING_MEMBER,
-        )
-        val managerTypes = setOf(
-            ItemTag.TYPE_GUI_SETTING_INFO,
-            ItemTag.TYPE_GUI_SETTING_ICON,
-            ItemTag.TYPE_GUI_SETTING_SPAWN,
-            ItemTag.TYPE_GUI_SETTING_NOTIFICATION,
-            ItemTag.TYPE_GUI_SETTING_ANNOUNCEMENT,
-            ItemTag.TYPE_GUI_SETTING_TOUR,
-        )
-        val inWorldTypes = setOf(
-            ItemTag.TYPE_GUI_SETTING_SPAWN,
-            ItemTag.TYPE_GUI_SETTING_EXPAND,
-            ItemTag.TYPE_GUI_SETTING_ENVIRONMENT,
-            ItemTag.TYPE_GUI_SETTING_CRITICAL,
-        )
-        if (type in ownerOnlyTypes || type in managerTypes) {
-            // 完成済み/提出済みでも許可する設定（公開レベル・訪問通知・ポータル取得）。
-            val protectedKind = when (type) {
-                ItemTag.TYPE_GUI_SETTING_PUBLISH -> WorldSettingsAccessGuard.ProtectedSettingsKind.PUBLISH
-                ItemTag.TYPE_GUI_SETTING_NOTIFICATION -> WorldSettingsAccessGuard.ProtectedSettingsKind.NOTIFICATION
-                ItemTag.TYPE_GUI_SETTING_PORTALS -> WorldSettingsAccessGuard.ProtectedSettingsKind.PORTAL
-                else -> WorldSettingsAccessGuard.ProtectedSettingsKind.NONE
-            }
-            if (!accessGuard.allow(
-                    player,
-                    worldData,
-                    ownerOnly = type in ownerOnlyTypes,
-                    requireTargetWorld = type in inWorldTypes,
-                    protectedSettings = protectedKind,
-                )
-            ) return MenuActionResult.Rejected()
-        }
-        return when (type) {
-            ItemTag.TYPE_GUI_SETTING_EXPAND -> {
-                if (worldData.borderExpansionLevel == WorldData.EXPANSION_LEVEL_SPECIAL) {
-                    return MenuActionResult.Ignored
-                }
-                if (worldData.borderExpansionLevel >= maxExpansionLevel()) {
-                    player.sendMessage(i18nComponent(player, "message.expand_max"))
-                    return MenuActionResult.Rejected()
-                }
-                if (mwm.playerPlatformResolver.isBedrock(player)) {
-                    openConfirmByPlatform(player, worldData, ConfirmAction.EXPAND, null)
-                    MenuActionResult.Success(MenuUpdate.None)
-                } else {
-                    openExpansionMenu(player, worldData)
-                }
-            }
-            ItemTag.TYPE_GUI_SETTING_CRITICAL -> {
-                openCriticalMenu(player, worldData)
-            }
-            ItemTag.TYPE_GUI_SETTING_ENVIRONMENT -> {
-                environmentGui.open(player, worldData)
-                MenuActionResult.Success(MenuUpdate.None)
-            }
-            ItemTag.TYPE_GUI_SETTING_INFO -> {
-                mwm.worldSettingsGui.editWorldInfo(player, worldData)
-                MenuActionResult.Success(MenuUpdate.None)
-            }
-            ItemTag.TYPE_GUI_SETTING_ICON -> {
-                mwm.worldSettingsGui.enterIconSelection(player, worldData)
-                MenuActionResult.Success(MenuUpdate.None)
-            }
-            ItemTag.TYPE_GUI_SETTING_SPAWN -> {
-                if (mwm.playerPlatformResolver.isBedrock(player)) {
-                    openBedrockSpawnForm(player, worldData)
-                    return MenuActionResult.Success(MenuUpdate.None)
-                }
-                val intent = settingIconIntent(player, type, click) ?: return MenuActionResult.Ignored
-                val isGuest = intent != SettingIconIntent.SET_MEMBER_SPAWN
-                mwm.worldSettingsGui.enterSpawnSetting(player, worldData, isGuest)
-                MenuActionResult.Success(MenuUpdate.None)
-            }
-            ItemTag.TYPE_GUI_SETTING_PUBLISH -> {
-                val nextVisibility = cycleVisibility(
-                    storage.getVisibility(worldUuid),
-                    GuiCycle.direction(click) ?: return MenuActionResult.Ignored
-                )
-                storage.setVisibility(worldUuid, nextVisibility)
-                MenuActionResult.Success(MenuUpdate.Refresh)
-            }
-            ItemTag.TYPE_GUI_SETTING_MEMBER -> {
-                mwm.worldSettingsGui.openMemberManagement(player, worldData, 0, true)
-                MenuActionResult.Success(MenuUpdate.None)
-            }
-            ItemTag.TYPE_GUI_SETTING_NOTIFICATION -> {
-                mwm.worldSettingsGui.toggleNotification(player, worldData)
-                MenuActionResult.Success(MenuUpdate.Refresh)
-            }
-            ItemTag.TYPE_GUI_SETTING_ANNOUNCEMENT -> {
-                when (settingIconIntent(player, type, click) ?: return MenuActionResult.Ignored) {
-                    SettingIconIntent.EDIT_ANNOUNCEMENT -> {
-                        mwm.worldSettingsGui.editAnnouncement(player, worldData)
-                        MenuActionResult.Success(MenuUpdate.None)
-                    }
-                    SettingIconIntent.CLEAR_ANNOUNCEMENT -> {
-                        mwm.worldSettingsGui.clearAnnouncements(player, worldData)
-                        MenuActionResult.Success(MenuUpdate.Refresh)
-                    }
-                    else -> MenuActionResult.Ignored
-                }
-            }
-            ItemTag.TYPE_GUI_SETTING_TOUR -> {
-                mwm.tourGui.openEditMenu(player, worldData, 0)
-                MenuActionResult.Success(MenuUpdate.None)
-            }
-            ItemTag.TYPE_GUI_SETTING_VISITOR -> {
-                mwm.worldSettingsGui.openVisitorManagement(player, worldData, 0)
-                MenuActionResult.Success(MenuUpdate.None)
-            }
-            ItemTag.TYPE_GUI_SETTING_PORTALS -> {
-                mwm.worldSettingsGui.openPortalManagement(player, worldData, 0)
-                MenuActionResult.Success(MenuUpdate.None)
-            }
-            ItemTag.TYPE_GUI_RETURN -> MenuActionResult.Success(MenuUpdate.Back)
-            else -> MenuActionResult.Ignored
-        }
-    }
 
     private fun handleExpansionClick(player: Player, source: Source, item: ItemStack): MenuActionResult {
         val worldUuid = source.worldUuid
@@ -473,8 +133,7 @@ class ChanponWorldSettingsMenu(
                                 Source(
                                     Screen.MODIFIED_WARNING,
                                     worldData.uuid,
-                                    currentRequest(player),
-                                    ConfirmAction.STEP_BACK,
+                                    confirmAction = ConfirmAction.STEP_BACK,
                                 )
                             )
                         )
@@ -537,7 +196,7 @@ class ChanponWorldSettingsMenu(
                 if (storage.isProductionWorld(worldUuid)) return MenuActionResult.Rejected()
                 MenuActionResult.Success(
                     MenuUpdate.Navigate(
-                        route(Source(Screen.DELETE_CONFIRM, worldData.uuid, currentRequest(player), finalStep = false))
+                        route(Source(Screen.DELETE_CONFIRM, worldData.uuid, finalStep = false))
                     )
                 )
             }
@@ -557,15 +216,17 @@ class ChanponWorldSettingsMenu(
                 if (!source.finalStep) {
                     return MenuActionResult.Success(
                         MenuUpdate.Navigate(
-                            route(Source(Screen.DELETE_CONFIRM, worldData.uuid, currentRequest(player), finalStep = true))
+                            route(Source(Screen.DELETE_CONFIRM, worldData.uuid, finalStep = true))
                         )
                     )
                 }
-                mwm().worldService.deleteWorld(source.worldUuid, player).thenAccept { success ->
+                val worldService =
+                    MyWorldManagerApi.getWorldService() ?: return MenuActionResult.Rejected()
+                worldService.deleteWorld(source.worldUuid).thenAccept { success ->
                     Bukkit.getScheduler().runTask(plugin, Runnable {
                         player.sendMessage(i18nComponent(player, if (success) "critical.deleted" else "critical.delete_failed"))
                         if (success) {
-                            mwm().settingsSessionManager.endSession(player)
+                            MyWorldManagerApi.closeWorldSettingsContext(player)
                         }
                     })
                 }
@@ -577,7 +238,7 @@ class ChanponWorldSettingsMenu(
 
     private fun openExpansionMenu(player: Player, worldData: WorldData): MenuActionResult =
         MenuActionResult.Success(
-            MenuUpdate.Navigate(route(Source(Screen.EXPANSION, worldData.uuid, currentRequest(player))))
+            MenuUpdate.Navigate(route(Source(Screen.EXPANSION, worldData.uuid)))
         )
 
     private fun openCriticalMenu(player: Player, worldData: WorldData): MenuActionResult {
@@ -586,17 +247,27 @@ class ChanponWorldSettingsMenu(
             return MenuActionResult.Rejected()
         }
         return MenuActionResult.Success(
-            MenuUpdate.Navigate(route(Source(Screen.CRITICAL, worldData.uuid, currentRequest(player))))
+            MenuUpdate.Navigate(route(Source(Screen.CRITICAL, worldData.uuid)))
         )
     }
 
     private fun openConfirmByPlatform(player: Player, worldData: WorldData, action: ConfirmAction, direction: BlockFace?) {
-        if (mwm().playerPlatformResolver.isBedrock(player) && openBedrockConfirmForm(player, worldData, action, direction)) {
+        if (
+            MyWorldManagerApi.getBedrockFormService()?.isBedrock(player) == true &&
+            openBedrockConfirmForm(player, worldData, action, direction)
+        ) {
             return
         }
         runtime.navigate(
             player,
-            route(Source(Screen.CONFIRM, worldData.uuid, currentRequest(player), action, direction)),
+            route(
+                Source(
+                    Screen.CONFIRM,
+                    worldData.uuid,
+                    confirmAction = action,
+                    direction = direction,
+                ),
+            ),
         )
     }
 
@@ -606,7 +277,7 @@ class ChanponWorldSettingsMenu(
         action: ConfirmAction,
         direction: BlockFace?,
     ): MenuActionResult {
-        if (mwm().playerPlatformResolver.isBedrock(player)) {
+        if (MyWorldManagerApi.getBedrockFormService()?.isBedrock(player) == true) {
             return if (openBedrockConfirmForm(player, worldData, action, direction)) {
                 MenuActionResult.Success(MenuUpdate.None)
             } else {
@@ -615,7 +286,14 @@ class ChanponWorldSettingsMenu(
         }
         return MenuActionResult.Success(
             MenuUpdate.Navigate(
-                route(Source(Screen.CONFIRM, worldData.uuid, currentRequest(player), action, direction))
+                route(
+                    Source(
+                        Screen.CONFIRM,
+                        worldData.uuid,
+                        confirmAction = action,
+                        direction = direction,
+                    ),
+                )
             )
         )
     }
@@ -624,7 +302,11 @@ class ChanponWorldSettingsMenu(
         val directionName = direction?.let { directionName(player, it) } ?: i18n(player, "direction.center")
         val modified = action == ConfirmAction.STEP_BACK && worldData.latestBorderExpansionRecord()?.modified == true
         runtime.suspendForExternal(player)
-        val opened = mwm().floodgateFormBridge.sendSimpleForm(
+        val forms = MyWorldManagerApi.getBedrockFormService() ?: run {
+            runtime.resumeFromExternal(player)
+            return false
+        }
+        val opened = forms.sendSimpleForm(
             player = player,
             title = i18n(player, "confirm.${action.key}.title"),
             content = confirmContentLines(player, action, directionName, modified).joinToString("\n"),
@@ -668,7 +350,7 @@ class ChanponWorldSettingsMenu(
         player.sendMessage(i18nComponent(player, if (success) action.successKey else action.failedKey))
         when {
             success && action == ConfirmAction.EXPAND -> {
-                mwm().settingsSessionManager.endSession(player)
+                MyWorldManagerApi.closeWorldSettingsContext(player)
                 return MenuActionResult.Success(MenuUpdate.Close)
             }
             external -> return MenuActionResult.Success(MenuUpdate.Resume)
@@ -809,7 +491,7 @@ class ChanponWorldSettingsMenu(
                     add(GuiLoreLine.Option(displayName, selected, selectedColor, "\u00A77"))
                 }
                 add(GuiLoreLine.Spacer)
-                add(GuiLoreActions.cycle(mwm().languageManager, player))
+                add(cycleAction(player))
             }, GuiLoreFrame.BOTH)
         )
         return componentItem(Material.OAK_SIGN, i18n(player, "publish.title"), lore, ItemTag.TYPE_GUI_SETTING_PUBLISH)
@@ -822,14 +504,7 @@ class ChanponWorldSettingsMenu(
             i18nList(player, "expand.status_max").map(GuiLoreLine::Text)
         } else {
             listOf(
-                GuiLoreActions.singleClick(
-                    mwm().languageManager,
-                    player,
-                    mwm().languageManager.getMessage(
-                        player,
-                        "gui.settings.expand.action.open_menu",
-                    ),
-                ),
+                singleClick(player, text(player, "gui.settings.expand.action.open_menu")),
             )
         }
         return componentItem(
@@ -837,7 +512,7 @@ class ChanponWorldSettingsMenu(
             i18n(player, "expand.display"),
             describedStructuredLore(
                 player,
-                mwm().languageManager.getMessageList(player, "gui.settings.expand.blocks.description").map(GuiLoreLine::Text),
+                textList(player, "gui.settings.expand.blocks.description").map(GuiLoreLine::Text),
                 lines,
                 requireTargetWorld = true,
                 worldData = worldData
@@ -848,21 +523,17 @@ class ChanponWorldSettingsMenu(
 
     private fun notificationItem(player: Player, worldData: WorldData): ItemStack {
         val status = i18n(player, if (worldData.notificationEnabled) "common.on" else "common.off")
-        val singleAction = GuiLoreActions.singleClick(
-            mwm().languageManager,
-            player,
-            i18n(player, "notification.action")
-        )
+        val singleAction = singleClick(player, i18n(player, "notification.action"))
         val item = CCSystem.getAPI().getGuiElementService().menuIcon(
             GuiMenuIconSpec(
                 Material.BELL,
                 GuiNameSpec.Text(
-                    mwm().languageManager.getMessage(player, "gui.settings.notification.display"),
+                    text(player, "gui.settings.notification.display"),
                     GuiNameStyle.DEFAULT
                 ),
                 GuiElementRole.CONTENT,
                 1,
-                mwm().languageManager.getMessageList(player, "gui.settings.notification.blocks.description"),
+                textList(player, "gui.settings.notification.blocks.description"),
                 listOf(GuiMenuIconData(i18n(player, "notification.current_label"), status, "§e")),
                 emptyList(),
                 emptyList(),
@@ -891,8 +562,8 @@ class ChanponWorldSettingsMenu(
             i18n(player, "critical.display"),
             describedStructuredLore(
                 player,
-                mwm().languageManager.getMessageList(player, "gui.settings.critical.blocks.summary").map(GuiLoreLine::Text),
-                listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "critical.action"))),
+                textList(player, "gui.settings.critical.blocks.summary").map(GuiLoreLine::Text),
+                listOf(singleClick(player, i18n(player, "critical.action"))),
                 requireTargetWorld = true,
                 worldData = worldData
             ),
@@ -903,7 +574,9 @@ class ChanponWorldSettingsMenu(
     private fun criticalUnavailableLoreKey(player: Player, worldData: WorldData): String? {
         // 重大な設定に入れない理由を一覧表示と遷移防御で共有し、専用メニューへの侵入を防ぐ。
         if (storage.isProductionWorld(worldData.uuid)) return "critical.production_warning"
-        if (!mwm().playerStatsRepository.findByUuid(player.uniqueId).criticalSettingsEnabled) return "critical.disabled_warning"
+        if (!MyWorldManagerApi.isCriticalSettingsEnabled(player.uniqueId)) {
+            return "critical.disabled_warning"
+        }
         return null
     }
 
@@ -913,7 +586,7 @@ class ChanponWorldSettingsMenu(
                 GuiLoreLine.Text(i18n(player, "critical.delete_description")),
                 GuiLoreLine.Danger(i18n(player, "critical.delete_danger"))
             )),
-            GuiLoreBlock(listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "critical.delete_action"))))
+            GuiLoreBlock(listOf(singleClick(player, i18n(player, "critical.delete_action"))))
         )))
         return componentItem(Material.TNT, i18n(player, "critical.delete_display"), lore, ItemTag.TYPE_GUI_SETTING_DELETE_WORLD)
     }
@@ -924,35 +597,13 @@ class ChanponWorldSettingsMenu(
             i18n(player, "critical.unavailable_display"),
             describedStructuredLore(
                 player,
-                mwm().languageManager.getMessageList(player, "gui.settings.critical.blocks.summary").map(GuiLoreLine::Text),
+                textList(player, "gui.settings.critical.blocks.summary").map(GuiLoreLine::Text),
                 listOf(GuiLoreLine.Warning(i18n(player, loreKey)))
             ),
             ItemTag.TYPE_GUI_INFO
         )
     }
 
-    private fun worldInfoItem(player: Player, worldData: WorldData): ItemStack {
-        val lore = CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(buildList {
-            add(GuiLoreBlock(listOf(
-                GuiLoreLine.Data(i18n(player, "info.description_label"), worldData.description.ifBlank { "-" }, "§f")
-            )))
-            if (!isCurrentWorld(player, worldData)) {
-                add(GuiLoreBlock(listOf(GuiLoreActions.singleClick(
-                    mwm().languageManager,
-                    player,
-                    mwm().languageManager.getMessage(player, "gui.player_world.world_item.warp")
-                ))))
-            }
-        }))
-        val item = componentItem(
-            worldData.icon,
-            "§e${worldData.name}",
-            lore,
-            ItemTag.TYPE_GUI_INFO
-        )
-        ItemTag.setWorldUuid(item, worldData.uuid)
-        return item
-    }
 
     private fun mwmItem(
         player: Player,
@@ -963,15 +614,15 @@ class ChanponWorldSettingsMenu(
         langPrefix: String = "gui.settings.$iconKey",
         requireTargetWorld: Boolean = false
     ): ItemStack {
-        val display = mwm().languageManager.getMessage(player, "$langPrefix.display")
+        val display = text(player, "$langPrefix.display")
         val lore = describedStructuredLore(
             player,
             mwmDescription(player, iconKey),
-            settingIconActions(player, type).map { it.lore },
+            listOf(singleClick(player, i18n(player, "mwm_action.action"))),
             requireTargetWorld = requireTargetWorld,
             worldData = worldData
         )
-        val icon = mwm().menuConfigManager.getIconMaterial("world_settings", iconKey, material)
+        val icon = MyWorldManagerApi.getConfiguredMenuIcon("world_settings", iconKey, material)
         return componentItem(icon, display, lore, type)
     }
 
@@ -979,129 +630,8 @@ class ChanponWorldSettingsMenu(
      * アイコンの表示案内と受理するクリックを同じ定義に保持する。
      * 左右で意味が分かれる設定を単一クリック表示へ退化させないための正本。
      */
-    private fun settingIconActions(player: Player, type: String): List<SettingIconActionDefinition> {
-        val language = mwm().languageManager
-        fun action(
-            click: SettingIconClick,
-            operationKey: String,
-            actionKey: String,
-            intent: SettingIconIntent,
-        ) =
-            SettingIconActionDefinition(
-                intent,
-                click,
-                GuiLoreLine.Action(
-                    language.getMessage(player, operationKey),
-                    language.getMessage(player, actionKey),
-                ),
-            )
 
-        return when (type) {
-            ItemTag.TYPE_GUI_SETTING_SPAWN -> {
-                if (mwm().playerPlatformResolver.isBedrock(player)) {
-                    listOf(
-                        SettingIconActionDefinition(
-                            SettingIconIntent.SET_BOTH_SPAWN,
-                            SettingIconClick.ANY,
-                            GuiLoreActions.singleClick(
-                                language,
-                                player,
-                                language.getMessage(player, "gui.settings.spawn.action.select_type"),
-                            ),
-                        )
-                    )
-                } else {
-                    listOf(
-                        action(SettingIconClick.LEFT, "lore.click.left", "gui.settings.spawn.action.set_guest", SettingIconIntent.SET_GUEST_SPAWN),
-                        action(SettingIconClick.RIGHT, "lore.click.right", "gui.settings.spawn.action.set_member", SettingIconIntent.SET_MEMBER_SPAWN),
-                    )
-                }
-            }
-            ItemTag.TYPE_GUI_SETTING_ANNOUNCEMENT -> listOf(
-                action(SettingIconClick.LEFT, "lore.click.left", "gui.settings.announcement.action.set_message", SettingIconIntent.EDIT_ANNOUNCEMENT),
-                action(SettingIconClick.RIGHT, "lore.click.right", "gui.settings.announcement.action.reset_message", SettingIconIntent.CLEAR_ANNOUNCEMENT),
-            )
-            else -> listOf(
-                SettingIconActionDefinition(
-                    SettingIconIntent.PRIMARY,
-                    SettingIconClick.ANY,
-                    GuiLoreActions.singleClick(language, player, i18n(player, "mwm_action.action")),
-                )
-            )
-        }
-    }
 
-    private fun openBedrockSpawnForm(player: Player, worldData: WorldData) {
-        val forms = MyWorldManagerApi.getBedrockFormService() ?: return
-        val language = mwm().languageManager
-        forms.sendSimpleForm(
-            player = player,
-            title = language.getMessage(player, "gui.settings.spawn.display"),
-            content = language.getMessage(player, "gui.settings.spawn.form.content"),
-            buttons = listOf(
-                language.getMessage(player, "gui.settings.spawn.type.guest"),
-                language.getMessage(player, "gui.settings.spawn.type.member"),
-                language.getMessage(player, "gui.common.back"),
-            ),
-            onSelect = { index ->
-                Bukkit.getScheduler().runTask(plugin, Runnable {
-                    when (index) {
-                        0 -> mwm().worldSettingsGui.enterSpawnSetting(player, worldData, true)
-                        1 -> mwm().worldSettingsGui.enterSpawnSetting(player, worldData, false)
-                        else -> MyWorldManagerApi.openWorldSettings(
-                            player,
-                            worldData.uuid,
-                            currentRequest(player),
-                        )
-                    }
-                })
-            },
-            onClosed = {
-                Bukkit.getScheduler().runTask(plugin, Runnable {
-                    MyWorldManagerApi.openWorldSettings(
-                        player,
-                        worldData.uuid,
-                        currentRequest(player),
-                    )
-                })
-            },
-        )
-    }
-
-    private fun settingIconIntent(
-        player: Player,
-        type: String,
-        click: org.bukkit.event.inventory.ClickType,
-    ): SettingIconIntent? {
-        return settingIconActions(player, type).firstOrNull { it.click.matches(click) }?.intent
-    }
-
-    private enum class SettingIconClick {
-        ANY,
-        LEFT,
-        RIGHT;
-
-        fun matches(click: org.bukkit.event.inventory.ClickType): Boolean = when (this) {
-            ANY -> click.isLeftClick || click.isRightClick
-            LEFT -> click.isLeftClick
-            RIGHT -> click.isRightClick
-        }
-    }
-
-    private enum class SettingIconIntent {
-        PRIMARY,
-        SET_GUEST_SPAWN,
-        SET_MEMBER_SPAWN,
-        SET_BOTH_SPAWN,
-        EDIT_ANNOUNCEMENT,
-        CLEAR_ANNOUNCEMENT,
-    }
-
-    private data class SettingIconActionDefinition(
-        val intent: SettingIconIntent,
-        val click: SettingIconClick,
-        val lore: GuiLoreLine,
-    )
 
     private fun mwmDescription(player: Player, iconKey: String): List<GuiLoreLine> {
         val key = when (iconKey) {
@@ -1115,7 +645,7 @@ class ChanponWorldSettingsMenu(
             "portals" -> "gui.settings.portals.blocks.summary"
             else -> return emptyList()
         }
-        return mwm().languageManager.getMessageList(player, key).map(GuiLoreLine::Text)
+        return textList(player, key).map(GuiLoreLine::Text)
     }
 
     private fun describedStructuredLore(
@@ -1150,7 +680,7 @@ class ChanponWorldSettingsMenu(
             i18n(player, "expand_menu.$key.display"),
             loreBlocks(listOf(
                 GuiLoreBlock(listOf(GuiLoreLine.Text(i18n(player, "expand_menu.$key.description")))),
-                GuiLoreBlock(listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "expand_menu.$key.action"))))
+                GuiLoreBlock(listOf(singleClick(player, i18n(player, "expand_menu.$key.action"))))
             )),
             TYPE_EXPAND_DIRECTION
         )
@@ -1169,7 +699,7 @@ class ChanponWorldSettingsMenu(
             i18n(player, "step_back.display"),
             loreBlocks(listOf(
                 GuiLoreBlock(lines),
-                GuiLoreBlock(listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "step_back.action"))))
+                GuiLoreBlock(listOf(singleClick(player, i18n(player, "step_back.action"))))
             )),
             ItemTag.TYPE_GUI_SETTING_STEP_BACK_EXPANSION
         )
@@ -1184,7 +714,7 @@ class ChanponWorldSettingsMenu(
                     GuiLoreLine.Warning(i18n(player, "modified_warning.description")),
                     GuiLoreLine.Text(i18n(player, "modified_warning.consequence"))
                 )),
-                GuiLoreBlock(listOf(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "modified_warning.action"))))
+                GuiLoreBlock(listOf(singleClick(player, i18n(player, "modified_warning.action"))))
             )),
             ItemTag.TYPE_GUI_INFO
         )
@@ -1270,15 +800,6 @@ class ChanponWorldSettingsMenu(
         return item
     }
 
-    private fun currentRequest(player: Player): WorldSettingsNavigationRequest {
-        val session = mwm().settingsSessionManager.getSession(player)
-        return WorldSettingsNavigationRequest(
-            showBackButton = session?.showBackButton ?: false,
-            isPlayerWorldFlow = session?.isPlayerWorldFlow,
-            parentShowBackButton = session?.parentShowBackButton,
-        )
-    }
-
     private fun isCurrentWorld(player: Player, worldData: WorldData): Boolean =
         MyWorldManagerApi.getWorldService()?.isPlayerInWorld(player, worldData) == true
 
@@ -1313,7 +834,36 @@ class ChanponWorldSettingsMenu(
         )
     }
 
-    private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)
+    private fun text(player: Player, key: String): String =
+        CCSystem.getAPI().getI18nString(player, key)
+
+    private fun textList(player: Player, key: String): List<String> =
+        CCSystem.getAPI().getI18nStringList(player, key)
+
+    private fun singleClick(player: Player, action: String): GuiLoreLine.SingleAction {
+        val operation = text(player, "lore.click.any")
+        return GuiLoreLine.SingleAction(
+            operation,
+            action,
+            textWithPlaceholders(
+                player,
+                "lore.action_single_with_operation",
+                mapOf("operation" to operation, "action" to action),
+            ),
+        )
+    }
+
+    private fun cycleAction(player: Player): GuiLoreLine.Action =
+        GuiLoreLine.Action(
+            text(player, "lore.click.left_right"),
+            text(player, "gui.common.action.cycle"),
+        )
+
+    private fun textWithPlaceholders(
+        player: Player,
+        key: String,
+        placeholders: Map<String, Any>,
+    ): String = CCSystem.getAPI().getI18nString(player, key, placeholders)
 
     private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): String {
         return CCSystem.getAPI().getI18nString(player, "chanpon.settings.$key", placeholders)
@@ -1330,7 +880,6 @@ class ChanponWorldSettingsMenu(
     private fun menuElements(
         items: Map<Int, ItemStack>,
         displayOnlyInfoWorldUuid: UUID? = null,
-        semanticInteractions: Map<Int, MenuInteraction> = emptyMap(),
     ): List<MenuElement> =
         items.map { (slot, item) ->
             val type = ItemTag.getType(item)
@@ -1347,7 +896,7 @@ class ChanponWorldSettingsMenu(
                     ItemTag.getWorldUuid(item) != null &&
                     ItemTag.getWorldUuid(item) != displayOnlyInfoWorldUuid
             val effectiveRole = if (clickableInfo) GuiElementRole.ACTION else role
-            val interaction = semanticInteractions[slot] ?: when {
+            val interaction = when {
                 effectiveRole == GuiElementRole.BACK -> MenuInteraction.Back()
                 role == GuiElementRole.DECORATION ||
                     (role == GuiElementRole.CONTENT && !clickableInfo) ->
@@ -1361,13 +910,6 @@ class ChanponWorldSettingsMenu(
                 interaction = interaction,
             )
         }
-
-    private fun handleCapability(context: MenuActionContext): MenuActionResult {
-        val capabilityId = context.payload[CAPABILITY_ID] ?: return MenuActionResult.Ignored
-        val arguments = context.payload - CAPABILITY_ID
-        return CCSystem.getAPI().getMenuCapabilityService()
-            .execute(capabilityId, context.player, context.click, arguments)
-    }
 
     internal fun isFeatureVisible(
         player: Player,
@@ -1437,7 +979,7 @@ class ChanponWorldSettingsMenu(
         if (!isFeatureActionable(player, worldData, feature)) return MenuActionResult.Ignored
         return when (feature) {
             WorldSettingsFeature.EXPANSION -> {
-                if (mwm().playerPlatformResolver.isBedrock(player)) {
+                if (MyWorldManagerApi.getBedrockFormService()?.isBedrock(player) == true) {
                     openConfirmByPlatform(player, worldData, ConfirmAction.EXPAND, null)
                     MenuActionResult.Success(MenuUpdate.None)
                 } else {
@@ -1453,8 +995,11 @@ class ChanponWorldSettingsMenu(
                 MenuActionResult.Success(MenuUpdate.Refresh)
             }
             WorldSettingsFeature.NOTIFICATION -> {
-                mwm().worldSettingsGui.toggleNotification(player, worldData)
-                MenuActionResult.Success(MenuUpdate.Refresh)
+                if (MyWorldManagerApi.toggleWorldVisitNotification(player, worldData.uuid)) {
+                    MenuActionResult.Success(MenuUpdate.Refresh)
+                } else {
+                    MenuActionResult.Rejected()
+                }
             }
             WorldSettingsFeature.ENVIRONMENT -> {
                 environmentGui.open(player, worldData)
@@ -1480,7 +1025,6 @@ class ChanponWorldSettingsMenu(
     private data class Source(
         val screen: Screen,
         val worldUuid: UUID,
-        val request: WorldSettingsNavigationRequest,
         val confirmAction: ConfirmAction? = null,
         val direction: BlockFace? = null,
         val finalStep: Boolean = false,
@@ -1506,11 +1050,6 @@ class ChanponWorldSettingsMenu(
             worldUuid = payload[PAYLOAD_WORLD_UUID]
                 ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
                 ?: UUID(0L, 0L),
-            request = WorldSettingsNavigationRequest(
-                showBackButton = payload[PAYLOAD_SHOW_BACK]?.toBooleanStrictOrNull() ?: false,
-                isPlayerWorldFlow = payload[PAYLOAD_PLAYER_FLOW]?.toBooleanStrictOrNull(),
-                parentShowBackButton = payload[PAYLOAD_PARENT_BACK]?.toBooleanStrictOrNull(),
-            ),
             confirmAction = payload[PAYLOAD_CONFIRM_ACTION]
                 ?.let { runCatching { ConfirmAction.valueOf(it) }.getOrNull() },
             direction = payload[PAYLOAD_DIRECTION]
@@ -1522,9 +1061,6 @@ class ChanponWorldSettingsMenu(
     private fun payload(source: Source): Map<String, String> = buildMap {
         put(PAYLOAD_SCREEN, source.screen.name)
         put(PAYLOAD_WORLD_UUID, source.worldUuid.toString())
-        put(PAYLOAD_SHOW_BACK, source.request.showBackButton.toString())
-        source.request.isPlayerWorldFlow?.let { put(PAYLOAD_PLAYER_FLOW, it.toString()) }
-        source.request.parentShowBackButton?.let { put(PAYLOAD_PARENT_BACK, it.toString()) }
         source.confirmAction?.let { put(PAYLOAD_CONFIRM_ACTION, it.name) }
         source.direction?.let { put(PAYLOAD_DIRECTION, it.name) }
         put(PAYLOAD_FINAL_STEP, source.finalStep.toString())
@@ -1544,20 +1080,11 @@ class ChanponWorldSettingsMenu(
         private const val RUNTIME_OWNER = "mwm-chanpon"
         private const val ROUTE_SETTINGS = "world-settings"
         private const val ACTION_SELECT = "select"
-        private const val ACTION_CAPABILITY = "capability"
-        private const val CAPABILITY_ID = "capability_id"
-        private const val WORLD_UUID = "world_uuid"
-        private val WORLD_SETTINGS_CAPABILITY_SLOTS = listOf(51)
         private const val PAYLOAD_SCREEN = "screen"
         private const val PAYLOAD_WORLD_UUID = "world_uuid"
-        private const val PAYLOAD_SHOW_BACK = "show_back"
-        private const val PAYLOAD_PLAYER_FLOW = "player_flow"
-        private const val PAYLOAD_PARENT_BACK = "parent_back"
         private const val PAYLOAD_CONFIRM_ACTION = "confirm_action"
         private const val PAYLOAD_DIRECTION = "direction"
         private const val PAYLOAD_FINAL_STEP = "final_step"
-        private const val PROTECTED_SETTINGS_SIZE = 45
-        private const val PROTECTED_BACK_SLOT = 40
         private const val TYPE_EXPAND_DIRECTION = "chanpon_expand_direction"
         private const val DIRECTION_KEY = "chanpon_direction"
         private const val ACTION_CENTER = "center"
