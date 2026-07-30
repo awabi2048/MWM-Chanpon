@@ -12,6 +12,8 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuIconAction
 import com.awabi2048.ccsystem.api.gui.GuiMenuIconData
 import com.awabi2048.ccsystem.api.gui.GuiMenuIconSpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
@@ -19,6 +21,7 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
 import com.awabi2048.ccsystem.api.gui.MenuInteraction
 import com.awabi2048.ccsystem.api.gui.MenuElement
@@ -362,79 +365,71 @@ class ChanponWorldSettingsMenu(
             addFeature(elements, player, worldData, WorldSettingsFeature.PUBLISH, 21)
             addFeature(elements, player, worldData, WorldSettingsFeature.NOTIFICATION, 22)
         } else if (manager) {
-            elements += settingsAction(
-                19,
-                mwmActionItem(player, worldData, WorldSettingsAction.EDIT_INFO, "info", Material.NAME_TAG),
-                OPERATION_EDIT_INFO,
-                WorldSettingsAction.EDIT_INFO,
+            elements += mwmActionEntry(player, 19, worldData, WorldSettingsAction.EDIT_INFO, "info", Material.NAME_TAG, OPERATION_EDIT_INFO, listOf(i18n(player, "mwm_action.action")))
+            elements += mwmActionEntry(player, 20, worldData, WorldSettingsAction.SELECT_ICON, "icon", Material.ANVIL, OPERATION_SELECT_ICON, listOf(i18n(player, "mwm_action.action")))
+            elements += mwmActionEntry(
                 player,
-                worldData,
-            )
-            elements += settingsAction(
-                20,
-                mwmActionItem(player, worldData, WorldSettingsAction.SELECT_ICON, "icon", Material.ANVIL),
-                OPERATION_SELECT_ICON,
-                WorldSettingsAction.SELECT_ICON,
-                player,
-                worldData,
-            )
-            elements += settingsAction(
                 21,
-                spawnItem(player, worldData),
-                OPERATION_SET_SPAWN,
+                worldData,
                 WorldSettingsAction.SET_SPAWN,
-                player,
-                worldData,
+                "spawn",
+                Material.COMPASS,
+                OPERATION_SET_SPAWN,
+                if (MyWorldManagerApi.getBedrockFormService()?.isBedrock(player) == true) {
+                    listOf(text(player, "gui.settings.spawn.action.select_type"))
+                } else {
+                    listOf(
+                        text(player, "gui.settings.spawn.action.set_guest"),
+                        text(player, "gui.settings.spawn.action.set_member"),
+                    )
+                },
+                requireTargetWorld = true,
             )
-            elements += settingsAction(
-                28,
-                announcementItem(player, worldData),
-                OPERATION_ANNOUNCEMENT,
-                WorldSettingsAction.EDIT_ANNOUNCEMENT,
+            elements += mwmActionEntry(
                 player,
+                28,
                 worldData,
+                WorldSettingsAction.EDIT_ANNOUNCEMENT,
+                "announcement",
+                Material.OAK_SIGN,
+                OPERATION_ANNOUNCEMENT,
+                listOf(
+                    text(player, "gui.settings.announcement.action.set_message"),
+                    text(player, "gui.settings.announcement.action.reset_message"),
+                ),
             )
             addFeature(elements, player, worldData, WorldSettingsFeature.NOTIFICATION, 29)
-            elements += settingsAction(
-                47,
-                mwmActionItem(
-                    player,
-                    worldData,
-                    WorldSettingsAction.MANAGE_TOUR,
-                    "tour",
-                    Material.PALE_OAK_BOAT,
-                    "gui.tour.worldmenu",
-                ),
-                OPERATION_TOUR,
-                WorldSettingsAction.MANAGE_TOUR,
+            elements += mwmActionEntry(
                 player,
+                47,
                 worldData,
+                WorldSettingsAction.MANAGE_TOUR,
+                "tour",
+                Material.PALE_OAK_BOAT,
+                OPERATION_TOUR,
+                listOf(i18n(player, "mwm_action.action")),
+                "gui.tour.worldmenu",
             )
         }
         if (owner && !protected) {
             addFeature(elements, player, worldData, WorldSettingsFeature.EXPANSION, 23)
             addFeature(elements, player, worldData, WorldSettingsFeature.PUBLISH, 24)
-            elements += settingsAction(
-                25,
-                mwmActionItem(player, worldData, WorldSettingsAction.MANAGE_MEMBERS, "member", Material.PLAYER_HEAD),
-                OPERATION_MEMBERS,
-                WorldSettingsAction.MANAGE_MEMBERS,
-                player,
-                worldData,
-            )
+            elements += mwmActionEntry(player, 25, worldData, WorldSettingsAction.MANAGE_MEMBERS, "member", Material.PLAYER_HEAD, OPERATION_MEMBERS, listOf(i18n(player, "mwm_action.action")))
             addFeature(elements, player, worldData, WorldSettingsFeature.ENVIRONMENT, 32)
             addFeature(elements, player, worldData, WorldSettingsFeature.CRITICAL, 33)
             val hasPortals = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldData.uuid) != null &&
                 MyWorldManagerApi.getWorldService() != null &&
                 hasWorldPortals(worldData)
             if (hasPortals) {
-                elements += settingsAction(
-                    ChanponWorldSettingsLayout.PORTAL_MANAGEMENT_SLOT,
-                    mwmActionItem(player, worldData, WorldSettingsAction.MANAGE_PORTALS, "portals", Material.END_PORTAL_FRAME),
-                    OPERATION_PORTALS,
-                    WorldSettingsAction.MANAGE_PORTALS,
+                elements += mwmActionEntry(
                     player,
+                    ChanponWorldSettingsLayout.PORTAL_MANAGEMENT_SLOT,
                     worldData,
+                    WorldSettingsAction.MANAGE_PORTALS,
+                    "portals",
+                    Material.END_PORTAL_FRAME,
+                    OPERATION_PORTALS,
+                    listOf(i18n(player, "mwm_action.action")),
                 )
             }
         }
@@ -857,6 +852,53 @@ class ChanponWorldSettingsMenu(
         )
         val icon = MyWorldManagerApi.getConfiguredMenuIcon("world_settings", iconKey, material)
         return capabilityPresentation(icon, display, lore)
+    }
+
+    private fun mwmActionEntry(
+        player: Player,
+        slot: Int,
+        worldData: WorldData,
+        action: WorldSettingsAction,
+        iconKey: String,
+        material: Material,
+        operation: String,
+        actionTexts: List<String>,
+        langPrefix: String = "gui.settings.$iconKey",
+        requireTargetWorld: Boolean = false,
+    ): MenuElement {
+        val contract = requireNotNull(
+            MyWorldManagerApi.getWorldSettingsActionContract(player, worldData.uuid, action),
+        ) { "Missing world settings action contract: $action/${worldData.uuid}" }
+        require(contract.options.size == actionTexts.size) {
+            "World settings action presentation mismatch: $action options=${contract.options.size} texts=${actionTexts.size}"
+        }
+        val actionable = contract.actionable &&
+            (!requireTargetWorld || isCurrentWorld(player, worldData))
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = slot,
+                material = MyWorldManagerApi.getConfiguredMenuIcon("world_settings", iconKey, material),
+                name = GuiNameSpec.Text(text(player, "$langPrefix.display"), GuiNameStyle.DEFAULT),
+                role = if (actionable) GuiElementRole.ACTION else GuiElementRole.CONTENT,
+                description = mwmDescription(player, iconKey).map { (it as GuiLoreLine.Text).text },
+                warnings = if (requireTargetWorld && !isCurrentWorld(player, worldData)) {
+                    listOf(i18n(player, "common.must_be_in_world_warning"))
+                } else {
+                    emptyList()
+                },
+                actions = contract.options.zip(actionTexts).map { (option, actionText) ->
+                    GuiMenuEntryAction(
+                        ACTION_SELECT,
+                        option.acceptedClicks,
+                        actionText,
+                        mapOf(OPERATION to operation),
+                        enabled = actionable,
+                    )
+                },
+                sounds = contract.sounds,
+            ),
+        )
     }
 
     private fun mwmActionItem(
