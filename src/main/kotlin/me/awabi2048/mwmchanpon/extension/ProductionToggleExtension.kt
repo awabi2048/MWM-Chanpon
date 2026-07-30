@@ -32,11 +32,13 @@ import me.awabi2048.mwmchanpon.ui.ChanponLore
 import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.event.MwmWorldCreatedEvent
+import me.awabi2048.myworldmanager.api.extension.CreationConfirmationCapability
+import me.awabi2048.myworldmanager.api.extension.CreationConfirmationCapabilityContext
+import me.awabi2048.myworldmanager.api.extension.CreationConfirmationCapabilityView
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsCapabilityPlacements
 import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.session.WorldCreationSession
 import me.awabi2048.myworldmanager.util.GuiLoreActions
-import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
 import org.bukkit.Material
@@ -54,7 +56,7 @@ class ProductionToggleExtension(
     private val globalStorage: ChanponGlobalStorage,
     private val protectionService: SubmittedWorldProtectionService,
     private val toolPermissionController: ToolPermissionController
-) : Listener {
+) : Listener, CreationConfirmationCapability {
     private val pendingProduction = ConcurrentHashMap<Pair<UUID, String>, Boolean>()
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
@@ -127,6 +129,21 @@ class ProductionToggleExtension(
         ) return false
         return storage.isProductionWorld(worldData.uuid) ||
             !ownerHasProductionWorld(worldData.owner, worldData.uuid)
+    }
+
+    override fun getId(): String = CREATION_CAPABILITY_ID
+
+    override fun resolve(
+        context: CreationConfirmationCapabilityContext,
+    ): CreationConfirmationCapabilityView = CreationConfirmationCapabilityView(
+        createCreationItem(context.session.extras[EXTRA_KEY] as? Boolean ?: false),
+    )
+
+    override fun handlePrimaryAction(
+        context: CreationConfirmationCapabilityContext,
+    ): MenuActionResult {
+        toggleCreationSelection(context.player, context.session)
+        return MenuActionResult.Success(MenuUpdate.Refresh)
     }
 
     private fun renderCapabilityItem(
@@ -345,9 +362,6 @@ class ProductionToggleExtension(
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         }
         if (enabled) item.addUnsafeEnchantment(Enchantment.UNBREAKING, 1)
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
-        ItemTag.setExtensionId(item, EXTENSION_ID)
-        ItemTag.setString(item, "chanpon_action", ACTION_TOGGLE_PRODUCTION)
         return item
     }
 
@@ -448,7 +462,7 @@ class ProductionToggleExtension(
     private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)
 
     companion object {
-        const val EXTENSION_ID = "chanpon.production_toggle"
+        const val CREATION_CAPABILITY_ID = "mwm-chanpon:production-selection"
         const val MENU_CAPABILITY_ID = "mwm-chanpon:world-production-submission"
         const val EXTRA_KEY = "chanpon.production"
         private const val RUNTIME_OWNER = "mwm-chanpon"
@@ -458,7 +472,6 @@ class ProductionToggleExtension(
         private const val CONFIRMATION_ACTION_ARGUMENT = "action"
         private const val ACTION_CONFIRM = "confirm"
         private const val ACTION_CANCEL = "cancel"
-        private const val ACTION_TOGGLE_PRODUCTION = "toggle_production"
     }
 
     private enum class ConfirmationAction(val key: String) {

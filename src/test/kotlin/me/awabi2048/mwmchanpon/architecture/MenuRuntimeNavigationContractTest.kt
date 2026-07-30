@@ -145,9 +145,6 @@ class MenuRuntimeNavigationContractTest {
         assertTrue("runtime.navigate(player, route(worldData.uuid))" in environment)
         assertFalse("runtime.open(player, route(worldData.uuid))" in environment)
 
-        val confirmation = uiRoot.resolve("ChanponCreationConfirmationMenuProvider.kt").readText()
-        assertTrue("return runtime.navigate(" in confirmation)
-
         listOf("ChanponPlayerWorldMenuProvider.kt").forEach { file ->
             val source = uiRoot.resolve(file).readText()
             assertTrue("runtime.navigate(" in source, file)
