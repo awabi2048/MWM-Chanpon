@@ -497,7 +497,7 @@ class WorldBackupCapability(
             ),
             actions = listOf(GuiMenuActionIntent.GestureAction(
                 ACTION_RUNTIME_RESTORE,
-                MenuGesture.LEFT_RIGHT,
+                MenuGesture.LEFT,
                 i18n(player, "owner_backup.item.rollback_action"),
                 payload,
             )),
@@ -665,8 +665,6 @@ class WorldBackupCapability(
         CCSystem.getAPI().getI18nString(player, "chanpon.backup.$key", placeholders)
     private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
-    private fun structuredBlocks(blocks: List<GuiLoreBlock>): List<Component> =
-        CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(blocks))
     data class Holder(val worldUuid: UUID, val page: Int)
 
     companion object {

@@ -548,11 +548,6 @@ class ChanponAdminWorldListMenu(
         FROM_ADMIN_MENU to state.fromAdminMenu.toString(),
     )
 
-    private fun structuredLore(lines: List<GuiLoreLine>): List<Component> =
-        CCSystem.getAPI().getLoreService().render(
-            GuiLoreSpec.Rich(lines, GuiLoreFrame.BOTH),
-        )
-
     private fun i18n(
         player: Player?,
         key: String,

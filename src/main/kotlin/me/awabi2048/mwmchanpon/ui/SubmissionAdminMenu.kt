@@ -726,10 +726,6 @@ class SubmissionAdminMenu(
         ),
     )
 
-    private fun structuredLore(lines: List<GuiLoreLine>): List<Component> {
-        return CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(lines, GuiLoreFrame.BOTH))
-    }
-
     private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): String {
         return CCSystem.getAPI().getI18nString(player, "chanpon.submission.$key", placeholders)
     }

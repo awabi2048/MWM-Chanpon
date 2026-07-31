@@ -5,6 +5,7 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiCycle
+import com.awabi2048.ccsystem.api.gui.GuiCycleDirection
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
@@ -161,18 +162,16 @@ class ChanponAdminMenu(
     }
 
     private fun toggleBuilding(context: MenuActionContext): MenuActionResult {
-        if (!context.click.isLeftClick && !context.click.isRightClick) return MenuActionResult.Ignored
         plugin.setBuildingAllowed(!globalStorage.isBuildingAllowed())
         return MenuActionResult.Success(MenuUpdate.Refresh)
     }
 
     private fun cycleWorldCreation(context: MenuActionContext): MenuActionResult {
-        val direction = GuiCycle.direction(context.click) ?: return MenuActionResult.Ignored
         globalStorage.setWorldCreationAvailability(
             GuiCycle.select(
                 globalStorage.getWorldCreationAvailability(),
                 WorldCreationAvailability.entries.toList(),
-                direction,
+                GuiCycleDirection.NEXT,
             ),
         )
         return MenuActionResult.Success(MenuUpdate.Refresh)
@@ -421,9 +420,6 @@ class ChanponAdminMenu(
 
     private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
-
-    private fun structuredBlocks(blocks: List<GuiLoreBlock>): List<Component> =
-        CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(blocks))
 
     companion object {
         private const val OWNER = "mwm-chanpon"
