@@ -312,19 +312,15 @@ class ChanponWorldSettingsMenu(
                 attributes + (CAPABILITY_ID to capability.capabilityId),
             )
         }
-        val item = if (presentation.embeddedLoreBlocks.isNotEmpty()) {
-            presentation.item.copy(lore = GuiLoreSpec.Blocks(presentation.embeddedLoreBlocks))
-        } else {
-            presentation.item
-        }
         return CCSystem.getAPI().getGuiElementService().menuStructuredEntry(
             player,
             GuiStructuredMenuEntrySpec(
                 slot = slot,
-                item = item.copy(
+                item = presentation.item.copy(
                     role = if (actions.isEmpty()) GuiElementRole.CONTENT else GuiElementRole.ACTION,
                 ),
                 actions = actions,
+                embeddedLoreBlocks = presentation.embeddedLoreBlocks,
                 glint = presentation.glint,
                 playerHeadOwner = presentation.playerHeadOwner,
             ),

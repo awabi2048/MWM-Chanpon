@@ -122,7 +122,7 @@ class ToolPermissionCapability(
             item = GuiItemSpec(
                 material = Material.PLAYER_HEAD,
                 name = GuiNameSpec.Text("", GuiNameStyle.DEFAULT),
-                lore = GuiLoreSpec.Blocks(blocks),
+                lore = GuiLoreSpec.None,
                 role = GuiElementRole.ACTION,
                 amount = 1,
             ),
