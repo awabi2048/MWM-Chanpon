@@ -37,6 +37,10 @@ class ArchiveService(
         incomingDir.mkdirs()
         storageDir.mkdirs()
         fullBackupDir.mkdirs()
+        if (globalStorage.isArchiveLocked()) {
+            plugin.logger.warning("Clearing stale archive operation lock from the previous server process.")
+            globalStorage.setArchiveLocked(false)
+        }
     }
 
     fun createAnnualArchive(archiveName: String, executor: Player): CompletableFuture<ArchiveResult> {
@@ -180,6 +184,7 @@ class ArchiveService(
 
         bossBar.isVisible = true
         val future = CompletableFuture<ArchiveResult>()
+        val copiedWorldDirectories = mutableListOf<File>()
         Bukkit.getScheduler().runTaskAsynchronously(plugin, Runnable {
             val tempDir = Files.createTempDirectory("mwmchan_${archiveName}_")
             try {
@@ -209,6 +214,7 @@ class ArchiveService(
                     val targetDir = worldService.getWorldCreationDirectory(imported.worldData)
                     if (sourceDir.isDirectory) {
                         sourceDir.copyRecursively(targetDir, overwrite = false)
+                        copiedWorldDirectories += targetDir
                     }
                     syncBossBar(bossBar, executor, index + 1, imports.size + 1)
                 }
@@ -220,23 +226,67 @@ class ArchiveService(
                             restoreChanponData(tempDir, imported.uuid)
                             restorePortals(tempDir, imported.uuid)
                             storage.setImportedArchive(imported.uuid, true)
-                            worldService.loadWorld(imported.uuid)
+                        }
+                        imports.forEach { imported ->
+                            runCatching { worldService.loadWorld(imported.uuid) }
+                                .onSuccess { loaded ->
+                                    if (!loaded) {
+                                        plugin.logger.warning(
+                                            "Imported archive world could not be loaded and remains available for later loading: " +
+                                                "${imported.worldData.name} (${imported.uuid})"
+                                        )
+                                    }
+                                }
+                                .onFailure {
+                                    plugin.logger.warning(
+                                        "Imported archive world could not be loaded and remains available for later loading: " +
+                                            "${imported.worldData.name} (${imported.uuid}): ${it.message}"
+                                    )
+                                }
                             plugin.logger.info("Extracted archive world: ${imported.worldData.name} (${imported.uuid})")
                         }
                         syncBossBar(bossBar, executor, imports.size + 1, imports.size + 1)
                         future.complete(ArchiveResult(true, "unzip_completed"))
                     } catch (ex: Exception) {
+                        rollbackImportedWorlds(imports, copiedWorldDirectories, repository)
                         future.completeExceptionally(ex)
                     } finally {
                         tempDir.toFile().deleteRecursively()
                     }
                 })
             } catch (ex: Exception) {
+                copiedWorldDirectories.asReversed().forEach { directory ->
+                    if (directory.exists() && !directory.deleteRecursively()) {
+                        plugin.logger.severe("Failed to remove partially imported world directory: $directory")
+                    }
+                }
                 tempDir.toFile().deleteRecursively()
                 future.completeExceptionally(ex)
             }
         })
         return future
+    }
+
+    private fun rollbackImportedWorlds(
+        imports: List<ImportedWorld>,
+        copiedWorldDirectories: List<File>,
+        repository: me.awabi2048.myworldmanager.api.service.ApiWorldRepository
+    ) {
+        imports.asReversed().forEach { imported ->
+            runCatching {
+                MyWorldManagerApi.getWorldService()?.replaceRelatedPortals(imported.uuid, emptyList())
+            }.onFailure {
+                plugin.logger.severe("Failed to roll back imported portals for ${imported.uuid}: ${it.message}")
+            }
+            runCatching { repository.delete(imported.uuid) }
+                .onFailure { plugin.logger.severe("Failed to roll back imported metadata for ${imported.uuid}: ${it.message}") }
+            runCatching { storage.worldFile(imported.uuid).delete() }
+        }
+        copiedWorldDirectories.asReversed().forEach { directory ->
+            if (directory.exists() && !directory.deleteRecursively()) {
+                plugin.logger.severe("Failed to roll back imported world directory: $directory")
+            }
+        }
     }
 
     private fun beginOperation(resultFuture: CompletableFuture<ArchiveResult>): Boolean {

@@ -1,0 +1,875 @@
+package me.awabi2048.mwmchanpon.ui
+
+import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiItemSpec
+import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuCapabilitySpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
+import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.GuiValueTone
+import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
+import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionTextProvider
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityContext
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentationProvider
+import com.awabi2048.ccsystem.api.gui.MenuRoute
+import com.awabi2048.ccsystem.api.gui.MenuUpdate
+import java.util.UUID
+import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
+import com.awabi2048.ccsystem.api.gui.InventoryMenuView
+import com.awabi2048.ccsystem.api.gui.MenuActionContext
+import com.awabi2048.ccsystem.api.gui.MenuActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuElement
+import me.awabi2048.mwmchanpon.MWMChanponPlugin
+import me.awabi2048.mwmchanpon.service.EasyVoidWorldCreationService
+import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
+import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
+import me.awabi2048.myworldmanager.api.MyWorldManagerApi
+import me.awabi2048.myworldmanager.api.extension.PlayerWorldCapabilityContract
+import me.awabi2048.myworldmanager.api.extension.PlayerWorldCapabilitySubject
+import me.awabi2048.myworldmanager.api.extension.PlayerWorldRouteCapability
+import me.awabi2048.myworldmanager.api.extension.PlayerWorldRouteRequest
+import me.awabi2048.myworldmanager.api.extension.WorldCreationOperation
+import me.awabi2048.myworldmanager.api.extension.WorldCreationRequest
+import me.awabi2048.myworldmanager.api.extension.WorldSettingsNavigationRequest
+import me.awabi2048.myworldmanager.api.service.WorldPointBillingMode
+import me.awabi2048.myworldmanager.model.WorldData
+import net.kyori.adventure.text.format.TextDecoration
+import org.bukkit.Bukkit
+import org.bukkit.Material
+import org.bukkit.entity.Player
+import org.bukkit.event.inventory.ClickType
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+
+/**
+ * MWMが所有するPlayerWorld画面へChanpon固有の表示値と操作だけを提供する。
+ *
+ * 画面、Route、履歴、MWMのGUIセッションは所有しない。
+ */
+class ChanponPlayerWorldCapability(
+    private val plugin: MWMChanponPlugin,
+    private val storage: ChanponWorldStorage,
+    private val easyVoidCreationService: EasyVoidWorldCreationService,
+) : PlayerWorldRouteCapability {
+    private val runtime = CCSystem.getAPI().getMenuRuntimeService()
+
+    init {
+        val service = CCSystem.getAPI().getMenuCapabilityService()
+        service.register(
+            MenuCapabilityDefinition(
+                owner = CAPABILITY_OWNER,
+                id = WORLD_CAPABILITY_ID,
+                placement = PlayerWorldCapabilityContract.WORLD_ITEM_PLACEMENT,
+                availability = MenuCapabilityAvailability {
+                    subject(it) != null && world(it) != null
+                },
+                presentationProvider = MenuCapabilityPresentationProvider {
+                    createWorldPresentation(it.player, requireNotNull(world(it)))
+                },
+                actions = listOf(
+                    MenuCapabilityAction(
+                        id = "primary",
+                        trigger = MenuCapabilityTrigger.LEFT,
+                        textProvider = MenuCapabilityActionTextProvider(::primaryWorldActionText),
+                        availability = MenuCapabilityAvailability {
+                            world(it)?.let { world ->
+                                !world.isArchived &&
+                                    (!isCurrentWorld(it.player, world) || canOpenSettings(it.player, world))
+                            } == true
+                        },
+                        handler = MenuCapabilityActionHandler(::handleWorld),
+                    ),
+                    MenuCapabilityAction(
+                        id = "settings",
+                        trigger = MenuCapabilityTrigger.RIGHT,
+                        textProvider = MenuCapabilityActionTextProvider {
+                            text(it.player, "gui.player_world.world_item.settings")
+                        },
+                        availability = MenuCapabilityAvailability {
+                            world(it)?.let { world ->
+                                canOpenSettings(it.player, world)
+                            } == true
+                        },
+                        handler = MenuCapabilityActionHandler(::handleWorld),
+                    ),
+                    MenuCapabilityAction(
+                        id = "prioritize",
+                        trigger = MenuCapabilityTrigger.SHIFT_LEFT,
+                        textProvider = MenuCapabilityActionTextProvider {
+                            text(it.player, "gui.player_world.world_item.move_to_top")
+                        },
+                        availability = MenuCapabilityAvailability {
+                            subject(it)?.targetPlayerUuid == it.player.uniqueId
+                        },
+                        handler = MenuCapabilityActionHandler(::handleWorld),
+                    ),
+                ),
+            ),
+        )
+        service.register(
+            MenuCapabilityDefinition(
+                owner = CAPABILITY_OWNER,
+                id = SUMMARY_CAPABILITY_ID,
+                placement = PlayerWorldCapabilityContract.SUMMARY_PLACEMENT,
+                availability = MenuCapabilityAvailability { subject(it) != null },
+                presentationProvider = MenuCapabilityPresentationProvider {
+                    val subject = requireNotNull(subject(it))
+                    createPlayerInfoPresentation(
+                        it.player,
+                        subject.targetPlayerUuid,
+                        subject.targetPlayerName,
+                    )
+                },
+                actions = emptyList(),
+            ),
+        )
+        service.register(
+            MenuCapabilityDefinition(
+                owner = CAPABILITY_OWNER,
+                id = CREATION_CAPABILITY_ID,
+                placement = PlayerWorldCapabilityContract.CREATION_PLACEMENT,
+                availability = MenuCapabilityAvailability {
+                    subject(it)?.targetPlayerUuid == it.player.uniqueId
+                },
+                presentationProvider = MenuCapabilityPresentationProvider {
+                    creationPresentation(it)
+                },
+                actions = listOf(
+                    MenuCapabilityAction(
+                        id = "standard-create",
+                        trigger = MenuCapabilityTrigger.LEFT,
+                        textProvider = MenuCapabilityActionTextProvider {
+                            text(it.player, "gui.player_world.creation_button.action")
+                        },
+                        availability = MenuCapabilityAvailability {
+                            creationBlockReason(it) == null && hasCreatePermission(it.player)
+                        },
+                        handler = MenuCapabilityActionHandler(::handleCreate),
+                    ),
+                    MenuCapabilityAction(
+                        id = "easy-create",
+                        trigger = MenuCapabilityTrigger.RIGHT,
+                        textProvider = MenuCapabilityActionTextProvider {
+                            plugin.getMessage(
+                                it.player,
+                                "chanpon.player_world.easy_creation.action",
+                            )
+                        },
+                        availability = MenuCapabilityAvailability {
+                            creationBlockReason(it) == null && hasCreatePermission(it.player)
+                        },
+                        handler = MenuCapabilityActionHandler(::handleCreate),
+                    ),
+                ),
+            ),
+        )
+        runtime.register(
+            InventoryMenuDefinition(
+                owner = ROUTE_OWNER,
+                id = ROUTE_ID,
+                renderer = { context -> render(context.player, context.route) },
+                actions = mapOf(
+                    ACTION_PAGE to MenuActionHandler(::changePage),
+                    ACTION_SETTINGS to MenuActionHandler(::openUserSettings),
+                    ACTION_PENDING to MenuActionHandler(::openPending),
+                    ACTION_CAPABILITY to MenuActionHandler(::executeCapability),
+                    ACTION_BACK to MenuActionHandler {
+                        MenuActionResult.Success(MenuUpdate.Back)
+                    },
+                ),
+            ),
+        )
+    }
+
+    override fun prepare(
+        player: Player,
+        request: PlayerWorldRouteRequest,
+    ): MenuRoute =
+        route(request)
+
+    private fun render(player: Player, route: MenuRoute): InventoryMenuView {
+        val request = request(route)
+        val worlds = MyWorldManagerApi.getPlayerWorlds(request.targetPlayerUuid)
+        val layout = CCSystem.getAPI().getGuiLayoutService()
+            .sevenColumnPage(worlds.size, request.page)
+        val current = request.copy(page = layout.page)
+        val currentRoute = route(current)
+        val subject = PlayerWorldCapabilitySubject(
+            player,
+            request.targetPlayerUuid,
+            request.targetPlayerName,
+            worlds,
+            request.showBackButton,
+            currentRoute,
+        )
+        val service = CCSystem.getAPI().getMenuCapabilityService()
+        val elements = mutableListOf<MenuElement>()
+        worlds.drop(layout.startIndex).take(layout.itemCount)
+            .forEachIndexed { index, worldData ->
+                val attributes = attributes(subject, worldData)
+                val capability = service.resolve(
+                    "$CAPABILITY_OWNER:$WORLD_CAPABILITY_ID",
+                    player,
+                    attributes = attributes,
+                ) ?: return@forEachIndexed
+                elements += CCSystem.getAPI().getGuiElementService().menuCapabilityEntry(
+                    player,
+                    GuiMenuCapabilitySpec(
+                        slot = layout.layout.itemSlots[index],
+                        capability = capability,
+                        actionId = ACTION_CAPABILITY,
+                        actionPayload = mapOf(
+                            PAYLOAD_CAPABILITY to capability.capabilityId,
+                            PAYLOAD_WORLD_UUID to worldData.uuid.toString(),
+                        ),
+                    ),
+                )
+            }
+
+        if (request.targetPlayerUuid == player.uniqueId) {
+            service.resolve(
+                "$CAPABILITY_OWNER:$CREATION_CAPABILITY_ID",
+                player,
+                attributes = attributes(subject),
+            )?.let { capability ->
+                val capabilityAttributes = attributes(subject)
+                elements += CCSystem.getAPI().getGuiElementService().menuCapabilityEntry(
+                    player,
+                    GuiMenuCapabilitySpec(
+                        slot = layout.layout.actionSlot - 2,
+                        capability = capability,
+                        actionId = ACTION_CAPABILITY,
+                        actionPayload = mapOf(PAYLOAD_CAPABILITY to capability.capabilityId),
+                    ),
+                )
+            }
+        }
+        service.resolve(
+            "$CAPABILITY_OWNER:$SUMMARY_CAPABILITY_ID",
+            player,
+            attributes = attributes(subject),
+        )?.let { capability ->
+            elements += CCSystem.getAPI().getGuiElementService().menuCapabilityEntry(
+                player,
+                GuiMenuCapabilitySpec(
+                    slot = layout.layout.actionSlot,
+                    capability = capability,
+                    actionId = ACTION_CAPABILITY,
+                    actionPayload = mapOf(PAYLOAD_CAPABILITY to capability.capabilityId),
+                ),
+            )
+        }
+        if (request.targetPlayerUuid == player.uniqueId) {
+            elements += simpleActionElement(
+                layout.layout.actionSlot + 2,
+                player,
+                Material.WRITABLE_BOOK,
+                text(player, "gui.user_settings.button.display"),
+                text(player, "gui.user_settings.button.action"),
+                ACTION_SETTINGS,
+            )
+            elements += pendingElement(layout.layout.size - 2, player)
+        }
+        if (layout.page > 0) {
+            elements += navigationElement(
+                layout.layout.previousPageSlot,
+                player,
+                false,
+                current.copy(page = layout.page - 1),
+            )
+        }
+        if (CCSystem.getAPI().getMenuNavigationService().canGoBack(player)) {
+            elements += CCSystem.getAPI().getGuiElementService().menuEntry(
+                player,
+                GuiMenuEntrySpec(
+                    slot = layout.layout.backSlot,
+                    material = Material.REDSTONE,
+                    name = GuiNameSpec.Text(
+                        text(player, "gui.common.return"),
+                        com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT,
+                    ),
+                    role = GuiElementRole.BACK,
+                    actions = listOf(
+                        GuiMenuEntryAction(
+                            ACTION_BACK,
+                            MenuAcceptedClicks.LEFT_RIGHT,
+                            text(player, "gui.common.return"),
+                        ),
+                    ),
+                ),
+            )
+        }
+        if (layout.page + 1 < layout.totalPages) {
+            elements += navigationElement(
+                layout.layout.nextPageSlot,
+                player,
+                true,
+                current.copy(page = layout.page + 1),
+            )
+        }
+        return InventoryMenuView(
+            layout.layout.size,
+            component(player, "gui.player_world.title"),
+            elements,
+        )
+    }
+
+    private fun creationPresentation(
+        context: MenuCapabilityContext,
+    ): MenuCapabilityPresentation {
+        val subject = requireNotNull(subject(context))
+        val reason = creationBlockReason(
+            context.player,
+            subject.worlds.count { it.owner == subject.targetPlayerUuid },
+            plugin.config.getInt("creation.max_worlds_per_player", 50),
+        )
+        return if (reason == null && hasCreatePermission(context.player)) {
+            createCreationPresentation(context.player)
+        } else {
+            createCreationUnavailablePresentation(
+                context.player,
+                reason ?: CreationBlockReason.NO_PERMISSION,
+            )
+        }
+    }
+
+    private fun handleCreate(context: MenuCapabilityActionContext): MenuActionResult {
+        val subject = subject(context) ?: return MenuActionResult.Ignored
+        val player = context.player
+        if (subject.targetPlayerUuid != player.uniqueId) return MenuActionResult.Rejected()
+        if (!hasCreatePermission(player)) {
+            player.sendMessage(i18n(player, "message.world_creation_no_permission"))
+            return MenuActionResult.Rejected()
+        }
+        if (context.click.isRightClick && !context.click.isShiftClick) {
+            return startEasyCreation(player, subject.returnRoute)
+        }
+        return MenuActionResult.Success(
+            MenuUpdate.Navigate(
+                MyWorldManagerApi.prepareStandardWorldCreationRoute(
+                    player,
+                    WorldPointBillingMode.NONE,
+                ),
+            ),
+        )
+    }
+
+    private fun handleWorld(context: MenuCapabilityActionContext): MenuActionResult {
+        val subject = subject(context) ?: return MenuActionResult.Ignored
+        val worldData = world(context) ?: return MenuActionResult.Ignored
+        val player = context.player
+        if (
+            subject.targetPlayerUuid == player.uniqueId &&
+            context.click.isShiftClick &&
+            context.click.isLeftClick
+        ) {
+            MyWorldManagerApi.prioritizePlayerWorld(player.uniqueId, worldData.uuid)
+            return MenuActionResult.Success(MenuUpdate.Refresh)
+        }
+        if (context.click.isLeftClick && !context.click.isShiftClick) {
+            if (worldData.isArchived) return MenuActionResult.Rejected()
+            if (isCurrentWorld(player, worldData)) {
+                if (!canOpenSettings(player, worldData)) return MenuActionResult.Rejected()
+                return openWorldSettings(subject, worldData)
+            }
+            MyWorldManagerApi.getWorldService()?.teleportToWorld(player, worldData.uuid)
+            player.sendMessage(
+                text(player, "messages.warp_success", mapOf("world" to worldData.name)),
+            )
+            return MenuActionResult.Success(MenuUpdate.Close)
+        }
+        if (context.click.isRightClick && !context.click.isShiftClick && canOpenSettings(player, worldData)) {
+            return openWorldSettings(subject, worldData)
+        }
+        return MenuActionResult.Ignored
+    }
+
+    private fun startEasyCreation(player: Player, returnRoute: MenuRoute): MenuActionResult =
+        easyVoidCreationService.start(player, returnRoute)
+
+    private fun primaryWorldActionText(context: MenuCapabilityContext): String {
+        val world = requireNotNull(world(context))
+        return if (isCurrentWorld(context.player, world)) {
+            text(context.player, "gui.player_world.world_item.settings")
+        } else {
+            text(context.player, "gui.player_world.world_item.warp")
+        }
+    }
+
+    private fun createWorldPresentation(
+        player: Player,
+        world: WorldData,
+    ): MenuCapabilityPresentation {
+        val ownerName = Bukkit.getOfflinePlayer(world.owner).name
+            ?: text(player, "general.unknown")
+        val progressLine = SubmissionProgressDisplay.loreLine(player, storage, world.uuid)
+        val information = buildList {
+            add(
+                GuiLoreLine.Data(
+                    CCSystem.getAPI().getI18nString(player, "gui_data.owner"),
+                    ownerName,
+                    "§f",
+                ),
+            )
+            add(
+                GuiLoreLine.Data(
+                    CCSystem.getAPI().getI18nString(player, "gui_data.visibility"),
+                    visibilityName(player, storage.getVisibility(world.uuid)),
+                    "§e",
+                ),
+            )
+            progressLine?.let(::add)
+        }
+        val blocks = buildList {
+            if (world.description.isNotBlank()) {
+                add(GuiLoreBlock(listOf(GuiLoreLine.Text(world.description))))
+            }
+            add(GuiLoreBlock(information))
+            if (world.isArchived) {
+                add(
+                    GuiLoreBlock(
+                        listOf(
+                            GuiLoreLine.Danger(
+                                text(player, "gui.player_world.world_item.expired"),
+                            ),
+                        ),
+                    ),
+                )
+            }
+        }
+        return MenuCapabilityPresentation(
+            item = GuiItemSpec(
+                material = world.icon,
+                name = GuiNameSpec.Component(
+                    component(
+                        player,
+                        "gui.common.world_item_name",
+                        mapOf("world" to world.name),
+                    ).decoration(TextDecoration.ITALIC, false),
+                ),
+                lore = GuiLoreSpec.Blocks(blocks),
+                role = GuiElementRole.ACTION,
+                amount = 1,
+            ),
+            glint = world.isArchived,
+        )
+    }
+
+    private fun createCreationPresentation(player: Player): MenuCapabilityPresentation =
+        MenuCapabilityPresentation(
+            GuiItemSpec(
+                material = Material.NETHER_STAR,
+                name = GuiNameSpec.Component(
+                    component(player, "gui.player_world.creation_button.display"),
+                ),
+                lore = GuiLoreSpec.Blocks(
+                    listOf(
+                        GuiLoreBlock(
+                            textList(player, "gui.player_world.creation_button.description")
+                                .map(GuiLoreLine::Text),
+                        ),
+                    ),
+                ),
+                role = GuiElementRole.ACTION,
+                amount = 1,
+            ),
+        )
+
+    private fun createCreationUnavailablePresentation(
+        player: Player,
+        reason: CreationBlockReason,
+    ): MenuCapabilityPresentation =
+        MenuCapabilityPresentation(
+            GuiItemSpec(
+                material = Material.BARRIER,
+                name = GuiNameSpec.Component(component(player, reason.displayKey)),
+                lore = GuiLoreSpec.Rich(
+                    textList(player, reason.loreKey).map(GuiLoreLine::Text),
+                    com.awabi2048.ccsystem.api.gui.GuiLoreFrame.BOTH,
+                ),
+                role = GuiElementRole.CONTENT,
+                amount = 1,
+            ),
+        )
+
+    private fun createPlayerInfoPresentation(
+        player: Player,
+        targetPlayerUuid: java.util.UUID,
+        targetPlayerName: String?,
+    ): MenuCapabilityPresentation =
+        MenuCapabilityPresentation(
+            item = GuiItemSpec(
+                material = Material.PLAYER_HEAD,
+                name = GuiNameSpec.Component(
+                    CCSystem.getAPI().getGuiElementService()
+                        .name(targetPlayerName ?: targetPlayerUuid.toString()),
+                ),
+                lore = GuiLoreSpec.None,
+                role = GuiElementRole.CONTENT,
+                amount = 1,
+            ),
+            playerHeadOwner = targetPlayerUuid,
+        )
+
+    private fun visibilityName(
+        player: Player,
+        visibility: ChanponWorldVisibility,
+    ): String {
+        val key = when (visibility) {
+            ChanponWorldVisibility.PUBLIC -> "chanpon.publish.public"
+            ChanponWorldVisibility.DEVELOPMENT -> "chanpon.publish.development"
+            ChanponWorldVisibility.PRIVATE -> "chanpon.publish.private"
+        }
+        return plugin.getMessage(player, key)
+    }
+
+    private fun canOpenSettings(player: Player, world: WorldData): Boolean =
+        player.hasPermission("myworldmanager.admin") ||
+            world.owner == player.uniqueId ||
+            world.moderators.contains(player.uniqueId) ||
+            world.members.contains(player.uniqueId)
+
+    private fun openWorldSettings(
+        context: PlayerWorldCapabilitySubject,
+        worldData: WorldData,
+    ): MenuActionResult {
+        val route = MyWorldManagerApi.prepareWorldSettingsRoute(
+            context.player,
+            worldData.uuid,
+            WorldSettingsNavigationRequest(
+                showBackButton = true,
+                isPlayerWorldFlow = true,
+                parentShowBackButton = context.showBackButton,
+            ),
+        ) ?: return MenuActionResult.Rejected()
+        return MenuActionResult.Success(MenuUpdate.Navigate(route))
+    }
+
+    private fun isCurrentWorld(player: Player, world: WorldData): Boolean =
+        MyWorldManagerApi.getWorldService()?.isPlayerInWorld(player, world) == true
+
+    private fun canBypassWorldLimits(player: Player): Boolean =
+        player.hasPermission("myworldmanager.admin.bypass_world_limits") ||
+            player.hasPermission("myworldmanager.admin") ||
+            player.hasPermission("craftercrossing.test")
+
+    private fun hasCreatePermission(player: Player): Boolean =
+        player.hasPermission("myworldmanager.world.create") ||
+            player.hasPermission("myworldmanager.admin") ||
+            player.hasPermission("mwmchanpon.admin") ||
+            player.hasPermission("craftercrossing.test")
+
+    private fun creationBlockReason(
+        context: MenuCapabilityContext,
+    ): CreationBlockReason? {
+        val subject = subject(context) ?: return CreationBlockReason.POLICY_DENIED
+        return creationBlockReason(
+            context.player,
+            subject.worlds.count { it.owner == subject.targetPlayerUuid },
+            plugin.config.getInt("creation.max_worlds_per_player", 50),
+        )
+    }
+
+    private fun creationBlockReason(
+        player: Player,
+        currentCreateCount: Int,
+        maxCreateCount: Int,
+    ): CreationBlockReason? {
+        if (!hasCreatePermission(player)) return CreationBlockReason.NO_PERMISSION
+        val creationDecision = MyWorldManagerApi.checkWorldCreation(
+            WorldCreationRequest(player, player, WorldCreationOperation.NORMAL, null),
+        )
+        if (!creationDecision.allowed) return CreationBlockReason.POLICY_DENIED
+        if (canBypassWorldLimits(player)) return null
+        if (currentCreateCount >= maxCreateCount) return CreationBlockReason.NO_SLOT
+        return null
+    }
+
+    private fun subject(context: MenuCapabilityContext): PlayerWorldCapabilitySubject? =
+        context.attributes[PlayerWorldCapabilityContract.SUBJECT_ATTRIBUTE]
+            as? PlayerWorldCapabilitySubject
+
+    private fun subject(context: MenuCapabilityActionContext): PlayerWorldCapabilitySubject? =
+        context.attributes[PlayerWorldCapabilityContract.SUBJECT_ATTRIBUTE]
+            as? PlayerWorldCapabilitySubject
+
+    private fun world(context: MenuCapabilityContext): WorldData? =
+        context.attributes[PlayerWorldCapabilityContract.WORLD_ATTRIBUTE] as? WorldData
+
+    private fun world(context: MenuCapabilityActionContext): WorldData? =
+        context.attributes[PlayerWorldCapabilityContract.WORLD_ATTRIBUTE] as? WorldData
+
+    private fun text(
+        player: Player,
+        key: String,
+        placeholders: Map<String, Any> = emptyMap(),
+    ): String = CCSystem.getAPI().getI18nString(player, key, placeholders)
+
+    private fun textList(player: Player, key: String): List<String> =
+        CCSystem.getAPI().getI18nStringList(player, key)
+
+    private fun component(
+        player: Player,
+        key: String,
+        placeholders: Map<String, Any> = emptyMap(),
+    ) = CCSystem.getAPI().getI18nComponent(player, key, placeholders)
+
+    private fun i18n(player: Player, key: String): String =
+        CCSystem.getAPI().getI18nString(player, "chanpon.backup.$key")
+
+    private fun changePage(context: MenuActionContext): MenuActionResult {
+        val page = context.payload[PAYLOAD_PAGE]?.toIntOrNull()
+            ?: return MenuActionResult.Ignored
+        return MenuActionResult.Success(
+            MenuUpdate.Replace(route(request(context.route).copy(page = page))),
+        )
+    }
+
+    private fun openUserSettings(context: MenuActionContext): MenuActionResult {
+        val route = MyWorldManagerApi.prepareUserSettingsRoute(context.player, true)
+            ?: return MenuActionResult.Rejected()
+        return MenuActionResult.Success(MenuUpdate.Navigate(route))
+    }
+
+    private fun openPending(context: MenuActionContext): MenuActionResult {
+        val request = request(context.route)
+        return MenuActionResult.Success(
+            MenuUpdate.Navigate(
+                MyWorldManagerApi.preparePendingInteractionRoute(
+                    page = 0,
+                    returnPage = request.page,
+                    showBackButton = request.showBackButton,
+                ),
+            ),
+        )
+    }
+
+    private fun simpleActionElement(
+        slot: Int,
+        player: Player,
+        material: Material,
+        name: String,
+        actionText: String,
+        actionId: String,
+    ): MenuElement {
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = slot,
+                material = material,
+                name = GuiNameSpec.Text(name, com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT),
+                role = GuiElementRole.ACTION,
+                actions = listOf(GuiMenuEntryAction(
+                    actionId,
+                    MenuAcceptedClicks.LEFT_RIGHT,
+                    actionText,
+                )),
+            ),
+        )
+    }
+
+    private fun executeCapability(context: MenuActionContext): MenuActionResult {
+        val capabilityId = context.payload[PAYLOAD_CAPABILITY]
+            ?: return MenuActionResult.Ignored
+        val worldData = context.payload[PAYLOAD_WORLD_UUID]
+            ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+            ?.let { MyWorldManagerApi.getWorldRepository()?.findByUuid(it) }
+        return CCSystem.getAPI().getMenuCapabilityService().execute(
+            capabilityId,
+            context.player,
+            context.click,
+            attributes = attributes(subject(context.player, context.route), worldData),
+        )
+    }
+
+    private fun navigationElement(
+        slot: Int,
+        player: Player,
+        next: Boolean,
+        request: PlayerWorldRouteRequest,
+    ): MenuElement {
+        val label = text(player, if (next) "gui.common.next_page" else "gui.common.prev_page")
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = slot,
+                material = Material.ARROW,
+                name = GuiNameSpec.Text(
+                    label,
+                    com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT,
+                ),
+                role = GuiElementRole.NAVIGATION,
+                actions = listOf(
+                    GuiMenuEntryAction(
+                        ACTION_PAGE,
+                        MenuAcceptedClicks.LEFT_RIGHT,
+                        label,
+                        mapOf(PAYLOAD_PAGE to request.page.toString()),
+                    ),
+                ),
+            ),
+        )
+    }
+
+    private fun pendingElement(slot: Int, player: Player): MenuElement {
+        val summary = MyWorldManagerApi.getPendingInteractionSummary(player.uniqueId)
+        if (summary.count == 0) {
+            return CCSystem.getAPI().getGuiElementService().menuDisplay(
+                GuiMenuDisplaySpec(
+                    slot,
+                    GuiItemSpec(
+                        material = Material.BARRIER,
+                        name = GuiNameSpec.Component(
+                            component(player, "gui.player_world.pending_button.display"),
+                        ),
+                        lore = GuiLoreSpec.Blocks(
+                            listOf(
+                                GuiLoreBlock(
+                                    listOf(
+                                        GuiLoreLine.Text(
+                                            text(player, "gui.player_world.pending_button.empty"),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ),
+                        role = GuiElementRole.CONTENT,
+                        amount = 1,
+                    ),
+                ),
+            )
+        }
+        val latest = summary.latestCreatedAt?.let {
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+                .withZone(ZoneId.systemDefault())
+                .format(Instant.ofEpochMilli(it))
+        } ?: text(player, "gui.player_world.pending_button.none")
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = slot,
+                material = Material.WRITABLE_BOOK,
+                name = GuiNameSpec.Component(component(player, "gui.player_world.pending_button.display")),
+                role = GuiElementRole.ACTION,
+                description = textList(player, "gui.player_world.pending_button.description"),
+                data = listOf(
+                    GuiMenuEntryData(
+                        text(player, "gui.player_world.pending_button.count_label"),
+                        summary.count,
+                        GuiValueTone.PRIMARY,
+                    ),
+                    GuiMenuEntryData(
+                        text(player, "gui.player_world.pending_button.latest_label"),
+                        latest,
+                        GuiValueTone.INFO,
+                    ),
+                ),
+                actions = listOf(GuiMenuEntryAction(
+                    ACTION_PENDING,
+                    MenuAcceptedClicks.LEFT_RIGHT,
+                    text(player, "gui.player_world.pending_button.action"),
+                )),
+                glint = true,
+            ),
+        )
+    }
+
+    private fun subject(
+        player: Player,
+        route: MenuRoute,
+    ): PlayerWorldCapabilitySubject {
+        val request = request(route)
+        return PlayerWorldCapabilitySubject(
+            player,
+            request.targetPlayerUuid,
+            request.targetPlayerName,
+            MyWorldManagerApi.getPlayerWorlds(request.targetPlayerUuid),
+            request.showBackButton,
+            route,
+        )
+    }
+
+    private fun attributes(
+        subject: PlayerWorldCapabilitySubject,
+        worldData: WorldData? = null,
+    ): Map<String, Any> = buildMap {
+        put(PlayerWorldCapabilityContract.SUBJECT_ATTRIBUTE, subject)
+        worldData?.let { put(PlayerWorldCapabilityContract.WORLD_ATTRIBUTE, it) }
+    }
+
+    private fun route(request: PlayerWorldRouteRequest): MenuRoute =
+        MenuRoute(
+            ROUTE_OWNER,
+            ROUTE_ID,
+            buildMap {
+                put(PAYLOAD_PAGE, request.page.coerceAtLeast(0).toString())
+                put(PAYLOAD_SHOW_BACK, request.showBackButton.toString())
+                put(PAYLOAD_TARGET_UUID, request.targetPlayerUuid.toString())
+                request.targetPlayerName?.let { put(PAYLOAD_TARGET_NAME, it) }
+            },
+        )
+
+    private fun request(route: MenuRoute): PlayerWorldRouteRequest =
+        PlayerWorldRouteRequest(
+            page = route.payload[PAYLOAD_PAGE]?.toIntOrNull()?.coerceAtLeast(0) ?: 0,
+            showBackButton =
+                route.payload[PAYLOAD_SHOW_BACK]?.toBooleanStrictOrNull() ?: false,
+            targetPlayerUuid = route.payload[PAYLOAD_TARGET_UUID]
+                ?.let { runCatching { java.util.UUID.fromString(it) }.getOrNull() }
+                ?: java.util.UUID(0L, 0L),
+            targetPlayerName = route.payload[PAYLOAD_TARGET_NAME],
+        )
+
+    private enum class CreationBlockReason(
+        val displayKey: String,
+        val loreKey: String,
+    ) {
+        POLICY_DENIED(
+            "gui.player_world.creation_unavailable.policy_denied.display",
+            "gui.player_world.creation_unavailable.policy_denied.lore",
+        ),
+        NO_SLOT(
+            "gui.player_world.creation_unavailable.no_slot.display",
+            "gui.player_world.creation_unavailable.no_slot.lore",
+        ),
+        NO_PERMISSION(
+            "gui.player_world.creation_unavailable.no_permission.display",
+            "gui.player_world.creation_unavailable.no_permission.lore",
+        ),
+    }
+
+    private companion object {
+        const val CAPABILITY_OWNER = "mwm-chanpon"
+        const val WORLD_CAPABILITY_ID = "player-world-item"
+        const val SUMMARY_CAPABILITY_ID = "player-world-summary"
+        const val CREATION_CAPABILITY_ID = "player-world-creation"
+        const val ROUTE_OWNER = "mwm-chanpon"
+        const val ROUTE_ID = "player-worlds"
+        const val ACTION_PAGE = "page"
+        const val ACTION_SETTINGS = "settings"
+        const val ACTION_PENDING = "pending"
+        const val ACTION_CAPABILITY = "capability"
+        const val ACTION_BACK = "back"
+        const val PAYLOAD_CAPABILITY = "capability_id"
+        const val PAYLOAD_WORLD_UUID = "capability_world_uuid"
+        const val PAYLOAD_PAGE = "page"
+        const val PAYLOAD_SHOW_BACK = "show_back"
+        const val PAYLOAD_TARGET_UUID = "target_uuid"
+        const val PAYLOAD_TARGET_NAME = "target_name"
+    }
+}

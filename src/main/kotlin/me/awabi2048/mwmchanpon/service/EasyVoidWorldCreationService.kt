@@ -1,21 +1,30 @@
 package me.awabi2048.mwmchanpon.service
 
-import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
-
 import com.awabi2048.ccsystem.CCSystem
-import io.papermc.paper.connection.PlayerGameConnection
-import io.papermc.paper.dialog.Dialog
-import io.papermc.paper.event.player.PlayerCustomClickEvent
-import io.papermc.paper.registry.data.dialog.ActionButton
-import io.papermc.paper.registry.data.dialog.DialogBase
-import io.papermc.paper.registry.data.dialog.action.DialogAction
-import io.papermc.paper.registry.data.dialog.body.DialogBody
-import io.papermc.paper.registry.data.dialog.input.DialogInput
-import io.papermc.paper.registry.data.dialog.type.DialogType
+import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiItemSpec
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameStyle
+import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiStructuredMenuEntrySpec
+import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
+import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
+import com.awabi2048.ccsystem.api.gui.InventoryMenuView
+import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuDialogButton
+import com.awabi2048.ccsystem.api.gui.MenuDialogHandler
+import com.awabi2048.ccsystem.api.gui.MenuDialogInput
+import com.awabi2048.ccsystem.api.gui.MenuDialogRequest
+import com.awabi2048.ccsystem.api.gui.MenuRoute
+import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
-import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.WorldCreationOperation
 import me.awabi2048.myworldmanager.api.extension.WorldCreationRequest
@@ -23,21 +32,17 @@ import me.awabi2048.myworldmanager.api.extension.WorldCreationType
 import me.awabi2048.myworldmanager.api.service.ManagedWorldCreationRequest
 import me.awabi2048.myworldmanager.api.service.ManagedWorldSpawn
 import me.awabi2048.myworldmanager.api.service.WorldPointBillingMode
-import me.awabi2048.myworldmanager.util.WorldNameValidation
-import net.kyori.adventure.key.Key
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
+import org.bukkit.Bukkit
 import org.bukkit.HeightMap
 import org.bukkit.Location
 import org.bukkit.Material
 import org.bukkit.World
 import org.bukkit.WorldType
 import org.bukkit.entity.Player
-import org.bukkit.event.EventHandler
-import org.bukkit.event.Listener
 import org.bukkit.generator.ChunkGenerator
 import org.bukkit.generator.WorldInfo
-import org.bukkit.plugin.java.JavaPlugin
 
 object EasyPlatformMaterialPolicy {
     val defaultMaterial: Material = Material.OBSIDIAN
@@ -51,154 +56,222 @@ object EasyPlatformMaterialPolicy {
  */
 class EasyVoidWorldCreationService(
     private val plugin: MWMChanponPlugin
-) : Listener {
-    private data class PendingCreation(val worldName: String, val platformMaterial: Material)
+) {
+    private data class PendingCreation(val worldName: String)
 
     private val pendingCreations = ConcurrentHashMap<UUID, PendingCreation>()
+    private val returnRoutes = ConcurrentHashMap<UUID, MenuRoute>()
+    private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
-    fun start(player: Player) {
-        if (!canCreate(player)) return
+    init {
+        runtime.register(
+            InventoryMenuDefinition(
+                owner = OWNER,
+                id = CONFIRM_ROUTE,
+                renderer = { context -> renderConfirmation(context.player) },
+                actions = mapOf(
+                    ACTION_CREATE to MenuActionHandler { context -> confirmCreation(context.player) },
+                    ACTION_BACK to MenuActionHandler { context -> returnToNameInput(context.player) },
+                ),
+                onClose = { context ->
+                    Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+                        val current = CCSystem.getAPI().getMenuNavigationService().currentRoute(context.player)
+                        if (current?.owner != OWNER || current.id != CONFIRM_ROUTE) {
+                            pendingCreations.remove(context.player.uniqueId)
+                            returnRoutes.remove(context.player.uniqueId)
+                        }
+                    }, 2L)
+                },
+            ),
+        )
+    }
+
+    fun start(player: Player, returnRoute: MenuRoute): MenuActionResult {
+        if (!canCreate(player)) return MenuActionResult.Rejected()
         pendingCreations.remove(player.uniqueId)
-        ManagedMenuPresenter.close(player)
+        returnRoutes[player.uniqueId] = returnRoute
         player.sendMessage(i18n(player, "start"))
         showNameDialog(player)
+        return MenuActionResult.Success(MenuUpdate.None)
     }
 
-    @EventHandler
-    fun onDialogClick(event: PlayerCustomClickEvent) {
-        val identifier = event.identifier
-        if (identifier !in DIALOG_KEYS) return
-
-        val connection = event.commonConnection as? PlayerGameConnection ?: return
-        val player = connection.player
-        when (identifier) {
-            NAME_SUBMIT -> handleNameSubmit(player, event)
-            NAME_CANCEL -> cancelFlow(player)
-            CONFIRM_CREATE -> {
-                val pending = pendingCreations.remove(player.uniqueId) ?: return
-                create(player, pending)
-            }
-            CONFIRM_BACK -> {
-                val pending = pendingCreations[player.uniqueId]
-                showNameDialog(
-                    player,
-                    pending?.worldName.orEmpty(),
-                    pending?.platformMaterial ?: DEFAULT_PLATFORM_MATERIAL
-                )
-            }
-        }
-    }
-
-    private fun cancelFlow(player: Player) {
+    private fun cancelFlow(player: Player): MenuActionResult {
         pendingCreations.remove(player.uniqueId)
-        if (!CCSystem.getAPI().getMenuNavigationService().openPrevious(player)) {
-            ManagedMenuPresenter.close(player)
-        }
+        val returnRoute = returnRoutes.remove(player.uniqueId)
+        return MenuActionResult.Success(
+            returnRoute?.let(MenuUpdate::Replace) ?: MenuUpdate.Close,
+        )
     }
 
-    private fun handleNameSubmit(player: Player, event: PlayerCustomClickEvent) {
-        val name = event.getDialogResponseView()?.getText(NAME_INPUT).orEmpty().trim()
-        val materialInput = event.getDialogResponseView()?.getText(PLATFORM_MATERIAL_INPUT).orEmpty().trim()
-        val platformMaterial = EasyPlatformMaterialPolicy.resolve(materialInput)
+    private fun handleNameSubmit(
+        player: Player,
+        nameInput: String,
+    ): MenuActionResult {
+        val name = nameInput.trim()
         if (name.isBlank()) {
             showNameDialog(
                 player,
                 name,
-                platformMaterial ?: DEFAULT_PLATFORM_MATERIAL,
                 legacy("§c${i18n(player, "name_required")}")
             )
-            return
+            return MenuActionResult.Success(MenuUpdate.None)
         }
-        if (platformMaterial == null) {
+
+        val worldService = MyWorldManagerApi.getWorldService()
+            ?: return MenuActionResult.Rejected()
+        worldService.validateWorldName(player, name)?.let { error ->
+            showNameDialog(player, name, error)
+            return MenuActionResult.Success(MenuUpdate.None)
+        }
+
+        if (MyWorldManagerApi.getWorldRepository()
+                ?.findByOwnerAndDisplayName(player.uniqueId, name) != null
+        ) {
             showNameDialog(
                 player,
                 name,
-                DEFAULT_PLATFORM_MATERIAL,
-                legacy("§c${i18n(player, "platform_material_invalid")}")
+                CCSystem.getAPI().getI18nComponent(player, "messages.world_name_duplicate"),
             )
-            return
+            return MenuActionResult.Success(MenuUpdate.None)
         }
 
-        val mwm = mwm()
-        when (val validation = mwm.worldValidator.validateName(name)) {
-            is WorldNameValidation.Failure -> {
-                showNameDialog(player, name, platformMaterial, mwm.languageManager.getComponent(player, validation.messageKey, validation.placeholders))
-                return
-            }
-            WorldNameValidation.Ok -> Unit
-        }
-
-        if (mwm.worldConfigRepository.findByOwnerAndDisplayName(player.uniqueId, name) != null) {
-            showNameDialog(player, name, platformMaterial, mwm.languageManager.getComponent(player, "messages.world_name_duplicate"))
-            return
-        }
-
-        pendingCreations[player.uniqueId] = PendingCreation(name, platformMaterial)
-        showConfirmDialog(player, name, platformMaterial)
+        pendingCreations[player.uniqueId] = PendingCreation(name)
+        return MenuActionResult.Success(
+            MenuUpdate.Navigate(MenuRoute(OWNER, CONFIRM_ROUTE)),
+        )
     }
 
     private fun showNameDialog(
         player: Player,
         initial: String = "",
-        platformMaterial: Material = DEFAULT_PLATFORM_MATERIAL,
         error: Component? = null
     ) {
-        val body = buildList {
-            add(DialogBody.plainMessage(component(player, "name_body")))
-            if (error != null) add(DialogBody.plainMessage(error))
-        }
-        val dialog = Dialog.create { builder ->
-            builder.empty()
-                .base(
-                    DialogBase.builder(component(player, "name_title"))
-                        .body(body)
-                        .inputs(
-                            listOf(
-                                DialogInput.text(NAME_INPUT, component(player, "name_label"))
-                                    .initial(initial)
-                                    .maxLength(32)
-                                    .build(),
-                                DialogInput.text(PLATFORM_MATERIAL_INPUT, component(player, "platform_material_label"))
-                                    .initial(platformMaterial.key.asString())
-                                    .maxLength(64)
-                                    .build()
-                            )
+        CCSystem.getAPI().getMenuDialogService().show(
+            player,
+            MenuDialogRequest(
+                owner = OWNER,
+                id = NAME_DIALOG,
+                title = component(player, "name_title"),
+                body = buildList {
+                    add(component(player, "name_body"))
+                    if (error != null) add(error)
+                },
+                inputs = listOf(
+                    MenuDialogInput.Text(NAME_INPUT, component(player, "name_label"), initial, maxLength = 32),
+                ),
+                confirm = MenuDialogButton(
+                    component(player, "next"),
+                    MenuDialogHandler { actor, response ->
+                        handleNameSubmit(
+                            actor,
+                            response.textValue(NAME_INPUT),
                         )
-                        .build()
-                )
-                .type(
-                    DialogType.confirmation(
-                        ActionButton.create(component(player, "next"), null, 100, DialogAction.customClick(NAME_SUBMIT, null)),
-                        ActionButton.create(component(player, "cancel"), null, 200, DialogAction.customClick(NAME_CANCEL, null))
-                    )
-                )
-        }
-        player.showDialog(dialog)
+                    },
+                ),
+                cancel = MenuDialogButton(
+                    component(player, "cancel"),
+                    MenuDialogHandler { actor, _ -> cancelFlow(actor) },
+                ),
+            ),
+        )
     }
 
-    private fun showConfirmDialog(player: Player, name: String, platformMaterial: Material) {
-        val body = listOf(
-            DialogBody.plainMessage(component(player, "confirm_body", "world" to name)),
-            DialogBody.plainMessage(component(player, "confirm_template", "material" to platformMaterial.key.asString()))
-        )
-        val dialog = Dialog.create { builder ->
-            builder.empty()
-                .base(DialogBase.builder(component(player, "confirm_title")).body(body).build())
-                .type(
-                    DialogType.confirmation(
-                        ActionButton.create(component(player, "create"), null, 100, DialogAction.customClick(CONFIRM_CREATE, null)),
-                        ActionButton.create(component(player, "back"), null, 200, DialogAction.customClick(CONFIRM_BACK, null))
-                    )
-                )
+    private fun renderConfirmation(player: Player): InventoryMenuView {
+        val pending = pendingCreations[player.uniqueId]
+        val layout = CCSystem.getAPI().getGuiLayoutService().confirmation45()
+        if (pending == null) {
+            return InventoryMenuView(layout.size, component(player, "confirm_title"), emptyList())
         }
-        player.showDialog(dialog)
+        val preview = guiItem(
+            Material.PAPER,
+            i18n(player, "confirm_title"),
+            GuiLoreSpec.Rich(
+                listOf(
+                    GuiLoreLine.Text(i18n(player, "confirm_body", "world" to pending.worldName)),
+                    GuiLoreLine.Text(
+                        i18n(
+                            player,
+                            "confirm_template",
+                            "material" to configuredPlatformMaterial().key.asString(),
+                        ),
+                    ),
+                ),
+                GuiLoreFrame.BOTH,
+            ),
+            GuiElementRole.CONTENT,
+        )
+        return InventoryMenuView(
+            layout.size,
+            component(player, "confirm_title"),
+            listOf(
+                CCSystem.getAPI().getGuiElementService().menuDisplay(
+                    GuiMenuDisplaySpec(layout.previewSlot, preview),
+                ),
+                CCSystem.getAPI().getGuiElementService().menuStructuredEntry(
+                    player,
+                    GuiStructuredMenuEntrySpec(
+                        slot = layout.confirmSlot,
+                        item = guiItem(
+                        Material.LIME_CONCRETE,
+                        i18n(player, "create"),
+                        GuiLoreSpec.None,
+                        GuiElementRole.CONFIRM,
+                        ),
+                        actions = listOf(
+                            GuiMenuEntryAction(
+                                ACTION_CREATE,
+                                MenuAcceptedClicks.LEFT_RIGHT,
+                                i18n(player, "create"),
+                            ),
+                        ),
+                    ),
+                ),
+                CCSystem.getAPI().getGuiElementService().menuStructuredEntry(
+                    player,
+                    GuiStructuredMenuEntrySpec(
+                        slot = layout.cancelSlot,
+                        item = guiItem(
+                        Material.RED_CONCRETE,
+                        i18n(player, "back"),
+                        GuiLoreSpec.None,
+                        GuiElementRole.CANCEL,
+                        ),
+                        actions = listOf(
+                            GuiMenuEntryAction(
+                                ACTION_BACK,
+                                MenuAcceptedClicks.LEFT_RIGHT,
+                                i18n(player, "back"),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+    }
+
+    private fun confirmCreation(player: Player): MenuActionResult {
+        val pending = pendingCreations.remove(player.uniqueId)
+            ?: return MenuActionResult.Rejected()
+        returnRoutes.remove(player.uniqueId)
+        create(player, pending)
+        return MenuActionResult.Success(MenuUpdate.Close)
+    }
+
+    private fun returnToNameInput(player: Player): MenuActionResult {
+        val pending = pendingCreations[player.uniqueId]
+        showNameDialog(
+            player,
+            pending?.worldName.orEmpty(),
+        )
+        return MenuActionResult.Success(MenuUpdate.None)
     }
 
     private fun create(player: Player, pending: PendingCreation) {
         if (!canCreate(player)) return
+        val platformMaterial = configuredPlatformMaterial()
         val worldService = MyWorldManagerApi.getWorldService()
         if (worldService == null) {
-            player.sendMessage(mwm().languageManager.getMessage(player, "error.internal_error"))
+            player.sendMessage(CCSystem.getAPI().getI18nString(player, "error.internal_error"))
             return
         }
         worldService.createManagedWorld(
@@ -214,13 +287,9 @@ class EasyVoidWorldCreationService(
                 initialSpawn = ManagedWorldSpawn(0, SPAWN_Y, 0),
                 cost = 0,
                 billingMode = WorldPointBillingMode.NONE,
-                initializeWorld = { world -> placePlatform(world, pending.platformMaterial) }
+                initializeWorld = { world -> placePlatform(world, platformMaterial) }
             )
-        ).thenAccept { success ->
-            if (success) {
-                CCSystem.getAPI().getMenuNavigationService().clear(player)
-            }
-        }
+        )
     }
 
     private fun canCreate(player: Player): Boolean {
@@ -229,7 +298,7 @@ class EasyVoidWorldCreationService(
             !player.hasPermission("mwmchanpon.admin") &&
             !player.hasPermission("craftercrossing.test")
         ) {
-            player.sendMessage(mwm().languageManager.getMessage(player, "no_permission"))
+            player.sendMessage(CCSystem.getAPI().getI18nString(player, "no_permission"))
             return false
         }
         val decision = MyWorldManagerApi.checkWorldCreation(
@@ -252,7 +321,23 @@ class EasyVoidWorldCreationService(
         }
     }
 
-    private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)
+    private fun configuredPlatformMaterial(): Material =
+        EasyPlatformMaterialPolicy.resolve(
+            plugin.config.getString(PLATFORM_MATERIAL_CONFIG_PATH, DEFAULT_PLATFORM_MATERIAL.key.asString()).orEmpty()
+        ) ?: error("$PLATFORM_MATERIAL_CONFIG_PATH contains an invalid block material")
+
+    private fun guiItem(
+        material: Material,
+        name: String,
+        lore: GuiLoreSpec,
+        role: GuiElementRole,
+    ) = GuiItemSpec(
+            material = material,
+            name = GuiNameSpec.Text(name, GuiNameStyle.DEFAULT),
+            lore = lore,
+            role = role,
+            amount = 1,
+        )
 
     private fun i18n(player: Player?, key: String, vararg placeholders: Pair<String, Any>): String =
         CCSystem.getAPI().getI18nString(player, "chanpon.player_world.easy_creation.$key", placeholders.toMap())
@@ -280,16 +365,16 @@ class EasyVoidWorldCreationService(
 
     private companion object {
         private const val NAME_INPUT = "easy_world_name"
-        private const val PLATFORM_MATERIAL_INPUT = "easy_platform_material"
+        const val PLATFORM_MATERIAL_CONFIG_PATH = "creation.easy.platform_material"
         private const val SOURCE_WORLD = "chanpon:easy_void"
         private const val PLATFORM_Y = 64
         private const val SPAWN_Y = 65
         private val DEFAULT_PLATFORM_MATERIAL = EasyPlatformMaterialPolicy.defaultMaterial
-        private val NAME_SUBMIT = Key.key("mwmchanpon:easy_creation/name_submit")
-        private val NAME_CANCEL = Key.key("mwmchanpon:easy_creation/name_cancel")
-        private val CONFIRM_CREATE = Key.key("mwmchanpon:easy_creation/confirm_create")
-        private val CONFIRM_BACK = Key.key("mwmchanpon:easy_creation/confirm_back")
-        private val DIALOG_KEYS = setOf(NAME_SUBMIT, NAME_CANCEL, CONFIRM_CREATE, CONFIRM_BACK)
+        private const val OWNER = "mwm-chanpon"
+        private const val NAME_DIALOG = "easy-creation-name"
+        private const val CONFIRM_ROUTE = "easy-creation-confirm"
+        private const val ACTION_CREATE = "create"
+        private const val ACTION_BACK = "back"
         private val EASY_VOID_GENERATOR = EasyVoidGenerator
     }
 }

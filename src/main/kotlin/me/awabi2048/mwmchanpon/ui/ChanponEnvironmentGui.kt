@@ -1,66 +1,81 @@
 package me.awabi2048.mwmchanpon.ui
-import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiCycle
 import com.awabi2048.ccsystem.api.gui.GuiCycleDirection
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
-import io.papermc.paper.connection.PlayerGameConnection
-import io.papermc.paper.dialog.Dialog
-import io.papermc.paper.event.player.PlayerCustomClickEvent
-import io.papermc.paper.registry.data.dialog.ActionButton
-import io.papermc.paper.registry.data.dialog.DialogBase
-import io.papermc.paper.registry.data.dialog.action.DialogAction
-import io.papermc.paper.registry.data.dialog.body.DialogBody
-import io.papermc.paper.registry.data.dialog.input.DialogInput
-import io.papermc.paper.registry.data.dialog.type.DialogType
-import me.awabi2048.myworldmanager.MyWorldManager
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryOption
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
+import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.GuiValueTone
+import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
+import com.awabi2048.ccsystem.api.gui.InventoryMenuView
+import com.awabi2048.ccsystem.api.gui.MenuActionContext
+import com.awabi2048.ccsystem.api.gui.MenuActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
+import com.awabi2048.ccsystem.api.gui.MenuDialogButton
+import com.awabi2048.ccsystem.api.gui.MenuDialogHandler
+import com.awabi2048.ccsystem.api.gui.MenuDialogInput
+import com.awabi2048.ccsystem.api.gui.MenuDialogRequest
+import com.awabi2048.ccsystem.api.gui.MenuElement
+import com.awabi2048.ccsystem.api.gui.MenuRoute
+import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
-import me.awabi2048.myworldmanager.api.extension.WorldSettingsInventoryHolder
 import me.awabi2048.myworldmanager.model.WorldData
-import me.awabi2048.myworldmanager.util.GuiLoreActions
-import me.awabi2048.myworldmanager.util.ItemTag
-import net.kyori.adventure.key.Key
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
-import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
-import org.bukkit.event.EventHandler
-import org.bukkit.event.EventPriority
-import org.bukkit.event.Listener
-import org.bukkit.event.inventory.InventoryClickEvent
-import org.bukkit.inventory.Inventory
-import org.bukkit.inventory.ItemFlag
-import org.bukkit.inventory.ItemStack
-import org.bukkit.plugin.java.JavaPlugin
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponWorldProtectionMode
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.protection.WorldBuildPermissionService
-import me.awabi2048.mwmchanpon.util.cancelWithDebug
 
 class ChanponEnvironmentGui(
     private val plugin: MWMChanponPlugin,
     private val storage: ChanponWorldStorage,
     protectionService: me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService,
     private val buildPermissionService: WorldBuildPermissionService,
-) : Listener {
+) {
     private val accessGuard = WorldSettingsAccessGuard(storage, protectionService)
-    private val pendingTimeInputs = ConcurrentHashMap<UUID, UUID>()
-    private val pendingProtectionPasswordInputs = ConcurrentHashMap<UUID, UUID>()
+    private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
-    fun open(player: Player, worldData: WorldData) {
+    init {
+        runtime.register(
+            InventoryMenuDefinition(
+                owner = RUNTIME_OWNER,
+                id = ROUTE_ENVIRONMENT,
+                renderer = { context -> render(context.player, world(context.route)) },
+                actions = mapOf(
+                    ACTION_SETTING to MenuActionHandler(::setting),
+                    ACTION_BACK to MenuActionHandler { MenuActionResult.Success(MenuUpdate.Back) },
+                ),
+            ),
+        )
+    }
+
+    fun open(player: Player, worldData: WorldData, replaceCurrent: Boolean = false) {
         if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
-        val holder = EnvMainHolder(worldData.uuid)
-        val inventory = Bukkit.createInventory(holder, 45, i18nComponent(player, "title"))
-        holder.inv = inventory
-        applyFrame(inventory)
+        if (replaceCurrent) {
+            runtime.replace(player, route(worldData.uuid))
+        } else {
+            runtime.navigate(player, route(worldData.uuid))
+        }
+    }
 
+    private fun render(player: Player, worldData: WorldData?): InventoryMenuView {
+        if (worldData == null ||
+            !accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)
+        ) {
+            return InventoryMenuView(9, i18nComponent(player, "title"), emptyList())
+        }
         val weather = worldData.fixedWeather
         val time = worldData.fixedTime
         val gravity = worldData.gravityValue
@@ -69,271 +84,212 @@ class ChanponEnvironmentGui(
         val allowFreecam = storage.isFreecamAllowed(worldData.uuid)
         val outsideTargetWorld = !isInTargetWorld(player, worldData)
 
-        inventory.setItem(19, directSettingItem(player, ACTION_WEATHER, Material.LIGHT_BLUE_WOOL, weatherDisplay(player, weather), weatherOptions(player), weather ?: NONE_KEY, outsideTargetWorld))
-        inventory.setItem(20, directSettingItem(player, ACTION_TIME, Material.CLOCK, timeDisplay(player, time), timeOptions(player, time), timeOptionKey(time), outsideTargetWorld, customTimeAction = true))
-        inventory.setItem(21, directSettingItem(player, ACTION_GRAVITY, Material.FEATHER, gravityDisplay(player, gravity), gravityOptions(player), (gravity ?: DEFAULT_GRAVITY).toString(), outsideTargetWorld))
-        inventory.setItem(22, directSettingItem(player, ACTION_FREECAM, Material.ENDER_EYE, freecamDisplay(player, allowFreecam), freecamOptions(player), allowFreecam.toString(), outsideTargetWorld))
-        inventory.setItem(23, directSettingItem(player, ACTION_SCALE, Material.PLAYER_HEAD, scaleDisplay(player, scale), scaleOptions(player), scale?.toString(), outsideTargetWorld))
-        inventory.setItem(24, directSettingItem(player, ACTION_FLIGHT, Material.ELYTRA, flightDisplay(player, allowFlight), flightOptions(player), allowFlight.toString(), outsideTargetWorld))
-        inventory.setItem(25, protectionSettingItem(player, worldData))
-        inventory.setItem(40, backItem(player))
-
-        fill(inventory)
-        ManagedMenuPresenter.open(player, inventory)
+        return InventoryMenuView(
+            45,
+            i18nComponent(player, "title"),
+            listOf(
+                directSettingEntry(player, 19, worldData.uuid, ACTION_WEATHER, Material.LIGHT_BLUE_WOOL, weatherDisplay(player, weather), weatherOptions(player), weather ?: NONE_KEY, outsideTargetWorld),
+                directSettingEntry(player, 20, worldData.uuid, ACTION_TIME, Material.CLOCK, timeDisplay(player, time), timeOptions(player, time), timeOptionKey(time), outsideTargetWorld, customTimeAction = true),
+                directSettingEntry(player, 21, worldData.uuid, ACTION_GRAVITY, Material.FEATHER, gravityDisplay(player, gravity), gravityOptions(player), (gravity ?: DEFAULT_GRAVITY).toString(), outsideTargetWorld),
+                directSettingEntry(player, 22, worldData.uuid, ACTION_FREECAM, Material.ENDER_EYE, freecamDisplay(player, allowFreecam), freecamOptions(player), allowFreecam.toString(), outsideTargetWorld),
+                directSettingEntry(player, 23, worldData.uuid, ACTION_SCALE, Material.PLAYER_HEAD, scaleDisplay(player, scale), scaleOptions(player), scale?.toString(), outsideTargetWorld),
+                directSettingEntry(player, 24, worldData.uuid, ACTION_FLIGHT, Material.ELYTRA, flightDisplay(player, allowFlight), flightOptions(player), allowFlight.toString(), outsideTargetWorld),
+                protectionSettingEntry(player, 25, worldData),
+                CCSystem.getAPI().getGuiElementService().menuEntry(
+                    player,
+                    GuiMenuEntrySpec(
+                        slot = 40,
+                        material = Material.REDSTONE,
+                        name = GuiNameSpec.Text(
+                            i18n(player, "common.back_to_settings"),
+                            com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT,
+                        ),
+                        role = GuiElementRole.BACK,
+                        actions = listOf(
+                            GuiMenuEntryAction(
+                                ACTION_BACK,
+                                MenuAcceptedClicks.LEFT_RIGHT,
+                                i18n(player, "common.back_to_settings"),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
     }
 
-    @EventHandler(priority = EventPriority.LOWEST)
-    fun onClick(event: InventoryClickEvent) {
-        val player = event.whoClicked as? Player ?: return
-        val holder = event.view.topInventory.holder
-        if (holder !is EnvMainHolder) {
-            return
+    private fun setting(context: MenuActionContext): MenuActionResult {
+        val worldData = world(context.route) ?: return MenuActionResult.Rejected()
+        if (!accessGuard.allow(
+                context.player,
+                worldData,
+                ownerOnly = true,
+                requireTargetWorld = true,
+            )
+        ) {
+            return MenuActionResult.Rejected()
         }
-        event.cancelWithDebug("ChanponEnvironmentGui.onClick: menu_click")
-        if (event.clickedInventory != event.view.topInventory) return
-        val item = event.currentItem ?: return
-
-        handleMainClick(event, player, holder.worldUuid, item)
-    }
-
-    private fun handleMainClick(event: InventoryClickEvent, player: Player, worldUuid: UUID, item: ItemStack) {
-        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
-        if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
-        when (ItemTag.getString(item, ACTION_KEY)) {
-            ACTION_WEATHER -> cycleWeather(player, worldData, GuiCycle.direction(event.click) ?: return)
+        val direction = GuiCycle.direction(context.click)
+        when (context.payload[PAYLOAD_SETTING]) {
+            ACTION_WEATHER -> cycleWeather(worldData, direction ?: return MenuActionResult.Ignored)
             ACTION_TIME -> {
-                if (event.isShiftClick && event.isLeftClick) {
-                    ManagedMenuPresenter.success(player, ChanponEnvironmentFeedback.OPEN_DIALOG)
-                    showCustomTimeDialog(player, worldData)
+                if (context.click.isShiftClick && context.click.isLeftClick) {
+                    showCustomTimeDialog(context.player, worldData)
+                    return MenuActionResult.Success(MenuUpdate.None)
                 } else {
-                    cycleTime(player, worldData, GuiCycle.direction(event.click) ?: return)
+                    cycleTime(worldData, direction ?: return MenuActionResult.Ignored)
                 }
             }
-            ACTION_GRAVITY -> cycleGravity(player, worldData, GuiCycle.direction(event.click) ?: return)
-            ACTION_SCALE -> cycleScale(player, worldData, GuiCycle.direction(event.click) ?: return)
-            ACTION_FLIGHT -> toggleFlight(player, worldData)
-            ACTION_FREECAM -> toggleFreecam(player, worldData)
+            ACTION_GRAVITY -> cycleGravity(worldData, direction ?: return MenuActionResult.Ignored)
+            ACTION_SCALE -> cycleScale(worldData, direction ?: return MenuActionResult.Ignored)
+            ACTION_FLIGHT -> toggleFlight(worldData)
+            ACTION_FREECAM -> toggleFreecam(worldData)
             ACTION_PROTECTION -> {
                 val mode = storage.getProtectionMode(worldData.uuid)
-                if (event.isShiftClick && event.isLeftClick && mode == ChanponWorldProtectionMode.PASSWORD) {
-                    ManagedMenuPresenter.success(player, ChanponEnvironmentFeedback.OPEN_DIALOG)
+                if (context.click.isShiftClick &&
+                    context.click.isLeftClick &&
+                    mode == ChanponWorldProtectionMode.PASSWORD
+                ) {
                     showProtectionPasswordDialog(
-                        player,
+                        context.player,
                         worldData,
-                        storage.getProtectionPassword(worldData.uuid).orEmpty()
+                        storage.getProtectionPassword(worldData.uuid).orEmpty(),
                     )
+                    return MenuActionResult.Success(MenuUpdate.None)
                 } else {
-                    cycleProtection(player, worldData, GuiCycle.direction(event.click) ?: return)
+                    cycleProtection(worldData, direction ?: return MenuActionResult.Ignored)
                 }
             }
+            else -> return MenuActionResult.Ignored
         }
-        if (ItemTag.isType(item, ItemTag.TYPE_GUI_RETURN)) {
-            ManagedMenuPresenter.success(player, ChanponEnvironmentFeedback.BACK)
-            if (!mwm().menuRouteHistory.openPrevious(player)) {
-                mwm().settingsSessionManager.getSession(player)?.let { session ->
-                    val worldSettings = JavaPlugin.getPlugin(MyWorldManager::class.java).worldSettingsGui
-                    worldSettings.open(player, worldData, session.showBackButton, session.isPlayerWorldFlow, session.parentShowBackButton)
-                }
-            }
-        }
+        return MenuActionResult.Success(MenuUpdate.Refresh)
     }
 
-    @EventHandler
-    fun onCustomTimeInput(event: PlayerCustomClickEvent) {
-        val identifier = event.identifier
-        if (identifier != Key.key("mwmchanpon:environment/time_submit") &&
-            identifier != Key.key("mwmchanpon:environment/time_cancel")
-        ) {
-            return
-        }
-
-        val conn = event.commonConnection as? PlayerGameConnection ?: return
-        val player = conn.player
-        val worldUuid = pendingTimeInputs.remove(player.uniqueId) ?: return
-        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
-        if (identifier == Key.key("mwmchanpon:environment/time_cancel")) {
-            open(player, worldData)
-            return
-        }
-
-        val input = event.getDialogResponseView()?.getText("custom_time").orEmpty()
-        val parsed = parseCustomTime(input)
-        if (parsed == null) {
-            player.sendMessage(i18n(player, "time.custom.invalid"))
-            showCustomTimeDialog(player, worldData, input)
-            return
-        }
-
-        worldData.fixedTime = parsed
-        MyWorldManagerApi.getWorldRepository()?.save(worldData)
-        applyTime(worldUuid, parsed)
-        open(player, worldData)
-    }
-
-    @EventHandler
-    fun onProtectionPasswordInput(event: PlayerCustomClickEvent) {
-        val identifier = event.identifier
-        if (identifier != Key.key("mwmchanpon:environment/protection_password_submit") &&
-            identifier != Key.key("mwmchanpon:environment/protection_password_cancel")
-        ) {
-            return
-        }
-
-        val conn = event.commonConnection as? PlayerGameConnection ?: return
-        val player = conn.player
-        val worldUuid = pendingProtectionPasswordInputs.remove(player.uniqueId) ?: return
-        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
-        if (identifier == Key.key("mwmchanpon:environment/protection_password_cancel")) {
-            open(player, worldData)
-            return
-        }
-
-        val input = event.getDialogResponseView()?.getText("protection_password").orEmpty().trim()
-        if (input.length < MIN_PROTECTION_PASSWORD_LENGTH) {
-            player.sendMessage(i18n(player, "protection.password_too_short"))
-            showProtectionPasswordDialog(player, worldData, input)
-            return
-        }
-
-        storage.setProtectionPassword(worldData.uuid, input)
-        buildPermissionService.sync(worldData)
-        player.sendMessage(i18n(player, "protection.password_updated"))
-        open(player, worldData)
-    }
-
-    private fun cycleWeather(player: Player, worldData: WorldData, direction: GuiCycleDirection) {
+    private fun cycleWeather(worldData: WorldData, direction: GuiCycleDirection) {
         val next = GuiCycle.selectNullable(worldData.fixedWeather, WEATHER_VALUES, direction)
         worldData.fixedWeather = next
         MyWorldManagerApi.getWorldRepository()?.save(worldData)
         applyWeather(worldData.uuid, next)
-        ManagedMenuPresenter.success(player, ChanponEnvironmentFeedback.SETTING_CHANGED)
-        open(player, worldData)
     }
 
-    private fun cycleTime(player: Player, worldData: WorldData, direction: GuiCycleDirection) {
+    private fun cycleTime(worldData: WorldData, direction: GuiCycleDirection) {
         // カスタム時刻は固定候補リスト外の有効値なので、循環時は未設定位置から再開する。
         val current = worldData.fixedTime.takeIf { it in TIME_VALUES }
         val next = GuiCycle.selectNullable(current, TIME_VALUES, direction)
         worldData.fixedTime = next
         MyWorldManagerApi.getWorldRepository()?.save(worldData)
         applyTime(worldData.uuid, next)
-        ManagedMenuPresenter.success(player, ChanponEnvironmentFeedback.SETTING_CHANGED)
-        open(player, worldData)
     }
 
-    private fun cycleGravity(player: Player, worldData: WorldData, direction: GuiCycleDirection) {
+    private fun cycleGravity(worldData: WorldData, direction: GuiCycleDirection) {
         val next = GuiCycle.select(worldData.gravityValue ?: DEFAULT_GRAVITY, GRAVITY_VALUES, direction)
         worldData.gravityValue = next
         MyWorldManagerApi.getWorldRepository()?.save(worldData)
         applyGravityToWorld(worldData.uuid, next)
-        ManagedMenuPresenter.success(player, ChanponEnvironmentFeedback.SETTING_CHANGED)
-        open(player, worldData)
     }
 
-    private fun cycleScale(player: Player, worldData: WorldData, direction: GuiCycleDirection) {
+    private fun cycleScale(worldData: WorldData, direction: GuiCycleDirection) {
         val next = GuiCycle.select(worldData.fixedScale ?: DEFAULT_SCALE, SCALE_VALUES, direction)
         worldData.fixedScale = next
         MyWorldManagerApi.getWorldRepository()?.save(worldData)
         applyScaleToWorld(worldData.uuid, next)
-        ManagedMenuPresenter.success(player, ChanponEnvironmentFeedback.SETTING_CHANGED)
-        open(player, worldData)
     }
 
-    private fun toggleFlight(player: Player, worldData: WorldData) {
+    private fun toggleFlight(worldData: WorldData) {
         worldData.allowFlight = !worldData.allowFlight
         MyWorldManagerApi.getWorldRepository()?.save(worldData)
         applyFlightToWorld(worldData.uuid, worldData.allowFlight)
-        ManagedMenuPresenter.success(player, ChanponEnvironmentFeedback.SETTING_CHANGED)
-        open(player, worldData)
     }
 
-    private fun toggleFreecam(player: Player, worldData: WorldData) {
+    private fun toggleFreecam(worldData: WorldData) {
         storage.setFreecamAllowed(worldData.uuid, !storage.isFreecamAllowed(worldData.uuid))
-        ManagedMenuPresenter.success(player, ChanponEnvironmentFeedback.SETTING_CHANGED)
-        open(player, worldData)
     }
 
-    private fun cycleProtection(player: Player, worldData: WorldData, direction: GuiCycleDirection) {
+    private fun cycleProtection(worldData: WorldData, direction: GuiCycleDirection) {
         val current = storage.getProtectionMode(worldData.uuid)
         val next = GuiCycle.select(current, PROTECTION_VALUES, direction)
         storage.setProtectionMode(worldData.uuid, next)
         buildPermissionService.sync(worldData)
-        ManagedMenuPresenter.success(player, ChanponEnvironmentFeedback.SETTING_CHANGED)
-        open(player, worldData)
     }
 
     private fun showCustomTimeDialog(player: Player, worldData: WorldData, initial: String = worldData.fixedTime?.toString() ?: "") {
-        pendingTimeInputs[player.uniqueId] = worldData.uuid
-        val dialog = Dialog.create { builder ->
-            builder.empty()
-                .base(
-                    DialogBase.builder(i18nComponent(player, "time.custom.title"))
-                        .body(listOf(DialogBody.plainMessage(i18nComponent(player, "time.custom.body"))))
-                        .inputs(
-                            listOf(
-                                DialogInput.text("custom_time", i18nComponent(player, "time.custom.label"))
-                                    .initial(initial)
-                                    .maxLength(8)
-                                    .build()
+        CCSystem.getAPI().getMenuDialogService().show(
+            player,
+            MenuDialogRequest(
+                owner = "mwmchanpon",
+                id = "environment-custom-time",
+                title = i18nComponent(player, "time.custom.title"),
+                body = listOf(i18nComponent(player, "time.custom.body")),
+                inputs = listOf(
+                    MenuDialogInput.Text(
+                        "custom_time",
+                        i18nComponent(player, "time.custom.label"),
+                        initial,
+                        maxLength = 8,
+                    ),
+                ),
+                confirm = MenuDialogButton(
+                    i18nComponent(player, "time.custom.apply"),
+                    MenuDialogHandler { target, response ->
+                        val parsed = parseCustomTime(response.textValue("custom_time"))
+                            ?: return@MenuDialogHandler MenuActionResult.Rejected(
+                                Component.text(i18n(target, "time.custom.invalid")),
                             )
-                        )
-                        .build()
-                )
-                .type(
-                    DialogType.confirmation(
-                        ActionButton.create(
-                            i18nComponent(player, "time.custom.apply"),
-                            null,
-                            100,
-                            DialogAction.customClick(Key.key("mwmchanpon:environment/time_submit"), null)
-                        ),
-                        ActionButton.create(
-                            Component.text(i18n(player, "common.back"), NamedTextColor.GRAY),
-                            null,
-                            200,
-                            DialogAction.customClick(Key.key("mwmchanpon:environment/time_cancel"), null)
-                        )
-                    )
-                )
-        }
-        player.showDialog(dialog)
+                        worldData.fixedTime = parsed
+                        MyWorldManagerApi.getWorldRepository()?.save(worldData)
+                        applyTime(worldData.uuid, parsed)
+                        MenuActionResult.Success(MenuUpdate.Replace(route(worldData.uuid)))
+                    },
+                ),
+                cancel = MenuDialogButton(
+                    Component.text(i18n(player, "common.back"), NamedTextColor.GRAY),
+                    MenuDialogHandler { target, _ ->
+                        MenuActionResult.Success(MenuUpdate.Replace(route(worldData.uuid)))
+                    },
+                ),
+            ),
+        )
     }
 
     private fun showProtectionPasswordDialog(player: Player, worldData: WorldData, initial: String = "") {
-        pendingProtectionPasswordInputs[player.uniqueId] = worldData.uuid
-        val dialog = Dialog.create { builder ->
-            builder.empty()
-                .base(
-                    DialogBase.builder(i18nComponent(player, "protection.password_set_title"))
-                        .body(listOf(DialogBody.plainMessage(i18nComponent(player, "protection.password_set_body"))))
-                        .inputs(
-                            listOf(
-                                DialogInput.text("protection_password", i18nComponent(player, "protection.password_label"))
-                                    .initial(initial)
-                                    .maxLength(64)
-                                    .build()
+        CCSystem.getAPI().getMenuDialogService().show(
+            player,
+            MenuDialogRequest(
+                owner = "mwmchanpon",
+                id = "environment-protection-password",
+                title = i18nComponent(player, "protection.password_set_title"),
+                body = listOf(i18nComponent(player, "protection.password_set_body")),
+                inputs = listOf(
+                    MenuDialogInput.Text(
+                        "protection_password",
+                        i18nComponent(player, "protection.password_label"),
+                        initial,
+                        maxLength = 64,
+                    ),
+                ),
+                confirm = MenuDialogButton(
+                    i18nComponent(player, "protection.password_apply"),
+                    MenuDialogHandler { target, response ->
+                        val input = response.textValue("protection_password").trim()
+                        if (input.length < MIN_PROTECTION_PASSWORD_LENGTH) {
+                            return@MenuDialogHandler MenuActionResult.Rejected(
+                                Component.text(i18n(target, "protection.password_too_short")),
                             )
-                        )
-                        .build()
-                )
-                .type(
-                    DialogType.confirmation(
-                        ActionButton.create(
-                            i18nComponent(player, "protection.password_apply"),
-                            null,
-                            100,
-                            DialogAction.customClick(Key.key("mwmchanpon:environment/protection_password_submit"), null)
-                        ),
-                        ActionButton.create(
-                            Component.text(i18n(player, "common.back"), NamedTextColor.GRAY),
-                            null,
-                            200,
-                            DialogAction.customClick(Key.key("mwmchanpon:environment/protection_password_cancel"), null)
-                        )
-                    )
-                )
-        }
-        player.showDialog(dialog)
+                        }
+                        storage.setProtectionPassword(worldData.uuid, input)
+                        buildPermissionService.sync(worldData)
+                        target.sendMessage(i18n(target, "protection.password_updated"))
+                        MenuActionResult.Success(MenuUpdate.Replace(route(worldData.uuid)))
+                    },
+                ),
+                cancel = MenuDialogButton(
+                    Component.text(i18n(player, "common.back"), NamedTextColor.GRAY),
+                    MenuDialogHandler { target, _ ->
+                        MenuActionResult.Success(MenuUpdate.Replace(route(worldData.uuid)))
+                    },
+                ),
+            ),
+        )
     }
 
     private fun parseCustomTime(input: String): Long? {
@@ -354,148 +310,16 @@ class ChanponEnvironmentGui(
     }
 
 
-    // ---- Weather ----
-
-    private fun openWeatherMenu(player: Player, worldData: WorldData) {
-        val holder = EnvWeatherHolder(worldData.uuid)
-        val inventory = Bukkit.createInventory(holder, 27, i18nComponent(player, "weather.title"))
-        holder.inv = inventory
-        applyFrame(inventory)
-        inventory.setItem(10, weatherOptionItem(player, "CLEAR", worldData.fixedWeather))
-        inventory.setItem(13, weatherOptionItem(player, "RAIN", worldData.fixedWeather))
-        inventory.setItem(16, weatherOptionItem(player, "THUNDER", worldData.fixedWeather))
-        inventory.setItem(22, backToMainItem(player))
-        fill(inventory)
-        ManagedMenuPresenter.open(player, inventory)
-    }
-
-    private fun handleWeatherClick(event: InventoryClickEvent, player: Player, worldUuid: UUID, item: ItemStack) {
-        if (ItemTag.isType(item, ItemTag.TYPE_GUI_RETURN)) {
-            val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
-            if (!mwm().menuRouteHistory.openPrevious(player)) {
-                open(player, worldData)
-            }
-            return
-        }
-        val weather = ItemTag.getString(item, ACTION_KEY) ?: return
-        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
-        if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
-        worldData.fixedWeather = weather
-        MyWorldManagerApi.getWorldRepository()?.save(worldData)
-        applyWeather(worldUuid, weather)
-        openWeatherMenu(player, worldData)
-    }
-
     private fun applyWeather(worldUuid: UUID, weather: String?) {
         MyWorldManagerApi.getWorldEnvironmentService()?.applyWeather(worldUuid)
-    }
-
-    // ---- Time ----
-
-    private fun openTimeMenu(player: Player, worldData: WorldData) {
-        val holder = EnvTimeHolder(worldData.uuid)
-        val inventory = Bukkit.createInventory(holder, 27, i18nComponent(player, "time.title"))
-        holder.inv = inventory
-        applyFrame(inventory)
-        inventory.setItem(9, timeOptionItem(player, 0L, "morning", worldData.fixedTime))
-        inventory.setItem(11, timeOptionItem(player, 6000L, "noon", worldData.fixedTime))
-        inventory.setItem(13, timeOptionItem(player, 12500L, "dusk", worldData.fixedTime))
-        inventory.setItem(15, timeOptionItem(player, 18000L, "night", worldData.fixedTime))
-        inventory.setItem(22, backToMainItem(player))
-        fill(inventory)
-        ManagedMenuPresenter.open(player, inventory)
-    }
-
-    private fun handleTimeClick(event: InventoryClickEvent, player: Player, worldUuid: UUID, item: ItemStack) {
-        if (ItemTag.isType(item, ItemTag.TYPE_GUI_RETURN)) {
-            val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
-            if (!mwm().menuRouteHistory.openPrevious(player)) {
-                open(player, worldData)
-            }
-            return
-        }
-        val timeStr = ItemTag.getString(item, ACTION_KEY) ?: return
-        val time = timeStr.toLongOrNull() ?: return
-        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
-        if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
-        worldData.fixedTime = time
-        MyWorldManagerApi.getWorldRepository()?.save(worldData)
-        applyTime(worldUuid, time)
-        openTimeMenu(player, worldData)
     }
 
     private fun applyTime(worldUuid: UUID, time: Long?) {
         MyWorldManagerApi.getWorldEnvironmentService()?.applyTime(worldUuid)
     }
 
-    // ---- Gravity ----
-
-    private fun openGravityMenu(player: Player, worldData: WorldData) {
-        val holder = EnvGravityHolder(worldData.uuid)
-        val inventory = Bukkit.createInventory(holder, 27, i18nComponent(player, "gravity.title"))
-        holder.inv = inventory
-        applyFrame(inventory)
-        inventory.setItem(10, gravityOptionItem(player, 0.08, "earth", worldData.gravityValue))
-        inventory.setItem(13, gravityOptionItem(player, 0.02, "mars", worldData.gravityValue))
-        inventory.setItem(16, gravityOptionItem(player, 0.01, "moon", worldData.gravityValue))
-        inventory.setItem(22, backToMainItem(player))
-        fill(inventory)
-        ManagedMenuPresenter.open(player, inventory)
-    }
-
-    private fun handleGravityClick(event: InventoryClickEvent, player: Player, worldUuid: UUID, item: ItemStack) {
-        if (ItemTag.isType(item, ItemTag.TYPE_GUI_RETURN)) {
-            val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
-            if (!mwm().menuRouteHistory.openPrevious(player)) {
-                open(player, worldData)
-            }
-            return
-        }
-        val gravityStr = ItemTag.getString(item, ACTION_KEY) ?: return
-        val gravity = gravityStr.toDoubleOrNull() ?: return
-        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
-        if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
-        worldData.gravityValue = gravity
-        MyWorldManagerApi.getWorldRepository()?.save(worldData)
-        applyGravityToWorld(worldUuid, gravity)
-        openGravityMenu(player, worldData)
-    }
-
     private fun applyGravityToWorld(worldUuid: UUID, gravity: Double) {
         MyWorldManagerApi.getWorldEnvironmentService()?.applyAttributes(worldUuid)
-    }
-
-    // ---- Scale ----
-
-    private fun openScaleMenu(player: Player, worldData: WorldData) {
-        val holder = EnvScaleHolder(worldData.uuid)
-        val inventory = Bukkit.createInventory(holder, 27, i18nComponent(player, "scale.title"))
-        holder.inv = inventory
-        applyFrame(inventory)
-        inventory.setItem(10, scaleOptionItem(player, 1.0, "normal", worldData.fixedScale))
-        inventory.setItem(13, scaleOptionItem(player, 0.5, "small", worldData.fixedScale))
-        inventory.setItem(16, scaleOptionItem(player, 2.0, "giant", worldData.fixedScale))
-        inventory.setItem(22, backToMainItem(player))
-        fill(inventory)
-        ManagedMenuPresenter.open(player, inventory)
-    }
-
-    private fun handleScaleClick(event: InventoryClickEvent, player: Player, worldUuid: UUID, item: ItemStack) {
-        if (ItemTag.isType(item, ItemTag.TYPE_GUI_RETURN)) {
-            val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
-            if (!mwm().menuRouteHistory.openPrevious(player)) {
-                open(player, worldData)
-            }
-            return
-        }
-        val scaleStr = ItemTag.getString(item, ACTION_KEY) ?: return
-        val scale = scaleStr.toDoubleOrNull() ?: return
-        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
-        if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) return
-        worldData.fixedScale = scale
-        MyWorldManagerApi.getWorldRepository()?.save(worldData)
-        applyScaleToWorld(worldUuid, scale)
-        openScaleMenu(player, worldData)
     }
 
     private fun applyScaleToWorld(worldUuid: UUID, scale: Double) {
@@ -504,203 +328,122 @@ class ChanponEnvironmentGui(
 
     // ---- Item helpers ----
 
-    private fun directSettingItem(
+    private fun directSettingEntry(
         player: Player,
+        slot: Int,
+        worldUuid: UUID,
         key: String,
         material: Material,
         currentValue: String,
         options: List<SettingOption>,
         currentKey: String?,
         showWorldRequiredWarning: Boolean,
-        customTimeAction: Boolean = false
-    ): ItemStack {
-        val item = ItemStack(material)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "$key.display"))
-            meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(buildList {
-                add(GuiLoreLine.Data(i18n(player, "common.current_label"), currentValue, "\u00A7e"))
-                if (showWorldRequiredWarning) {
-                    add(GuiLoreLine.Warning(i18n(player, "common.must_be_in_world_warning")))
-                }
-                add(GuiLoreLine.Text(i18n(player, "$key.description")))
-                add(GuiLoreLine.Spacer)
-                options.forEach { option ->
-                    val selected = option.key == currentKey
-                    add(GuiLoreLine.Option(option.display, selected, option.selectedColor, "\u00A77"))
-                }
-                add(GuiLoreLine.Spacer)
-                addAll(
-                    listNavigationActionLines(
-                        player,
-                        if (customTimeAction) {
-                            listOf(GuiLoreLine.Action(i18n(player, "common.shift_left"), i18n(player, "time.custom.action")))
-                        } else {
-                            emptyList()
-                        }
-                    )
-                )
-            }, GuiLoreFrame.BOTH)))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
-        }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
-        ItemTag.setString(item, ACTION_KEY, key)
-        return item
-    }
-
-    private fun emptySettingSlot(): ItemStack {
-        return decoration(Material.WHITE_STAINED_GLASS_PANE)
-    }
-
-    private fun protectionSettingItem(player: Player, worldData: WorldData): ItemStack {
-        val mode = storage.getProtectionMode(worldData.uuid)
-        val item = ItemStack(Material.IRON_DOOR)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "protection.display"))
-            meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(buildList {
-                val password =
-                    if (mode == ChanponWorldProtectionMode.PASSWORD) {
-                        storage.getProtectionPassword(worldData.uuid)
-                    } else {
-                        null
-                    }
-                add(GuiLoreLine.Data(i18n(player, "common.current_label"), protectionDisplay(player, mode), "\u00A7e"))
-                add(GuiLoreLine.Text(i18n(player, "protection.description")))
-                if (password != null) {
-                    add(GuiLoreLine.Data(i18n(player, "protection.password_label"), password, "\u00A7f"))
-                }
-                add(GuiLoreLine.Spacer)
-                protectionOptions(player).forEach { option ->
-                    val selected = option.key == mode.storageValue
-                    add(GuiLoreLine.Option(option.display, selected, option.selectedColor, "\u00A77"))
-                }
-                if (mode == ChanponWorldProtectionMode.PASSWORD && password == null) {
-                    add(GuiLoreLine.Warning(i18n(player, "protection.password_missing_warning")))
-                }
-                add(GuiLoreLine.Spacer)
-                addAll(
-                    listNavigationActionLines(
-                        player,
-                        if (mode == ChanponWorldProtectionMode.PASSWORD) {
-                            listOf(GuiLoreLine.Action(i18n(player, "common.shift_left"), i18n(player, "protection.password_change_action")))
-                        } else {
-                            emptyList()
-                        }
-                    )
-                )
-            }, GuiLoreFrame.BOTH)))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
-        }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
-        ItemTag.setString(item, ACTION_KEY, ACTION_PROTECTION)
-        return item
-    }
-
-    private fun listNavigationActionLines(player: Player, extraActions: List<GuiLoreLine>): List<GuiLoreLine> {
-        return listOf(
-            GuiLoreLine.Action(i18n(player, "common.left_right_click"), i18n(player, "common.action_next"))
-        ) + extraActions
-    }
-
-    private fun categoryItem(player: Player, key: String, currentValue: String, active: Boolean): ItemStack {
-        val item = ItemStack(
-            if (active) Material.GRASS_BLOCK else Material.GRASS_BLOCK
+        customTimeAction: Boolean = false,
+    ): MenuElement {
+        val payload = mapOf(
+            PAYLOAD_WORLD_UUID to worldUuid.toString(),
+            PAYLOAD_SETTING to key,
         )
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "$key.display"))
-            meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(listOf(
-                GuiLoreLine.Data(i18n(player, "common.current_label"), currentValue, "§e"),
-                GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "common.action_next"))
-            ), GuiLoreFrame.BOTH)))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
+        val actions = buildList {
+            add(GuiMenuEntryAction(
+                ACTION_SETTING,
+                MenuAcceptedClicks.PLAIN_LEFT_RIGHT,
+                i18n(player, "common.action_next"),
+                payload,
+            ))
+            if (customTimeAction) {
+                add(GuiMenuEntryAction(
+                    ACTION_SETTING,
+                    MenuAcceptedClicks.SHIFT_LEFT,
+                    i18n(player, "time.custom.action"),
+                    payload,
+                ))
+            }
         }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
-        ItemTag.setString(item, ACTION_KEY, key)
-        return item
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = slot,
+                material = material,
+                name = GuiNameSpec.Component(i18nComponent(player, "$key.display")),
+                role = GuiElementRole.ACTION,
+                description = listOf(i18n(player, "$key.description")),
+                data = listOf(GuiMenuEntryData(
+                    i18n(player, "common.current_label"),
+                    currentValue,
+                    GuiValueTone.PRIMARY,
+                )),
+                options = options.map { GuiMenuEntryOption(it.display, it.key == currentKey) },
+                warnings = if (showWorldRequiredWarning) {
+                    listOf(i18n(player, "common.must_be_in_world_warning"))
+                } else {
+                    emptyList()
+                },
+                actions = actions,
+            ),
+        )
     }
 
-    private fun weatherOptionItem(player: Player, weather: String, current: String?): ItemStack {
-        val active = current == weather
-        val material = when (weather) {
-            "CLEAR" -> Material.YELLOW_WOOL
-            "RAIN" -> Material.LIGHT_BLUE_WOOL
-            "THUNDER" -> Material.CYAN_WOOL
-            else -> Material.WHITE_WOOL
+    private fun protectionSettingEntry(
+        player: Player,
+        slot: Int,
+        worldData: WorldData,
+    ): MenuElement {
+        val mode = storage.getProtectionMode(worldData.uuid)
+        val password = if (mode == ChanponWorldProtectionMode.PASSWORD) {
+            storage.getProtectionPassword(worldData.uuid)
+        } else {
+            null
         }
-        val item = ItemStack(material)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "weather.${weather.lowercase()}.display"))
-            meta.lore(optionLore(player, selectionMarker(active), i18n(player, "weather.${weather.lowercase()}.display"), weatherColor(weather)))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
+        val payload = mapOf(
+            PAYLOAD_WORLD_UUID to worldData.uuid.toString(),
+            PAYLOAD_SETTING to ACTION_PROTECTION,
+        )
+        val actions = buildList {
+            add(GuiMenuEntryAction(
+                ACTION_SETTING,
+                MenuAcceptedClicks.PLAIN_LEFT_RIGHT,
+                i18n(player, "common.action_next"),
+                payload,
+            ))
+            if (mode == ChanponWorldProtectionMode.PASSWORD) {
+                add(GuiMenuEntryAction(
+                    ACTION_SETTING,
+                    MenuAcceptedClicks.SHIFT_LEFT,
+                    i18n(player, "protection.password_change_action"),
+                    payload,
+                ))
+            }
         }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
-        ItemTag.setString(item, ACTION_KEY, weather)
-        return item
-    }
-
-    private fun timeOptionItem(player: Player, time: Long, key: String, current: Long?): ItemStack {
-        val active = current == time
-        val item = ItemStack(Material.CLOCK)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "time.$key.display"))
-            meta.lore(optionLore(player, selectionMarker(active), i18n(player, "time.$key.display"), "§e", i18n(player, "time.$key.value")))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
-        }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
-        ItemTag.setString(item, ACTION_KEY, time.toString())
-        return item
-    }
-
-    private fun gravityOptionItem(player: Player, gravity: Double, key: String, current: Double?): ItemStack {
-        val active = current == gravity
-        val item = ItemStack(Material.FEATHER)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "gravity.$key.display"))
-            meta.lore(optionLore(player, selectionMarker(active), i18n(player, "gravity.$key.display"), "§e", i18n(player, "gravity.$key.value")))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
-        }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
-        ItemTag.setString(item, ACTION_KEY, gravity.toString())
-        return item
-    }
-
-    private fun scaleOptionItem(player: Player, scale: Double, key: String, current: Double?): ItemStack {
-        val active = current == scale
-        val item = ItemStack(Material.PLAYER_HEAD)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "scale.$key.display"))
-            meta.lore(optionLore(player, selectionMarker(active), i18n(player, "scale.$key.display"), "§e", i18n(player, "scale.$key.value")))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
-        }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
-        ItemTag.setString(item, ACTION_KEY, scale.toString())
-        return item
-    }
-
-    private fun backToMainItem(player: Player): ItemStack {
-        val item = ItemStack(Material.REDSTONE)
-        item.editMeta { meta ->
-            meta.displayName(CCSystem.getAPI().getGuiElementService().name(i18n(player, "common.back")))
-        }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_RETURN)
-        return item
-    }
-
-    private fun selectionMarker(active: Boolean): String = if (active) "§a»" else "§8・"
-
-    private fun optionLore(player: Player, marker: String, display: String, color: String, detail: String? = null): List<Component> {
-        return CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(buildList {
-            add(GuiLoreLine.Option(detail?.let { "$display §7($it)" } ?: display, marker.contains("\u00A7a"), color, "\u00A77"))
-            add(GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "common.action_set")))
-        }, GuiLoreFrame.BOTH))
-    }
-
-    private fun backItem(player: Player): ItemStack {
-        val item = ItemStack(Material.REDSTONE)
-        item.editMeta { meta ->
-            meta.displayName(CCSystem.getAPI().getGuiElementService().name(i18n(player, "common.back_to_settings")))
-        }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_RETURN)
-        return item
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = slot,
+                material = Material.IRON_DOOR,
+                name = GuiNameSpec.Component(i18nComponent(player, "protection.display")),
+                role = GuiElementRole.ACTION,
+                description = listOf(i18n(player, "protection.description")),
+                data = buildList {
+                    add(GuiMenuEntryData(
+                        i18n(player, "common.current_label"),
+                        protectionDisplay(player, mode),
+                        GuiValueTone.PRIMARY,
+                    ))
+                    if (password != null) {
+                        add(GuiMenuEntryData(i18n(player, "protection.password_label"), password))
+                    }
+                },
+                options = protectionOptions(player).map {
+                    GuiMenuEntryOption(it.display, it.key == mode.storageValue)
+                },
+                warnings = if (mode == ChanponWorldProtectionMode.PASSWORD && password == null) {
+                    listOf(i18n(player, "protection.password_missing_warning"))
+                } else {
+                    emptyList()
+                },
+                actions = actions,
+            ),
+        )
     }
 
     // ---- Display helpers ----
@@ -841,41 +584,8 @@ class ChanponEnvironmentGui(
         }
     }
 
-    // ---- Utility ----
-
-    private fun applyFrame(inventory: Inventory) {
-        ChanponGuiElements.applyStandardFrame(inventory)
-    }
-
-    private fun fill(inventory: Inventory) {
-        ChanponGuiElements.fill(inventory)
-    }
-
-    private fun decoration(material: Material): ItemStack {
-        return ChanponGuiElements.decoration(material)
-    }
-
-    private fun pushMainRoute(player: Player, worldData: WorldData) {
-        mwm().menuRouteHistory.pushCustom(
-            player,
-            "chanpon.environment:${worldData.uuid}"
-        ) { target ->
-            val latest = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldData.uuid) ?: return@pushCustom false
-            open(target, latest)
-            true
-        }
-    }
-
-    private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)
-
-    private fun isInTargetWorld(player: Player, worldData: WorldData): Boolean {
-        val currentWorldUuid = MyWorldManagerApi.getWorldRepository()?.findByWorldName(player.world.name)?.uuid
-        if (currentWorldUuid == worldData.uuid) return true
-        val targetWorldName = MyWorldManagerApi.getWorldService()?.getWorldFolderName(worldData)
-            ?: worldData.customWorldName
-            ?: "my_world.${worldData.uuid}"
-        return player.world.name == targetWorldName
-    }
+    private fun isInTargetWorld(player: Player, worldData: WorldData): Boolean =
+        MyWorldManagerApi.getWorldService()?.isPlayerInWorld(player, worldData) == true
 
     private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): String {
         return CCSystem.getAPI().getI18nString(player, "chanpon.environment.$key", placeholders)
@@ -889,31 +599,17 @@ class ChanponEnvironmentGui(
         return CCSystem.getAPI().getI18nComponent(player, "chanpon.environment.$key", placeholders)
     }
 
-    // ---- Holders ----
+    internal fun route(worldUuid: UUID): MenuRoute = MenuRoute(
+        RUNTIME_OWNER,
+        ROUTE_ENVIRONMENT,
+        mapOf(PAYLOAD_WORLD_UUID to worldUuid.toString()),
+    )
 
-    private class EnvMainHolder(val worldUuid: UUID) : WorldSettingsInventoryHolder {
-        lateinit var inv: Inventory
-        override fun getInventory(): Inventory = inv
-    }
-
-    private class EnvWeatherHolder(val worldUuid: UUID) : WorldSettingsInventoryHolder {
-        lateinit var inv: Inventory
-        override fun getInventory(): Inventory = inv
-    }
-
-    private class EnvTimeHolder(val worldUuid: UUID) : WorldSettingsInventoryHolder {
-        lateinit var inv: Inventory
-        override fun getInventory(): Inventory = inv
-    }
-
-    private class EnvGravityHolder(val worldUuid: UUID) : WorldSettingsInventoryHolder {
-        lateinit var inv: Inventory
-        override fun getInventory(): Inventory = inv
-    }
-
-    private class EnvScaleHolder(val worldUuid: UUID) : WorldSettingsInventoryHolder {
-        lateinit var inv: Inventory
-        override fun getInventory(): Inventory = inv
+    private fun world(route: MenuRoute): WorldData? {
+        val worldUuid = route.payload[PAYLOAD_WORLD_UUID]
+            ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+            ?: return null
+        return MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
     }
 
     private data class SettingOption(
@@ -931,6 +627,12 @@ class ChanponEnvironmentGui(
         private const val ACTION_FLIGHT = "flight"
         private const val ACTION_FREECAM = "freecam"
         private const val ACTION_PROTECTION = "protection"
+        private const val RUNTIME_OWNER = "mwm-chanpon"
+        private const val ROUTE_ENVIRONMENT = "environment"
+        private const val ACTION_SETTING = "change-setting"
+        private const val ACTION_BACK = "back"
+        private const val PAYLOAD_WORLD_UUID = "world_uuid"
+        private const val PAYLOAD_SETTING = "setting"
         private const val NONE_KEY = "NONE"
         private const val DEFAULT_GRAVITY = 0.08
         private const val DEFAULT_SCALE = 1.0

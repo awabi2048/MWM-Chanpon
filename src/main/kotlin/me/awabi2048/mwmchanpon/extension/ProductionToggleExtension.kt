@@ -1,11 +1,32 @@
 package me.awabi2048.mwmchanpon.extension
-import me.awabi2048.mwmchanpon.ui.ManagedMenuPresenter
-
-import me.awabi2048.mwmchanpon.util.cancelWithDebug
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiItemSpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.GuiStructuredMenuEntrySpec
+import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
+import com.awabi2048.ccsystem.api.gui.InventoryMenuView
+import com.awabi2048.ccsystem.api.gui.MenuActionContext
+import com.awabi2048.ccsystem.api.gui.MenuActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionTextProvider
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentationProvider
+import com.awabi2048.ccsystem.api.gui.MenuElement
+import com.awabi2048.ccsystem.api.gui.MenuRoute
+import com.awabi2048.ccsystem.api.gui.MenuUpdate
+import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
@@ -17,30 +38,17 @@ import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.SubmissionState
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.mwmchanpon.ui.ChanponGuiElements
-import me.awabi2048.mwmchanpon.ui.ChanponLore
-import me.awabi2048.myworldmanager.MyWorldManager
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.event.MwmWorldCreatedEvent
-import me.awabi2048.myworldmanager.api.extension.MenuExtension
-import me.awabi2048.myworldmanager.api.extension.MenuExtensionContext
-import me.awabi2048.myworldmanager.api.extension.WorldSettingsInventoryHolder
-import me.awabi2048.myworldmanager.api.extension.WorldSettingsMenuRequest
+import me.awabi2048.myworldmanager.api.extension.CreationConfirmationCapabilityContract
+import me.awabi2048.myworldmanager.api.extension.WorldCreationDraft
 import me.awabi2048.myworldmanager.model.WorldData
-import me.awabi2048.myworldmanager.session.WorldCreationSession
-import me.awabi2048.myworldmanager.util.GuiLoreActions
-import me.awabi2048.myworldmanager.util.ItemTag
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
 import org.bukkit.Material
-import org.bukkit.enchantments.Enchantment
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
-import org.bukkit.event.inventory.InventoryClickEvent
-import org.bukkit.inventory.Inventory
-import org.bukkit.inventory.ItemFlag
-import org.bukkit.inventory.ItemStack
-import org.bukkit.plugin.java.JavaPlugin
 
 class ProductionToggleExtension(
     private val plugin: MWMChanponPlugin,
@@ -48,39 +56,71 @@ class ProductionToggleExtension(
     private val globalStorage: ChanponGlobalStorage,
     private val protectionService: SubmittedWorldProtectionService,
     private val toolPermissionController: ToolPermissionController
-) : MenuExtension, Listener {
+) : Listener {
     private val pendingProduction = ConcurrentHashMap<Pair<UUID, String>, Boolean>()
+    private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
-    override fun getId(): String = EXTENSION_ID
-
-    override fun onRender(inventory: Inventory, player: Player, context: MenuExtensionContext) {
-        when (context.menuType) {
-            "world_settings" -> {
-                if (context.get<Boolean>("isProtected") == true) return
-                if (globalStorage.getWorldCreationAvailability() != WorldCreationAvailability.PRODUCTION) return
-                val worldData = context.get<WorldData>("worldData") ?: return
-                if (plugin.isSubmissionClosed()) {
-                    inventory.setItem(WORLD_MENU_SLOT, createDecorationItem(Material.GRAY_STAINED_GLASS_PANE))
-                    return
-                }
-                val item = if (storage.isProductionWorld(worldData.uuid)) {
-                    createSubmissionItem(player, worldData.uuid)
-                } else {
-                    if (ownerHasProductionWorld(worldData.owner, worldData.uuid)) return
-                    createProductionItem(player)
-                }
-                inventory.setItem(WORLD_MENU_SLOT, item)
-            }
-        }
-    }
-
-    override fun onClick(event: InventoryClickEvent, player: Player, context: MenuExtensionContext): Boolean {
-        val item = event.currentItem ?: return false
-        if (ItemTag.getExtensionId(item) != getId()) return false
-        return when (context.menuType) {
-            "world_settings" -> handleWorldSettingsClick(event, player, context, item)
-            else -> false
-        }
+    init {
+        runtime.register(
+            InventoryMenuDefinition(
+                owner = RUNTIME_OWNER,
+                id = CONFIRMATION_ROUTE,
+                renderer = { context -> renderConfirmation(context.player, context.route) },
+                actions = mapOf(
+                    ACTION_CONFIRM to MenuActionHandler(::confirm),
+                    ACTION_CANCEL to MenuActionHandler(::cancel),
+                ),
+            ),
+        )
+        CCSystem.getAPI().getMenuCapabilityService().register(
+            MenuCapabilityDefinition(
+                owner = RUNTIME_OWNER,
+                id = CAPABILITY_ID,
+                placement = ChanponWorldSettingsPlacements.FOOTER,
+                availability = MenuCapabilityAvailability(::isCapabilityAvailable),
+                presentationProvider =
+                    MenuCapabilityPresentationProvider(::resolveCapabilityPresentation),
+                actions = listOf(
+                    MenuCapabilityAction(
+                        id = "open-confirmation",
+                        trigger = MenuCapabilityTrigger.LEFT,
+                        textProvider =
+                            MenuCapabilityActionTextProvider(::capabilityActionText),
+                        availability =
+                            MenuCapabilityAvailability { resolveCapabilityRoute(it) != null },
+                        handler = MenuCapabilityActionHandler(::handleCapabilityAction),
+                    ),
+                ),
+            ),
+        )
+        CCSystem.getAPI().getMenuCapabilityService().register(
+            MenuCapabilityDefinition(
+                owner = RUNTIME_OWNER,
+                id = CREATION_CAPABILITY_LOCAL_ID,
+                placement = CreationConfirmationCapabilityContract.PLACEMENT,
+                availability = MenuCapabilityAvailability { creationDraft(it) != null },
+                presentationProvider = MenuCapabilityPresentationProvider {
+                    creationPresentation(
+                        creationDraft(it)?.getBoolean(EXTRA_KEY) ?: false,
+                    )
+                },
+                actions = listOf(
+                    MenuCapabilityAction(
+                        id = "toggle",
+                        trigger = MenuCapabilityTrigger.LEFT,
+                        textProvider = MenuCapabilityActionTextProvider {
+                            i18n(it.player, "production.lore.action")
+                        },
+                        handler = MenuCapabilityActionHandler {
+                            val draft = creationDraft(it)
+                                ?: return@MenuCapabilityActionHandler MenuActionResult.Ignored
+                            toggleCreationSelection(it.player, draft)
+                            MenuActionResult.Success(MenuUpdate.Refresh)
+                        },
+                    ),
+                ),
+            ),
+        )
     }
 
     @EventHandler
@@ -103,142 +143,211 @@ class ProductionToggleExtension(
             .forEach { applyForcedTags(it.uuid) }
     }
 
-    fun toggleCreationSelection(player: Player, session: WorldCreationSession): ItemStack {
+    private fun toggleCreationSelection(player: Player, draft: WorldCreationDraft) {
         if (!canUseProduction(player)) {
-            return createCreationItem(session.extras[EXTRA_KEY] as? Boolean ?: false)
-        }
-        val next = !(session.extras[EXTRA_KEY] as? Boolean ?: false)
-        if (next && ownerHasProductionWorld(player.uniqueId, null)) {
-            player.sendMessage(i18n(player, "message.production_limit"))
-            return createCreationItem(false)
-        }
-        session.extras[EXTRA_KEY] = next
-        session.worldName?.let { pendingProduction[player.uniqueId to it] = next }
-        return createCreationItem(next)
-    }
-
-    private fun handleWorldSettingsClick(
-        event: InventoryClickEvent,
-        player: Player,
-        context: MenuExtensionContext,
-        item: ItemStack
-    ): Boolean {
-        val worldData = context.get<WorldData>("worldData") ?: return false
-        when (ItemTag.getString(item, "chanpon_action")) {
-            ACTION_SET_PRODUCTION -> {
-                if (!canUseProduction(player)) return true
-                mwm().soundManager.playClickSound(player, item, "world_settings")
-                if (ownerHasProductionWorld(worldData.owner, worldData.uuid)) {
-                    player.sendMessage(i18n(player, "message.production_limit"))
-                    return true
-                }
-                openConfirmation(player, worldData.uuid, ConfirmationAction.SET_PRODUCTION, currentRequest(player, context))
-            }
-            ACTION_TOGGLE_SUBMISSION -> {
-                // 本番用設定の解除は管理者メニューに集約し、通常の /worldmenu では提出操作だけを扱う。
-                if (!event.click.isLeftClick) {
-                    return true
-                }
-                mwm().soundManager.playClickSound(player, item, "world_settings")
-                if (worldData.owner != player.uniqueId) {
-                    player.sendMessage(i18n(player, "message.owner_only_submit"))
-                    return true
-                }
-                val current = try {
-                    storage.getSubmissionState(worldData.uuid)
-                } catch (ex: IllegalStateException) {
-                    player.sendMessage(i18n(player, "message.state_error"))
-                    event.inventory.setItem(event.slot, createSubmissionErrorItem(player))
-                    return true
-                }
-                if (plugin.isSubmissionClosed()) {
-                    player.sendMessage(i18n(player, "message.deadline_closed"))
-                    event.inventory.setItem(event.slot, createDecorationItem(Material.GRAY_STAINED_GLASS_PANE))
-                    return true
-                }
-                when (current) {
-                    SubmissionState.UNSUBMITTED -> {
-                        openConfirmation(player, worldData.uuid, ConfirmationAction.SUBMIT, currentRequest(player, context))
-                    }
-                    SubmissionState.SUBMITTED -> return true
-                    SubmissionState.COMPLETED -> return true
-                }
-            }
-            else -> return false
-        }
-        return true
-    }
-
-    @EventHandler
-    fun onConfirmationClick(event: InventoryClickEvent) {
-        val player = event.whoClicked as? Player ?: return
-        val holder = event.view.topInventory.holder as? SubmissionConfirmationHolder ?: return
-        event.cancelWithDebug("ProductionToggleExtension.onConfirmationClick: confirm_click")
-        if (event.clickedInventory != event.view.topInventory) return
-        val item = event.currentItem ?: return
-        when (ItemTag.getType(item)) {
-            ItemTag.TYPE_GUI_CONFIRM -> {
-                holder.resolved = true
-                ManagedMenuPresenter.close(player)
-                executeConfirmedAction(player, holder.worldUuid, holder.action)
-                returnToWorldSettings(player, holder.worldUuid, holder.request)
-            }
-            ItemTag.TYPE_GUI_CANCEL -> {
-                holder.resolved = true
-                player.sendMessage(i18n(player, "message.cancelled_confirmation"))
-                returnToWorldSettings(player, holder.worldUuid, holder.request)
-            }
-        }
-    }
-
-    private fun openConfirmation(
-        player: Player,
-        worldUuid: UUID,
-        action: ConfirmationAction,
-        request: WorldSettingsMenuRequest
-    ) {
-        val holder = SubmissionConfirmationHolder(worldUuid, action, request)
-        val layout = ChanponGuiElements.confirmationLayout()
-        val inventory = Bukkit.createInventory(
-            holder,
-            layout.size,
-            i18nComponent(player, "confirm.${action.key}.title")
-        )
-        holder.inv = inventory
-
-        applyConfirmationFrame(inventory)
-        ChanponGuiElements.setConfirmationItems(
-            inventory,
-            createConfirmationCenterItem(player, action),
-            createConfirmationButton(player, true),
-            createConfirmationButton(player, false)
-        )
-        ManagedMenuPresenter.open(player, inventory)
-    }
-
-    private fun returnToWorldSettings(player: Player, worldUuid: UUID, request: WorldSettingsMenuRequest) {
-        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
-        if (worldData == null) {
-            ManagedMenuPresenter.close(player)
             return
         }
-        mwm().worldSettingsGui.open(
-            player,
-            worldData,
-            request.showBackButton,
-            request.isPlayerWorldFlow,
-            request.parentShowBackButton
+        val next = !(draft.getBoolean(EXTRA_KEY) ?: false)
+        if (next && ownerHasProductionWorld(player.uniqueId, null)) {
+            player.sendMessage(i18n(player, "message.production_limit"))
+            draft.setBoolean(EXTRA_KEY, false)
+            return
+        }
+        draft.setBoolean(EXTRA_KEY, next)
+        draft.worldName?.let { pendingProduction[player.uniqueId to it] = next }
+    }
+
+    private fun isCapabilityAvailable(context: com.awabi2048.ccsystem.api.gui.MenuCapabilityContext): Boolean {
+        val worldData = worldData(context.arguments) ?: return false
+        if (globalStorage.getWorldCreationAvailability() != WorldCreationAvailability.PRODUCTION) return false
+        if (protectionService.isProtected(worldData)) return false
+        if (worldData.owner != context.player.uniqueId &&
+            !context.player.hasPermission("myworldmanager.admin")
+        ) return false
+        return storage.isProductionWorld(worldData.uuid) ||
+            !ownerHasProductionWorld(worldData.owner, worldData.uuid)
+    }
+
+    private fun creationDraft(
+        context: com.awabi2048.ccsystem.api.gui.MenuCapabilityContext,
+    ): WorldCreationDraft? =
+        context.attributes[CreationConfirmationCapabilityContract.DRAFT_ATTRIBUTE]
+            as? WorldCreationDraft
+
+    private fun creationDraft(
+        context: MenuCapabilityActionContext,
+    ): WorldCreationDraft? =
+        context.attributes[CreationConfirmationCapabilityContract.DRAFT_ATTRIBUTE]
+            as? WorldCreationDraft
+
+    private fun resolveCapabilityPresentation(
+        context: com.awabi2048.ccsystem.api.gui.MenuCapabilityContext,
+    ): MenuCapabilityPresentation {
+        val worldData = requireNotNull(worldData(context.arguments))
+        if (plugin.isSubmissionClosed()) {
+            return capabilityPresentation(
+                Material.GRAY_STAINED_GLASS_PANE,
+                Component.empty(),
+                GuiLoreSpec.None,
+                GuiElementRole.DECORATION,
+            )
+        }
+        return if (storage.isProductionWorld(worldData.uuid)) {
+            submissionPresentation(context.player, worldData.uuid)
+        } else {
+            productionPresentation(context.player)
+        }
+    }
+
+    private fun resolveCapabilityRoute(
+        context: com.awabi2048.ccsystem.api.gui.MenuCapabilityContext,
+    ): MenuRoute? {
+        val worldData = worldData(context.arguments) ?: return null
+        if (plugin.isSubmissionClosed()) return null
+        val action = if (storage.isProductionWorld(worldData.uuid)) {
+            when (runCatching { storage.getSubmissionState(worldData.uuid) }.getOrNull()) {
+                SubmissionState.UNSUBMITTED -> ConfirmationAction.SUBMIT
+                SubmissionState.SUBMITTED,
+                SubmissionState.COMPLETED,
+                null -> return null
+            }
+        } else {
+            ConfirmationAction.SET_PRODUCTION
+        }
+        return MenuRoute(
+            RUNTIME_OWNER,
+            CONFIRMATION_ROUTE,
+            mapOf(
+                WORLD_UUID_ARGUMENT to worldData.uuid.toString(),
+                CONFIRMATION_ACTION_ARGUMENT to action.key,
+            ),
         )
     }
 
-    private fun currentRequest(player: Player, context: MenuExtensionContext): WorldSettingsMenuRequest {
-        val session = mwm().settingsSessionManager.getSession(player)
-        return WorldSettingsMenuRequest(
-            context.get<Boolean>("showBackButton") ?: session?.showBackButton ?: false,
-            context.get<Boolean?>("isPlayerWorldFlow") ?: session?.isPlayerWorldFlow,
-            context.get<Boolean?>("parentShowBackButton") ?: session?.parentShowBackButton
+    private fun handleCapabilityAction(
+        context: MenuCapabilityActionContext,
+    ): MenuActionResult {
+        val route = resolveCapabilityRoute(
+            com.awabi2048.ccsystem.api.gui.MenuCapabilityContext(
+                context.player,
+                context.arguments,
+            ),
+        ) ?: return MenuActionResult.Ignored
+        return MenuActionResult.Success(MenuUpdate.Navigate(route))
+    }
+
+    private fun capabilityActionText(
+        context: com.awabi2048.ccsystem.api.gui.MenuCapabilityContext,
+    ): String {
+        val worldData = requireNotNull(worldData(context.arguments))
+        return if (storage.isProductionWorld(worldData.uuid)) {
+            i18n(context.player, "submission.lore.unsubmitted.action")
+        } else {
+            i18n(context.player, "production.lore.action")
+        }
+    }
+
+    private fun renderConfirmation(player: Player, route: MenuRoute): InventoryMenuView {
+        val action = confirmationAction(route)
+        val layout = ChanponGuiElements.confirmationLayout()
+        val title = i18nComponent(player, "confirm.${action.key}.title")
+        val gui = CCSystem.getAPI().getGuiElementService()
+        return InventoryMenuView(
+            layout.size,
+            title,
+            listOf(
+                gui.menuDisplay(
+                    GuiMenuDisplaySpec(
+                        layout.previewSlot,
+                        GuiItemSpec(
+                            Material.PAPER,
+                            GuiNameSpec.Component(title),
+                            GuiLoreSpec.Rich(
+                                i18nList(player, "confirm.${action.key}.lore")
+                                    .map(GuiLoreLine::Text),
+                                GuiLoreFrame.NONE,
+                            ),
+                            GuiElementRole.CONTENT,
+                            1,
+                        ),
+                    ),
+                ),
+                confirmationEntry(
+                    player,
+                    layout.confirmSlot,
+                    Material.LIME_CONCRETE,
+                    "confirm.button.confirm.display",
+                    GuiElementRole.CONFIRM,
+                    ACTION_CONFIRM,
+                ),
+                confirmationEntry(
+                    player,
+                    layout.cancelSlot,
+                    Material.RED_CONCRETE,
+                    "confirm.button.cancel.display",
+                    GuiElementRole.CANCEL,
+                    ACTION_CANCEL,
+                ),
+            ),
         )
     }
+
+    private fun confirmationEntry(
+        player: Player,
+        slot: Int,
+        material: Material,
+        textKey: String,
+        role: GuiElementRole,
+        actionId: String,
+    ): MenuElement {
+        val text = i18n(player, textKey)
+        return CCSystem.getAPI().getGuiElementService().menuStructuredEntry(
+            player,
+            GuiStructuredMenuEntrySpec(
+                slot = slot,
+                item = GuiItemSpec(
+                    material,
+                    GuiNameSpec.Component(i18nComponent(player, textKey)),
+                    GuiLoreSpec.None,
+                    role,
+                    1,
+                ),
+                actions = listOf(
+                    GuiMenuEntryAction(
+                        actionId,
+                        MenuAcceptedClicks.LEFT_RIGHT,
+                        text,
+                    ),
+                ),
+            ),
+        )
+    }
+
+    private fun confirm(context: MenuActionContext): MenuActionResult {
+        val worldUuid = worldUuid(context.route) ?: return MenuActionResult.Rejected()
+        val action = confirmationAction(context.route)
+        executeConfirmedAction(context.player, worldUuid, action)
+        return MenuActionResult.Success(MenuUpdate.Back)
+    }
+
+    private fun cancel(context: MenuActionContext): MenuActionResult {
+        context.player.sendMessage(i18n(context.player, "message.cancelled_confirmation"))
+        return MenuActionResult.Success(MenuUpdate.Back)
+    }
+
+    private fun worldData(arguments: Map<String, String>): WorldData? =
+        arguments[WORLD_UUID_ARGUMENT]
+            ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+            ?.let { MyWorldManagerApi.getWorldRepository()?.findByUuid(it) }
+
+    private fun worldUuid(route: MenuRoute): UUID? =
+        route.payload[WORLD_UUID_ARGUMENT]
+            ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+
+    private fun confirmationAction(route: MenuRoute): ConfirmationAction =
+        route.payload[CONFIRMATION_ACTION_ARGUMENT]
+            ?.let { key -> ConfirmationAction.entries.firstOrNull { it.key == key } }
+            ?: error("確認操作が見つかりません")
 
     private fun executeConfirmedAction(player: Player, worldUuid: UUID, action: ConfirmationAction) {
         when (action) {
@@ -336,69 +445,88 @@ class ProductionToggleExtension(
         return decision.allowed
     }
 
-    fun createCreationItem(enabled: Boolean): ItemStack {
-        val item = ItemStack(if (enabled) Material.YELLOW_WOOL else Material.GRAY_WOOL)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(null, "creation.display"))
-            meta.lore(structuredLore(listOf(
-                GuiLoreLine.Text(i18n(null, "creation.lore.description")),
-                GuiLoreLine.Warning(i18n(null, "creation.lore.delete_guard")),
-                GuiLoreLine.Data(
-                    i18n(null, "creation.lore.state"),
-                    i18n(null, if (enabled) "common.on" else "common.off"),
-                    if (enabled) "§e" else "§7"
-                )
-            )))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
-        }
-        if (enabled) item.addUnsafeEnchantment(Enchantment.UNBREAKING, 1)
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
-        ItemTag.setExtensionId(item, getId())
-        ItemTag.setString(item, "chanpon_action", ACTION_TOGGLE_PRODUCTION)
-        return item
-    }
+    private fun creationPresentation(enabled: Boolean) = MenuCapabilityPresentation(
+        item = GuiItemSpec(
+            material = if (enabled) Material.YELLOW_WOOL else Material.GRAY_WOOL,
+            name = GuiNameSpec.Component(i18nComponent(null, "creation.display")),
+            lore = GuiLoreSpec.Rich(
+                listOf(
+                    GuiLoreLine.Text(i18n(null, "creation.lore.description")),
+                    GuiLoreLine.Warning(i18n(null, "creation.lore.delete_guard")),
+                    GuiLoreLine.Data(
+                        i18n(null, "creation.lore.state"),
+                        i18n(null, if (enabled) "common.on" else "common.off"),
+                        if (enabled) "§e" else "§7",
+                    ),
+                ),
+                GuiLoreFrame.BOTH,
+            ),
+            role = GuiElementRole.ACTION,
+            amount = 1,
+        ),
+        glint = enabled,
+    )
 
-    private fun createProductionItem(player: Player): ItemStack {
-        val item = ItemStack(Material.HEART_OF_THE_SEA)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "production.display"))
-            meta.lore(structuredLore(listOf(
-                GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "production.lore.action")),
-                GuiLoreLine.Warning(i18n(player, "production.lore.limit_warning"))
-            )))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
-        ItemTag.setExtensionId(item, getId())
-        ItemTag.setString(item, "chanpon_action", ACTION_SET_PRODUCTION)
-        return item
-    }
-
-    private fun createSubmissionItem(player: Player, worldUuid: UUID): ItemStack {
-        val state = try {
-            storage.getSubmissionState(worldUuid)
-        } catch (ex: IllegalStateException) {
-            return createSubmissionErrorItem(player)
-        }
-        val item = ItemStack(
-            when (state) {
-                SubmissionState.UNSUBMITTED -> Material.BRICKS
-                SubmissionState.SUBMITTED -> Material.FLOW_BANNER_PATTERN
-                SubmissionState.COMPLETED -> Material.BOOK
-            }
+    private fun productionPresentation(player: Player): MenuCapabilityPresentation =
+        capabilityPresentation(
+            Material.HEART_OF_THE_SEA,
+            i18nComponent(player, "production.display"),
+            structuredLore(
+                listOf(
+                    GuiLoreLine.Warning(i18n(player, "production.lore.limit_warning")),
+                ),
+            ),
         )
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "submission.display"))
-            meta.lore(createSubmissionLore(player, state))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
+
+    private fun submissionPresentation(
+        player: Player,
+        worldUuid: UUID,
+    ): MenuCapabilityPresentation {
+        val state = runCatching { storage.getSubmissionState(worldUuid) }
+            .getOrElse {
+                return capabilityPresentation(
+                    Material.BARRIER,
+                    i18nComponent(player, "error.display"),
+                    GuiLoreSpec.Rich(
+                        i18nList(player, "error.lore").map(GuiLoreLine::Text),
+                        GuiLoreFrame.BOTH,
+                    ),
+                    GuiElementRole.CONTENT,
+                )
+            }
+        val material = when (state) {
+            SubmissionState.UNSUBMITTED -> Material.BRICKS
+            SubmissionState.SUBMITTED -> Material.FLOW_BANNER_PATTERN
+            SubmissionState.COMPLETED -> Material.BOOK
         }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
-        ItemTag.setExtensionId(item, getId())
-        ItemTag.setString(item, "chanpon_action", ACTION_TOGGLE_SUBMISSION)
-        return item
+        return capabilityPresentation(
+            material,
+            i18nComponent(player, "submission.display"),
+            createSubmissionLore(player, state),
+            if (state == SubmissionState.UNSUBMITTED) {
+                GuiElementRole.ACTION
+            } else {
+                GuiElementRole.CONTENT
+            },
+        )
     }
 
-    private fun createSubmissionLore(player: Player, state: SubmissionState): List<Component> {
+    private fun capabilityPresentation(
+        material: Material,
+        name: Component,
+        lore: GuiLoreSpec,
+        role: GuiElementRole = GuiElementRole.ACTION,
+    ) = MenuCapabilityPresentation(
+        GuiItemSpec(
+            material = material,
+            name = GuiNameSpec.Component(name),
+            lore = lore,
+            role = role,
+            amount = 1,
+        ),
+    )
+
+    private fun createSubmissionLore(player: Player, state: SubmissionState): GuiLoreSpec {
         val key = when (state) {
             SubmissionState.UNSUBMITTED -> "submission.lore.unsubmitted"
             SubmissionState.SUBMITTED -> "submission.lore.submitted"
@@ -416,7 +544,6 @@ class ProductionToggleExtension(
         return when (state) {
             SubmissionState.UNSUBMITTED -> structuredLore(listOf(
                 stateLine,
-                GuiLoreActions.singleClick(mwm().languageManager, player, i18n(player, "$key.action")),
                 GuiLoreLine.Warning(i18n(player, "$key.warning"))
             ))
             SubmissionState.SUBMITTED,
@@ -428,53 +555,8 @@ class ProductionToggleExtension(
         }
     }
 
-    private fun createSubmissionErrorItem(player: Player): ItemStack {
-        val item = ItemStack(Material.BARRIER)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "error.display"))
-            meta.lore(ChanponLore.build(i18nList(player, "error.lore").map(GuiLoreLine::Text)))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_EXTENSION)
-        ItemTag.setExtensionId(item, getId())
-        ItemTag.setString(item, "chanpon_action", ACTION_TOGGLE_SUBMISSION)
-        return item
-    }
-
-    private fun createConfirmationCenterItem(player: Player, action: ConfirmationAction): ItemStack {
-        val item = ItemStack(action.material)
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "confirm.${action.key}.display"))
-            meta.lore(ChanponLore.build(i18nList(player, "confirm.${action.key}.lore").map(GuiLoreLine::Text)))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        ItemTag.tagItem(item, ItemTag.TYPE_GUI_INFO)
-        return item
-    }
-
-    private fun createConfirmationButton(player: Player, confirm: Boolean): ItemStack {
-        val item = ItemStack(if (confirm) Material.LIME_CONCRETE else Material.RED_CONCRETE)
-        val key = if (confirm) "confirm.button.confirm" else "confirm.button.cancel"
-        item.editMeta { meta ->
-            meta.displayName(i18nComponent(player, "$key.display"))
-            meta.lore(null)
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        }
-        ItemTag.tagItem(item, if (confirm) ItemTag.TYPE_GUI_CONFIRM else ItemTag.TYPE_GUI_CANCEL)
-        return item
-    }
-
-    private fun applyConfirmationFrame(inventory: Inventory) {
-        ChanponGuiElements.applyConfirmationFrame(inventory)
-    }
-
-    private fun createDecorationItem(material: Material): ItemStack {
-        return ChanponGuiElements.decoration(material)
-    }
-
-    private fun structuredLore(lines: List<GuiLoreLine>): List<Component> {
-        return CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(lines, GuiLoreFrame.BOTH))
-    }
+    private fun structuredLore(lines: List<GuiLoreLine>): GuiLoreSpec =
+        GuiLoreSpec.Rich(lines, GuiLoreFrame.BOTH)
 
     private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): String {
         return CCSystem.getAPI().getI18nString(player, "chanpon.submission.$key", placeholders)
@@ -488,34 +570,24 @@ class ProductionToggleExtension(
         return CCSystem.getAPI().getI18nComponent(player, "chanpon.submission.$key", placeholders)
     }
 
-    private fun mwm(): MyWorldManager = JavaPlugin.getPlugin(MyWorldManager::class.java)
-
     companion object {
-        const val EXTENSION_ID = "chanpon.production_toggle"
+        const val CREATION_CAPABILITY_ID = "mwm-chanpon:production-selection"
+        const val MENU_CAPABILITY_ID = "mwm-chanpon:world-production-submission"
         const val EXTRA_KEY = "chanpon.production"
-        private const val WORLD_MENU_SLOT = 51
-        private const val CRITICAL_MENU_SLOT = 33
-        private const val ACTION_TOGGLE_PRODUCTION = "toggle_production"
-        private const val ACTION_SET_PRODUCTION = "set_production"
-        private const val ACTION_TOGGLE_SUBMISSION = "toggle_submission"
-        private const val ACTION_SUBMIT = "submit"
-        private const val ACTION_UNSET_PRODUCTION = "unset_production"
+        private const val RUNTIME_OWNER = "mwm-chanpon"
+        private const val CREATION_CAPABILITY_LOCAL_ID = "production-selection"
+        private const val CAPABILITY_ID = "world-production-submission"
+        private const val CONFIRMATION_ROUTE = "world-production-submission-confirmation"
+        private const val WORLD_UUID_ARGUMENT = "world_uuid"
+        private const val CONFIRMATION_ACTION_ARGUMENT = "action"
+        private const val ACTION_CONFIRM = "confirm"
+        private const val ACTION_CANCEL = "cancel"
     }
 
-    private enum class ConfirmationAction(val key: String, val material: Material) {
-        SET_PRODUCTION("set_production", Material.HEART_OF_THE_SEA),
-        UNSET_PRODUCTION("unset_production", Material.REDSTONE),
-        SUBMIT("submit", Material.BRICKS)
+    private enum class ConfirmationAction(val key: String) {
+        SET_PRODUCTION("set_production"),
+        UNSET_PRODUCTION("unset_production"),
+        SUBMIT("submit")
     }
 
-    private class SubmissionConfirmationHolder(
-        val worldUuid: UUID,
-        val action: ConfirmationAction,
-        val request: WorldSettingsMenuRequest
-    ) : WorldSettingsInventoryHolder {
-        lateinit var inv: Inventory
-        var resolved: Boolean = false
-
-        override fun getInventory(): Inventory = inv
-    }
 }

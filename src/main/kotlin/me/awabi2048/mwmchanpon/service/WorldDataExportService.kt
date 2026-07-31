@@ -5,13 +5,15 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import java.util.Comparator
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
+import me.awabi2048.mwmchanpon.api.StandaloneExportContext
+import me.awabi2048.mwmchanpon.api.StandaloneExportContributors
+import me.awabi2048.mwmchanpon.api.StandaloneExportWorld
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.model.WorldData
@@ -23,21 +25,25 @@ class WorldDataExportService(
     private val storage: ChanponWorldStorage
 ) {
     private val exportDir = File(plugin.dataFolder, "exports")
-    private val formatter = DateTimeFormatter.ofPattern("yyyyMMddHHmmss")
 
     init {
         exportDir.mkdirs()
     }
 
-    fun exportStandaloneWorld(selectedWorldUuids: Collection<UUID>): CompletableFuture<WorldDataExportResult> {
-        val selected = selectedWorldUuids.toSet()
-        val worlds = productionWorlds().filter { it.uuid in selected }
+    fun exportStandaloneWorld(selectedWorldUuids: List<UUID>): CompletableFuture<WorldDataExportResult> {
+        if (selectedWorldUuids.distinct().size != selectedWorldUuids.size) {
+            return CompletableFuture.completedFuture(
+                WorldDataExportResult(false, null, "selection contains duplicate worlds")
+            )
+        }
+        val available = productionWorlds().associateBy { it.uuid }
+        val worlds = selectedWorldUuids.mapNotNull(available::get)
         if (worlds.isEmpty()) {
             return CompletableFuture.completedFuture(
                 WorldDataExportResult(false, null, "no worlds selected")
             )
         }
-        if (worlds.size != selected.size) {
+        if (worlds.size != selectedWorldUuids.size) {
             return CompletableFuture.completedFuture(
                 WorldDataExportResult(false, null, "selection contains a world that is not exportable")
             )
@@ -58,19 +64,49 @@ class WorldDataExportService(
             world.uuid to ExportCoordinates(
                 spawn?.x ?: 0.5,
                 spawn?.y ?: 100.0,
-                spawn?.z ?: 0.5
+                spawn?.z ?: 0.5,
+                spawn?.yaw ?: 0.0f
             )
         }
         val portalSnapshots = worlds.flatMap { core.getRelatedPortals(it.uuid) }.distinctBy { it.id }
-        val bootstrapWorldDirectory = Bukkit.getWorlds()
-            .asSequence()
-            .map { it.worldFolder.toPath() }
-            .firstOrNull { Files.isRegularFile(it.resolve("level.dat")) }
-            ?: return CompletableFuture.completedFuture(
-                WorldDataExportResult(false, null, "bootstrap level.dat is unavailable")
+        val primaryUuid = worlds.first().uuid
+        val contributorContext = StandaloneExportContext(
+            worlds.map { world ->
+                StandaloneExportWorld(
+                    uuid = world.uuid,
+                    sourceWorldName = core.getWorldFolderName(world),
+                    dimensionKey = if (world.uuid == primaryUuid) {
+                        "minecraft:overworld"
+                    } else {
+                        StandaloneWorldExportLayout.dimensionKey(world.uuid)
+                    },
+                    primary = world.uuid == primaryUuid,
+                )
+            },
+        )
+        val preparedContributions = runCatching {
+            StandaloneExportContributors.prepare(contributorContext)
+        }.getOrElse { error ->
+            return CompletableFuture.completedFuture(
+                WorldDataExportResult(false, null, error.message ?: "standalone export validation failed")
             )
+        }
+        val serverMainWorldSource = runCatching {
+            ServerMainWorldDirectory.resolve(Bukkit.getWorldContainer().toPath())
+        }.getOrElse { error ->
+            return CompletableFuture.completedFuture(
+                WorldDataExportResult(false, null, error.message ?: "server main world level.dat is unavailable")
+            )
+        }
+        Bukkit.getWorlds()
+            .firstOrNull {
+                it.worldFolder.toPath().toAbsolutePath().normalize() == serverMainWorldSource.path
+            }
+            ?.save()
+        val serverMainWorldDirectory = serverMainWorldSource.path
 
-        val output = File(exportDir, "${LocalDateTime.now().format(formatter)}-standalone-${worlds.size}.zip")
+        val fiscalYear = plugin.config.getInt("standalone_export.fiscal_year")
+        val output = File(exportDir, StandaloneExportFileName.create(fiscalYear, worlds.map { it.name }))
         val future = CompletableFuture<WorldDataExportResult>()
         Bukkit.getScheduler().runTaskAsynchronously(plugin, Runnable {
             val staging = File(exportDir, ".${output.nameWithoutExtension}-${UUID.randomUUID()}")
@@ -80,11 +116,32 @@ class WorldDataExportService(
                 val primary = worlds.first()
                 copyPrimaryWorld(
                     worldDirectories.getValue(primary.uuid),
-                    bootstrapWorldDirectory,
+                    serverMainWorldDirectory,
                     staging.toPath()
                 )
+                val now = System.currentTimeMillis()
+                val primarySpawn = spawnCoordinates.getValue(primary.uuid)
+                val metadata = StandaloneLevelMetadata(
+                    levelName = primary.name,
+                    lastPlayed = now,
+                    dataVersion = Bukkit.getUnsafe().dataVersion,
+                    versionName = Bukkit.getMinecraftVersion(),
+                    spawnX = kotlin.math.floor(primarySpawn.x).toInt(),
+                    spawnY = kotlin.math.floor(primarySpawn.y).toInt(),
+                    spawnZ = kotlin.math.floor(primarySpawn.z).toInt(),
+                    spawnAngle = primarySpawn.yaw,
+                )
+                StandaloneLevelDatRewriter.rewrite(
+                    staging.toPath().resolve("level.dat"),
+                    staging.toPath().resolve("level.dat"),
+                    metadata,
+                )
+                val oldLevelData = staging.toPath().resolve("level.dat_old")
+                if (Files.isRegularFile(oldLevelData)) {
+                    StandaloneLevelDatRewriter.rewrite(oldLevelData, oldLevelData, metadata)
+                }
                 writeDimensions(staging.toPath(), worlds.drop(1), worldDirectories)
-                writePortalFunctions(
+                writePortalCommandBlocks(
                     staging.toPath(),
                     primary,
                     worlds,
@@ -92,7 +149,16 @@ class WorldDataExportService(
                     spawnCoordinates,
                     portalSnapshots
                 )
-                writeManifest(staging, primary, worlds, portalSnapshots)
+                preparedContributions.forEach { it.writeTo(staging.toPath()) }
+                writeManifest(
+                    staging,
+                    output.name,
+                    fiscalYear,
+                    primary,
+                    worlds,
+                    portalSnapshots,
+                    serverMainWorldSource.levelName,
+                )
                 zipWorld(staging.toPath(), temporaryZip.toPath())
                 try {
                     Files.move(
@@ -133,28 +199,8 @@ class WorldDataExportService(
         }
     }
 
-    private fun copyPrimaryWorld(source: Path, bootstrapWorld: Path, target: Path) {
-        require(Files.isDirectory(source)) { "primary world directory is missing: $source" }
-        copyTree(source, target) { path ->
-            path.fileName?.toString() !in ROOT_EXCLUDED_FILES
-        }
-        if (!Files.isRegularFile(target.resolve("level.dat"))) {
-            Files.copy(
-                bootstrapWorld.resolve("level.dat"),
-                target.resolve("level.dat"),
-                StandardCopyOption.REPLACE_EXISTING,
-                StandardCopyOption.COPY_ATTRIBUTES
-            )
-            val oldLevelData = bootstrapWorld.resolve("level.dat_old")
-            if (Files.isRegularFile(oldLevelData)) {
-                Files.copy(
-                    oldLevelData,
-                    target.resolve("level.dat_old"),
-                    StandardCopyOption.REPLACE_EXISTING,
-                    StandardCopyOption.COPY_ATTRIBUTES
-                )
-            }
-        }
+    private fun copyPrimaryWorld(source: Path, serverMainWorld: Path, target: Path) {
+        StandalonePrimaryWorldAssembler.copy(source, serverMainWorld, target)
     }
 
     private fun writeDimensions(
@@ -191,13 +237,22 @@ class WorldDataExportService(
 
     private fun writeManifest(
         root: File,
+        outputFileName: String,
+        fiscalYear: Int,
         primary: WorldData,
         worlds: List<WorldData>,
-        portals: List<me.awabi2048.myworldmanager.api.service.ApiPortalSnapshot>
+        portals: List<me.awabi2048.myworldmanager.api.service.ApiPortalSnapshot>,
+        serverMainWorldName: String,
     ) {
         val manifest = YamlConfiguration()
-        manifest.set("format", 1)
+        manifest.set("format", 2)
         manifest.set("created_at", LocalDateTime.now().toString())
+        manifest.set("output_file", outputFileName)
+        manifest.set("fiscal_year", fiscalYear)
+        manifest.set("game_mode", "creative")
+        manifest.set("allow_commands", true)
+        manifest.set("shared_data_source", serverMainWorldName)
+        manifest.set("shared_data_policy", "all selected dimensions use the running server main world data/")
         manifest.set("primary_world_uuid", primary.uuid.toString())
         manifest.set(
             "worlds",
@@ -235,7 +290,7 @@ class WorldDataExportService(
         manifest.save(File(root, "mwm-export-manifest.yml"))
     }
 
-    private fun writePortalFunctions(
+    private fun writePortalCommandBlocks(
         root: Path,
         primary: WorldData,
         worlds: List<WorldData>,
@@ -251,36 +306,29 @@ class WorldDataExportService(
             }
         }
         val sourceWorldByKey = worldKeys.entries.associate { it.value to it.key }
-        val commands = portals.mapNotNull { portal ->
-            val sourceUuid = sourceWorldByKey[portal.worldKey] ?: return@mapNotNull null
-            val targetUuid = portal.worldUuid ?: return@mapNotNull null
-            val sourceDimension = dimensionByWorld[sourceUuid] ?: return@mapNotNull null
-            val targetDimension = dimensionByWorld[targetUuid] ?: return@mapNotNull null
-            val spawn = spawnCoordinates[targetUuid] ?: return@mapNotNull null
-            val minX = minOf(portal.minX ?: portal.x, portal.maxX ?: portal.x)
-            val minY = minOf(portal.minY ?: portal.y, portal.maxY ?: portal.y)
-            val minZ = minOf(portal.minZ ?: portal.z, portal.maxZ ?: portal.z)
-            val maxX = maxOf(portal.minX ?: portal.x, portal.maxX ?: portal.x)
-            val maxY = maxOf(portal.maxY ?: portal.y + 2, portal.minY ?: portal.y + 2)
-            val maxZ = maxOf(portal.minZ ?: portal.z, portal.maxZ ?: portal.z)
-            "execute in $sourceDimension as @a[x=$minX,y=$minY,z=$minZ,dx=${maxX - minX},dy=${maxY - minY},dz=${maxZ - minZ}] run execute in $targetDimension run tp @s ${spawn.x} ${spawn.y} ${spawn.z}"
+        portals.forEach { portal ->
+            val sourceUuid = sourceWorldByKey[portal.worldKey] ?: return@forEach
+            val targetUuid = portal.worldUuid ?: return@forEach
+            dimensionByWorld[sourceUuid] ?: return@forEach
+            val targetDimension = dimensionByWorld[targetUuid] ?: return@forEach
+            val spawn = spawnCoordinates[targetUuid] ?: return@forEach
+            val sourceRoot = if (sourceUuid == primary.uuid) {
+                root
+            } else {
+                root.resolve(
+                    "dimensions/${StandaloneWorldExportLayout.NAMESPACE}/${StandaloneWorldExportLayout.dimensionId(sourceUuid)}",
+                )
+            }
+            StandalonePortalRegionEditor.write(
+                sourceRoot,
+                StandalonePortalCommand(
+                    portal.x,
+                    portal.y,
+                    portal.z,
+                    "execute as @p at @s in $targetDimension run tp @s ${spawn.x} ${spawn.y} ${spawn.z}",
+                ),
+            )
         }
-        if (commands.isEmpty()) return
-
-        val packRoot = root.resolve("datapacks/mwm-standalone-export")
-        Files.createDirectories(packRoot)
-        Files.writeString(packRoot.resolve("pack.mcmeta"), StandaloneWorldExportLayout.packMetadata())
-        val tickFunction = packRoot.resolve(
-            "data/${StandaloneWorldExportLayout.NAMESPACE}/function/portal_tick.mcfunction"
-        )
-        Files.createDirectories(tickFunction.parent)
-        Files.writeString(tickFunction, commands.joinToString(System.lineSeparator(), postfix = System.lineSeparator()))
-        val tickTag = packRoot.resolve("data/minecraft/tags/function/tick.json")
-        Files.createDirectories(tickTag.parent)
-        Files.writeString(
-            tickTag,
-            """{"values":["${StandaloneWorldExportLayout.NAMESPACE}:portal_tick"]}"""
-        )
     }
 
     private fun copyTree(source: Path, target: Path, include: (Path) -> Boolean = { true }) {
@@ -325,12 +373,27 @@ class WorldDataExportService(
     }
 
     companion object {
-        private val ROOT_EXCLUDED_FILES = setOf("session.lock", "uid.dat")
         private val DIMENSION_DIRECTORIES = listOf("region", "entities", "poi")
     }
 }
 
-private data class ExportCoordinates(val x: Double, val y: Double, val z: Double)
+private data class ExportCoordinates(val x: Double, val y: Double, val z: Double, val yaw: Float)
+
+internal object StandaloneExportFileName {
+    private val forbidden = Regex("""[\\/:*?"<>|\u0000-\u001f]""")
+
+    fun create(fiscalYear: Int, worldNames: List<String>): String {
+        require(fiscalYear in 2000..9999) { "fiscal year must be between 2000 and 9999" }
+        require(worldNames.isNotEmpty()) { "at least one world is required" }
+        worldNames.forEach { name ->
+            require(name.isNotBlank() && !forbidden.containsMatchIn(name)) {
+                "world name contains characters that cannot be used in an export file name: $name"
+            }
+        }
+        val suffix = if (worldNames.size == 1) "" else "ほか"
+        return "［さばちゃんぽん$fiscalYear］【${worldNames.first()}】$suffix.zip"
+    }
+}
 
 data class WorldDataExportResult(
     val success: Boolean,

@@ -1,0 +1,103 @@
+package me.awabi2048.mwmchanpon.extension
+
+import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionTextProvider
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityContext
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentationProvider
+import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
+import me.awabi2048.mwmchanpon.ui.ChanponWorldSettingsMenu
+import me.awabi2048.mwmchanpon.ui.WorldSettingsFeature
+import me.awabi2048.myworldmanager.api.MyWorldManagerApi
+import me.awabi2048.myworldmanager.model.WorldData
+
+internal class ChanponWorldSettingsCapabilities(
+    private val menu: ChanponWorldSettingsMenu,
+) {
+    init {
+        register(
+            WorldSettingsFeature.EXPANSION,
+            ChanponWorldSettingsPlacements.EXPANSION,
+        )
+        register(
+            WorldSettingsFeature.PUBLISH,
+            ChanponWorldSettingsPlacements.PUBLISH,
+        )
+        register(
+            WorldSettingsFeature.NOTIFICATION,
+            ChanponWorldSettingsPlacements.NOTIFICATION,
+        )
+        register(
+            WorldSettingsFeature.ENVIRONMENT,
+            ChanponWorldSettingsPlacements.ENVIRONMENT,
+        )
+        register(
+            WorldSettingsFeature.CRITICAL,
+            ChanponWorldSettingsPlacements.CRITICAL,
+        )
+    }
+
+    private fun register(feature: WorldSettingsFeature, placement: String) {
+        CCSystem.getAPI().getMenuCapabilityService().register(
+            MenuCapabilityDefinition(
+                owner = OWNER,
+                id = "world-settings-${feature.name.lowercase()}",
+                placement = placement,
+                availability = MenuCapabilityAvailability { context ->
+                    worldData(context)?.let {
+                        menu.isFeatureVisible(context.player, it, feature)
+                    } == true
+                },
+                presentationProvider = MenuCapabilityPresentationProvider { context ->
+                    menu.renderFeature(
+                        context.player,
+                        requireNotNull(worldData(context)),
+                        feature,
+                    )
+                },
+                actions = listOf(
+                    MenuCapabilityAction(
+                        id = feature.name.lowercase(),
+                        trigger = menu.actionTrigger(feature),
+                        textProvider = MenuCapabilityActionTextProvider { context ->
+                            menu.featureActionText(context.player, feature)
+                        },
+                        availability = MenuCapabilityAvailability { context ->
+                            worldData(context)?.let {
+                                menu.isFeatureActionable(context.player, it, feature)
+                            } == true
+                        },
+                        handler = MenuCapabilityActionHandler { context ->
+                            menu.handleFeature(
+                                context.player,
+                                requireNotNull(worldData(context)),
+                                feature,
+                                context.click,
+                            )
+                        },
+                    ),
+                ),
+            ),
+        )
+    }
+
+    private fun worldData(context: MenuCapabilityContext): WorldData? =
+        context.arguments[WORLD_UUID]
+            ?.let { runCatching { java.util.UUID.fromString(it) }.getOrNull() }
+            ?.let { MyWorldManagerApi.getWorldRepository()?.findByUuid(it) }
+
+    private fun worldData(context: MenuCapabilityActionContext): WorldData? =
+        context.arguments[WORLD_UUID]
+            ?.let { runCatching { java.util.UUID.fromString(it) }.getOrNull() }
+            ?.let { MyWorldManagerApi.getWorldRepository()?.findByUuid(it) }
+
+    companion object {
+        private const val OWNER = "mwm-chanpon"
+        private const val WORLD_UUID = "world_uuid"
+    }
+}

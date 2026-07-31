@@ -3,6 +3,8 @@ package me.awabi2048.mwmchanpon.ui.bedrock
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.bridge.CoreApiBridge
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.service.ApiBedrockFormService
 import me.awabi2048.myworldmanager.api.service.ApiTemplateValidationIssue
@@ -59,12 +61,16 @@ class AdminWizardForm(
             content = text(player, "chanpon.admin_wizard.select_template"),
             buttons = labels,
             onSelect = { index ->
-                val current = sessions[player.uniqueId] ?: return@sendSimpleForm
-                val selected = current.templates.getOrNull(index) ?: return@sendSimpleForm
+                val current = sessions[player.uniqueId] ?: return@sendSimpleForm MenuActionResult.Ignored
+                val selected = current.templates.getOrNull(index) ?: return@sendSimpleForm MenuActionResult.Ignored
                 current.template = selected
                 openTemplateDetail(player, current, forms)
+                noUpdate()
             },
-            onClosed = { cancel(player) }
+            onClosed = {
+                cancel(player)
+                noUpdate()
+            }
         )
         if (!opened) fail(player, session.request)
         return opened
@@ -125,14 +131,17 @@ class AdminWizardForm(
             onSelect = { index ->
                 if (!usable) {
                     openTemplateSelection(player, session, forms)
-                    return@sendSimpleForm
+                    return@sendSimpleForm noUpdate()
                 }
                 when (index) {
-                    0 -> openNameInput(player, session, forms)
+                    0 -> {
+                        openNameInput(player, session, forms)
+                        noUpdate()
+                    }
                     1 -> {
                         val service = core.getWorldService() ?: run {
                             fail(player, session.request)
-                            return@sendSimpleForm
+                            return@sendSimpleForm noUpdate()
                         }
                         val started = service.previewTemplate(player, template.id) {
                             val current = sessions[player.uniqueId] ?: return@previewTemplate
@@ -143,11 +152,18 @@ class AdminWizardForm(
                         if (!started) {
                             openTemplateDetail(player, session, forms)
                         }
+                        noUpdate()
                     }
-                    else -> openTemplateSelection(player, session, forms)
+                    else -> {
+                        openTemplateSelection(player, session, forms)
+                        noUpdate()
+                    }
                 }
             },
-            onClosed = { cancel(player) }
+            onClosed = {
+                cancel(player)
+                noUpdate()
+            }
         )
         if (!opened) fail(player, session.request)
         return opened
@@ -168,17 +184,21 @@ class AdminWizardForm(
                 val name = normalizeName(rawName)
                 if (name == null) {
                     openNameInput(player, session, forms, text(player, "chanpon.admin_wizard.invalid_name"))
-                    return@sendCustomInputForm
+                    return@sendCustomInputForm noUpdate()
                 }
                 val validationError = core.getWorldService()?.validateWorldName(player, name)
                 if (validationError != null) {
                     openNameInput(player, session, forms, plainText.serialize(validationError))
-                    return@sendCustomInputForm
+                    return@sendCustomInputForm noUpdate()
                 }
                 session.worldName = name
                 openConfirmation(player, session, forms)
+                noUpdate()
             },
-            onClosed = { cancel(player) }
+            onClosed = {
+                cancel(player)
+                noUpdate()
+            }
         )
         if (!opened) fail(player, session.request)
         return opened
@@ -210,11 +230,15 @@ class AdminWizardForm(
             onSelect = { index ->
                 if (index != 0) {
                     cancel(player)
-                    return@sendSimpleForm
+                    return@sendSimpleForm noUpdate()
                 }
                 create(player, session, template, name)
+                noUpdate()
             },
-            onClosed = { cancel(player) }
+            onClosed = {
+                cancel(player)
+                noUpdate()
+            }
         )
         if (!opened) fail(player, session.request)
         return opened
@@ -264,6 +288,8 @@ class AdminWizardForm(
 
     private fun text(player: Player, key: String, vararg placeholders: Pair<String, Any>): String =
         CCSystem.getAPI().getI18nString(player, key, placeholders.toMap())
+
+    private fun noUpdate(): MenuActionResult = MenuActionResult.Success(MenuUpdate.None)
 
     companion object {
         fun normalizeName(raw: String): String? = raw.trim().takeIf { it.isNotEmpty() && it.length <= 32 }

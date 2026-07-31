@@ -8,12 +8,17 @@ production:
 
 creation:
   max_worlds_per_player: 50
+  easy:
+    platform_material: OBSIDIAN
 
 world_expansion:
   max_level: 3
 
 submission:
   closed: false
+
+standalone_export:
+  fiscal_year: 2026
 
 tool_permissions:
   menu_slot: 5
@@ -59,4 +64,4 @@ backup:
       scheduled: 14
       restore_point: 5
       pre_rollback: 10
-config_version: 2
+config_version: 4
