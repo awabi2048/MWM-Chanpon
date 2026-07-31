@@ -108,9 +108,9 @@ class MenuRuntimeNavigationContractTest {
     }
 
     @Test
-    fun `tool permission menu uses any click and the localized back label`() {
+    fun `tool permission menu uses shared back entry and any-click toggles`() {
         val source = uiRoot.resolve("ToolPermissionMenu.kt").readText()
-        assertTrue("name = GuiNameSpec.Text(i18n(\"back\")" in source)
+        assertTrue("getGuiElementService().backEntry(player, 40)" in source)
         assertTrue("MenuGesture.ANY" in source)
         assertFalse("MenuGesture.LEFT_RIGHT" in source)
     }
