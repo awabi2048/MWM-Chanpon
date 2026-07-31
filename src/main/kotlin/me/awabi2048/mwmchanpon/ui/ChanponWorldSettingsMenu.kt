@@ -7,7 +7,6 @@ import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
-import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
 import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
@@ -732,22 +731,25 @@ class ChanponWorldSettingsMenu(
             ChanponWorldVisibility.DEVELOPMENT -> i18n(player, "publish.development_description")
             ChanponWorldVisibility.PRIVATE -> i18n(player, "publish.private_description")
         }
-        val lore = CCSystem.getAPI().getLoreService().render(
-            GuiLoreSpec.Rich(buildList {
-                add(GuiLoreLine.Data(
+        val loreBlocks = buildList {
+            add(GuiLoreBlock(listOf(GuiLoreLine.Text(description))))
+            add(GuiLoreBlock(listOf(
+                GuiLoreLine.Data(
                     i18n(player, "publish.current_label"),
                     display,
-                    options.first { it.first == visibility }.third
-                ))
-                add(GuiLoreLine.Text(description))
-                add(GuiLoreLine.Spacer)
-                options.forEach { (option, displayName, selectedColor) ->
-                    val selected = option == visibility
-                    add(GuiLoreLine.Option(displayName, selected, selectedColor, "\u00A77"))
-                }
-            }, GuiLoreFrame.BOTH)
-        )
-        return capabilityPresentation(Material.OAK_SIGN, i18n(player, "publish.title"), lore)
+                    options.first { it.first == visibility }.third,
+                ),
+            )))
+            add(GuiLoreBlock(options.map { (option, displayName, selectedColor) ->
+                GuiLoreLine.Option(
+                    displayName,
+                    option == visibility,
+                    selectedColor,
+                    "\u00A77",
+                )
+            }))
+        }
+        return capabilityPresentation(Material.OAK_SIGN, i18n(player, "publish.title"), loreBlocks)
     }
 
     private fun expansionPresentation(
@@ -958,20 +960,17 @@ class ChanponWorldSettingsMenu(
     private fun capabilityPresentation(
         material: Material,
         display: String,
-        lore: List<Component>,
+        loreBlocks: List<GuiLoreBlock>,
         role: GuiElementRole = GuiElementRole.ACTION,
     ) = MenuCapabilityPresentation(
         GuiItemSpec(
             material = material,
             name = GuiNameSpec.Text(display, GuiNameStyle.DEFAULT),
-            lore = if (lore.isEmpty()) {
-                GuiLoreSpec.None
-            } else {
-                GuiLoreSpec.Rich(lore.map(GuiLoreLine::Component), GuiLoreFrame.NONE)
-            },
+            lore = GuiLoreSpec.None,
             role = role,
             amount = 1,
         ),
+        embeddedLoreBlocks = loreBlocks,
     )
 
     /**
@@ -1002,24 +1001,15 @@ class ChanponWorldSettingsMenu(
         existing: List<GuiLoreLine>,
         requireTargetWorld: Boolean = false,
         worldData: WorldData? = null
-    ): List<Component> {
+    ): List<GuiLoreBlock> {
         val outsideTargetWorld = requireTargetWorld && worldData != null && !isCurrentWorld(player, worldData)
-        val actionLines = if (outsideTargetWorld) emptyList() else existing
-        return CCSystem.getAPI().getLoreService().render(
-            GuiLoreSpec.Rich(
-                buildList {
-                    if (outsideTargetWorld) {
-                        add(GuiLoreLine.Warning(i18n(player, "common.must_be_in_world_warning")))
-                    }
-                    addAll(description)
-                    if (description.isNotEmpty() && actionLines.any { it != GuiLoreLine.Spacer }) {
-                        add(GuiLoreLine.Spacer)
-                    }
-                    addAll(actionLines)
-                },
-                GuiLoreFrame.BOTH
-            )
-        )
+        return buildList {
+            if (description.isNotEmpty()) add(GuiLoreBlock(description))
+            if (!outsideTargetWorld && existing.isNotEmpty()) add(GuiLoreBlock(existing))
+            if (outsideTargetWorld) {
+                add(GuiLoreBlock(listOf(GuiLoreLine.Warning(i18n(player, "common.must_be_in_world_warning")))))
+            }
+        }
     }
 
     private fun simpleActionEntry(
@@ -1150,18 +1140,15 @@ class ChanponWorldSettingsMenu(
         return i18n(player, "visibility.${visibility.storageValue}")
     }
 
-    private fun cycleVisibility(
-        current: ChanponWorldVisibility,
-        direction: GuiCycleDirection
-    ): ChanponWorldVisibility {
+    private fun cycleVisibility(current: ChanponWorldVisibility): ChanponWorldVisibility {
         return GuiCycle.select(
             current,
             listOf(
-            ChanponWorldVisibility.PUBLIC,
-            ChanponWorldVisibility.DEVELOPMENT,
-            ChanponWorldVisibility.PRIVATE
+                ChanponWorldVisibility.PUBLIC,
+                ChanponWorldVisibility.DEVELOPMENT,
+                ChanponWorldVisibility.PRIVATE,
             ),
-            direction
+            GuiCycleDirection.NEXT,
         )
     }
 
@@ -1249,11 +1236,7 @@ class ChanponWorldSettingsMenu(
 
     internal fun actionTrigger(feature: WorldSettingsFeature):
         com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger =
-        if (feature == WorldSettingsFeature.PUBLISH) {
-            com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger.LEFT_RIGHT
-        } else {
-            com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger.ANY
-        }
+        com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger.ANY
 
     internal fun featureActionText(
         player: Player,
@@ -1286,10 +1269,7 @@ class ChanponWorldSettingsMenu(
                 }
             }
             WorldSettingsFeature.PUBLISH -> {
-                val next = cycleVisibility(
-                    storage.getVisibility(worldData.uuid),
-                    GuiCycle.direction(click) ?: return MenuActionResult.Ignored,
-                )
+                val next = cycleVisibility(storage.getVisibility(worldData.uuid))
                 storage.setVisibility(worldData.uuid, next)
                 MenuActionResult.Success(MenuUpdate.Refresh)
             }
