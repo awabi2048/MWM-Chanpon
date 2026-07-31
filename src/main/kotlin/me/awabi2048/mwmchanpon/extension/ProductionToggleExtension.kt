@@ -83,7 +83,7 @@ class ProductionToggleExtension(
                 actions = listOf(
                     MenuCapabilityAction(
                         id = "open-confirmation",
-                        trigger = MenuCapabilityTrigger.LEFT,
+                        trigger = MenuCapabilityTrigger.ANY,
                         textProvider =
                             MenuCapabilityActionTextProvider(::capabilityActionText),
                         availability =
@@ -107,7 +107,7 @@ class ProductionToggleExtension(
                 actions = listOf(
                     MenuCapabilityAction(
                         id = "toggle",
-                        trigger = MenuCapabilityTrigger.LEFT,
+                        trigger = MenuCapabilityTrigger.ANY,
                         textProvider = MenuCapabilityActionTextProvider {
                             i18n(it.player, "production.lore.action")
                         },

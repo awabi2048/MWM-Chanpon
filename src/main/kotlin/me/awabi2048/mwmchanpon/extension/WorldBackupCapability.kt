@@ -119,7 +119,7 @@ class WorldBackupCapability(
                 actions = listOf(
                     MenuCapabilityAction(
                         id = "open",
-                        trigger = MenuCapabilityTrigger.LEFT,
+                        trigger = MenuCapabilityTrigger.ANY,
                         textProvider = MenuCapabilityActionTextProvider {
                             i18n(it.player, "owner_backup.action")
                         },
@@ -474,7 +474,8 @@ class WorldBackupCapability(
         slot: Int,
         backup: BackupEntry,
         payload: Map<String, String>,
-    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+    ): MenuElement {
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
         player,
         GuiMenuEntrySpec(
             slot = slot,
@@ -501,6 +502,7 @@ class WorldBackupCapability(
             )),
         ),
     )
+    }
 
     private fun backupControlEntry(
         player: Player,
@@ -545,7 +547,9 @@ class WorldBackupCapability(
         actionId: String,
         actionText: String,
         payload: Map<String, String> = emptyMap(),
-    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+    ): MenuElement {
+        if (role == GuiElementRole.BACK) return CCSystem.getAPI().getGuiElementService().backEntry(player, slot)
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
         player,
         GuiMenuEntrySpec(
             slot = slot,
@@ -557,6 +561,7 @@ class WorldBackupCapability(
             ),
         ),
     )
+    }
 
     private fun displayEntry(
         slot: Int,

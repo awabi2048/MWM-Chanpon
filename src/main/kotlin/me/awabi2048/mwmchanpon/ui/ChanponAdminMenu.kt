@@ -107,7 +107,7 @@ class ChanponAdminMenu(
                 actions = listOf(
                     MenuCapabilityAction(
                         id = "open",
-                        trigger = MenuCapabilityTrigger.LEFT,
+                        trigger = MenuCapabilityTrigger.ANY,
                         textProvider = MenuCapabilityActionTextProvider {
                             CCSystem.getAPI().getI18nString(
                                 it.player,

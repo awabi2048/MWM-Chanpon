@@ -41,7 +41,7 @@ class LinkedPortalCapability {
                 actions = listOf(
                     MenuCapabilityAction(
                         id = "receive",
-                        trigger = MenuCapabilityTrigger.LEFT,
+                        trigger = MenuCapabilityTrigger.ANY,
                         textProvider = MenuCapabilityActionTextProvider {
                             i18n(it.player, "linked_portal.action")
                         },

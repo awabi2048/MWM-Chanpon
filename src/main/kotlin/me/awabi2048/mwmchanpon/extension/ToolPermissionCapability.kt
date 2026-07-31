@@ -65,7 +65,7 @@ class ToolPermissionCapability(
                 actions = listOf(
                     MenuCapabilityAction(
                         id = "edit",
-                        trigger = MenuCapabilityTrigger.LEFT,
+                        trigger = MenuCapabilityTrigger.ANY,
                         textProvider = MenuCapabilityActionTextProvider {
                             i18n(it.player, "click_edit_action")
                         },
@@ -101,22 +101,6 @@ class ToolPermissionCapability(
         val offlinePlayer = Bukkit.getOfflinePlayer(memberUuid)
         val detailLines = mutableListOf<GuiLoreLine>()
 
-        if (!offlinePlayer.isOnline) {
-            val date = if (offlinePlayer.lastSeen > 0) {
-                Instant.ofEpochMilli(offlinePlayer.lastSeen)
-                    .atZone(ZoneId.systemDefault())
-                    .format(DateTimeFormatter.ofPattern("yyyy年M月d日 HH:mm"))
-            } else {
-                i18n(player, "unknown")
-            }
-            detailLines += GuiLoreLine.Data(
-                i18n(player, "last_online_label"),
-                date,
-                "§f",
-            )
-            detailLines += GuiLoreLine.Spacer
-        }
-
         detailLines += GuiLoreLine.Data(
             i18n(player, "tool_permission_title"),
             null,
@@ -125,9 +109,9 @@ class ToolPermissionCapability(
         definitions.forEach { definition ->
             detailLines += GuiLoreLine.Text(
                 if (states[definition.id] == true) {
-                    "§6✦ ${definition.displayName}"
+                    "§6◆ ${definition.displayName}"
                 } else {
-                    "§8・ §7${definition.displayName}"
+                    "§8◆ §7${definition.displayName}"
                 },
             )
         }

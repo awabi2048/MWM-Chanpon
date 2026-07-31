@@ -411,7 +411,8 @@ class BackupListMenu(
         slot: Int,
         backup: BackupEntry,
         payload: Map<String, String>,
-    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+    ): MenuElement {
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
         player,
         GuiMenuEntrySpec(
             slot = slot,
@@ -437,6 +438,7 @@ class BackupListMenu(
             ),
         ),
     )
+    }
 
     private fun materialFor(kind: BackupKind): Material = when (kind) {
         BackupKind.USER_MANUAL -> Material.PLAYER_HEAD
@@ -455,7 +457,9 @@ class BackupListMenu(
         actionId: String,
         actionText: String,
         payload: Map<String, String> = emptyMap(),
-    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+    ): MenuElement {
+        if (role == GuiElementRole.BACK) return CCSystem.getAPI().getGuiElementService().backEntry(player, slot)
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
         player,
         GuiMenuEntrySpec(
             slot = slot,
@@ -467,6 +471,7 @@ class BackupListMenu(
             ),
         ),
     )
+    }
 
     private fun displayEntry(
         slot: Int,

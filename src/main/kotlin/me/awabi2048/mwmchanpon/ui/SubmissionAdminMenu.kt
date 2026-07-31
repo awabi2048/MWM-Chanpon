@@ -622,7 +622,8 @@ class SubmissionAdminMenu(
         optionKeys: List<String>,
         selectedKey: String,
         actionId: String,
-    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+    ): MenuElement {
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
         player,
         GuiMenuEntrySpec(
             slot = slot,
@@ -637,6 +638,7 @@ class SubmissionAdminMenu(
             )),
         ),
     )
+    }
 
     private fun closeSubmissionItem(player: Player): MenuElement {
         val key = if (plugin.isSubmissionClosed()) {
@@ -696,7 +698,9 @@ class SubmissionAdminMenu(
         actionId: String,
         actionText: String,
         payload: Map<String, String> = emptyMap(),
-    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+    ): MenuElement {
+        if (role == GuiElementRole.BACK) return CCSystem.getAPI().getGuiElementService().backEntry(player, slot)
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
         player,
         GuiMenuEntrySpec(
             slot = slot,
@@ -708,6 +712,7 @@ class SubmissionAdminMenu(
             ),
         ),
     )
+    }
 
     private fun displayEntry(
         slot: Int,

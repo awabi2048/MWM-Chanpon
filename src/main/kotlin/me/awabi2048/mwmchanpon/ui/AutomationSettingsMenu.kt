@@ -328,8 +328,9 @@ class AutomationSettingsMenu(
         role: GuiElementRole,
         actionId: String,
         actionText: String,
-    ): MenuElement =
-        CCSystem.getAPI().getGuiElementService().menuStructuredEntry(
+    ): MenuElement {
+        if (role == GuiElementRole.BACK) return CCSystem.getAPI().getGuiElementService().backEntry(player, slot)
+        return CCSystem.getAPI().getGuiElementService().menuStructuredEntry(
             player,
             GuiStructuredMenuEntrySpec(
                 slot,
@@ -343,6 +344,7 @@ class AutomationSettingsMenu(
                 listOf(GuiMenuActionIntent.GestureAction(actionId, MenuGesture.ANY, actionText)),
             ),
         )
+    }
 
     private fun i18n(player: Player?, key: String) =
         CCSystem.getAPI().getI18nString(player, "chanpon.backup.$key")

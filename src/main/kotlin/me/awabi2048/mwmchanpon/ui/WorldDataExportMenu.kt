@@ -200,7 +200,8 @@ class WorldDataExportMenu(
         slot: Int,
         world: WorldData,
         selected: Boolean,
-    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+    ): MenuElement {
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
         player,
         GuiMenuEntrySpec(
             slot = slot,
@@ -229,6 +230,7 @@ class WorldDataExportMenu(
             glint = selected,
         ),
     )
+    }
 
     private fun exportSelectionItem(player: Player, slot: Int, selectedCount: Int): MenuElement {
         val enabled = selectedCount > 0
@@ -346,7 +348,9 @@ class WorldDataExportMenu(
         actionId: String,
         actionText: String,
         payload: Map<String, String> = emptyMap(),
-    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+    ): MenuElement {
+        if (role == GuiElementRole.BACK) return CCSystem.getAPI().getGuiElementService().backEntry(player, slot)
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
         player,
         GuiMenuEntrySpec(
             slot = slot,
@@ -358,6 +362,7 @@ class WorldDataExportMenu(
             ),
         ),
     )
+    }
 
     private fun displayEntry(
         slot: Int,

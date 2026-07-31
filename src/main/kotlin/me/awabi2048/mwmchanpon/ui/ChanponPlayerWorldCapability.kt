@@ -294,25 +294,7 @@ class ChanponPlayerWorldCapability(
             )
         }
         if (CCSystem.getAPI().getMenuNavigationService().canGoBack(player)) {
-            elements += CCSystem.getAPI().getGuiElementService().menuEntry(
-                player,
-                GuiMenuEntrySpec(
-                    slot = layout.layout.backSlot,
-                    material = Material.REDSTONE,
-                    name = GuiNameSpec.Text(
-                        text(player, "gui.common.return"),
-                        com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT,
-                    ),
-                    role = GuiElementRole.BACK,
-                    actions = listOf(
-                        GuiMenuActionIntent.GestureAction(
-                            ACTION_BACK,
-                            MenuGesture.ANY,
-                            text(player, "gui.common.return"),
-                        ),
-                    ),
-                ),
-            )
+            elements += CCSystem.getAPI().getGuiElementService().backEntry(player, layout.layout.backSlot)
         }
         if (layout.page + 1 < layout.totalPages) {
             elements += navigationElement(

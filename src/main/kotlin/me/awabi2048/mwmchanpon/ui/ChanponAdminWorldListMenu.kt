@@ -84,7 +84,7 @@ class ChanponAdminWorldListMenu(
                 actions = listOf(
                     MenuCapabilityAction(
                         id = "open",
-                        trigger = MenuCapabilityTrigger.LEFT,
+                        trigger = MenuCapabilityTrigger.ANY,
                         textProvider = MenuCapabilityActionTextProvider {
                             CCSystem.getAPI()
                                 .getI18nString(it.player, "gui.admin_menu.info.action")
@@ -383,7 +383,8 @@ class ChanponAdminWorldListMenu(
         optionKeys: List<String>,
         selectedKey: String,
         actionId: String,
-    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+    ): MenuElement {
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
         player,
         GuiMenuEntrySpec(
             slot = slot,
@@ -398,6 +399,7 @@ class ChanponAdminWorldListMenu(
             )),
         ),
     )
+    }
 
     private fun infoEntry(
         player: Player,
@@ -434,7 +436,9 @@ class ChanponAdminWorldListMenu(
         actionId: String,
         actionText: String,
         payload: Map<String, String> = emptyMap(),
-    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+    ): MenuElement {
+        if (role == GuiElementRole.BACK) return CCSystem.getAPI().getGuiElementService().backEntry(player, slot)
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
         player,
         GuiMenuEntrySpec(
             slot = slot,
@@ -446,6 +450,7 @@ class ChanponAdminWorldListMenu(
             ),
         ),
     )
+    }
 
     private fun openSettings(player: Player, worldData: WorldData): MenuActionResult {
         val folderName = worldDirectory(worldData)

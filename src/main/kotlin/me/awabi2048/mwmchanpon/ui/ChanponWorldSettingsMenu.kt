@@ -236,7 +236,7 @@ class ChanponWorldSettingsMenu(
             .firstNotNullOfOrNull {
                 service.resolve(it.capabilityId, player, arguments)
             } ?: return
-        val accepted = capability.acceptedClicks - ClickType.MIDDLE
+        val accepted = capability.acceptedClicks
         elements += capabilityEntry(
             player,
             slot,
@@ -312,11 +312,16 @@ class ChanponWorldSettingsMenu(
                 attributes + (CAPABILITY_ID to capability.capabilityId),
             )
         }
+        val item = if (presentation.embeddedLoreBlocks.isNotEmpty()) {
+            presentation.item.copy(lore = GuiLoreSpec.Blocks(presentation.embeddedLoreBlocks))
+        } else {
+            presentation.item
+        }
         return CCSystem.getAPI().getGuiElementService().menuStructuredEntry(
             player,
             GuiStructuredMenuEntrySpec(
                 slot = slot,
-                item = presentation.item.copy(
+                item = item.copy(
                     role = if (actions.isEmpty()) GuiElementRole.CONTENT else GuiElementRole.ACTION,
                 ),
                 actions = actions,
@@ -431,7 +436,7 @@ class ChanponWorldSettingsMenu(
             elements += actionElement(
                 player,
                 ChanponGuiElements.backSlot(size),
-                returnItem(player),
+                null,
                 i18n(player, "common.back"),
                 OPERATION_BACK,
                 GuiElementRole.BACK,
@@ -589,7 +594,7 @@ class ChanponWorldSettingsMenu(
             actionElement(
                 player,
                 ChanponGuiElements.backSlot(45),
-                returnItem(player),
+                null,
                 i18n(player, "common.back"),
                 OPERATION_BACK,
                 GuiElementRole.BACK,
@@ -657,7 +662,7 @@ class ChanponWorldSettingsMenu(
                 actionElement(
                     player,
                     ChanponGuiElements.backSlot(45),
-                    returnItem(player),
+                    null,
                     i18n(player, "common.back"),
                     OPERATION_BACK,
                     GuiElementRole.BACK,
@@ -1134,15 +1139,6 @@ class ChanponWorldSettingsMenu(
         )
     }
 
-    private fun returnItem(player: Player): GuiItemSpec =
-        GuiItemSpec(
-            material = Material.REDSTONE,
-            name = GuiNameSpec.Text(i18n(player, "common.back"), GuiNameStyle.DEFAULT),
-            lore = GuiLoreSpec.None,
-            role = GuiElementRole.BACK,
-            amount = 1,
-        )
-
     private fun isCurrentWorld(player: Player, worldData: WorldData): Boolean =
         MyWorldManagerApi.getWorldService()?.isPlayerInWorld(player, worldData) == true
 
@@ -1257,15 +1253,10 @@ class ChanponWorldSettingsMenu(
 
     internal fun actionTrigger(feature: WorldSettingsFeature):
         com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger =
-        if (feature in setOf(
-                WorldSettingsFeature.PUBLISH,
-                WorldSettingsFeature.EXPANSION,
-                WorldSettingsFeature.NOTIFICATION,
-            )
-        ) {
+        if (feature == WorldSettingsFeature.PUBLISH) {
             com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger.LEFT_RIGHT
         } else {
-            com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger.LEFT
+            com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger.ANY
         }
 
     internal fun featureActionText(
@@ -1355,15 +1346,20 @@ class ChanponWorldSettingsMenu(
     private fun actionElement(
         player: Player,
         slot: Int,
-        item: GuiItemSpec,
+        item: GuiItemSpec?,
         actionLabel: String,
         operation: String,
         role: GuiElementRole = GuiElementRole.ACTION,
-    ) = CCSystem.getAPI().getGuiElementService().menuStructuredEntry(
+    ): MenuElement {
+        if (role == GuiElementRole.BACK) {
+            return CCSystem.getAPI().getGuiElementService().backEntry(player, slot)
+        }
+        val actionItem = requireNotNull(item) { "Non-back action requires an item spec" }
+        return CCSystem.getAPI().getGuiElementService().menuStructuredEntry(
         player,
         GuiStructuredMenuEntrySpec(
             slot = slot,
-            item = item.copy(role = role),
+            item = actionItem.copy(role = role),
             actions = listOf(
                 GuiMenuActionIntent.GestureAction(
                     ACTION_SELECT,
@@ -1373,7 +1369,8 @@ class ChanponWorldSettingsMenu(
                 ),
             ),
         ),
-    )
+        )
+    }
 
     private data class Source(
         val screen: Screen,

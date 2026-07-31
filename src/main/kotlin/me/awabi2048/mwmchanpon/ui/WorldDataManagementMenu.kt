@@ -329,7 +329,8 @@ class WorldDataManagementMenu(
         slot: Int,
         world: WorldData,
         payload: Map<String, String>,
-    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+    ): MenuElement {
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
         player,
         GuiMenuEntrySpec(
             slot = slot,
@@ -358,6 +359,7 @@ class WorldDataManagementMenu(
             ),
         ),
     )
+    }
 
     private fun controlEntry(
         player: Player,
@@ -394,7 +396,9 @@ class WorldDataManagementMenu(
         actionId: String,
         actionText: String,
         payload: Map<String, String> = emptyMap(),
-    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+    ): MenuElement {
+        if (role == GuiElementRole.BACK) return CCSystem.getAPI().getGuiElementService().backEntry(player, slot)
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
         player,
         GuiMenuEntrySpec(
             slot = slot,
@@ -406,6 +410,7 @@ class WorldDataManagementMenu(
             ),
         ),
     )
+    }
 
     private fun displayEntry(
         slot: Int,

@@ -95,25 +95,7 @@ class ChanponEnvironmentGui(
                 directSettingEntry(player, 23, worldData.uuid, ACTION_SCALE, Material.PLAYER_HEAD, scaleDisplay(player, scale), scaleOptions(player), scale?.toString(), outsideTargetWorld),
                 directSettingEntry(player, 24, worldData.uuid, ACTION_FLIGHT, Material.ELYTRA, flightDisplay(player, allowFlight), flightOptions(player), allowFlight.toString(), outsideTargetWorld),
                 protectionSettingEntry(player, 25, worldData),
-                CCSystem.getAPI().getGuiElementService().menuEntry(
-                    player,
-                    GuiMenuEntrySpec(
-                        slot = 40,
-                        material = Material.REDSTONE,
-                        name = GuiNameSpec.Text(
-                            i18n(player, "common.back_to_settings"),
-                            com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT,
-                        ),
-                        role = GuiElementRole.BACK,
-                        actions = listOf(
-                            GuiMenuActionIntent.GestureAction(
-                                ACTION_BACK,
-                                MenuGesture.ANY,
-                                i18n(player, "common.back_to_settings"),
-                            ),
-                        ),
-                    ),
-                ),
+                CCSystem.getAPI().getGuiElementService().backEntry(player, 40),
             ),
         )
     }

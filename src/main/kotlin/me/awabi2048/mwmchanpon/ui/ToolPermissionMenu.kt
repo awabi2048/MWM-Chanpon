@@ -92,22 +92,7 @@ class ToolPermissionMenu(
         }
         elements += decorationEntry(24)
         elements += decorationEntry(25)
-        elements += CCSystem.getAPI().getGuiElementService().menuEntry(
-            player,
-            GuiMenuEntrySpec(
-                slot = 40,
-                material = Material.REDSTONE,
-                name = GuiNameSpec.Text(i18n("back"), GuiNameStyle.DEFAULT),
-                role = GuiElementRole.BACK,
-                actions = listOf(
-                    GuiMenuActionIntent.GestureAction(
-                        ACTION_BACK,
-                        MenuGesture.ANY,
-                        i18n("back"),
-                    ),
-                ),
-            ),
-        )
+        elements += CCSystem.getAPI().getGuiElementService().backEntry(player, 40)
         return InventoryMenuView(
             45,
             CCSystem.getAPI().getGuiElementService().name(i18n("title")),
