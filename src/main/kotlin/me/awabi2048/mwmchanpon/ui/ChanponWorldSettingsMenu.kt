@@ -973,13 +973,7 @@ class ChanponWorldSettingsMenu(
         embeddedLoreBlocks = loreBlocks,
     )
 
-    /**
-     * アイコンの表示案内と受理するクリックを同じ定義に保持する。
-     * 左右で意味が分かれる設定を単一クリック表示へ退化させないための正本。
-     */
-
-
-
+    /** 単一操作は、受理するクリック集合と表示する操作案内を同じ定義から生成する。 */
     private fun mwmDescription(player: Player, iconKey: String): List<GuiLoreLine> {
         val key = when (iconKey) {
             "info" -> "gui.settings.info.blocks.summary"
