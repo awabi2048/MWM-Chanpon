@@ -65,7 +65,8 @@ class ToolPermissionCapability(
                 actions = listOf(
                     MenuCapabilityAction(
                         id = "edit",
-                        trigger = MenuCapabilityTrigger.ANY,
+                        // メンバー一覧ではShift操作を別枝として併設するため、通常左右クリックを使用する。
+                        trigger = MenuCapabilityTrigger.LEFT_RIGHT,
                         textProvider = MenuCapabilityActionTextProvider {
                             i18n(it.player, "click_edit_action")
                         },
