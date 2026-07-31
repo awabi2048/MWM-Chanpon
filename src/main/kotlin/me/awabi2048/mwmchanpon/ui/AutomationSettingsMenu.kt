@@ -7,11 +7,11 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
-import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiStructuredMenuEntrySpec
-import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
+import com.awabi2048.ccsystem.api.gui.MenuGesture
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
@@ -117,6 +117,7 @@ class AutomationSettingsMenu(
                 i18n(player, "common.back"),
                 GuiElementRole.BACK,
                 ACTION_BACK,
+                i18n(player, "common.back_action"),
             ),
         )
         if (plugin.config.getBoolean("backup.auto_rollback.enabled", false)) {
@@ -128,9 +129,9 @@ class AutomationSettingsMenu(
                     name = GuiNameSpec.Component(i18nComponent(player, "automation.restore_point.display")),
                     role = GuiElementRole.ACTION,
                     description = i18nList(player, "automation.restore_point.lore"),
-                    actions = listOf(GuiMenuEntryAction(
+                    actions = listOf(GuiMenuActionIntent.GestureAction(
                         ACTION_RESTORE_POINT,
-                        MenuAcceptedClicks.LEFT_RIGHT,
+                        MenuGesture.ANY,
                         i18n(player, "automation.restore_point.action"),
                     )),
                 ),
@@ -165,6 +166,7 @@ class AutomationSettingsMenu(
                     i18n(player, "confirm.button.confirm"),
                     GuiElementRole.CONFIRM,
                     ACTION_CONFIRM_TOGGLE,
+                    i18n(player, "confirm.button.confirm_action"),
                 ),
                 simpleActionEntry(
                     player,
@@ -173,6 +175,7 @@ class AutomationSettingsMenu(
                     i18n(player, "confirm.button.cancel"),
                     GuiElementRole.CANCEL,
                     ACTION_CANCEL,
+                    i18n(player, "confirm.button.cancel_action"),
                 ),
             ),
         )
@@ -192,6 +195,7 @@ class AutomationSettingsMenu(
                     i18n(player, "confirm.button.confirm"),
                     GuiElementRole.CONFIRM,
                     ACTION_CONFIRM_RESTORE_POINT,
+                    i18n(player, "confirm.button.confirm_action"),
                 ),
                 simpleActionEntry(
                     player,
@@ -200,6 +204,7 @@ class AutomationSettingsMenu(
                     i18n(player, "confirm.button.cancel"),
                     GuiElementRole.CANCEL,
                     ACTION_CANCEL,
+                    i18n(player, "confirm.button.cancel_action"),
                 ),
             ),
         )
@@ -282,9 +287,9 @@ class AutomationSettingsMenu(
                 "$key.lore",
                 mapOf("state" to i18n(player, if (enabled) "common.on" else "common.off")),
             ),
-            actions = listOf(GuiMenuEntryAction(
+            actions = listOf(GuiMenuActionIntent.GestureAction(
                 actionId,
-                MenuAcceptedClicks.LEFT_RIGHT,
+                MenuGesture.ANY,
                 i18n(player, "$key.action"),
             )),
             glint = enabled,
@@ -322,6 +327,7 @@ class AutomationSettingsMenu(
         text: String,
         role: GuiElementRole,
         actionId: String,
+        actionText: String,
     ): MenuElement =
         CCSystem.getAPI().getGuiElementService().menuStructuredEntry(
             player,
@@ -334,7 +340,7 @@ class AutomationSettingsMenu(
                     role,
                     1,
                 ),
-                listOf(GuiMenuEntryAction(actionId, MenuAcceptedClicks.LEFT_RIGHT, text)),
+                listOf(GuiMenuActionIntent.GestureAction(actionId, MenuGesture.ANY, actionText)),
             ),
         )
 

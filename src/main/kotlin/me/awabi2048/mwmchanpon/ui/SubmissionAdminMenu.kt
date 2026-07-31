@@ -7,7 +7,7 @@ import com.awabi2048.ccsystem.api.gui.GuiCycle
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
-import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
 import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryOption
@@ -15,7 +15,7 @@ import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import com.awabi2048.ccsystem.api.gui.GuiValueTone
-import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
+import com.awabi2048.ccsystem.api.gui.MenuGesture
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
@@ -127,19 +127,20 @@ class SubmissionAdminMenu(
             elements += simpleActionEntry(
                 player, layout.previousPageSlot, Material.ARROW,
                 i18n(player, "admin_menu.prev"), GuiElementRole.NAVIGATION,
-                ACTION_PAGE, statePayload(current.copy(page = safePage - 1)),
+                ACTION_PAGE, i18n(player, "admin_menu.prev_action"), statePayload(current.copy(page = safePage - 1)),
             )
         }
         if (safePage < totalPages - 1) {
             elements += simpleActionEntry(
                 player, layout.nextPageSlot, Material.ARROW,
                 i18n(player, "admin_menu.next"), GuiElementRole.NAVIGATION,
-                ACTION_PAGE, statePayload(current.copy(page = safePage + 1)),
+                ACTION_PAGE, i18n(player, "admin_menu.next_action"), statePayload(current.copy(page = safePage + 1)),
             )
         }
         elements += simpleActionEntry(
             player, layout.backSlot, Material.REDSTONE,
             i18n(player, "admin_menu.back.display"), GuiElementRole.BACK, ACTION_BACK,
+            i18n(player, "admin_menu.back.action"),
         )
         elements += statsEntry(player, layout.infoSlot)
         worlds.drop(safePage * ITEMS_PER_PAGE)
@@ -526,12 +527,12 @@ class SubmissionAdminMenu(
             .let { if (it.isEmpty()) i18n(player, "admin_menu.world.no_members") else it.joinToString(", ") }
         val production = storage.isProductionWorld(worldData.uuid)
         val actions = buildList {
-            add(GuiMenuEntryAction(ACTION_WORLD, MenuAcceptedClicks.LEFT, i18n(player, "admin_menu.world.action_warp"), payload))
+            add(GuiMenuActionIntent.GestureAction(ACTION_WORLD, MenuGesture.LEFT, i18n(player, "admin_menu.world.action_warp"), payload))
             if (player.gameMode == GameMode.CREATIVE) {
-                add(GuiMenuEntryAction(ACTION_WORLD, MenuAcceptedClicks.RIGHT, i18n(player, "admin_menu.world.action_complete"), payload))
+                add(GuiMenuActionIntent.GestureAction(ACTION_WORLD, MenuGesture.RIGHT, i18n(player, "admin_menu.world.action_complete"), payload))
             }
             if (production) {
-                add(GuiMenuEntryAction(ACTION_WORLD, MenuAcceptedClicks.MIDDLE, i18n(player, "admin_menu.world.action_remove_production"), payload))
+                add(GuiMenuActionIntent.GestureAction(ACTION_WORLD, MenuGesture.MIDDLE, i18n(player, "admin_menu.world.action_remove_production"), payload))
             }
         }
         return CCSystem.getAPI().getGuiElementService().menuEntry(
@@ -629,9 +630,9 @@ class SubmissionAdminMenu(
             name = GuiNameSpec.Component(i18nComponent(player, displayKey)),
             role = GuiElementRole.ACTION,
             options = optionKeys.map { GuiMenuEntryOption(i18n(player, it), it == selectedKey) },
-            actions = listOf(GuiMenuEntryAction(
+            actions = listOf(GuiMenuActionIntent.GestureAction(
                 actionId,
-                MenuAcceptedClicks.LEFT_RIGHT,
+                MenuGesture.ANY,
                 i18n(player, "common.action_next"),
             )),
         ),
@@ -651,9 +652,9 @@ class SubmissionAdminMenu(
                 name = GuiNameSpec.Component(i18nComponent(player, "$key.display")),
                 role = GuiElementRole.ACTION,
                 description = i18nList(player, "$key.lore"),
-                actions = listOf(GuiMenuEntryAction(
+                actions = listOf(GuiMenuActionIntent.GestureAction(
                     ACTION_CLOSE_SUBMISSIONS,
-                    MenuAcceptedClicks.LEFT_RIGHT,
+                    MenuGesture.ANY,
                     i18n(player, "$key.action"),
                 )),
             ),
@@ -676,10 +677,10 @@ class SubmissionAdminMenu(
                 role = if (confirm) GuiElementRole.CONFIRM else GuiElementRole.CANCEL,
                 description = i18nList(player, "$key.lore"),
                 actions = listOf(
-                    GuiMenuEntryAction(
+                    GuiMenuActionIntent.GestureAction(
                         actionId,
-                        MenuAcceptedClicks.LEFT_RIGHT,
-                        i18n(player, "$key.display"),
+                        MenuGesture.ANY,
+                        i18n(player, "$key.action"),
                     ),
                 ),
             ),
@@ -693,6 +694,7 @@ class SubmissionAdminMenu(
         text: String,
         role: GuiElementRole,
         actionId: String,
+        actionText: String,
         payload: Map<String, String> = emptyMap(),
     ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
         player,
@@ -702,7 +704,7 @@ class SubmissionAdminMenu(
             name = GuiNameSpec.Text(text, GuiNameStyle.DEFAULT),
             role = role,
             actions = listOf(
-                GuiMenuEntryAction(actionId, MenuAcceptedClicks.LEFT_RIGHT, text, payload),
+                GuiMenuActionIntent.GestureAction(actionId, MenuGesture.ANY, actionText, payload),
             ),
         ),
     )

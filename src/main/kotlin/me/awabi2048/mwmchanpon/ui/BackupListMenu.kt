@@ -6,13 +6,13 @@ import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
-import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
 import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
-import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
+import com.awabi2048.ccsystem.api.gui.MenuGesture
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
@@ -137,20 +137,20 @@ class BackupListMenu(
         if (safePage > 0) {
             elements += simpleActionEntry(
                 player, previousPageSlot, Material.ARROW, i18n(player, "common.prev"),
-                GuiElementRole.NAVIGATION, ACTION_PAGE,
+                GuiElementRole.NAVIGATION, ACTION_PAGE, i18n(player, "common.prev_action"),
                 sourcePayload(source.copy(page = safePage - 1)),
             )
         }
         if (safePage < pages - 1) {
             elements += simpleActionEntry(
                 player, nextPageSlot, Material.ARROW, i18n(player, "common.next"),
-                GuiElementRole.NAVIGATION, ACTION_PAGE,
+                GuiElementRole.NAVIGATION, ACTION_PAGE, i18n(player, "common.next_action"),
                 sourcePayload(source.copy(page = safePage + 1)),
             )
         }
         elements += simpleActionEntry(
             player, backSlot, Material.REDSTONE, i18n(player, "common.back"),
-            GuiElementRole.BACK, ACTION_BACK,
+            GuiElementRole.BACK, ACTION_BACK, i18n(player, "common.back_action"),
         )
         elements += infoEntry(player, infoSlot, backups.size, safePage + 1, pages)
         backups.drop(startIndex).take(itemCount).forEachIndexed { index, backup ->
@@ -432,8 +432,8 @@ class BackupListMenu(
                 GuiMenuEntryData(i18n(player, "backup_list.item.actor_label"), BackupDisplay.actorName(backup)),
             ),
             actions = listOf(
-                GuiMenuEntryAction(ACTION_BACKUP, MenuAcceptedClicks.LEFT, i18n(player, "backup_list.item.rollback_action"), payload),
-                GuiMenuEntryAction(ACTION_BACKUP, MenuAcceptedClicks.MIDDLE, i18n(player, "backup_list.item.delete_action"), payload),
+                GuiMenuActionIntent.GestureAction(ACTION_BACKUP, MenuGesture.LEFT, i18n(player, "backup_list.item.rollback_action"), payload),
+                GuiMenuActionIntent.GestureAction(ACTION_BACKUP, MenuGesture.MIDDLE, i18n(player, "backup_list.item.delete_action"), payload),
             ),
         ),
     )
@@ -453,6 +453,7 @@ class BackupListMenu(
         text: String,
         role: GuiElementRole,
         actionId: String,
+        actionText: String,
         payload: Map<String, String> = emptyMap(),
     ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
         player,
@@ -462,7 +463,7 @@ class BackupListMenu(
             name = GuiNameSpec.Text(text, GuiNameStyle.DEFAULT),
             role = role,
             actions = listOf(
-                GuiMenuEntryAction(actionId, MenuAcceptedClicks.LEFT_RIGHT, text, payload),
+                GuiMenuActionIntent.GestureAction(actionId, MenuGesture.ANY, actionText, payload),
             ),
         ),
     )
@@ -514,6 +515,7 @@ class BackupListMenu(
             text,
             if (confirm) GuiElementRole.CONFIRM else GuiElementRole.CANCEL,
             actionId,
+            i18n(player, if (confirm) "confirm.button.confirm_action" else "confirm.button.cancel_action"),
         )
     }
 

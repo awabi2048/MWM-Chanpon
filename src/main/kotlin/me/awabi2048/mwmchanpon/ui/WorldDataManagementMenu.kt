@@ -6,12 +6,12 @@ import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
-import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
 import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
-import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
+import com.awabi2048.ccsystem.api.gui.MenuGesture
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
@@ -97,19 +97,19 @@ class WorldDataManagementMenu(
             elements += simpleActionEntry(
                 player, layout.previousPageSlot, Material.ARROW,
                 i18n(player, "common.prev"), GuiElementRole.NAVIGATION,
-                ACTION_PAGE, mapOf(PAGE to (safePage - 1).toString()),
+                ACTION_PAGE, i18n(player, "common.prev_action"), mapOf(PAGE to (safePage - 1).toString()),
             )
         }
         if (safePage < pages - 1) {
             elements += simpleActionEntry(
                 player, layout.nextPageSlot, Material.ARROW,
                 i18n(player, "common.next"), GuiElementRole.NAVIGATION,
-                ACTION_PAGE, mapOf(PAGE to (safePage + 1).toString()),
+                ACTION_PAGE, i18n(player, "common.next_action"), mapOf(PAGE to (safePage + 1).toString()),
             )
         }
         elements += simpleActionEntry(
             player, layout.backSlot, Material.REDSTONE,
-            i18n(player, "common.back"), GuiElementRole.BACK, ACTION_BACK,
+            i18n(player, "common.back"), GuiElementRole.BACK, ACTION_BACK, i18n(player, "common.back_action"),
         )
         elements += infoEntry(player, layout.infoSlot, worlds.size, safePage + 1, pages)
         worlds.drop(safePage * ITEMS_PER_PAGE).take(ITEMS_PER_PAGE).forEachIndexed { index, world ->
@@ -189,12 +189,12 @@ class WorldDataManagementMenu(
                 simpleActionEntry(
                     player, layout.confirmSlot, Material.LIME_CONCRETE,
                     i18n(player, "confirm.button.confirm"), GuiElementRole.CONFIRM,
-                    confirmAction,
+                    confirmAction, i18n(player, "confirm.button.confirm_action"),
                 ),
                 simpleActionEntry(
                     player, layout.cancelSlot, Material.RED_CONCRETE,
                     i18n(player, "confirm.button.cancel"), GuiElementRole.CANCEL,
-                    ACTION_CANCEL,
+                    ACTION_CANCEL, i18n(player, "confirm.button.cancel_action"),
                 ),
             ),
         )
@@ -353,8 +353,8 @@ class WorldDataManagementMenu(
                 ),
             ),
             actions = listOf(
-                GuiMenuEntryAction(ACTION_WORLD, MenuAcceptedClicks.LEFT, i18n(player, "world_data.world.backup_action"), payload),
-                GuiMenuEntryAction(ACTION_WORLD, MenuAcceptedClicks.RIGHT, i18n(player, "world_data.world.list_action"), payload),
+                GuiMenuActionIntent.GestureAction(ACTION_WORLD, MenuGesture.LEFT, i18n(player, "world_data.world.backup_action"), payload),
+                GuiMenuActionIntent.GestureAction(ACTION_WORLD, MenuGesture.RIGHT, i18n(player, "world_data.world.list_action"), payload),
             ),
         ),
     )
@@ -376,9 +376,9 @@ class WorldDataManagementMenu(
             role = GuiElementRole.ACTION,
             description = listOf(i18n(player, "$key.description")),
             warnings = if (warning) listOf(i18n(player, "$key.warning")) else emptyList(),
-            actions = listOf(GuiMenuEntryAction(
+            actions = listOf(GuiMenuActionIntent.GestureAction(
                 actionId,
-                MenuAcceptedClicks.LEFT_RIGHT,
+                MenuGesture.ANY,
                 i18n(player, "$key.action"),
                 payload,
             )),
@@ -392,6 +392,7 @@ class WorldDataManagementMenu(
         text: String,
         role: GuiElementRole,
         actionId: String,
+        actionText: String,
         payload: Map<String, String> = emptyMap(),
     ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
         player,
@@ -401,7 +402,7 @@ class WorldDataManagementMenu(
             name = GuiNameSpec.Text(text, GuiNameStyle.DEFAULT),
             role = role,
             actions = listOf(
-                GuiMenuEntryAction(actionId, MenuAcceptedClicks.LEFT_RIGHT, text, payload),
+                GuiMenuActionIntent.GestureAction(actionId, MenuGesture.ANY, actionText, payload),
             ),
         ),
     )

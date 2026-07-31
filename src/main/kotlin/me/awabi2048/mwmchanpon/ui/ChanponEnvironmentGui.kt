@@ -7,7 +7,7 @@ import com.awabi2048.ccsystem.api.gui.GuiCycleDirection
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
-import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryOption
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
@@ -18,7 +18,7 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
-import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
+import com.awabi2048.ccsystem.api.gui.MenuGesture
 import com.awabi2048.ccsystem.api.gui.MenuDialogButton
 import com.awabi2048.ccsystem.api.gui.MenuDialogHandler
 import com.awabi2048.ccsystem.api.gui.MenuDialogInput
@@ -106,9 +106,9 @@ class ChanponEnvironmentGui(
                         ),
                         role = GuiElementRole.BACK,
                         actions = listOf(
-                            GuiMenuEntryAction(
+                            GuiMenuActionIntent.GestureAction(
                                 ACTION_BACK,
-                                MenuAcceptedClicks.LEFT_RIGHT,
+                                MenuGesture.ANY,
                                 i18n(player, "common.back_to_settings"),
                             ),
                         ),
@@ -345,16 +345,16 @@ class ChanponEnvironmentGui(
             PAYLOAD_SETTING to key,
         )
         val actions = buildList {
-            add(GuiMenuEntryAction(
+            add(GuiMenuActionIntent.GestureAction(
                 ACTION_SETTING,
-                MenuAcceptedClicks.PLAIN_LEFT_RIGHT,
+                MenuGesture.PLAIN_LEFT_RIGHT,
                 i18n(player, "common.action_next"),
                 payload,
             ))
             if (customTimeAction) {
-                add(GuiMenuEntryAction(
+                add(GuiMenuActionIntent.GestureAction(
                     ACTION_SETTING,
-                    MenuAcceptedClicks.SHIFT_LEFT,
+                    MenuGesture.SHIFT_LEFT,
                     i18n(player, "time.custom.action"),
                     payload,
                 ))
@@ -400,16 +400,16 @@ class ChanponEnvironmentGui(
             PAYLOAD_SETTING to ACTION_PROTECTION,
         )
         val actions = buildList {
-            add(GuiMenuEntryAction(
+            add(GuiMenuActionIntent.GestureAction(
                 ACTION_SETTING,
-                MenuAcceptedClicks.PLAIN_LEFT_RIGHT,
+                MenuGesture.PLAIN_LEFT_RIGHT,
                 i18n(player, "common.action_next"),
                 payload,
             ))
             if (mode == ChanponWorldProtectionMode.PASSWORD) {
-                add(GuiMenuEntryAction(
+                add(GuiMenuActionIntent.GestureAction(
                     ACTION_SETTING,
-                    MenuAcceptedClicks.SHIFT_LEFT,
+                    MenuGesture.SHIFT_LEFT,
                     i18n(player, "protection.password_change_action"),
                     payload,
                 ))

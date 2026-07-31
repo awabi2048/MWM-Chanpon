@@ -9,7 +9,7 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
-import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
 import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
@@ -22,7 +22,7 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
-import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
+import com.awabi2048.ccsystem.api.gui.MenuGesture
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
@@ -305,9 +305,9 @@ class ChanponWorldSettingsMenu(
         val presentation = capability.presentation
         val actions = capability.actions.mapNotNull { action ->
             val clicks = action.trigger.clicks.intersect(acceptedClicks)
-            if (clicks.isEmpty()) null else GuiMenuEntryAction(
+            if (clicks.isEmpty()) null else GuiMenuActionIntent.GestureAction(
                 ACTION_CAPABILITY,
-                clicks,
+                MenuGesture.fromClicks(clicks),
                 action.text,
                 attributes + (CAPABILITY_ID to capability.capabilityId),
             )
@@ -908,9 +908,9 @@ class ChanponWorldSettingsMenu(
                     emptyList()
                 },
                 actions = contract.options.zip(actionTexts).map { (option, actionText) ->
-                    GuiMenuEntryAction(
+                    GuiMenuActionIntent.GestureAction(
                         ACTION_SELECT,
-                        option.acceptedClicks,
+                        option.gesture,
                         actionText,
                         mapOf(OPERATION to operation),
                         enabled = actionable,
@@ -940,9 +940,9 @@ class ChanponWorldSettingsMenu(
                     i18n(player, "info.description_label"),
                     worldData.description.ifBlank { "-" },
                 )),
-                actions = if (actionable) listOf(GuiMenuEntryAction(
+                actions = if (actionable) listOf(GuiMenuActionIntent.GestureAction(
                     ACTION_SELECT,
-                    requireNotNull(warpContract).acceptedClicks,
+                    MenuGesture.fromClicks(requireNotNull(warpContract).acceptedClicks),
                     text(player, "gui.player_world.world_item.warp"),
                     mapOf(OPERATION to OPERATION_WARP),
                 )) else emptyList(),
@@ -1043,9 +1043,9 @@ class ChanponWorldSettingsMenu(
                 warnings = warnings,
                 dangers = dangers,
                 actions = listOf(
-                    GuiMenuEntryAction(
+                    GuiMenuActionIntent.GestureAction(
                         ACTION_SELECT,
-                        MenuAcceptedClicks.LEFT_RIGHT,
+                        MenuGesture.ANY,
                         i18n(player, actionKey),
                         mapOf(OPERATION to operation),
                     ),
@@ -1365,9 +1365,9 @@ class ChanponWorldSettingsMenu(
             slot = slot,
             item = item.copy(role = role),
             actions = listOf(
-                GuiMenuEntryAction(
+                GuiMenuActionIntent.GestureAction(
                     ACTION_SELECT,
-                    MenuAcceptedClicks.LEFT_RIGHT,
+                    MenuGesture.ANY,
                     actionLabel,
                     mapOf(OPERATION to operation),
                 ),

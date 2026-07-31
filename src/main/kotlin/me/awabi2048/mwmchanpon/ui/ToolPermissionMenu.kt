@@ -5,13 +5,13 @@ import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
-import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import com.awabi2048.ccsystem.api.gui.GuiValueTone
-import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
+import com.awabi2048.ccsystem.api.gui.MenuGesture
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
@@ -97,13 +97,13 @@ class ToolPermissionMenu(
             GuiMenuEntrySpec(
                 slot = 40,
                 material = Material.REDSTONE,
-                name = GuiNameSpec.Text("§7戻る", GuiNameStyle.DEFAULT),
+                name = GuiNameSpec.Text(i18n("back"), GuiNameStyle.DEFAULT),
                 role = GuiElementRole.BACK,
                 actions = listOf(
-                    GuiMenuEntryAction(
+                    GuiMenuActionIntent.GestureAction(
                         ACTION_BACK,
-                        MenuAcceptedClicks.LEFT_RIGHT,
-                        "§7戻る",
+                        MenuGesture.ANY,
+                        i18n("back"),
                     ),
                 ),
             ),
@@ -172,9 +172,9 @@ class ToolPermissionMenu(
                     i18n(if (moderator) "role.moderator" else "role.member"),
                     if (moderator) GuiValueTone.PRIMARY else GuiValueTone.DEFAULT,
                 )),
-                actions = listOf(GuiMenuEntryAction(
+                actions = listOf(GuiMenuActionIntent.GestureAction(
                     ACTION_ROLE,
-                    MenuAcceptedClicks.LEFT_RIGHT,
+                    MenuGesture.ANY,
                     i18n("role.action"),
                 )),
             ),
@@ -233,9 +233,9 @@ class ToolPermissionMenu(
                     i18n(if (enabled) "enabled" else "disabled"),
                     if (enabled) GuiValueTone.SUCCESS else GuiValueTone.DANGER,
                 )),
-                actions = listOf(GuiMenuEntryAction(
+                actions = listOf(GuiMenuActionIntent.GestureAction(
                     ACTION_TOGGLE,
-                    MenuAcceptedClicks.LEFT_RIGHT,
+                    MenuGesture.ANY,
                     i18n("toggle_action"),
                     mapOf(TOOL_ID to definition.id),
                 )),

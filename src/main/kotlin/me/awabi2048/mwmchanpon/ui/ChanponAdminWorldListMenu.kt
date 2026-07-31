@@ -8,7 +8,7 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
-import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
 import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryOption
@@ -20,7 +20,7 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
-import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
+import com.awabi2048.ccsystem.api.gui.MenuGesture
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionTextProvider
@@ -140,7 +140,7 @@ class ChanponAdminWorldListMenu(
         if (CCSystem.getAPI().getMenuNavigationService().canGoBack(player)) {
             elements += simpleActionEntry(
                 player, 45, Material.REDSTONE, i18n(player, "admin_list.back.display"),
-                GuiElementRole.BACK, ACTION_BACK,
+                GuiElementRole.BACK, ACTION_BACK, i18n(player, "admin_list.back.action"),
             )
         }
         elements += infoEntry(player, 49, worlds.size, current.page + 1, totalPages)
@@ -149,14 +149,14 @@ class ChanponAdminWorldListMenu(
         if (current.page > 0) {
             elements += simpleActionEntry(
                 player, 52, Material.ARROW, i18n(player, "admin_list.prev"),
-                GuiElementRole.NAVIGATION, ACTION_PAGE,
+                GuiElementRole.NAVIGATION, ACTION_PAGE, i18n(player, "admin_list.prev_action"),
                 statePayload(current.copy(page = current.page - 1)),
             )
         }
         if (current.page < totalPages - 1) {
             elements += simpleActionEntry(
                 player, 53, Material.ARROW, i18n(player, "admin_list.next"),
-                GuiElementRole.NAVIGATION, ACTION_PAGE,
+                GuiElementRole.NAVIGATION, ACTION_PAGE, i18n(player, "admin_list.next_action"),
                 statePayload(current.copy(page = current.page + 1)),
             )
         }
@@ -307,12 +307,12 @@ class ChanponAdminWorldListMenu(
                 if (names.isEmpty()) i18n(player, "admin_list.world.no_members") else names.joinToString(", ")
             }
         val actions = buildList {
-            add(GuiMenuEntryAction(ACTION_WORLD, MenuAcceptedClicks.LEFT, i18n(player, "admin_list.world.action_warp"), payload))
+            add(GuiMenuActionIntent.GestureAction(ACTION_WORLD, MenuGesture.LEFT, i18n(player, "admin_list.world.action_warp"), payload))
             if (!current) {
-                add(GuiMenuEntryAction(ACTION_WORLD, MenuAcceptedClicks.RIGHT, i18n(player, "admin_list.world.action_settings"), payload))
+                add(GuiMenuActionIntent.GestureAction(ACTION_WORLD, MenuGesture.RIGHT, i18n(player, "admin_list.world.action_settings"), payload))
             }
             if (player.gameMode == GameMode.CREATIVE) {
-                add(GuiMenuEntryAction(ACTION_WORLD, MenuAcceptedClicks.MIDDLE, i18n(player, "admin_list.world.action_copy"), payload))
+                add(GuiMenuActionIntent.GestureAction(ACTION_WORLD, MenuGesture.MIDDLE, i18n(player, "admin_list.world.action_copy"), payload))
             }
         }
         return CCSystem.getAPI().getGuiElementService().menuEntry(
@@ -391,9 +391,9 @@ class ChanponAdminWorldListMenu(
             name = GuiNameSpec.Component(i18nComponent(player, "$key.display")),
             role = GuiElementRole.ACTION,
             options = optionKeys.map { GuiMenuEntryOption(i18n(player, it), it == selectedKey) },
-            actions = listOf(GuiMenuEntryAction(
+            actions = listOf(GuiMenuActionIntent.GestureAction(
                 actionId,
-                MenuAcceptedClicks.LEFT_RIGHT,
+                MenuGesture.ANY,
                 i18n(player, "common.action_next"),
             )),
         ),
@@ -432,6 +432,7 @@ class ChanponAdminWorldListMenu(
         text: String,
         role: GuiElementRole,
         actionId: String,
+        actionText: String,
         payload: Map<String, String> = emptyMap(),
     ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
         player,
@@ -441,7 +442,7 @@ class ChanponAdminWorldListMenu(
             name = GuiNameSpec.Text(text, GuiNameStyle.DEFAULT),
             role = role,
             actions = listOf(
-                GuiMenuEntryAction(actionId, MenuAcceptedClicks.LEFT_RIGHT, text, payload),
+                GuiMenuActionIntent.GestureAction(actionId, MenuGesture.ANY, actionText, payload),
             ),
         ),
     )

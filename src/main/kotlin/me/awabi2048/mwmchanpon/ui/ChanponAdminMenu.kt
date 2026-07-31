@@ -6,12 +6,12 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiCycle
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
-import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryOption
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiValueTone
-import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
+import com.awabi2048.ccsystem.api.gui.MenuGesture
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
@@ -260,10 +260,10 @@ class ChanponAdminMenu(
                 role = GuiElementRole.ACTION,
                 description = i18nList(player, "$key.lore"),
                 actions = listOf(
-                    GuiMenuEntryAction(
+                    GuiMenuActionIntent.GestureAction(
                         actionId,
-                        MenuAcceptedClicks.LEFT_RIGHT,
-                        i18n(player, "$key.display"),
+                        MenuGesture.ANY,
+                        i18n(player, "$key.action"),
                         payload,
                     ),
                 ),
@@ -286,9 +286,9 @@ class ChanponAdminMenu(
                     controlsI18n(player, if (allowed) "build.allowed" else "build.denied"),
                     GuiValueTone.PRIMARY,
                 )),
-                actions = listOf(GuiMenuEntryAction(
+                actions = listOf(GuiMenuActionIntent.GestureAction(
                     ACTION_BUILDING_ALLOWED,
-                    MenuAcceptedClicks.LEFT_RIGHT,
+                    MenuGesture.ANY,
                     controlsI18n(player, if (allowed) "build.deny_action" else "build.allow_action"),
                 )),
                 glint = null
@@ -326,9 +326,9 @@ class ChanponAdminMenu(
                 },
                 warnings = emptyList(),
                 dangers = emptyList(),
-                actions = listOf(GuiMenuEntryAction(
+                actions = listOf(GuiMenuActionIntent.GestureAction(
                     ACTION_WORLD_CREATION,
-                    MenuAcceptedClicks.LEFT_RIGHT,
+                    MenuGesture.ANY,
                     controlsI18n(player, "creation.cycle_action"),
                 )),
                 glint = null
@@ -351,10 +351,10 @@ class ChanponAdminMenu(
                 name = GuiNameSpec.Component(i18nComponent(player, key)),
                 role = if (confirm) GuiElementRole.CONFIRM else GuiElementRole.CANCEL,
                 actions = listOf(
-                    GuiMenuEntryAction(
+                    GuiMenuActionIntent.GestureAction(
                         actionId,
-                        MenuAcceptedClicks.LEFT_RIGHT,
-                        i18n(player, key),
+                        MenuGesture.ANY,
+                        i18n(player, "$key.action"),
                     ),
                 ),
             ),
@@ -374,9 +374,9 @@ class ChanponAdminMenu(
                 name = GuiNameSpec.Component(i18nComponent(player, "admin.switch_mwm.display")),
                 role = GuiElementRole.NAVIGATION,
                 description = listOf(i18n(player, "admin.switch_mwm.description")),
-                actions = listOf(GuiMenuEntryAction(
+                actions = listOf(GuiMenuActionIntent.GestureAction(
                     ACTION_SWITCH_MWM,
-                    MenuAcceptedClicks.LEFT_RIGHT,
+                    MenuGesture.ANY,
                     i18n(player, "admin.switch_mwm.action"),
                 )),
             ),

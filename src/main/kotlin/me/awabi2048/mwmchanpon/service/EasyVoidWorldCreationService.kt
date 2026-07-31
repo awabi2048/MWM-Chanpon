@@ -9,9 +9,9 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
-import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
 import com.awabi2048.ccsystem.api.gui.GuiStructuredMenuEntrySpec
-import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
+import com.awabi2048.ccsystem.api.gui.MenuGesture
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
@@ -218,9 +218,9 @@ class EasyVoidWorldCreationService(
                         GuiElementRole.CONFIRM,
                         ),
                         actions = listOf(
-                            GuiMenuEntryAction(
+                            GuiMenuActionIntent.GestureAction(
                                 ACTION_CREATE,
-                                MenuAcceptedClicks.LEFT_RIGHT,
+                        MenuGesture.ANY,
                                 i18n(player, "create"),
                             ),
                         ),
@@ -237,9 +237,9 @@ class EasyVoidWorldCreationService(
                         GuiElementRole.CANCEL,
                         ),
                         actions = listOf(
-                            GuiMenuEntryAction(
+                            GuiMenuActionIntent.GestureAction(
                                 ACTION_BACK,
-                                MenuAcceptedClicks.LEFT_RIGHT,
+                        MenuGesture.ANY,
                                 i18n(player, "back"),
                             ),
                         ),

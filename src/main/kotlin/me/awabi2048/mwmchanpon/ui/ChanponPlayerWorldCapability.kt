@@ -6,14 +6,14 @@ import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
-import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
 import com.awabi2048.ccsystem.api.gui.GuiMenuCapabilitySpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiValueTone
-import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
+import com.awabi2048.ccsystem.api.gui.MenuGesture
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
@@ -305,9 +305,9 @@ class ChanponPlayerWorldCapability(
                     ),
                     role = GuiElementRole.BACK,
                     actions = listOf(
-                        GuiMenuEntryAction(
+                        GuiMenuActionIntent.GestureAction(
                             ACTION_BACK,
-                            MenuAcceptedClicks.LEFT_RIGHT,
+                            MenuGesture.ANY,
                             text(player, "gui.common.return"),
                         ),
                     ),
@@ -674,9 +674,9 @@ class ChanponPlayerWorldCapability(
                 material = material,
                 name = GuiNameSpec.Text(name, com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT),
                 role = GuiElementRole.ACTION,
-                actions = listOf(GuiMenuEntryAction(
+                actions = listOf(GuiMenuActionIntent.GestureAction(
                     actionId,
-                    MenuAcceptedClicks.LEFT_RIGHT,
+                    MenuGesture.ANY,
                     actionText,
                 )),
             ),
@@ -715,9 +715,9 @@ class ChanponPlayerWorldCapability(
                 ),
                 role = GuiElementRole.NAVIGATION,
                 actions = listOf(
-                    GuiMenuEntryAction(
+                    GuiMenuActionIntent.GestureAction(
                         ACTION_PAGE,
-                        MenuAcceptedClicks.LEFT_RIGHT,
+                        MenuGesture.LEFT_RIGHT,
                         label,
                         mapOf(PAYLOAD_PAGE to request.page.toString()),
                     ),
@@ -779,9 +779,9 @@ class ChanponPlayerWorldCapability(
                         GuiValueTone.INFO,
                     ),
                 ),
-                actions = listOf(GuiMenuEntryAction(
+                actions = listOf(GuiMenuActionIntent.GestureAction(
                     ACTION_PENDING,
-                    MenuAcceptedClicks.LEFT_RIGHT,
+                    MenuGesture.ANY,
                     text(player, "gui.player_world.pending_button.action"),
                 )),
                 glint = true,
