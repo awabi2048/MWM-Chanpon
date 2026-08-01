@@ -20,6 +20,7 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionTextProvider
@@ -106,7 +107,7 @@ class ChanponAdminMenu(
                     switchToChanponPresentation(it.player)
                 },
                 actions = listOf(
-                    MenuCapabilityAction(
+                    chanponCapabilityAction(
                         id = "open",
                         trigger = MenuCapabilityTrigger.ANY,
                         textProvider = MenuCapabilityActionTextProvider {
@@ -122,6 +123,7 @@ class ChanponAdminMenu(
                                 MenuActionResult.Success(MenuUpdate.Navigate(MenuRoute(OWNER, ROUTE_MAIN)))
                             }
                         },
+                        safety = MenuActionSafety.NAVIGATION_ONLY,
                     ),
                 ),
             ),
@@ -259,11 +261,12 @@ class ChanponAdminMenu(
                 role = GuiElementRole.ACTION,
                 description = i18nList(player, "$key.lore"),
                 actions = listOf(
-                    GuiMenuActionIntent.GestureAction(
+                    chanponGestureAction(
                         actionId,
                         MenuGesture.ANY,
                         i18n(player, "$key.action"),
                         payload,
+                        safety = adminActionSafety(actionId),
                     ),
                 ),
             ),
@@ -285,10 +288,11 @@ class ChanponAdminMenu(
                     controlsI18n(player, if (allowed) "build.allowed" else "build.denied"),
                     GuiValueTone.PRIMARY,
                 )),
-                actions = listOf(GuiMenuActionIntent.GestureAction(
+                actions = listOf(chanponGestureAction(
                     ACTION_BUILDING_ALLOWED,
                     MenuGesture.ANY,
                     controlsI18n(player, if (allowed) "build.deny_action" else "build.allow_action"),
+                    safety = MenuActionSafety.REVERSIBLE,
                 )),
                 glint = null
             ),
@@ -325,10 +329,11 @@ class ChanponAdminMenu(
                 },
                 warnings = emptyList(),
                 dangers = emptyList(),
-                actions = listOf(GuiMenuActionIntent.GestureAction(
+                actions = listOf(chanponGestureAction(
                     ACTION_WORLD_CREATION,
                     MenuGesture.ANY,
                     controlsI18n(player, "creation.cycle_action"),
+                    safety = MenuActionSafety.REVERSIBLE,
                 )),
                 glint = null
             ),
@@ -350,10 +355,11 @@ class ChanponAdminMenu(
                 name = GuiNameSpec.Component(i18nComponent(player, key)),
                 role = if (confirm) GuiElementRole.CONFIRM else GuiElementRole.CANCEL,
                 actions = listOf(
-                    GuiMenuActionIntent.GestureAction(
+                    chanponGestureAction(
                         actionId,
                         MenuGesture.ANY,
                         i18n(player, "$key.action"),
+                        safety = adminActionSafety(actionId),
                     ),
                 ),
             ),
@@ -362,6 +368,20 @@ class ChanponAdminMenu(
 
     private fun currentWorldUuid(player: Player): java.util.UUID? {
         return MyWorldManagerApi.getWorldRepository()?.findByWorldName(player.world.name)?.uuid
+    }
+
+    private fun adminActionSafety(actionId: String): MenuActionSafety = when (actionId) {
+        ACTION_SUBMISSION,
+        ACTION_WORLD_DATA,
+        ACTION_AUTOMATION,
+        ACTION_EXPORT,
+        ACTION_SWITCH_MWM,
+        ACTION_CANCEL_SPAWN -> MenuActionSafety.NAVIGATION_ONLY
+        ACTION_SET_SPAWN_WORLD -> MenuActionSafety.CONFIRM_ENTRY
+        ACTION_BUILDING_ALLOWED,
+        ACTION_WORLD_CREATION,
+        ACTION_CONFIRM_SPAWN -> MenuActionSafety.REVERSIBLE
+        else -> error("Chanpon admin action must declare a dedicated safety mapping: $actionId")
     }
 
     private fun switchToMwmItem(player: Player): MenuElement =
@@ -373,10 +393,11 @@ class ChanponAdminMenu(
                 name = GuiNameSpec.Component(i18nComponent(player, "admin.switch_mwm.display")),
                 role = GuiElementRole.NAVIGATION,
                 description = listOf(i18n(player, "admin.switch_mwm.description")),
-                actions = listOf(GuiMenuActionIntent.GestureAction(
+                actions = listOf(chanponGestureAction(
                     ACTION_SWITCH_MWM,
                     MenuGesture.ANY,
                     i18n(player, "admin.switch_mwm.action"),
+                    safety = MenuActionSafety.NAVIGATION_ONLY,
                 )),
             ),
         )

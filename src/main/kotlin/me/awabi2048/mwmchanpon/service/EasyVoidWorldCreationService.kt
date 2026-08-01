@@ -15,6 +15,7 @@ import com.awabi2048.ccsystem.api.gui.MenuGesture
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuDialogButton
 import com.awabi2048.ccsystem.api.gui.MenuDialogHandler
@@ -25,6 +26,7 @@ import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
+import me.awabi2048.mwmchanpon.ui.chanponGestureAction
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.WorldCreationOperation
 import me.awabi2048.myworldmanager.api.extension.WorldCreationRequest
@@ -218,10 +220,11 @@ class EasyVoidWorldCreationService(
                         GuiElementRole.CONFIRM,
                         ),
                         actions = listOf(
-                            GuiMenuActionIntent.GestureAction(
+                            chanponGestureAction(
                                 ACTION_CREATE,
-                        MenuGesture.ANY,
+                                MenuGesture.ANY,
                                 i18n(player, "create"),
+                                safety = MenuActionSafety.IRREVERSIBLE,
                             ),
                         ),
                     ),
@@ -237,10 +240,11 @@ class EasyVoidWorldCreationService(
                         GuiElementRole.CANCEL,
                         ),
                         actions = listOf(
-                            GuiMenuActionIntent.GestureAction(
+                            chanponGestureAction(
                                 ACTION_BACK,
-                        MenuGesture.ANY,
+                                MenuGesture.ANY,
                                 i18n(player, "back"),
+                                safety = MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE,
                             ),
                         ),
                     ),

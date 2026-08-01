@@ -9,6 +9,7 @@ import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
@@ -26,6 +27,7 @@ import java.time.format.DateTimeFormatter
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.mwmchanpon.tool.ToolPermissionDefinition
 import me.awabi2048.mwmchanpon.ui.ToolPermissionMenu
+import me.awabi2048.mwmchanpon.ui.chanponCapabilityAction
 import me.awabi2048.myworldmanager.api.extension.MemberManagementCapabilityContract
 import me.awabi2048.myworldmanager.api.extension.MemberManagementCapabilitySubject
 import me.awabi2048.myworldmanager.model.WorldData
@@ -63,7 +65,7 @@ class ToolPermissionCapability(
                     )
                 },
                 actions = listOf(
-                    MenuCapabilityAction(
+                    chanponCapabilityAction(
                         id = "edit",
                         // メンバー一覧ではShift操作を別枝として併設するため、通常左右クリックを使用する。
                         trigger = MenuCapabilityTrigger.LEFT_RIGHT,
@@ -71,6 +73,7 @@ class ToolPermissionCapability(
                             i18n(it.player, "click_edit_action")
                         },
                         handler = MenuCapabilityActionHandler(::handlePrimaryAction),
+                        safety = MenuActionSafety.NAVIGATION_ONLY,
                     ),
                 ),
             ),

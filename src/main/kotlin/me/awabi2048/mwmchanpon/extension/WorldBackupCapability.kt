@@ -19,6 +19,7 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuGesture
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
@@ -43,6 +44,8 @@ import me.awabi2048.mwmchanpon.backup.BackupService
 import me.awabi2048.mwmchanpon.backup.RestoreOperationResult
 import me.awabi2048.mwmchanpon.service.BackupAutomationService
 import me.awabi2048.mwmchanpon.service.ManualRollbackService
+import me.awabi2048.mwmchanpon.ui.chanponCapabilityAction
+import me.awabi2048.mwmchanpon.ui.chanponGestureAction
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
@@ -118,13 +121,14 @@ class WorldBackupCapability(
                     entryPresentation(context.player)
                 },
                 actions = listOf(
-                    MenuCapabilityAction(
+                    chanponCapabilityAction(
                         id = "open",
                         trigger = MenuCapabilityTrigger.ANY,
                         textProvider = MenuCapabilityActionTextProvider {
                             i18n(it.player, "owner_backup.action")
                         },
                         handler = MenuCapabilityActionHandler(::openFromCapability),
+                        safety = MenuActionSafety.NAVIGATION_ONLY,
                     ),
                 ),
             ),
@@ -495,11 +499,12 @@ class WorldBackupCapability(
                     BackupDisplay.actorName(backup),
                 ),
             ),
-            actions = listOf(GuiMenuActionIntent.GestureAction(
+            actions = listOf(chanponGestureAction(
                 ACTION_RUNTIME_RESTORE,
                 MenuGesture.LEFT,
                 i18n(player, "owner_backup.item.rollback_action"),
                 payload,
+                safety = MenuActionSafety.CONFIRM_ENTRY,
             )),
         ),
     )
@@ -529,11 +534,12 @@ class WorldBackupCapability(
                     "$key.description",
                     mapOf("remaining" to BackupDisplay.formatDuration(remaining)),
                 )),
-                actions = if (remaining > 0) emptyList() else listOf(GuiMenuActionIntent.GestureAction(
+                actions = if (remaining > 0) emptyList() else listOf(chanponGestureAction(
                     ACTION_RUNTIME_CREATE,
                     MenuGesture.ANY,
                     i18n(player, "$key.action"),
                     payload,
+                    safety = MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE,
                 )),
             ),
         )
@@ -558,7 +564,7 @@ class WorldBackupCapability(
             name = GuiNameSpec.Text(text, GuiNameStyle.DEFAULT),
             role = role,
             actions = listOf(
-                GuiMenuActionIntent.GestureAction(actionId, MenuGesture.ANY, actionText, payload),
+                chanponGestureAction(actionId, MenuGesture.ANY, actionText, payload, safety = ownerBackupActionSafety(actionId)),
             ),
         ),
     )
@@ -665,6 +671,15 @@ class WorldBackupCapability(
         CCSystem.getAPI().getI18nString(player, "chanpon.backup.$key", placeholders)
     private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
+
+    private fun ownerBackupActionSafety(actionId: String): MenuActionSafety = when (actionId) {
+        ACTION_RUNTIME_BACK, ACTION_RUNTIME_PAGE, ACTION_RUNTIME_CANCEL -> MenuActionSafety.NAVIGATION_ONLY
+        ACTION_RUNTIME_RESTORE -> MenuActionSafety.CONFIRM_ENTRY
+        ACTION_RUNTIME_CREATE -> MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE
+        ACTION_RUNTIME_CONFIRM -> MenuActionSafety.IRREVERSIBLE
+        else -> error("Owner-backup action must declare a dedicated safety mapping: $actionId")
+    }
+
     data class Holder(val worldUuid: UUID, val page: Int)
 
     companion object {

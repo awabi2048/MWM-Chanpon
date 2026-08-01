@@ -20,6 +20,7 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
@@ -221,11 +222,12 @@ class WorldDataExportMenu(
                 i18n(player, if (selected) "export_menu.world.selected" else "export_menu.world.not_selected"),
                 selected,
             )),
-            actions = listOf(GuiMenuActionIntent.GestureAction(
+            actions = listOf(chanponGestureAction(
                 ACTION_TOGGLE,
                 MenuGesture.ANY,
                 i18n(player, "export_menu.world.action"),
                 mapOf(WORLD_UUID to world.uuid.toString()),
+                safety = MenuActionSafety.REVERSIBLE,
             )),
             glint = selected,
         ),
@@ -248,10 +250,11 @@ class WorldDataExportMenu(
                 warnings = if (enabled) emptyList() else {
                     listOf(i18n(player, "export_menu.execute.disabled"))
                 },
-                actions = if (enabled) listOf(GuiMenuActionIntent.GestureAction(
+                actions = if (enabled) listOf(chanponGestureAction(
                     ACTION_EXPORT_SELECTION,
                     MenuGesture.ANY,
                     i18n(player, "export_menu.execute.action"),
+                    safety = MenuActionSafety.CONFIRM_ENTRY,
                 )) else emptyList(),
             ),
         )
@@ -273,10 +276,11 @@ class WorldDataExportMenu(
             name = GuiNameSpec.Component(i18nComponent(player, "$key.display")),
             role = if (enabled) role else GuiElementRole.CONTENT,
             description = listOf(i18n(player, "$key.description")),
-            actions = if (enabled) listOf(GuiMenuActionIntent.GestureAction(
+            actions = if (enabled) listOf(chanponGestureAction(
                 actionId,
                 MenuGesture.ANY,
                 i18n(player, "$key.action"),
+                safety = exportActionSafety(actionId),
             )) else emptyList(),
         ),
     )
@@ -358,7 +362,7 @@ class WorldDataExportMenu(
             name = GuiNameSpec.Text(text, GuiNameStyle.DEFAULT),
             role = role,
             actions = listOf(
-                GuiMenuActionIntent.GestureAction(actionId, MenuGesture.ANY, actionText, payload),
+                chanponGestureAction(actionId, MenuGesture.ANY, actionText, payload, safety = exportActionSafety(actionId)),
             ),
         ),
     )
@@ -388,6 +392,14 @@ class WorldDataExportMenu(
 
     private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nString(player, "chanpon.backup.$key", placeholders)
+
+    private fun exportActionSafety(actionId: String): MenuActionSafety = when (actionId) {
+        ACTION_BACK, ACTION_PAGE -> MenuActionSafety.NAVIGATION_ONLY
+        ACTION_TOGGLE, ACTION_SELECT_ALL, ACTION_CLEAR_SELECTION -> MenuActionSafety.REVERSIBLE
+        ACTION_EXPORT_SELECTION -> MenuActionSafety.CONFIRM_ENTRY
+        ACTION_CONFIRM -> MenuActionSafety.IRREVERSIBLE
+        else -> error("World-data export action must declare a dedicated safety mapping: $actionId")
+    }
 
     private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)

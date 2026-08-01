@@ -15,6 +15,7 @@ import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiValueTone
 import com.awabi2048.ccsystem.api.gui.MenuGesture
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
@@ -73,16 +74,16 @@ class ChanponPlayerWorldCapability(
         service.register(
             MenuCapabilityDefinition(
                 owner = CAPABILITY_OWNER,
-                id = WORLD_CAPABILITY_ID,
+                id = CURRENT_WORLD_CAPABILITY_ID,
                 placement = PlayerWorldCapabilityContract.WORLD_ITEM_PLACEMENT,
                 availability = MenuCapabilityAvailability {
-                    subject(it) != null && world(it) != null
+                    subject(it) != null && world(it)?.let { world -> isCurrentWorld(it.player, world) } == true
                 },
                 presentationProvider = MenuCapabilityPresentationProvider {
                     createWorldPresentation(it.player, requireNotNull(world(it)))
                 },
                 actions = listOf(
-                    MenuCapabilityAction(
+                    chanponCapabilityAction(
                         id = "primary",
                         trigger = MenuCapabilityTrigger.LEFT,
                         textProvider = MenuCapabilityActionTextProvider(::primaryWorldActionText),
@@ -93,8 +94,9 @@ class ChanponPlayerWorldCapability(
                             } == true
                         },
                         handler = MenuCapabilityActionHandler(::handleWorld),
+                        safety = MenuActionSafety.NAVIGATION_ONLY,
                     ),
-                    MenuCapabilityAction(
+                    chanponCapabilityAction(
                         id = "settings",
                         trigger = MenuCapabilityTrigger.RIGHT,
                         textProvider = MenuCapabilityActionTextProvider {
@@ -106,8 +108,9 @@ class ChanponPlayerWorldCapability(
                             } == true
                         },
                         handler = MenuCapabilityActionHandler(::handleWorld),
+                        safety = MenuActionSafety.NAVIGATION_ONLY,
                     ),
-                    MenuCapabilityAction(
+                    chanponCapabilityAction(
                         id = "prioritize",
                         trigger = MenuCapabilityTrigger.SHIFT_LEFT,
                         textProvider = MenuCapabilityActionTextProvider {
@@ -117,6 +120,56 @@ class ChanponPlayerWorldCapability(
                             subject(it)?.targetPlayerUuid == it.player.uniqueId
                         },
                         handler = MenuCapabilityActionHandler(::handleWorld),
+                        safety = MenuActionSafety.REVERSIBLE,
+                    ),
+                ),
+            ),
+        )
+        service.register(
+            MenuCapabilityDefinition(
+                owner = CAPABILITY_OWNER,
+                id = AWAY_WORLD_CAPABILITY_ID,
+                placement = PlayerWorldCapabilityContract.WORLD_ITEM_PLACEMENT,
+                availability = MenuCapabilityAvailability {
+                    subject(it) != null && world(it)?.let { world -> !isCurrentWorld(it.player, world) } == true
+                },
+                presentationProvider = MenuCapabilityPresentationProvider {
+                    createWorldPresentation(it.player, requireNotNull(world(it)))
+                },
+                actions = listOf(
+                    chanponCapabilityAction(
+                        id = "primary",
+                        trigger = MenuCapabilityTrigger.LEFT,
+                        textProvider = MenuCapabilityActionTextProvider(::primaryWorldActionText),
+                        availability = MenuCapabilityAvailability {
+                            world(it)?.isArchived == false
+                        },
+                        handler = MenuCapabilityActionHandler(::handleWorld),
+                        safety = MenuActionSafety.EXTERNAL_SIDE_EFFECT,
+                    ),
+                    chanponCapabilityAction(
+                        id = "settings",
+                        trigger = MenuCapabilityTrigger.RIGHT,
+                        textProvider = MenuCapabilityActionTextProvider {
+                            text(it.player, "gui.player_world.world_item.settings")
+                        },
+                        availability = MenuCapabilityAvailability {
+                            world(it)?.let { world -> canOpenSettings(it.player, world) } == true
+                        },
+                        handler = MenuCapabilityActionHandler(::handleWorld),
+                        safety = MenuActionSafety.NAVIGATION_ONLY,
+                    ),
+                    chanponCapabilityAction(
+                        id = "prioritize",
+                        trigger = MenuCapabilityTrigger.SHIFT_LEFT,
+                        textProvider = MenuCapabilityActionTextProvider {
+                            text(it.player, "gui.player_world.world_item.move_to_top")
+                        },
+                        availability = MenuCapabilityAvailability {
+                            subject(it)?.targetPlayerUuid == it.player.uniqueId
+                        },
+                        handler = MenuCapabilityActionHandler(::handleWorld),
+                        safety = MenuActionSafety.REVERSIBLE,
                     ),
                 ),
             ),
@@ -150,7 +203,7 @@ class ChanponPlayerWorldCapability(
                     creationPresentation(it)
                 },
                 actions = listOf(
-                    MenuCapabilityAction(
+                    chanponCapabilityAction(
                         id = "standard-create",
                         trigger = MenuCapabilityTrigger.LEFT,
                         textProvider = MenuCapabilityActionTextProvider {
@@ -160,8 +213,9 @@ class ChanponPlayerWorldCapability(
                             creationBlockReason(it) == null && hasCreatePermission(it.player)
                         },
                         handler = MenuCapabilityActionHandler(::handleCreate),
+                        safety = MenuActionSafety.REVERSIBLE,
                     ),
-                    MenuCapabilityAction(
+                    chanponCapabilityAction(
                         id = "easy-create",
                         trigger = MenuCapabilityTrigger.RIGHT,
                         textProvider = MenuCapabilityActionTextProvider {
@@ -174,6 +228,7 @@ class ChanponPlayerWorldCapability(
                             creationBlockReason(it) == null && hasCreatePermission(it.player)
                         },
                         handler = MenuCapabilityActionHandler(::handleCreate),
+                        safety = MenuActionSafety.REVERSIBLE,
                     ),
                 ),
             ),
@@ -223,15 +278,15 @@ class ChanponPlayerWorldCapability(
             .forEachIndexed { index, worldData ->
                 val attributes = attributes(subject, worldData)
                 val capability = service.resolve(
-                    "$CAPABILITY_OWNER:$WORLD_CAPABILITY_ID",
+                    "$CAPABILITY_OWNER:${worldCapabilityId(player, worldData)}",
                     player,
                     attributes = attributes,
-                ) ?: return@forEachIndexed
+                )?.requireExplicitActionSafety() ?: return@forEachIndexed
                 elements += CCSystem.getAPI().getGuiElementService().menuCapabilityEntry(
                     player,
                     GuiMenuCapabilitySpec(
                         slot = layout.layout.itemSlots[index],
-                        capability = capability,
+                        capability = capability.requireExplicitActionSafety(),
                         actionId = ACTION_CAPABILITY,
                         actionPayload = mapOf(
                             PAYLOAD_CAPABILITY to capability.capabilityId,
@@ -246,13 +301,13 @@ class ChanponPlayerWorldCapability(
                 "$CAPABILITY_OWNER:$CREATION_CAPABILITY_ID",
                 player,
                 attributes = attributes(subject),
-            )?.let { capability ->
+            )?.requireExplicitActionSafety()?.let { capability ->
                 val capabilityAttributes = attributes(subject)
                 elements += CCSystem.getAPI().getGuiElementService().menuCapabilityEntry(
                     player,
                     GuiMenuCapabilitySpec(
                         slot = layout.layout.actionSlot - 2,
-                        capability = capability,
+                        capability = capability.requireExplicitActionSafety(),
                         actionId = ACTION_CAPABILITY,
                         actionPayload = mapOf(PAYLOAD_CAPABILITY to capability.capabilityId),
                     ),
@@ -263,12 +318,12 @@ class ChanponPlayerWorldCapability(
             "$CAPABILITY_OWNER:$SUMMARY_CAPABILITY_ID",
             player,
             attributes = attributes(subject),
-        )?.let { capability ->
+        )?.requireExplicitActionSafety()?.let { capability ->
             elements += CCSystem.getAPI().getGuiElementService().menuCapabilityEntry(
                 player,
                 GuiMenuCapabilitySpec(
                     slot = layout.layout.actionSlot,
-                    capability = capability,
+                    capability = capability.requireExplicitActionSafety(),
                     actionId = ACTION_CAPABILITY,
                     actionPayload = mapOf(PAYLOAD_CAPABILITY to capability.capabilityId),
                 ),
@@ -392,6 +447,9 @@ class ChanponPlayerWorldCapability(
             text(context.player, "gui.player_world.world_item.warp")
         }
     }
+
+    private fun worldCapabilityId(player: Player, worldData: WorldData): String =
+        if (isCurrentWorld(player, worldData)) CURRENT_WORLD_CAPABILITY_ID else AWAY_WORLD_CAPABILITY_ID
 
     private fun createWorldPresentation(
         player: Player,
@@ -641,6 +699,11 @@ class ChanponPlayerWorldCapability(
         )
     }
 
+    private fun playerWorldRuntimeActionSafety(actionId: String): MenuActionSafety = when (actionId) {
+        ACTION_PAGE, ACTION_SETTINGS, ACTION_PENDING, ACTION_BACK -> MenuActionSafety.NAVIGATION_ONLY
+        else -> error("Chanpon player-world action must declare a dedicated safety mapping: $actionId")
+    }
+
     private fun simpleActionElement(
         slot: Int,
         player: Player,
@@ -656,10 +719,11 @@ class ChanponPlayerWorldCapability(
                 material = material,
                 name = GuiNameSpec.Text(name, com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT),
                 role = GuiElementRole.ACTION,
-                actions = listOf(GuiMenuActionIntent.GestureAction(
+                actions = listOf(chanponGestureAction(
                     actionId,
                     MenuGesture.ANY,
                     actionText,
+                    safety = playerWorldRuntimeActionSafety(actionId),
                 )),
             ),
         )
@@ -697,11 +761,12 @@ class ChanponPlayerWorldCapability(
                 ),
                 role = GuiElementRole.NAVIGATION,
                 actions = listOf(
-                    GuiMenuActionIntent.GestureAction(
+                    chanponGestureAction(
                         ACTION_PAGE,
                         MenuGesture.LEFT_RIGHT,
                         label,
                         mapOf(PAYLOAD_PAGE to request.page.toString()),
+                        safety = MenuActionSafety.NAVIGATION_ONLY,
                     ),
                 ),
             ),
@@ -761,10 +826,11 @@ class ChanponPlayerWorldCapability(
                         GuiValueTone.INFO,
                     ),
                 ),
-                actions = listOf(GuiMenuActionIntent.GestureAction(
+                actions = listOf(chanponGestureAction(
                     ACTION_PENDING,
                     MenuGesture.ANY,
                     text(player, "gui.player_world.pending_button.action"),
+                    safety = MenuActionSafety.NAVIGATION_ONLY,
                 )),
                 glint = true,
             ),
@@ -837,7 +903,8 @@ class ChanponPlayerWorldCapability(
 
     private companion object {
         const val CAPABILITY_OWNER = "mwm-chanpon"
-        const val WORLD_CAPABILITY_ID = "player-world-item"
+        const val CURRENT_WORLD_CAPABILITY_ID = "player-world-item-current"
+        const val AWAY_WORLD_CAPABILITY_ID = "player-world-item-away"
         const val SUMMARY_CAPABILITY_ID = "player-world-summary"
         const val CREATION_CAPABILITY_ID = "player-world-creation"
         const val ROUTE_OWNER = "mwm-chanpon"

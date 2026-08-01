@@ -18,6 +18,7 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
@@ -433,8 +434,8 @@ class BackupListMenu(
                 GuiMenuEntryData(i18n(player, "backup_list.item.actor_label"), BackupDisplay.actorName(backup)),
             ),
             actions = listOf(
-                GuiMenuActionIntent.GestureAction(ACTION_BACKUP, MenuGesture.LEFT, i18n(player, "backup_list.item.rollback_action"), payload),
-                GuiMenuActionIntent.GestureAction(ACTION_BACKUP, MenuGesture.MIDDLE, i18n(player, "backup_list.item.delete_action"), payload),
+                chanponGestureAction(ACTION_BACKUP, MenuGesture.LEFT, i18n(player, "backup_list.item.rollback_action"), payload, safety = MenuActionSafety.CONFIRM_ENTRY),
+                chanponGestureAction(ACTION_BACKUP, MenuGesture.MIDDLE, i18n(player, "backup_list.item.delete_action"), payload, safety = MenuActionSafety.CONFIRM_ENTRY),
             ),
         ),
     )
@@ -457,6 +458,7 @@ class BackupListMenu(
         actionId: String,
         actionText: String,
         payload: Map<String, String> = emptyMap(),
+        safety: MenuActionSafety = backupActionSafety(actionId),
     ): MenuElement {
         if (role == GuiElementRole.BACK) return CCSystem.getAPI().getGuiElementService().backEntry(player, slot)
         return CCSystem.getAPI().getGuiElementService().menuEntry(
@@ -467,7 +469,7 @@ class BackupListMenu(
             name = GuiNameSpec.Text(text, GuiNameStyle.DEFAULT),
             role = role,
             actions = listOf(
-                GuiMenuActionIntent.GestureAction(actionId, MenuGesture.ANY, actionText, payload),
+                chanponGestureAction(actionId, MenuGesture.ANY, actionText, payload, safety = safety),
             ),
         ),
     )
@@ -510,6 +512,7 @@ class BackupListMenu(
         slot: Int,
         confirm: Boolean,
         actionId: String,
+        safety: MenuActionSafety = backupActionSafety(actionId),
     ): MenuElement {
         val key = if (confirm) "confirm.button.confirm" else "confirm.button.cancel"
         val text = i18n(player, key)
@@ -521,7 +524,15 @@ class BackupListMenu(
             if (confirm) GuiElementRole.CONFIRM else GuiElementRole.CANCEL,
             actionId,
             i18n(player, if (confirm) "confirm.button.confirm_action" else "confirm.button.cancel_action"),
+            safety = safety,
         )
+    }
+
+    private fun backupActionSafety(actionId: String): MenuActionSafety = when (actionId) {
+        ACTION_BACK, ACTION_PAGE, ACTION_CANCEL -> MenuActionSafety.NAVIGATION_ONLY
+        ACTION_BACKUP -> MenuActionSafety.CONFIRM_ENTRY
+        ACTION_CONFIRM_RESTORE, ACTION_CONFIRM_DELETE -> MenuActionSafety.IRREVERSIBLE
+        else -> error("Backup action must declare a dedicated safety mapping: $actionId")
     }
 
     private fun formatBytes(bytes: Long): String {

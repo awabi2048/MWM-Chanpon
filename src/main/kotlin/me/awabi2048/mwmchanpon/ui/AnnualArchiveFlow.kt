@@ -11,6 +11,7 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
@@ -200,10 +201,11 @@ class AnnualArchiveFlow(
                 name = GuiNameSpec.Component(i18nComponent(player, textKey)),
                 role = role,
                 actions = listOf(
-                    GuiMenuActionIntent.GestureAction(
+                    chanponGestureAction(
                         actionId,
                         MenuGesture.ANY,
                         i18n(player, textKey),
+                        safety = archiveActionSafety(actionId),
                     ),
                 ),
             ),
@@ -254,6 +256,13 @@ class AnnualArchiveFlow(
                     }
                 })
             }
+    }
+
+    private fun archiveActionSafety(actionId: String): MenuActionSafety = when (actionId) {
+        ACTION_CONFIRM_NAME -> MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE
+        ACTION_EXECUTE -> MenuActionSafety.IRREVERSIBLE
+        ACTION_CANCEL -> MenuActionSafety.NAVIGATION_ONLY
+        else -> error("Annual archive action must declare a dedicated safety mapping: $actionId")
     }
 
     private fun cancel(player: Player, closeMenu: Boolean) {

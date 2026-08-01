@@ -19,6 +19,7 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuGesture
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
 import com.awabi2048.ccsystem.api.gui.MenuElement
@@ -342,6 +343,7 @@ class ChanponWorldSettingsMenu(
                 warningButton(player, false),
                 i18n(player, "modified_warning.button.continue"),
                 i18n(player, "modified_warning.button.cancel"),
+                MenuActionSafety.CONFIRM_ENTRY,
             ),
         )
     }
@@ -360,6 +362,7 @@ class ChanponWorldSettingsMenu(
                 confirmButton(player, false),
                 i18n(player, "confirm.button.confirm"),
                 i18n(player, "confirm.button.cancel"),
+                MenuActionSafety.IRREVERSIBLE,
             ),
         )
     }
@@ -426,6 +429,7 @@ class ChanponWorldSettingsMenu(
                 confirmButton(player, false),
                 i18n(player, "confirm.button.confirm"),
                 i18n(player, "confirm.button.cancel"),
+                if (finalStep) MenuActionSafety.IRREVERSIBLE else MenuActionSafety.CONFIRM_ENTRY,
             ),
         )
     }
@@ -647,11 +651,12 @@ class ChanponWorldSettingsMenu(
                 warnings = warnings,
                 dangers = dangers,
                 actions = listOf(
-                    GuiMenuActionIntent.GestureAction(
+                    chanponGestureAction(
                         ACTION_SELECT,
                         MenuGesture.ANY,
                         i18n(player, actionKey),
                         mapOf(OPERATION to operation),
+                        safety = worldSettingsOperationSafety(operation),
                     ),
                 ),
             ),
@@ -904,6 +909,7 @@ class ChanponWorldSettingsMenu(
         cancel: GuiItemSpec,
         confirmLabel: String,
         cancelLabel: String,
+        confirmSafety: MenuActionSafety,
     ): List<MenuElement> = listOf(
         CCSystem.getAPI().getGuiElementService().menuDisplay(
             GuiMenuDisplaySpec(layout.previewSlot, center),
@@ -915,6 +921,7 @@ class ChanponWorldSettingsMenu(
             confirmLabel,
             OPERATION_CONFIRM,
             GuiElementRole.CONFIRM,
+            safety = confirmSafety,
         ),
         actionElement(
             player,
@@ -923,6 +930,7 @@ class ChanponWorldSettingsMenu(
             cancelLabel,
             OPERATION_BACK,
             GuiElementRole.CANCEL,
+            safety = MenuActionSafety.NAVIGATION_ONLY,
         ),
     )
 
@@ -933,6 +941,7 @@ class ChanponWorldSettingsMenu(
         actionLabel: String,
         operation: String,
         role: GuiElementRole = GuiElementRole.ACTION,
+        safety: MenuActionSafety = worldSettingsOperationSafety(operation),
     ): MenuElement {
         if (role == GuiElementRole.BACK) {
             return CCSystem.getAPI().getGuiElementService().backEntry(player, slot)
@@ -944,11 +953,12 @@ class ChanponWorldSettingsMenu(
             slot = slot,
             item = actionItem.copy(role = role),
             actions = listOf(
-                GuiMenuActionIntent.GestureAction(
+                chanponGestureAction(
                     ACTION_SELECT,
                     MenuGesture.ANY,
                     actionLabel,
                     mapOf(OPERATION to operation),
+                    safety = safety,
                 ),
             ),
         ),
@@ -997,6 +1007,16 @@ class ChanponWorldSettingsMenu(
         source.confirmAction?.let { put(PAYLOAD_CONFIRM_ACTION, it.name) }
         source.direction?.let { put(PAYLOAD_DIRECTION, it.name) }
         put(PAYLOAD_FINAL_STEP, source.finalStep.toString())
+    }
+
+    private fun worldSettingsOperationSafety(operation: String): MenuActionSafety = when (operation) {
+        OPERATION_BACK -> MenuActionSafety.NAVIGATION_ONLY
+        OPERATION_EXPAND_CENTER,
+        OPERATION_EXPAND_DIRECTION,
+        OPERATION_STEP_BACK -> MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE
+        OPERATION_DELETE -> MenuActionSafety.CONFIRM_ENTRY
+        OPERATION_CONFIRM -> MenuActionSafety.IRREVERSIBLE
+        else -> error("Chanpon world-settings action must declare a dedicated safety mapping: $operation")
     }
 
     private enum class ConfirmAction(

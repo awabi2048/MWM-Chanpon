@@ -20,6 +20,7 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuGesture
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
@@ -82,7 +83,7 @@ class ChanponAdminWorldListMenu(
                     adminMenuWorldListPresentation(it.player)
                 },
                 actions = listOf(
-                    MenuCapabilityAction(
+                    chanponCapabilityAction(
                         id = "open",
                         trigger = MenuCapabilityTrigger.ANY,
                         textProvider = MenuCapabilityActionTextProvider {
@@ -93,6 +94,7 @@ class ChanponAdminWorldListMenu(
                             val state = ListState(fromAdminMenu = true)
                             MenuActionResult.Success(MenuUpdate.Navigate(listRoute(state)))
                         },
+                        safety = MenuActionSafety.NAVIGATION_ONLY,
                     ),
                 ),
             ),
@@ -307,12 +309,12 @@ class ChanponAdminWorldListMenu(
                 if (names.isEmpty()) i18n(player, "admin_list.world.no_members") else names.joinToString(", ")
             }
         val actions = buildList {
-            add(GuiMenuActionIntent.GestureAction(ACTION_WORLD, MenuGesture.LEFT, i18n(player, "admin_list.world.action_warp"), payload))
+            add(chanponGestureAction(ACTION_WORLD, MenuGesture.LEFT, i18n(player, "admin_list.world.action_warp"), payload, safety = MenuActionSafety.EXTERNAL_SIDE_EFFECT))
             if (!current) {
-                add(GuiMenuActionIntent.GestureAction(ACTION_WORLD, MenuGesture.RIGHT, i18n(player, "admin_list.world.action_settings"), payload))
+                add(chanponGestureAction(ACTION_WORLD, MenuGesture.RIGHT, i18n(player, "admin_list.world.action_settings"), payload, safety = MenuActionSafety.EXTERNAL_SIDE_EFFECT))
             }
             if (player.gameMode == GameMode.CREATIVE) {
-                add(GuiMenuActionIntent.GestureAction(ACTION_WORLD, MenuGesture.MIDDLE, i18n(player, "admin_list.world.action_copy"), payload))
+                add(chanponGestureAction(ACTION_WORLD, MenuGesture.MIDDLE, i18n(player, "admin_list.world.action_copy"), payload, safety = MenuActionSafety.EXTERNAL_SIDE_EFFECT))
             }
         }
         return CCSystem.getAPI().getGuiElementService().menuEntry(
@@ -392,10 +394,11 @@ class ChanponAdminWorldListMenu(
             name = GuiNameSpec.Component(i18nComponent(player, "$key.display")),
             role = GuiElementRole.ACTION,
             options = optionKeys.map { GuiMenuEntryOption(i18n(player, it), it == selectedKey) },
-            actions = listOf(GuiMenuActionIntent.GestureAction(
+            actions = listOf(chanponGestureAction(
                 actionId,
                 MenuGesture.ANY,
                 i18n(player, "common.action_next"),
+                safety = MenuActionSafety.REVERSIBLE,
             )),
         ),
     )
@@ -446,7 +449,7 @@ class ChanponAdminWorldListMenu(
             name = GuiNameSpec.Text(text, GuiNameStyle.DEFAULT),
             role = role,
             actions = listOf(
-                GuiMenuActionIntent.GestureAction(actionId, MenuGesture.ANY, actionText, payload),
+                chanponGestureAction(actionId, MenuGesture.ANY, actionText, payload, safety = adminListActionSafety(actionId)),
             ),
         ),
     )
@@ -478,6 +481,12 @@ class ChanponAdminWorldListMenu(
         }
         val route = settingsRoute(player, worldData) ?: return MenuActionResult.Rejected()
         return MenuActionResult.Success(MenuUpdate.Navigate(route))
+    }
+
+    private fun adminListActionSafety(actionId: String): MenuActionSafety = when (actionId) {
+        ACTION_BACK, ACTION_PAGE -> MenuActionSafety.NAVIGATION_ONLY
+        ACTION_VISIBILITY_FILTER, ACTION_SORT -> MenuActionSafety.REVERSIBLE
+        else -> error("Chanpon admin world-list action must declare a dedicated safety mapping: $actionId")
     }
 
     private fun settingsRoute(player: Player, worldData: WorldData): MenuRoute? =

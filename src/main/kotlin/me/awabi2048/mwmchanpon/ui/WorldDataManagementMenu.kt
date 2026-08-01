@@ -17,6 +17,7 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
@@ -354,8 +355,8 @@ class WorldDataManagementMenu(
                 ),
             ),
             actions = listOf(
-                GuiMenuActionIntent.GestureAction(ACTION_WORLD, MenuGesture.LEFT, i18n(player, "world_data.world.backup_action"), payload),
-                GuiMenuActionIntent.GestureAction(ACTION_WORLD, MenuGesture.RIGHT, i18n(player, "world_data.world.list_action"), payload),
+                chanponGestureAction(ACTION_WORLD, MenuGesture.LEFT, i18n(player, "world_data.world.backup_action"), payload, safety = MenuActionSafety.CONFIRM_ENTRY),
+                chanponGestureAction(ACTION_WORLD, MenuGesture.RIGHT, i18n(player, "world_data.world.list_action"), payload, safety = MenuActionSafety.NAVIGATION_ONLY),
             ),
         ),
     )
@@ -378,11 +379,12 @@ class WorldDataManagementMenu(
             role = GuiElementRole.ACTION,
             description = listOf(i18n(player, "$key.description")),
             warnings = if (warning) listOf(i18n(player, "$key.warning")) else emptyList(),
-            actions = listOf(GuiMenuActionIntent.GestureAction(
+            actions = listOf(chanponGestureAction(
                 actionId,
                 MenuGesture.ANY,
                 i18n(player, "$key.action"),
                 payload,
+                safety = worldDataActionSafety(actionId),
             )),
         ),
     )
@@ -406,7 +408,7 @@ class WorldDataManagementMenu(
             name = GuiNameSpec.Text(text, GuiNameStyle.DEFAULT),
             role = role,
             actions = listOf(
-                GuiMenuActionIntent.GestureAction(actionId, MenuGesture.ANY, actionText, payload),
+                chanponGestureAction(actionId, MenuGesture.ANY, actionText, payload, safety = worldDataActionSafety(actionId)),
             ),
         ),
     )
@@ -461,6 +463,14 @@ class WorldDataManagementMenu(
         key: String,
         placeholders: Map<String, Any> = emptyMap(),
     ) = CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
+
+    private fun worldDataActionSafety(actionId: String): MenuActionSafety = when (actionId) {
+        ACTION_BACK, ACTION_PAGE, ACTION_CANCEL -> MenuActionSafety.NAVIGATION_ONLY
+        ACTION_BULK_BACKUP, ACTION_BULK_ROLLBACK, ACTION_CONFIRM_ROLLBACK -> MenuActionSafety.CONFIRM_ENTRY
+        ACTION_ANNUAL_ARCHIVE -> MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE
+        ACTION_CONFIRM_BACKUP -> MenuActionSafety.IRREVERSIBLE
+        else -> error("World-data action must declare a dedicated safety mapping: $actionId")
+    }
 
     companion object {
         private const val OWNER = "mwm-chanpon"

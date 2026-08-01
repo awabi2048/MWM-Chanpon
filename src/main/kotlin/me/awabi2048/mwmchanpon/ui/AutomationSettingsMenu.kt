@@ -17,6 +17,7 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
@@ -129,10 +130,11 @@ class AutomationSettingsMenu(
                     name = GuiNameSpec.Component(i18nComponent(player, "automation.restore_point.display")),
                     role = GuiElementRole.ACTION,
                     description = i18nList(player, "automation.restore_point.lore"),
-                    actions = listOf(GuiMenuActionIntent.GestureAction(
+                    actions = listOf(chanponGestureAction(
                         ACTION_RESTORE_POINT,
                         MenuGesture.ANY,
                         i18n(player, "automation.restore_point.action"),
+                        safety = MenuActionSafety.CONFIRM_ENTRY,
                     )),
                 ),
             )
@@ -287,10 +289,11 @@ class AutomationSettingsMenu(
                 "$key.lore",
                 mapOf("state" to i18n(player, if (enabled) "common.on" else "common.off")),
             ),
-            actions = listOf(GuiMenuActionIntent.GestureAction(
+            actions = listOf(chanponGestureAction(
                 actionId,
                 MenuGesture.ANY,
                 i18n(player, "$key.action"),
+                safety = automationActionSafety(actionId),
             )),
             glint = enabled,
         ),
@@ -341,7 +344,12 @@ class AutomationSettingsMenu(
                     role,
                     1,
                 ),
-                listOf(GuiMenuActionIntent.GestureAction(actionId, MenuGesture.ANY, actionText)),
+                listOf(chanponGestureAction(
+                    actionId,
+                    MenuGesture.ANY,
+                    actionText,
+                    safety = automationActionSafety(actionId),
+                )),
             ),
         )
     }
@@ -360,6 +368,14 @@ class AutomationSettingsMenu(
         key: String,
         placeholders: Map<String, Any> = emptyMap(),
     ) = CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
+
+    private fun automationActionSafety(actionId: String): MenuActionSafety = when (actionId) {
+        ACTION_BACK, ACTION_CANCEL -> MenuActionSafety.NAVIGATION_ONLY
+        ACTION_AUTO_BACKUP, ACTION_AUTO_ROLLBACK, ACTION_RESTORE_POINT -> MenuActionSafety.CONFIRM_ENTRY
+        ACTION_CONFIRM_TOGGLE -> MenuActionSafety.REVERSIBLE
+        ACTION_CONFIRM_RESTORE_POINT -> MenuActionSafety.IRREVERSIBLE
+        else -> error("Automation action must declare a dedicated safety mapping: $actionId")
+    }
 
     companion object {
         private const val OWNER = "mwm-chanpon"

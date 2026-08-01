@@ -18,6 +18,7 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuGesture
 import com.awabi2048.ccsystem.api.gui.MenuDialogButton
 import com.awabi2048.ccsystem.api.gui.MenuDialogHandler
@@ -327,18 +328,20 @@ class ChanponEnvironmentGui(
             PAYLOAD_SETTING to key,
         )
         val actions = buildList {
-            add(GuiMenuActionIntent.GestureAction(
+            add(chanponGestureAction(
                 ACTION_SETTING,
                 MenuGesture.PLAIN_LEFT_RIGHT,
                 i18n(player, "common.action_next"),
                 payload,
+                safety = MenuActionSafety.REVERSIBLE,
             ))
             if (customTimeAction) {
-                add(GuiMenuActionIntent.GestureAction(
+                add(chanponGestureAction(
                     ACTION_SETTING,
                     MenuGesture.SHIFT_LEFT,
                     i18n(player, "time.custom.action"),
                     payload,
+                    safety = MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE,
                 ))
             }
         }
@@ -382,18 +385,20 @@ class ChanponEnvironmentGui(
             PAYLOAD_SETTING to ACTION_PROTECTION,
         )
         val actions = buildList {
-            add(GuiMenuActionIntent.GestureAction(
+            add(chanponGestureAction(
                 ACTION_SETTING,
                 MenuGesture.PLAIN_LEFT_RIGHT,
                 i18n(player, "common.action_next"),
                 payload,
+                safety = MenuActionSafety.REVERSIBLE,
             ))
             if (mode == ChanponWorldProtectionMode.PASSWORD) {
-                add(GuiMenuActionIntent.GestureAction(
+                add(chanponGestureAction(
                     ACTION_SETTING,
                     MenuGesture.SHIFT_LEFT,
                     i18n(player, "protection.password_change_action"),
                     payload,
+                    safety = MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE,
                 ))
             }
         }

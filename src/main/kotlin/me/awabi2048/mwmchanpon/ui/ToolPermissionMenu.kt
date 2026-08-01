@@ -17,6 +17,7 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
@@ -157,10 +158,11 @@ class ToolPermissionMenu(
                     i18n(if (moderator) "role.moderator" else "role.member"),
                     if (moderator) GuiValueTone.PRIMARY else GuiValueTone.DEFAULT,
                 )),
-                actions = listOf(GuiMenuActionIntent.GestureAction(
+                actions = listOf(chanponGestureAction(
                     ACTION_ROLE,
                     MenuGesture.ANY,
                     i18n("role.action"),
+                    safety = MenuActionSafety.REVERSIBLE,
                 )),
             ),
         )
@@ -218,11 +220,12 @@ class ToolPermissionMenu(
                     i18n(if (enabled) "enabled" else "disabled"),
                     if (enabled) GuiValueTone.SUCCESS else GuiValueTone.DANGER,
                 )),
-                actions = listOf(GuiMenuActionIntent.GestureAction(
+                actions = listOf(chanponGestureAction(
                     ACTION_TOGGLE,
                     MenuGesture.ANY,
                     i18n("toggle_action"),
                     mapOf(TOOL_ID to definition.id),
+                    safety = MenuActionSafety.REVERSIBLE,
                 )),
                 glint = enabled,
             ),

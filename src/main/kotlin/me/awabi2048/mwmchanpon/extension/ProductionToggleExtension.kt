@@ -14,6 +14,7 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
@@ -38,6 +39,8 @@ import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.SubmissionState
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.mwmchanpon.ui.ChanponGuiElements
+import me.awabi2048.mwmchanpon.ui.chanponCapabilityAction
+import me.awabi2048.mwmchanpon.ui.chanponGestureAction
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.event.MwmWorldCreatedEvent
 import me.awabi2048.myworldmanager.api.extension.CreationConfirmationCapabilityContract
@@ -82,7 +85,7 @@ class ProductionToggleExtension(
                 presentationProvider =
                     MenuCapabilityPresentationProvider(::resolveCapabilityPresentation),
                 actions = listOf(
-                    MenuCapabilityAction(
+                    chanponCapabilityAction(
                         id = "open-confirmation",
                         trigger = MenuCapabilityTrigger.ANY,
                         textProvider =
@@ -90,6 +93,7 @@ class ProductionToggleExtension(
                         availability =
                             MenuCapabilityAvailability { resolveCapabilityRoute(it) != null },
                         handler = MenuCapabilityActionHandler(::handleCapabilityAction),
+                        safety = MenuActionSafety.CONFIRM_ENTRY,
                     ),
                 ),
             ),
@@ -106,7 +110,7 @@ class ProductionToggleExtension(
                     )
                 },
                 actions = listOf(
-                    MenuCapabilityAction(
+                    chanponCapabilityAction(
                         id = "toggle",
                         trigger = MenuCapabilityTrigger.ANY,
                         textProvider = MenuCapabilityActionTextProvider {
@@ -118,6 +122,7 @@ class ProductionToggleExtension(
                             toggleCreationSelection(it.player, draft)
                             MenuActionResult.Success(MenuUpdate.Refresh)
                         },
+                        safety = MenuActionSafety.REVERSIBLE,
                     ),
                 ),
             ),
@@ -314,10 +319,11 @@ class ProductionToggleExtension(
                     1,
                 ),
                 actions = listOf(
-                    GuiMenuActionIntent.GestureAction(
+                    chanponGestureAction(
                         actionId,
                         MenuGesture.ANY,
                         text,
+                        safety = productionConfirmationSafety(actionId),
                     ),
                 ),
             ),
@@ -334,6 +340,12 @@ class ProductionToggleExtension(
     private fun cancel(context: MenuActionContext): MenuActionResult {
         context.player.sendMessage(i18n(context.player, "message.cancelled_confirmation"))
         return MenuActionResult.Success(MenuUpdate.Back)
+    }
+
+    private fun productionConfirmationSafety(actionId: String): MenuActionSafety = when (actionId) {
+        ACTION_CONFIRM -> MenuActionSafety.IRREVERSIBLE
+        ACTION_CANCEL -> MenuActionSafety.NAVIGATION_ONLY
+        else -> error("Production confirmation action must declare a dedicated safety mapping: $actionId")
     }
 
     private fun worldData(arguments: Map<String, String>): WorldData? =

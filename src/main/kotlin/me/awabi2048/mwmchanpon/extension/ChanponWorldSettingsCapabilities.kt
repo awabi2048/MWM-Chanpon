@@ -2,6 +2,7 @@ package me.awabi2048.mwmchanpon.extension
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
+import com.awabi2048.ccsystem.api.gui.MenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionTextProvider
@@ -13,6 +14,7 @@ import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentationProvider
 import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import me.awabi2048.mwmchanpon.ui.ChanponWorldSettingsMenu
 import me.awabi2048.mwmchanpon.ui.WorldSettingsFeature
+import me.awabi2048.mwmchanpon.ui.chanponCapabilityAction
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsCapabilityPlacements
 import me.awabi2048.myworldmanager.model.WorldData
@@ -62,7 +64,7 @@ internal class ChanponWorldSettingsCapabilities(
                     )
                 },
                 actions = listOf(
-                    MenuCapabilityAction(
+                    chanponCapabilityAction(
                         id = feature.name.lowercase(),
                         trigger = menu.actionTrigger(feature),
                         textProvider = MenuCapabilityActionTextProvider { context ->
@@ -81,6 +83,7 @@ internal class ChanponWorldSettingsCapabilities(
                                 context.click,
                             )
                         },
+                        safety = featureActionSafety(feature),
                     ),
                 ),
             ),
@@ -96,6 +99,12 @@ internal class ChanponWorldSettingsCapabilities(
         context.arguments[WORLD_UUID]
             ?.let { runCatching { java.util.UUID.fromString(it) }.getOrNull() }
             ?.let { MyWorldManagerApi.getWorldRepository()?.findByUuid(it) }
+
+    private fun featureActionSafety(feature: WorldSettingsFeature): MenuActionSafety = when (feature) {
+        WorldSettingsFeature.EXPANSION -> MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE
+        WorldSettingsFeature.PUBLISH, WorldSettingsFeature.NOTIFICATION -> MenuActionSafety.REVERSIBLE
+        WorldSettingsFeature.ENVIRONMENT, WorldSettingsFeature.CRITICAL -> MenuActionSafety.NAVIGATION_ONLY
+    }
 
     companion object {
         private const val OWNER = "mwm-chanpon"

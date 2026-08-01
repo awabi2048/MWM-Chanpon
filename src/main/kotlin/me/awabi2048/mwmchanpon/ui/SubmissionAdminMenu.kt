@@ -21,6 +21,7 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
@@ -527,12 +528,18 @@ class SubmissionAdminMenu(
             .let { if (it.isEmpty()) i18n(player, "admin_menu.world.no_members") else it.joinToString(", ") }
         val production = storage.isProductionWorld(worldData.uuid)
         val actions = buildList {
-            add(GuiMenuActionIntent.GestureAction(ACTION_WORLD, MenuGesture.LEFT, i18n(player, "admin_menu.world.action_warp"), payload))
+            add(chanponGestureAction(ACTION_WORLD, MenuGesture.LEFT, i18n(player, "admin_menu.world.action_warp"), payload, safety = MenuActionSafety.EXTERNAL_SIDE_EFFECT))
             if (player.gameMode == GameMode.CREATIVE) {
-                add(GuiMenuActionIntent.GestureAction(ACTION_WORLD, MenuGesture.RIGHT, i18n(player, "admin_menu.world.action_complete"), payload))
+                add(chanponGestureAction(
+                    ACTION_WORLD,
+                    MenuGesture.RIGHT,
+                    i18n(player, "admin_menu.world.action_complete"),
+                    payload,
+                    safety = if (state == SubmissionState.UNSUBMITTED) MenuActionSafety.CONFIRM_ENTRY else MenuActionSafety.REVERSIBLE,
+                ))
             }
             if (production) {
-                add(GuiMenuActionIntent.GestureAction(ACTION_WORLD, MenuGesture.MIDDLE, i18n(player, "admin_menu.world.action_remove_production"), payload))
+                add(chanponGestureAction(ACTION_WORLD, MenuGesture.MIDDLE, i18n(player, "admin_menu.world.action_remove_production"), payload, safety = MenuActionSafety.CONFIRM_ENTRY))
             }
         }
         return CCSystem.getAPI().getGuiElementService().menuEntry(
@@ -631,10 +638,11 @@ class SubmissionAdminMenu(
             name = GuiNameSpec.Component(i18nComponent(player, displayKey)),
             role = GuiElementRole.ACTION,
             options = optionKeys.map { GuiMenuEntryOption(i18n(player, it), it == selectedKey) },
-            actions = listOf(GuiMenuActionIntent.GestureAction(
+            actions = listOf(chanponGestureAction(
                 actionId,
                 MenuGesture.ANY,
                 i18n(player, "common.action_next"),
+                safety = MenuActionSafety.REVERSIBLE,
             )),
         ),
     )
@@ -654,10 +662,11 @@ class SubmissionAdminMenu(
                 name = GuiNameSpec.Component(i18nComponent(player, "$key.display")),
                 role = GuiElementRole.ACTION,
                 description = i18nList(player, "$key.lore"),
-                actions = listOf(GuiMenuActionIntent.GestureAction(
+                actions = listOf(chanponGestureAction(
                     ACTION_CLOSE_SUBMISSIONS,
                     MenuGesture.ANY,
                     i18n(player, "$key.action"),
+                    safety = if (plugin.isSubmissionClosed()) MenuActionSafety.REVERSIBLE else MenuActionSafety.CONFIRM_ENTRY,
                 )),
             ),
         )
@@ -679,10 +688,11 @@ class SubmissionAdminMenu(
                 role = if (confirm) GuiElementRole.CONFIRM else GuiElementRole.CANCEL,
                 description = i18nList(player, "$key.lore"),
                 actions = listOf(
-                    GuiMenuActionIntent.GestureAction(
+                    chanponGestureAction(
                         actionId,
                         MenuGesture.ANY,
                         i18n(player, "$key.action"),
+                        safety = submissionActionSafety(actionId),
                     ),
                 ),
             ),
@@ -708,7 +718,7 @@ class SubmissionAdminMenu(
             name = GuiNameSpec.Text(text, GuiNameStyle.DEFAULT),
             role = role,
             actions = listOf(
-                GuiMenuActionIntent.GestureAction(actionId, MenuGesture.ANY, actionText, payload),
+                chanponGestureAction(actionId, MenuGesture.ANY, actionText, payload, safety = submissionActionSafety(actionId)),
             ),
         ),
     )
@@ -728,6 +738,15 @@ class SubmissionAdminMenu(
 
     private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): String {
         return CCSystem.getAPI().getI18nString(player, "chanpon.submission.$key", placeholders)
+    }
+
+    private fun submissionActionSafety(actionId: String): MenuActionSafety = when (actionId) {
+        ACTION_BACK, ACTION_PAGE, ACTION_CANCEL -> MenuActionSafety.NAVIGATION_ONLY
+        ACTION_PROGRESS_FILTER, ACTION_SORT -> MenuActionSafety.REVERSIBLE
+        ACTION_CLOSE_SUBMISSIONS -> MenuActionSafety.CONFIRM_ENTRY
+        ACTION_CONFIRM_CLOSE, ACTION_CONFIRM_COMPLETE -> MenuActionSafety.REVERSIBLE
+        ACTION_CONFIRM_PRODUCTION -> MenuActionSafety.IRREVERSIBLE
+        else -> error("Submission action must declare a dedicated safety mapping: $actionId")
     }
 
     private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): List<String> {
