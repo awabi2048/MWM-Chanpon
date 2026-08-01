@@ -13,13 +13,18 @@ import com.awabi2048.ccsystem.api.gui.MenuReversibleStateRestoreContext
 class EasyCreationReversibleProvider(
     private val service: EasyCreationFlowStateStore,
 ) : MenuReversibleStateProvider {
-    override fun capture(context: MenuReversibleStateCaptureContext): MenuReversibleProviderCaptureResult =
-        MenuReversibleProviderCaptureResult.Captured(
+    override fun capture(context: MenuReversibleStateCaptureContext): MenuReversibleProviderCaptureResult {
+        val returnRoute = EasyCreationReturnRouteContract.resolve(
+            context.interaction.contract.arguments,
+            context.interaction.attributes,
+        ) ?: return MenuReversibleProviderCaptureResult.Rejected("easy creation return route is missing or invalid")
+        return MenuReversibleProviderCaptureResult.Captured(
             State(
                 before = service.captureFlowState(context.player.uniqueId),
-                expectedAfter = service.expectedFlowStateAfterStart(context.route),
+                expectedAfter = service.expectedFlowStateAfterStart(returnRoute),
             ),
         )
+    }
 
     override fun restore(context: MenuReversibleStateRestoreContext): MenuReversibleProviderRestoreResult {
         val state = context.state as? State

@@ -7,6 +7,7 @@ import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuRenderer
 import com.awabi2048.ccsystem.api.gui.MenuActionObservation
+import com.awabi2048.ccsystem.api.gui.MenuActionResult
 import com.awabi2048.ccsystem.api.gui.MenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuReversibleContract
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
@@ -17,6 +18,7 @@ import com.awabi2048.ccsystem.api.gui.ResolvedMenuCapability
 import com.awabi2048.ccsystem.api.gui.ResolvedMenuCapabilityAction
 import me.awabi2048.mwmchanpon.service.ChanponReversibleActionClassification
 import me.awabi2048.mwmchanpon.service.EasyCreationReversibleProvider
+import me.awabi2048.mwmchanpon.service.EasyCreationReturnRouteContract
 import me.awabi2048.myworldmanager.service.MwmReversibleContracts
 import org.bukkit.Material
 import org.bukkit.event.inventory.ClickType
@@ -30,6 +32,11 @@ class ChanponPlayerWorldCapabilityInvocationTest {
     fun `player world capability entries retain their production restore contracts`() {
         val subject = Any()
         val world = Any()
+        val returnRoute = com.awabi2048.ccsystem.api.gui.MenuRoute(
+            "mwm-chanpon",
+            "player-worlds",
+            mapOf("page" to "0", "target_uuid" to "00000000-0000-0000-0000-000000000000"),
+        )
         val invocations = listOf(
             playerWorldCapabilityInvocation(
                 slot = 10,
@@ -82,7 +89,7 @@ class ChanponPlayerWorldCapabilityInvocationTest {
                         ),
                     ),
                 ),
-                attributes = mapOf("subject" to subject),
+                attributes = mapOf("subject" to subject) + EasyCreationReturnRouteContract.attributes(returnRoute),
             ),
             playerWorldCapabilityInvocation(
                 slot = 24,
@@ -143,8 +150,10 @@ class ChanponPlayerWorldCapabilityInvocationTest {
             mapOf("subject" to subject, "world" to world),
             worldInteraction.attributes,
         )
-        assertEquals(mapOf("subject" to subject),
-            assertInstanceOf(MenuInteraction.Capability::class.java, observations[2].interaction).attributes)
+        assertEquals(
+            mapOf("subject" to subject) + EasyCreationReturnRouteContract.attributes(returnRoute),
+            assertInstanceOf(MenuInteraction.Capability::class.java, observations[2].interaction).attributes,
+        )
         assertEquals(mapOf("subject" to subject), invocations[3].attributes)
         assertEquals(
             setOf(ClickType.LEFT, ClickType.RIGHT, ClickType.SHIFT_LEFT),
@@ -170,6 +179,17 @@ class ChanponPlayerWorldCapabilityInvocationTest {
             GuiItemSpec(Material.STONE, GuiNameSpec.Empty, GuiLoreSpec.None, GuiElementRole.ACTION, 1),
         ),
         actions = actions.mapIndexed { index, action ->
+            val factoryAction = chanponCapabilityAction(
+                id = "action-$index",
+                trigger = action.trigger,
+                textProvider = com.awabi2048.ccsystem.api.gui.MenuCapabilityActionTextProvider { "click" },
+                handler = com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler { MenuActionResult.Ignored },
+                safety = action.safety,
+                reversibleContract = action.reversibleContract,
+                classification = action.classification,
+            )
+            assertEquals(action.safety, factoryAction.safety)
+            assertEquals(action.reversibleContract, factoryAction.reversibleContract)
             action.classification?.let { classification ->
                 ChanponReversibleActionClassification.validateActionContract(
                     classification,

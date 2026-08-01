@@ -94,11 +94,13 @@ object ChanponReversibleContracts {
         "toggle",
     )
 
-    fun easyCreation() = contract(
+    fun easyCreation() = MenuReversibleContract(
         EASY_CREATION_PROVIDER,
-        "easy-creation-flow",
-        "player-flow",
-        "start",
+        mapOf(
+            AGGREGATE_KEY to "easy-creation-flow",
+            TARGET_ID to "player-flow",
+            OPERATION to "start",
+        ) + EasyCreationReturnRouteContract.arguments,
     )
 
     private fun contract(
@@ -114,4 +116,63 @@ object ChanponReversibleContracts {
             OPERATION to operation,
         ),
     )
+}
+
+/**
+ * Easy作成で開始元へ戻るためのRouteを、可逆tokenへ明示的に結び付けます。
+ *
+ * Capability定義は共有されるため、実値はInvocation属性で渡します。providerは
+ * 現在表示中のRouteを参照せず、この契約が指す属性だけから期待状態を再構成します。
+ */
+internal object EasyCreationReturnRouteContract {
+    const val OWNER_ARGUMENT = "return_route_owner"
+    const val ID_ARGUMENT = "return_route_id"
+    const val PAYLOAD_ARGUMENT = "return_route_payload"
+
+    const val OWNER_ATTRIBUTE = "mwm-chanpon.easy-creation.return-route.owner"
+    const val ID_ATTRIBUTE = "mwm-chanpon.easy-creation.return-route.id"
+    const val PAYLOAD_ATTRIBUTE = "mwm-chanpon.easy-creation.return-route.payload"
+
+    val arguments: Map<String, String> = mapOf(
+        OWNER_ARGUMENT to "attribute:$OWNER_ATTRIBUTE",
+        ID_ARGUMENT to "attribute:$ID_ATTRIBUTE",
+        PAYLOAD_ARGUMENT to "attribute:$PAYLOAD_ATTRIBUTE",
+    )
+
+    fun attributes(route: com.awabi2048.ccsystem.api.gui.MenuRoute): Map<String, Any> = mapOf(
+        OWNER_ATTRIBUTE to route.owner,
+        ID_ATTRIBUTE to route.id,
+        PAYLOAD_ATTRIBUTE to route.payload.toMap(),
+    )
+
+    fun resolve(
+        contractArguments: Map<String, String>,
+        interactionAttributes: Map<String, Any>,
+    ): com.awabi2048.ccsystem.api.gui.MenuRoute? {
+        val owner = attributeValue(contractArguments, interactionAttributes, OWNER_ARGUMENT) as? String
+            ?: return null
+        val id = attributeValue(contractArguments, interactionAttributes, ID_ARGUMENT) as? String
+            ?: return null
+        val payload = attributeValue(contractArguments, interactionAttributes, PAYLOAD_ARGUMENT) as? Map<*, *>
+            ?: return null
+        val normalizedPayload = buildMap<String, String> {
+            payload.forEach { (key, value) ->
+                if (key !is String || value !is String) return null
+                put(key, value)
+            }
+        }
+        return com.awabi2048.ccsystem.api.gui.MenuRoute(owner, id, normalizedPayload)
+    }
+
+    private fun attributeValue(
+        contractArguments: Map<String, String>,
+        interactionAttributes: Map<String, Any>,
+        argument: String,
+    ): Any? {
+        val attribute = contractArguments[argument]
+            ?.removePrefix("attribute:")
+            ?.takeIf { contractArguments[argument]?.startsWith("attribute:") == true }
+            ?: return null
+        return interactionAttributes[attribute]
+    }
 }

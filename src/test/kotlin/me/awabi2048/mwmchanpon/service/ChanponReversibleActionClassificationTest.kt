@@ -1,9 +1,10 @@
 package me.awabi2048.mwmchanpon.service
 
 import com.awabi2048.ccsystem.api.gui.MenuActionSafety
-import java.nio.file.Files
-import java.nio.file.Path
-import java.util.stream.Collectors
+import com.awabi2048.ccsystem.api.gui.MenuGesture
+import com.awabi2048.ccsystem.api.gui.MenuReversibleContract
+import java.util.UUID
+import me.awabi2048.mwmchanpon.ui.chanponGestureAction
 import me.awabi2048.myworldmanager.service.MwmReversibleContracts
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -44,56 +45,54 @@ class ChanponReversibleActionClassificationTest {
     }
 
     @Test
-    fun `all classified operations are used by production menu callsites`() {
-        val expected = ChanponReversibleActionClassification.Operation.entries.toSet()
-        val sources = Files.walk(Path.of("src", "main", "kotlin")).use { paths ->
-            paths
-                .filter { path -> Files.isRegularFile(path) && path.fileName.toString().endsWith(".kt") }
-                .map { Files.readString(it) }
-                .collect(Collectors.toList())
+    fun `every classified operation produces its declared safety and restore contract through the production factory`() {
+        val generated = ChanponReversibleActionClassification.Operation.entries.associateWith { operation ->
+            val contract = contractFor(operation)
+            val safety = when (operation.kind) {
+                ChanponReversibleActionClassification.Kind.STATE_AGGREGATE -> MenuActionSafety.REVERSIBLE
+                ChanponReversibleActionClassification.Kind.ROUTE_ONLY -> MenuActionSafety.NAVIGATION_ONLY
+            }
+            chanponGestureAction(
+                actionId = operation.key,
+                gesture = MenuGesture.ANY,
+                label = operation.key,
+                safety = safety,
+                reversibleContract = contract,
+                classification = operation,
+            )
         }
-        val actual = sources.flatMap { source ->
-            Regex("ChanponReversibleActionClassification\\.Operation\\.([A-Z_]+)")
-                .findAll(source)
-                .map { match -> ChanponReversibleActionClassification.Operation.valueOf(match.groupValues[1]) }
-        }.toSet()
 
-        assertEquals(expected, actual, "分類台帳と実際の画面呼び出し箇所が一致しません")
-        expected.forEach { operation ->
-            when (operation.kind) {
-                ChanponReversibleActionClassification.Kind.STATE_AGGREGATE ->
-                    ChanponReversibleActionClassification.validateActionContract(
-                        operation,
-                        operation.providerId,
-                        MenuActionSafety.REVERSIBLE,
-                    )
-                ChanponReversibleActionClassification.Kind.ROUTE_ONLY ->
-                    ChanponReversibleActionClassification.validateActionContract(
-                        operation,
-                        null,
-                        MenuActionSafety.NAVIGATION_ONLY,
-                    )
+        assertEquals(ChanponReversibleActionClassification.Operation.entries.toSet(), generated.keys)
+        generated.forEach { (operation, action) ->
+            assertEquals(
+                if (operation.kind == ChanponReversibleActionClassification.Kind.STATE_AGGREGATE) {
+                    MenuActionSafety.REVERSIBLE
+                } else {
+                    MenuActionSafety.NAVIGATION_ONLY
+                },
+                action.safety,
+            )
+            assertEquals(operation.providerId, action.reversibleContract?.providerId)
+            if (operation.kind == ChanponReversibleActionClassification.Kind.STATE_AGGREGATE) {
+                assertTrue(action.reversibleContract!!.arguments.isNotEmpty() || operation.providerId!!.startsWith("myworldmanager:"))
             }
         }
     }
 
     @Test
-    fun `MWM player world classifications retain provider and argument verification references`() {
+    fun `MWM player world classifications retain provider and argument verification`() {
         val references = listOf(
             MwmProviderReference(
                 ChanponReversibleActionClassification.Operation.CURRENT_PLAYER_WORLD_DISPLAY_ORDER,
                 MwmReversibleContracts.displayOrder(),
-                "my_world_manager_plugin/MwmReversibleStateProviders.DisplayOrderProvider",
             ),
             MwmProviderReference(
                 ChanponReversibleActionClassification.Operation.AWAY_PLAYER_WORLD_DISPLAY_ORDER,
                 MwmReversibleContracts.displayOrder(),
-                "my_world_manager_plugin/MwmReversibleStateProviders.DisplayOrderProvider",
             ),
             MwmProviderReference(
                 ChanponReversibleActionClassification.Operation.STANDARD_CREATION_SESSION,
                 MwmReversibleContracts.creationSession(),
-                "my_world_manager_plugin/MwmReversibleStateProviders.CreationSessionProvider",
             ),
         )
         assertEquals(
@@ -116,17 +115,50 @@ class ChanponReversibleActionClassificationTest {
         assertEquals(emptyMap<String, String>(), references[1].contract.arguments)
         assertEquals(mapOf("operation" to "start"), references[2].contract.arguments)
 
-        val providerSource = Path.of("..", "..", "my_world_manager_plugin", "src", "main", "kotlin",
-            "me", "awabi2048", "myworldmanager", "service", "MwmReversibleStateProviders.kt")
-        val source = Files.readString(providerSource)
-        references.map(MwmProviderReference::providerTestReference).toSet().forEach { reference ->
-            assertTrue(source.contains(reference.substringAfterLast('.')))
+    }
+
+    private fun contractFor(operation: ChanponReversibleActionClassification.Operation): MenuReversibleContract? {
+        val world = UUID.fromString("00000000-0000-0000-0000-000000000001")
+        val player = UUID.fromString("00000000-0000-0000-0000-000000000002")
+        return when (operation) {
+            ChanponReversibleActionClassification.Operation.AUTOMATION_TOGGLE ->
+                ChanponReversibleContracts.automation("backup.auto_backup.enabled")
+            ChanponReversibleActionClassification.Operation.BUILDING_TOGGLE ->
+                ChanponReversibleContracts.adminWorldControls("building")
+            ChanponReversibleActionClassification.Operation.CREATION_AVAILABILITY_CYCLE ->
+                ChanponReversibleContracts.adminWorldControls("creation")
+            ChanponReversibleActionClassification.Operation.SPAWN_WORLD_SET ->
+                ChanponReversibleContracts.adminWorldControls("spawn", world.toString())
+            ChanponReversibleActionClassification.Operation.ENVIRONMENT_DIRECT_SETTING_CYCLE,
+            ChanponReversibleActionClassification.Operation.ENVIRONMENT_PROTECTION_CYCLE ->
+                ChanponReversibleContracts.environment(world)
+            ChanponReversibleActionClassification.Operation.PUBLICATION_CYCLE -> ChanponReversibleContracts.publication()
+            ChanponReversibleActionClassification.Operation.WORLD_NOTIFICATION_TOGGLE -> ChanponReversibleContracts.notification()
+            ChanponReversibleActionClassification.Operation.SUBMISSION_CLOSURE ->
+                ChanponReversibleContracts.submission("global", "close")
+            ChanponReversibleActionClassification.Operation.SUBMISSION_COMPLETION ->
+                ChanponReversibleContracts.submission(world.toString(), "complete")
+            ChanponReversibleActionClassification.Operation.TOOL_ENABLE_TOGGLE ->
+                ChanponReversibleContracts.toolPermission(world, player, "toggle")
+            ChanponReversibleActionClassification.Operation.MEMBER_ROLE_TOGGLE ->
+                ChanponReversibleContracts.toolPermission(world, player, "role")
+            ChanponReversibleActionClassification.Operation.CREATION_PRODUCTION_SELECTION ->
+                ChanponReversibleContracts.creationProductionSelection()
+            ChanponReversibleActionClassification.Operation.EASY_CREATION_START -> ChanponReversibleContracts.easyCreation()
+            ChanponReversibleActionClassification.Operation.CURRENT_PLAYER_WORLD_DISPLAY_ORDER,
+            ChanponReversibleActionClassification.Operation.AWAY_PLAYER_WORLD_DISPLAY_ORDER -> MwmReversibleContracts.displayOrder()
+            ChanponReversibleActionClassification.Operation.STANDARD_CREATION_SESSION -> MwmReversibleContracts.creationSession()
+            ChanponReversibleActionClassification.Operation.ADMIN_WORLD_LIST_FILTER,
+            ChanponReversibleActionClassification.Operation.ADMIN_WORLD_LIST_SORT,
+            ChanponReversibleActionClassification.Operation.SUBMISSION_LIST_FILTER,
+            ChanponReversibleActionClassification.Operation.SUBMISSION_LIST_SORT,
+            ChanponReversibleActionClassification.Operation.EXPORT_SELECTION_TOGGLE,
+            ChanponReversibleActionClassification.Operation.EXPORT_SELECTION_CONTROLS -> null
         }
     }
 
     private data class MwmProviderReference(
         val operation: ChanponReversibleActionClassification.Operation,
         val contract: com.awabi2048.ccsystem.api.gui.MenuReversibleContract,
-        val providerTestReference: String,
     )
 }

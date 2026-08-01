@@ -4,6 +4,9 @@ import com.awabi2048.ccsystem.api.gui.MenuReversibleInteractionContext
 import com.awabi2048.ccsystem.api.gui.MenuReversibleProviderCaptureResult
 import com.awabi2048.ccsystem.api.gui.MenuReversibleProviderRestoreResult
 import com.awabi2048.ccsystem.api.gui.MenuReversibleStateCaptureContext
+import com.awabi2048.ccsystem.api.gui.MenuReversibleStateProviderDefinition
+import com.awabi2048.ccsystem.api.gui.MenuReversibleStateProviderRegistration
+import com.awabi2048.ccsystem.api.gui.MenuReversibleStateProviderRegistry
 import com.awabi2048.ccsystem.api.gui.MenuReversibleStateRestoreContext
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import java.lang.reflect.Proxy
@@ -17,6 +20,19 @@ import org.junit.jupiter.api.Test
 
 class EasyCreationReversibleProviderTest {
     @Test
+    fun `easy creation contract explicitly binds the normalized return route attributes`() {
+        val contract = EasyCreationReversibleProvider.contract()
+        assertEquals(
+            EasyCreationReturnRouteContract.arguments,
+            contract.arguments.filterKeys { it.startsWith("return_route_") },
+        )
+
+        val registry = RecordingProviderRegistry()
+        EasyCreationReversibleProvider.register(registry, FakeFlowStateStore(EasyVoidWorldCreationService.FlowState.of(null, null)))
+        assertEquals(contract.providerId, requireNotNull(registry.definition(contract.providerId)).providerId)
+    }
+
+    @Test
     fun `easy creation provider restores only the expected flow state`() {
         val playerId = UUID.randomUUID()
         val player = player(playerId)
@@ -25,29 +41,60 @@ class EasyCreationReversibleProviderTest {
             MenuRoute("mwm-chanpon", "previous", mapOf("selection" to "one")),
         )
         val route = MenuRoute("mwm-chanpon", "player_world", mapOf("mode" to "easy"))
-        val expectedAfter = EasyVoidWorldCreationService.FlowState.of(null, route)
-        val store = FakeFlowStateStore(before, expectedAfter)
+        val store = FakeFlowStateStore(before)
         val provider = EasyCreationReversibleProvider(store)
-        val capture = provider.capture(captureContext(player, route))
+        val capture = provider.capture(captureContext(player, route, route))
         val captured = assertInstanceOf(MenuReversibleProviderCaptureResult.Captured::class.java, capture)
 
-        store.current = expectedAfter
+        store.start(route)
         assertEquals(
             MenuReversibleProviderRestoreResult.Restored,
-            provider.restore(restoreContext(player, route, captured.state)),
+            provider.restore(restoreContext(player, route, route, captured.state)),
         )
         assertEquals(before, store.current)
 
         val second = assertInstanceOf(
             MenuReversibleProviderCaptureResult.Captured::class.java,
-            provider.capture(captureContext(player, route)),
+            provider.capture(captureContext(player, route, route)),
         )
         store.current = EasyVoidWorldCreationService.FlowState.of("changed", route)
         assertInstanceOf(
             MenuReversibleProviderRestoreResult.Rejected::class.java,
-            provider.restore(restoreContext(player, route, second.state)),
+            provider.restore(restoreContext(player, route, route, second.state)),
         )
         assertEquals("changed", store.current.pendingWorldName)
+    }
+
+    @Test
+    fun `easy creation uses the explicitly supplied normalized return route instead of the current route`() {
+        val playerId = UUID.randomUUID()
+        val player = player(playerId)
+        val before = EasyVoidWorldCreationService.FlowState.of(null, null)
+        val rawRoute = MenuRoute("mwm-chanpon", "player-worlds", mapOf("page" to "-1", "target" to "player"))
+        val normalizedReturnRoute = MenuRoute("mwm-chanpon", "player-worlds", mapOf("page" to "0", "target" to "player"))
+        val store = FakeFlowStateStore(before)
+        val provider = EasyCreationReversibleProvider(store)
+
+        val captured = assertInstanceOf(
+            MenuReversibleProviderCaptureResult.Captured::class.java,
+            provider.capture(captureContext(player, rawRoute, normalizedReturnRoute)),
+        )
+        store.start(normalizedReturnRoute)
+        assertEquals(
+            MenuReversibleProviderRestoreResult.Restored,
+            provider.restore(restoreContext(player, rawRoute, normalizedReturnRoute, captured.state)),
+        )
+        assertEquals(before, store.current)
+
+        val stale = assertInstanceOf(
+            MenuReversibleProviderCaptureResult.Captured::class.java,
+            provider.capture(captureContext(player, rawRoute, normalizedReturnRoute)),
+        )
+        store.start(MenuRoute("mwm-chanpon", "player-worlds", mapOf("page" to "8", "target" to "player")))
+        assertInstanceOf(
+            MenuReversibleProviderRestoreResult.Rejected::class.java,
+            provider.restore(restoreContext(player, rawRoute, normalizedReturnRoute, stale.state)),
+        )
     }
 
     @Test
@@ -68,19 +115,30 @@ class EasyCreationReversibleProviderTest {
         }
     }
 
-    private fun captureContext(player: Player, route: MenuRoute): MenuReversibleStateCaptureContext {
-        val interaction = interaction(route)
-        return MenuReversibleStateCaptureContext(player, route, "run", interaction)
+    private fun captureContext(
+        player: Player,
+        currentRoute: MenuRoute,
+        normalizedReturnRoute: MenuRoute,
+    ): MenuReversibleStateCaptureContext {
+        val interaction = interaction(currentRoute, normalizedReturnRoute)
+        return MenuReversibleStateCaptureContext(player, currentRoute, "run", interaction)
     }
 
     private fun restoreContext(
         player: Player,
-        route: MenuRoute,
+        currentRoute: MenuRoute,
+        normalizedReturnRoute: MenuRoute,
         state: com.awabi2048.ccsystem.api.gui.MenuReversibleProviderState,
     ): MenuReversibleStateRestoreContext =
-        MenuReversibleStateRestoreContext(player, route, "run", interaction(route), state)
+        MenuReversibleStateRestoreContext(
+            player,
+            currentRoute,
+            "run",
+            interaction(currentRoute, normalizedReturnRoute),
+            state,
+        )
 
-    private fun interaction(route: MenuRoute) = MenuReversibleInteractionContext(
+    private fun interaction(currentRoute: MenuRoute, normalizedReturnRoute: MenuRoute) = MenuReversibleInteractionContext(
         slot = 0,
         click = ClickType.RIGHT,
         actionId = "easy-create",
@@ -88,8 +146,8 @@ class EasyCreationReversibleProviderTest {
         contract = EasyCreationReversibleProvider.contract(),
         revision = 1L,
         arguments = emptyMap(),
-        attributes = emptyMap(),
-        routePayload = route.payload,
+        attributes = EasyCreationReturnRouteContract.attributes(normalizedReturnRoute),
+        routePayload = currentRoute.payload,
     )
 
     private fun player(playerId: UUID): Player = Proxy.newProxyInstance(
@@ -115,16 +173,46 @@ class EasyCreationReversibleProviderTest {
 
     private class FakeFlowStateStore(
         private val before: EasyVoidWorldCreationService.FlowState,
-        private val expected: EasyVoidWorldCreationService.FlowState,
     ) : EasyCreationFlowStateStore {
         var current: EasyVoidWorldCreationService.FlowState = before
 
         override fun captureFlowState(playerId: UUID): EasyVoidWorldCreationService.FlowState = current
 
-        override fun expectedFlowStateAfterStart(returnRoute: MenuRoute): EasyVoidWorldCreationService.FlowState = expected
+        override fun expectedFlowStateAfterStart(returnRoute: MenuRoute): EasyVoidWorldCreationService.FlowState =
+            EasyVoidWorldCreationService.FlowState.of(null, returnRoute)
+
+        fun start(returnRoute: MenuRoute) {
+            current = expectedFlowStateAfterStart(returnRoute)
+        }
 
         override fun restoreFlowState(playerId: UUID, state: EasyVoidWorldCreationService.FlowState) {
             current = state
         }
+    }
+
+    private class RecordingProviderRegistry : MenuReversibleStateProviderRegistry {
+        private val definitions = linkedMapOf<String, MenuReversibleStateProviderDefinition>()
+
+        override fun register(definition: MenuReversibleStateProviderDefinition) {
+            definitions[definition.providerId] = definition
+        }
+
+        override fun unregister(owner: String, id: String) {
+            definitions.remove("$owner:$id")
+        }
+
+        override fun unregisterOwner(owner: String) {
+            definitions.keys.removeIf { it.startsWith("$owner:") }
+        }
+
+        override fun definition(providerId: String): MenuReversibleStateProviderDefinition? = definitions[providerId]
+
+        override fun registration(providerId: String): MenuReversibleStateProviderRegistration =
+            error("registration is not needed by this contract test: $providerId")
+
+        override fun addInvalidationListener(listener: (MenuReversibleStateProviderRegistration) -> Unit): AutoCloseable =
+            AutoCloseable { }
+
+        override fun definitions(): List<MenuReversibleStateProviderDefinition> = definitions.values.toList()
     }
 }

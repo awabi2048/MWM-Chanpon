@@ -19,27 +19,27 @@ class ChanponWorldPublishPolicyTest {
         val folder = Files.createTempDirectory("chanpon-publish-policy").toFile()
         try {
             val storage = ChanponWorldStorage(folder)
-            val policy = ChanponWorldPublishPolicy(storage)
+            val policy = ChanponWorldPublishPolicy(storage) { _, _ -> }
             val player = player()
             val world = WorldData(
                 UUID.randomUUID(), "test", "", Material.STONE, "test", "", UUID.randomUUID(),
             )
             val before = policy.capturePublishCycleState(player, world)
-            val expectedAfter = policy.expectedPublishCycleState(player, world, before)
-
-            storage.setVisibility(world.uuid, ChanponWorldVisibility.PUBLIC)
+            assertEquals(true, policy.cyclePublishLevel(player, world))
+            val actualAfter = policy.capturePublishCycleState(player, world)
             assertEquals(
                 WorldPublishReversibleRestoreResult.Restored,
-                policy.restorePublishCycleState(player, world, before, expectedAfter),
+                policy.restorePublishCycleState(player, world, before, actualAfter),
             )
             assertEquals(ChanponWorldVisibility.PRIVATE, storage.getVisibility(world.uuid))
 
             val staleBefore = policy.capturePublishCycleState(player, world)
-            val staleExpectedAfter = policy.expectedPublishCycleState(player, world, staleBefore)
+            assertEquals(true, policy.cyclePublishLevel(player, world))
+            val staleActualAfter = policy.capturePublishCycleState(player, world)
             storage.setVisibility(world.uuid, ChanponWorldVisibility.DEVELOPMENT)
             assertInstanceOf(
                 WorldPublishReversibleRestoreResult.Rejected::class.java,
-                policy.restorePublishCycleState(player, world, staleBefore, staleExpectedAfter),
+                policy.restorePublishCycleState(player, world, staleBefore, staleActualAfter),
             )
             assertEquals(ChanponWorldVisibility.DEVELOPMENT, storage.getVisibility(world.uuid))
         } finally {

@@ -10,7 +10,16 @@ import me.awabi2048.myworldmanager.api.extension.WorldPublishReversibleState
 import org.bukkit.entity.Player
 
 class ChanponWorldPublishPolicy(
-    private val storage: ChanponWorldStorage
+    private val storage: ChanponWorldStorage,
+    private val onPublishUpdated: (Player, ChanponWorldVisibility) -> Unit = { player, visibility ->
+        player.sendMessage(
+            CCSystem.getAPI().getI18nString(
+                player,
+                "chanpon.publish.updated",
+                mapOf("level" to CCSystem.getAPI().getI18nString(player, "chanpon.publish.${visibility.name.lowercase()}")),
+            ),
+        )
+    },
 ) : ReversibleWorldPublishPolicy {
     override fun getId(): String = "mwmchanpon.world_publish"
 
@@ -27,25 +36,12 @@ class ChanponWorldPublishPolicy(
     override fun cyclePublishLevel(player: Player, worldData: WorldData): Boolean {
         val next = next(storage.getVisibility(worldData.uuid))
         storage.setVisibility(worldData.uuid, next)
-        player.sendMessage(
-            text(player, "chanpon.publish.updated", mapOf("level" to displayName(player, next)))
-        )
+        onPublishUpdated(player, next)
         return true
     }
 
     override fun capturePublishCycleState(player: Player, worldData: WorldData): WorldPublishReversibleState =
         VisibilityState(worldData.uuid, storage.getVisibility(worldData.uuid))
-
-    override fun expectedPublishCycleState(
-        player: Player,
-        worldData: WorldData,
-        before: WorldPublishReversibleState,
-    ): WorldPublishReversibleState {
-        val state = before as? VisibilityState
-            ?: throw IllegalArgumentException("Chanpon publish state type is invalid")
-        require(state.worldUuid == worldData.uuid) { "Chanpon publish state target does not match" }
-        return state.copy(visibility = next(state.visibility))
-    }
 
     override fun restorePublishCycleState(
         player: Player,
@@ -79,12 +75,7 @@ class ChanponWorldPublishPolicy(
     ) : WorldPublishReversibleState
 
     private fun displayName(player: Player?, visibility: ChanponWorldVisibility): String {
-        val key = when (visibility) {
-            ChanponWorldVisibility.PUBLIC -> "public"
-            ChanponWorldVisibility.DEVELOPMENT -> "development"
-            ChanponWorldVisibility.PRIVATE -> "private"
-        }
-        return text(player, "chanpon.publish.$key")
+        return text(player, "chanpon.publish.${visibility.name.lowercase()}")
     }
 
     private fun text(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): String {
