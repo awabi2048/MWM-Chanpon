@@ -1,7 +1,6 @@
 package me.awabi2048.mwmchanpon
 
 import com.awabi2048.ccsystem.CCSystem
-import com.awabi2048.ccsystem.api.CCSystemAPI
 import com.awabi2048.ccsystem.api.gui.MenuTargetPolicy
 import com.awabi2048.ccsystem.api.gui.PublicMenuDefinition
 import me.awabi2048.mwmchanpon.backup.BackupService
@@ -350,10 +349,10 @@ class MWMChanponPlugin : JavaPlugin() {
                 server.pluginManager.disablePlugin(this)
                 return false
             }
-        if (actualVersion != CCSystemAPI.GUI_RUNTIME_CONTRACT_VERSION) {
+        if (actualVersion != REQUIRED_GUI_RUNTIME_CONTRACT_VERSION) {
             logger.severe(
                 "CC-System GUI runtime contract version mismatch: " +
-                    "expected=${CCSystemAPI.GUI_RUNTIME_CONTRACT_VERSION}, actual=$actualVersion",
+                    "expected=$REQUIRED_GUI_RUNTIME_CONTRACT_VERSION, actual=$actualVersion",
             )
             server.pluginManager.disablePlugin(this)
             return false
@@ -434,6 +433,7 @@ class MWMChanponPlugin : JavaPlugin() {
 
     private companion object {
         private const val MENU_OWNER = "mwm-chanpon"
+        private const val REQUIRED_GUI_RUNTIME_CONTRACT_VERSION = 5
     }
 
 }

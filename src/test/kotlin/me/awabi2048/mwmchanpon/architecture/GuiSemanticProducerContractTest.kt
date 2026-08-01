@@ -79,6 +79,20 @@ class GuiSemanticProducerContractTest {
         ).name)
     }
 
+    @Test
+    fun `tool permission capability supplies a complete player target presentation`() {
+        val source = Files.readString(sourceRoot().resolve("extension/ToolPermissionCapability.kt"))
+
+        assertTrue(source.contains("GuiNameSpec.TargetIdentity("))
+        assertTrue(source.contains("playerHeadOwner = memberUuid"))
+        assertTrue(source.contains("GuiLoreSpec.Blocks("))
+        assertTrue(source.contains("GuiLoreLine.Text(i18n(player, \"online\"))"))
+        assertTrue(source.contains("GuiLoreLine.Data(i18n(player, \"last_online_label\")"))
+        assertTrue(source.contains("GuiLoreBlock(statusLines), GuiLoreBlock(toolLines)"))
+        assertFalse(source.contains("embeddedLoreBlocks ="))
+        assertFalse(source.contains("fixedName(\"\""))
+    }
+
     private fun inventorySources(): List<Path> = Files.walk(sourceRoot()).use { paths ->
         paths.filter { Files.isRegularFile(it) && it.name.endsWith(".kt") }
             // Cumulus/Floodgate forms do not produce inventory items.

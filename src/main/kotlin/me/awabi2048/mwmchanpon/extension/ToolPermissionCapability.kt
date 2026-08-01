@@ -6,7 +6,6 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
-import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
 import com.awabi2048.ccsystem.api.gui.MenuActionSafety
@@ -31,6 +30,8 @@ import me.awabi2048.mwmchanpon.ui.chanponCapabilityAction
 import me.awabi2048.myworldmanager.api.extension.MemberManagementCapabilityContract
 import me.awabi2048.myworldmanager.api.extension.MemberManagementCapabilitySubject
 import me.awabi2048.myworldmanager.model.WorldData
+import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.format.TextDecoration
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
@@ -103,15 +104,30 @@ class ToolPermissionCapability(
         states: Map<String, Boolean>,
     ): MenuCapabilityPresentation {
         val offlinePlayer = Bukkit.getOfflinePlayer(memberUuid)
-        val detailLines = mutableListOf<GuiLoreLine>()
+        val identity = offlinePlayer.name ?: memberUuid.toString()
+        val identityColor = if (offlinePlayer.isOnline) "§a" else "§c"
+        val statusLines = mutableListOf<GuiLoreLine>()
+        if (offlinePlayer.isOnline) {
+            statusLines += GuiLoreLine.Text(i18n(player, "online"))
+        } else {
+            val date = if (offlinePlayer.lastSeen > 0) {
+                Instant.ofEpochMilli(offlinePlayer.lastSeen)
+                    .atZone(ZoneId.systemDefault())
+                    .format(DateTimeFormatter.ofPattern("yyyy年M月d日 HH:mm"))
+            } else {
+                i18n(player, "unknown")
+            }
+            statusLines += GuiLoreLine.Data(i18n(player, "last_online_label"), date, "§f")
+        }
 
-        detailLines += GuiLoreLine.Data(
+        val toolLines = mutableListOf<GuiLoreLine>()
+        toolLines += GuiLoreLine.Data(
             i18n(player, "tool_permission_title"),
             null,
             "",
         )
         definitions.forEach { definition ->
-            detailLines += GuiLoreLine.Text(
+            toolLines += GuiLoreLine.Text(
                 if (states[definition.id] == true) {
                     "§6◆ ${definition.displayName}"
                 } else {
@@ -120,16 +136,19 @@ class ToolPermissionCapability(
             )
         }
 
-        val blocks = listOf(GuiLoreBlock(detailLines))
         return MenuCapabilityPresentation(
             item = GuiItemSpec(
                 material = Material.PLAYER_HEAD,
-                name = me.awabi2048.mwmchanpon.ui.fixedName("", GuiNameStyle.DEFAULT),
-                lore = GuiLoreSpec.None,
+                name = GuiNameSpec.TargetIdentity(
+                    Component.text("$identityColor$identity").decoration(TextDecoration.ITALIC, false),
+                ),
+                lore = GuiLoreSpec.Blocks(
+                    listOf(GuiLoreBlock(statusLines), GuiLoreBlock(toolLines)),
+                ),
                 role = GuiElementRole.ACTION,
                 amount = 1,
             ),
-            embeddedLoreBlocks = blocks,
+            playerHeadOwner = memberUuid,
         )
     }
 
