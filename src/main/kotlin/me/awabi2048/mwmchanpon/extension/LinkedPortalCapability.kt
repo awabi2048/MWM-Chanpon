@@ -78,7 +78,7 @@ class LinkedPortalCapability {
         GuiItemSpec(
             material = Material.END_PORTAL_FRAME,
             name = GuiNameSpec.FixedLabel(i18nComponent(player, "linked_portal.display")),
-            lore = GuiLoreSpec.NameOnly,
+            lore = GuiLoreSpec.None,
             role = GuiElementRole.ACTION,
             amount = 1,
         ),

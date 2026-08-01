@@ -25,6 +25,7 @@ class ChanponActionLoreProducerContractTest {
             "gui.input.right_click" -> "右クリック"
             "gui.input.left_or_right_click" -> "クリック"
             "gui.input.any_click" -> "クリック"
+            "lore.click.any" -> "クリック"
             else -> key
         }
     }
@@ -74,6 +75,30 @@ class ChanponActionLoreProducerContractTest {
         assertEquals(MenuPresentationProfile.SINGLE_CUSTOM_ACTION, semantics.profile)
         assertEquals(setOf(ClickType.LEFT, ClickType.RIGHT), semantics.lore.blocks.single().lines.single().action?.acceptedClicks)
         assertTrue(MenuPresentationSemanticsValidator.violations(semantics).isEmpty())
+    }
+
+    @Test
+    fun `linked portal keeps its label and composes exactly one standard action`() {
+        val source = Files.readString(source("extension/LinkedPortalCapability.kt"))
+        assertTrue(source.contains("lore = GuiLoreSpec.None"))
+        assertFalse(source.contains("lore = GuiLoreSpec.NameOnly"))
+
+        val renderer = LoreServiceImpl(i18n)
+        val composed = renderer.compose(
+            GuiLoreSpec.None,
+            listOf(GuiLoreLine.Interaction(null, MenuAcceptedClicks.STANDARD, "ポータルを受け取る")),
+        )
+        val result = semantics(
+            GuiNameSpec.FixedLabel(Component.text("このワールドのワールドポータルを取得")),
+            composed,
+            MenuPresentationProfile.SINGLE_STANDARD_ACTION,
+        )
+        val action = result.lore.blocks.single().lines.single().action!!
+
+        assertEquals(MenuAcceptedClicks.STANDARD, action.acceptedClicks)
+        assertEquals("クリック", action.operationLabel)
+        assertEquals("ポータルを受け取る", action.actionLabel)
+        assertTrue(MenuPresentationSemanticsValidator.violations(result).isEmpty())
     }
 
     private fun source(relative: String): Path =

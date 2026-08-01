@@ -169,7 +169,7 @@ class ChanponPlayerWorldCapability(
                             text(it.player, "gui.player_world.world_item.move_to_top")
                         },
                         availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
-                            subject(it)?.targetPlayerUuid == it.player.uniqueId
+                            canPrioritizeWorld(it)
                         },
                         handler = MenuCapabilityActionHandler(::handleWorld),
                         safety = MenuActionSafety.REVERSIBLE,
@@ -201,8 +201,8 @@ class ChanponPlayerWorldCapability(
                 owner = CAPABILITY_OWNER,
                 id = CREATION_CAPABILITY_ID,
                 placement = PlayerWorldCapabilityContract.CREATION_PLACEMENT,
-                availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
-                    subject(it)?.targetPlayerUuid == it.player.uniqueId
+                        availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
+                            canPrioritizeWorld(it)
                 },
                 presentationProvider = MenuCapabilityPresentationProvider {
                     creationPresentation(it)
@@ -411,10 +411,10 @@ class ChanponPlayerWorldCapability(
         val worldData = world(context) ?: return MenuActionResult.Ignored
         val player = context.player
         if (
-            subject.targetPlayerUuid == player.uniqueId &&
             context.click.isShiftClick &&
             context.click.isLeftClick
         ) {
+            if (!canPrioritizeWorld(context)) return MenuActionResult.Ignored
             MyWorldManagerApi.prioritizePlayerWorld(player.uniqueId, worldData.uuid)
             return MenuActionResult.Success(MenuUpdate.Refresh)
         }
@@ -450,6 +450,28 @@ class ChanponPlayerWorldCapability(
 
     private fun worldCapabilityId(player: Player, worldData: WorldData): String =
         if (isCurrentWorld(player, worldData)) CURRENT_WORLD_CAPABILITY_ID else AWAY_WORLD_CAPABILITY_ID
+
+    private fun canPrioritizeWorld(context: MenuCapabilityContext): Boolean {
+        val subject = subject(context) ?: return false
+        val world = world(context) ?: return false
+        return isMoveToTopAvailable(
+            context.player.uniqueId,
+            subject.targetPlayerUuid,
+            subject.worlds.map(WorldData::uuid),
+            world.uuid,
+        )
+    }
+
+    private fun canPrioritizeWorld(context: MenuCapabilityActionContext): Boolean {
+        val subject = subject(context) ?: return false
+        val world = world(context) ?: return false
+        return isMoveToTopAvailable(
+            context.player.uniqueId,
+            subject.targetPlayerUuid,
+            subject.worlds.map(WorldData::uuid),
+            world.uuid,
+        )
+    }
 
     private fun createWorldPresentation(
         player: Player,
@@ -905,6 +927,13 @@ class ChanponPlayerWorldCapability(
         const val PAYLOAD_TARGET_NAME = "target_name"
     }
 }
+
+internal fun isMoveToTopAvailable(
+    viewerUuid: java.util.UUID,
+    targetPlayerUuid: java.util.UUID,
+    orderedWorldUuids: List<java.util.UUID>,
+    targetWorldUuid: java.util.UUID,
+): Boolean = viewerUuid == targetPlayerUuid && orderedWorldUuids.indexOf(targetWorldUuid) > 0
 
 internal fun playerWorldCapabilityInvocation(
     slot: Int,
