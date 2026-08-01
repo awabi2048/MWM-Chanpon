@@ -34,7 +34,6 @@ import me.awabi2048.mwmchanpon.protection.WorldBuildPermissionService
 import me.awabi2048.mwmchanpon.service.BackupAutomationService
 import me.awabi2048.mwmchanpon.service.ChanponSpawnWorldService
 import me.awabi2048.mwmchanpon.service.EasyVoidWorldCreationService
-import me.awabi2048.mwmchanpon.service.EasyCreationReversibleProvider
 import me.awabi2048.mwmchanpon.service.ArchiveOperationGuard
 import me.awabi2048.mwmchanpon.service.ManualRollbackService
 import me.awabi2048.mwmchanpon.service.PublishLevelSynchronizer
@@ -254,10 +253,6 @@ class MWMChanponPlugin : JavaPlugin() {
             chanponStorage,
         )
         easyVoidWorldCreationService = EasyVoidWorldCreationService(this)
-        EasyCreationReversibleProvider.register(
-            CCSystem.getAPI().getMenuReversibleStateProviderRegistry(),
-            easyVoidWorldCreationService,
-        )
         val archiveOperationGuard = ArchiveOperationGuard(globalStorage)
         playerWorldCapability = ChanponPlayerWorldCapability(this, chanponStorage, easyVoidWorldCreationService)
         MyWorldManagerApi.registerPlayerWorldRouteCapability(playerWorldCapability)

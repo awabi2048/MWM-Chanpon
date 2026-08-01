@@ -8,6 +8,7 @@ import com.awabi2048.ccsystem.api.gui.MenuReversibleStateRestoreContext
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import java.lang.reflect.Proxy
 import java.util.UUID
+import me.awabi2048.mwmchanpon.restoreContextForTest
 import me.awabi2048.mwmchanpon.service.ChanponReversibleContracts
 import me.awabi2048.myworldmanager.api.extension.CreationConfirmationCapabilityContract
 import me.awabi2048.myworldmanager.api.extension.WorldCreationDraft
@@ -81,7 +82,7 @@ class CreationProductionSelectionProviderTest {
         player: Player,
         capture: MenuReversibleStateCaptureContext,
         state: CreationProductionSelectionProviderState,
-    ) = MenuReversibleStateRestoreContext(player, capture.route, capture.runId, capture.interaction, state)
+    ) = restoreContextForTest(player, capture, state)
 
     private fun player(playerId: UUID): Player = Proxy.newProxyInstance(
         Player::class.java.classLoader,

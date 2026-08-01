@@ -3,7 +3,7 @@ package me.awabi2048.mwmchanpon.service
 import com.awabi2048.ccsystem.api.gui.MenuReversibleInteractionContext
 import com.awabi2048.ccsystem.api.gui.MenuReversibleProviderCaptureResult
 import com.awabi2048.ccsystem.api.gui.MenuReversibleProviderRestoreResult
-import com.awabi2048.ccsystem.api.gui.MenuReversibleProviderState
+import com.awabi2048.ccsystem.api.gui.MenuReversibleOpaqueState
 import com.awabi2048.ccsystem.api.gui.MenuReversibleStateCaptureContext
 import com.awabi2048.ccsystem.api.gui.MenuReversibleStateProvider
 import com.awabi2048.ccsystem.api.gui.MenuReversibleStateRestoreContext
@@ -11,6 +11,8 @@ import com.awabi2048.ccsystem.api.gui.MenuRoute
 import java.lang.reflect.Proxy
 import java.nio.file.Files
 import java.util.UUID
+import me.awabi2048.mwmchanpon.restoreContextForTest
+import me.awabi2048.mwmchanpon.snapshotForTest
 import me.awabi2048.mwmchanpon.protection.SpawnWorldProtectionService
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
@@ -25,9 +27,25 @@ import org.bukkit.entity.Player
 import org.bukkit.event.inventory.ClickType
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertInstanceOf
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class ChanponReversibleStateProviderTest {
+    @Test
+    fun `opaque snapshot detaches mutable provider payload`() {
+        val mutableHistory = mutableListOf<Map<String, Any?>>(mapOf("value" to "before"))
+        val state = ChanponReversibleOpaqueState.of(
+            "mwm-chanpon:test",
+            "mutable",
+            mapOf("history" to mutableHistory),
+        )
+        val snapshot = snapshotForTest(state)
+        mutableHistory.clear()
+        val envelope = snapshot.value as Map<*, *>
+        val payload = envelope["payload"] as Map<*, *>
+        assertEquals(listOf(mapOf("value" to "before")), payload["history"])
+    }
+
     @Test
     fun `automation provider restores only its expected toggle state`() = withWorldStorage { storage, _ ->
         val gateway = MutableAutomationGateway(false)
@@ -108,9 +126,30 @@ class ChanponReversibleStateProviderTest {
     }
 
     @Test
+    fun `publication restore rejects a deleted target explicitly`() = withWorldStorage { storage, _ ->
+        val world = world()
+        registerRepository(world)
+        val player = player()
+        val provider = PublicationProvider(storage)
+        val context = captureContext(
+            player,
+            ChanponReversibleContracts.publication(),
+            arguments = mapOf("world_uuid" to world.uuid.toString()),
+        )
+        val state = captured(provider, context)
+        storage.setVisibility(world.uuid, ChanponWorldVisibility.PUBLIC)
+        registerRepository()
+        val rejected = assertInstanceOf(
+            MenuReversibleProviderRestoreResult.Rejected::class.java,
+            provider.restore(restoreContextForTest(player, context, state)),
+        )
+        assertTrue(rejected.reason.contains("TARGET_MISSING"))
+    }
+
+    @Test
     fun `submission and tool providers restore domain state and synchronize exactly after CAS`() = withWorldStorage { storage, _ ->
         val world = world()
-        val actor = UUID.randomUUID()
+        val actor = UUID(0L, 1L)
         val target = UUID.randomUUID()
         world.moderators += target
         registerRepository(world)
@@ -120,7 +159,7 @@ class ChanponReversibleStateProviderTest {
         val submission = SubmissionProvider(submissionGateway, storage)
         val completionContext = captureContext(player, ChanponReversibleContracts.submission(world.uuid.toString(), "complete"))
         val completionState = captured(submission, completionContext)
-        storage.setSubmissionState(world.uuid, SubmissionState.COMPLETED, actor, "tester", "complete")
+        storage.setSubmissionState(world.uuid, SubmissionState.COMPLETED, actor, "tester", "mark_completed")
         assertRestored(submission, player, completionContext, completionState)
         assertEquals(SubmissionState.UNSUBMITTED, storage.getSubmissionState(world.uuid))
         assertEquals(listOf(world.uuid), submissionGateway.syncedWorlds)
@@ -159,17 +198,34 @@ class ChanponReversibleStateProviderTest {
         assertRejected(tool, player, roleContext, captured(tool, roleContext))
     }
 
+    @Test
+    fun `submission restore rejects same length history content mutation`() = withWorldStorage { storage, _ ->
+        val world = world()
+        registerRepository(world)
+        storage.initializeSubmissionState(world.uuid)
+        val player = player()
+        val provider = SubmissionProvider(RecordingSubmissionGateway(), storage)
+        val context = captureContext(player, ChanponReversibleContracts.submission(world.uuid.toString(), "complete"))
+        val state = captured(provider, context)
+        storage.setSubmissionState(world.uuid, SubmissionState.COMPLETED, player.uniqueId, player.name, "mark_completed")
+        val actual = storage.captureSubmissionSnapshot(world.uuid)
+        val changedEvent = actual.history.single().toMutableMap().apply { put("actor_name", "changed") }
+        storage.restoreSubmissionSnapshot(worldUuid = world.uuid, snapshot = actual.copy(history = listOf(changedEvent)))
+        assertRejected(provider, player, context, state)
+    }
+
     private fun captured(
         provider: MenuReversibleStateProvider,
         context: MenuReversibleStateCaptureContext,
-    ): MenuReversibleProviderState =
-        assertInstanceOf(MenuReversibleProviderCaptureResult.Captured::class.java, provider.capture(context)).state
+    ): MenuReversibleOpaqueState =
+        assertInstanceOf(MenuReversibleOpaqueState::class.java,
+            assertInstanceOf(MenuReversibleProviderCaptureResult.Captured::class.java, provider.capture(context)).state)
 
     private fun assertRestored(
         provider: MenuReversibleStateProvider,
         player: Player,
         capture: MenuReversibleStateCaptureContext,
-        state: MenuReversibleProviderState,
+        state: MenuReversibleOpaqueState,
     ) {
         assertEquals(
             MenuReversibleProviderRestoreResult.Restored,
@@ -181,7 +237,7 @@ class ChanponReversibleStateProviderTest {
         provider: MenuReversibleStateProvider,
         player: Player,
         capture: MenuReversibleStateCaptureContext,
-        state: MenuReversibleProviderState,
+        state: MenuReversibleOpaqueState,
     ) {
         assertInstanceOf(
             MenuReversibleProviderRestoreResult.Rejected::class.java,
@@ -204,8 +260,8 @@ class ChanponReversibleStateProviderTest {
     private fun restoreContext(
         player: Player,
         capture: MenuReversibleStateCaptureContext,
-        state: MenuReversibleProviderState,
-    ) = MenuReversibleStateRestoreContext(player, capture.route, capture.runId, capture.interaction, state)
+        state: MenuReversibleOpaqueState,
+    ) = restoreContextForTest(player, capture, state)
 
     private fun world(): WorldData = WorldData(
         UUID.randomUUID(), "test", "", Material.STONE, "test", "", UUID.randomUUID(),
@@ -221,6 +277,7 @@ class ChanponReversibleStateProviderTest {
     ) { _, method, _ ->
         when (method.name) {
             "getUniqueId" -> UUID(0L, 1L)
+            "getName" -> "tester"
             else -> when (method.returnType) {
                 Boolean::class.javaPrimitiveType -> false
                 Byte::class.javaPrimitiveType -> 0.toByte()

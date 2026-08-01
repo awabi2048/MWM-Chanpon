@@ -14,7 +14,7 @@ class ChanponReversibleActionClassificationTest {
     @Test
     fun `reversible action classification has a provider for every state aggregate`() {
         assertEquals(emptyList<String>(), ChanponReversibleActionClassification.validate())
-        assertEquals(23, ChanponReversibleActionClassification.entries.size)
+        assertEquals(22, ChanponReversibleActionClassification.entries.size)
         val providerIds = ChanponReversibleActionClassification.entries
             .filter { it.kind == ChanponReversibleActionClassification.Kind.STATE_AGGREGATE }
             .mapNotNull { it.providerId }
@@ -144,7 +144,6 @@ class ChanponReversibleActionClassificationTest {
                 ChanponReversibleContracts.toolPermission(world, player, "role")
             ChanponReversibleActionClassification.Operation.CREATION_PRODUCTION_SELECTION ->
                 ChanponReversibleContracts.creationProductionSelection()
-            ChanponReversibleActionClassification.Operation.EASY_CREATION_START -> ChanponReversibleContracts.easyCreation()
             ChanponReversibleActionClassification.Operation.CURRENT_PLAYER_WORLD_DISPLAY_ORDER,
             ChanponReversibleActionClassification.Operation.AWAY_PLAYER_WORLD_DISPLAY_ORDER -> MwmReversibleContracts.displayOrder()
             ChanponReversibleActionClassification.Operation.STANDARD_CREATION_SESSION -> MwmReversibleContracts.creationSession()

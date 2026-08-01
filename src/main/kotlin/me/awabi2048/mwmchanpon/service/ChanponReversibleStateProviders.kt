@@ -2,7 +2,7 @@ package me.awabi2048.mwmchanpon.service
 
 import com.awabi2048.ccsystem.api.gui.MenuReversibleProviderCaptureResult
 import com.awabi2048.ccsystem.api.gui.MenuReversibleProviderRestoreResult
-import com.awabi2048.ccsystem.api.gui.MenuReversibleProviderState
+import com.awabi2048.ccsystem.api.gui.MenuReversibleOpaqueState
 import com.awabi2048.ccsystem.api.gui.MenuReversibleStateCaptureContext
 import com.awabi2048.ccsystem.api.gui.MenuReversibleStateProvider
 import com.awabi2048.ccsystem.api.gui.MenuReversibleStateProviderDefinition
@@ -21,6 +21,8 @@ import me.awabi2048.mwmchanpon.storage.WorldCreationAvailability
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.model.WorldData
+import com.sk89q.worldguard.protection.flags.RegionGroup
+import com.sk89q.worldguard.protection.flags.StateFlag
 import java.util.UUID
 
 /** Chanponの実状態を扱う可逆provider群です。各providerは一つのaggregateだけを復元します。 */
@@ -110,7 +112,27 @@ private data class AutomationSettingsState(
     val configPath: String,
     val before: Boolean,
     val expectedAfter: Boolean,
-) : MenuReversibleProviderState
+) : MenuReversibleOpaqueState {
+    override fun snapshot(): Any = ChanponReversibleOpaqueState.of(
+        AUTOMATION_PROVIDER_ID,
+        TYPE,
+        mapOf("configPath" to configPath, "before" to before, "expectedAfter" to expectedAfter),
+    ).snapshot()
+
+    companion object {
+        private const val TYPE = "automation-settings"
+        fun decode(value: Any?): AutomationSettingsState? {
+            val payload = decodeChanponOpaqueState(
+                value, AUTOMATION_PROVIDER_ID, TYPE, setOf("configPath", "before", "expectedAfter"),
+            )?.payload ?: return null
+            return AutomationSettingsState(
+                payload.strictString("configPath") ?: return null,
+                payload.strictBoolean("before") ?: return null,
+                payload.strictBoolean("expectedAfter") ?: return null,
+            )
+        }
+    }
+}
 
 internal interface AutomationSettingsGateway {
     fun getBoolean(path: String): Boolean
@@ -142,7 +164,7 @@ internal class AutomationSettingsProvider(
     }
 
     override fun restore(context: MenuReversibleStateRestoreContext): MenuReversibleProviderRestoreResult {
-        val state = context.state as? AutomationSettingsState
+        val state = AutomationSettingsState.decode(context.state.value)
             ?: return rejectRestore("invalid automation settings state type")
         val current = gateway.getBoolean(state.configPath)
         if (current != state.expectedAfter) return concurrent("automation setting ${state.configPath}", state.expectedAfter, current)
@@ -160,7 +182,36 @@ private data class AdminWorldControlsState(
     val expectedAfter: ChanponGlobalStorage.AdminWorldControlsSnapshot,
     val spawnDefaultsBefore: SpawnWorldProtectionService.DefaultsSnapshot? = null,
     val spawnDefaultsExpectedAfter: SpawnWorldProtectionService.DefaultsSnapshot? = null,
-) : MenuReversibleProviderState
+) : MenuReversibleOpaqueState {
+    override fun snapshot(): Any = ChanponReversibleOpaqueState.of(
+        ADMIN_PROVIDER_ID,
+        TYPE,
+        mapOf(
+            "before" to before.toOpaqueMap(),
+            "expectedAfter" to expectedAfter.toOpaqueMap(),
+            "spawnDefaultsBefore" to spawnDefaultsBefore?.toOpaqueMap(),
+            "spawnDefaultsExpectedAfter" to spawnDefaultsExpectedAfter?.toOpaqueMap(),
+        ),
+    ).snapshot()
+
+    companion object {
+        private const val TYPE = "admin-world-controls"
+        fun decode(value: Any?): AdminWorldControlsState? {
+            val payload = decodeChanponOpaqueState(
+                value,
+                ADMIN_PROVIDER_ID,
+                TYPE,
+                setOf("before", "expectedAfter", "spawnDefaultsBefore", "spawnDefaultsExpectedAfter"),
+            )?.payload ?: return null
+            return AdminWorldControlsState(
+                decodeAdminWorldControls(payload["before"]) ?: return null,
+                decodeAdminWorldControls(payload["expectedAfter"]) ?: return null,
+                (decodeNullableSpawnDefaults(payload["spawnDefaultsBefore"]) ?: return null).value,
+                (decodeNullableSpawnDefaults(payload["spawnDefaultsExpectedAfter"]) ?: return null).value,
+            )
+        }
+    }
+}
 
 internal class AdminWorldControlsProvider(
     private val storage: ChanponGlobalStorage,
@@ -203,7 +254,7 @@ internal class AdminWorldControlsProvider(
     }
 
     override fun restore(context: MenuReversibleStateRestoreContext): MenuReversibleProviderRestoreResult {
-        val state = context.state as? AdminWorldControlsState
+        val state = AdminWorldControlsState.decode(context.state.value)
             ?: return rejectRestore("invalid admin world controls state type")
         val current = storage.captureAdminWorldControls()
         if (current != state.expectedAfter) return concurrent("admin world controls", state.expectedAfter, current)
@@ -244,7 +295,31 @@ private data class EnvironmentState(
     val worldUuid: UUID,
     val before: EnvironmentSnapshot,
     val expectedAfter: EnvironmentSnapshot,
-) : MenuReversibleProviderState
+) : MenuReversibleOpaqueState {
+    override fun snapshot(): Any = ChanponReversibleOpaqueState.of(
+        ENVIRONMENT_PROVIDER_ID,
+        TYPE,
+        mapOf(
+            "worldUuid" to worldUuid,
+            "before" to before.toOpaqueMap(),
+            "expectedAfter" to expectedAfter.toOpaqueMap(),
+        ),
+    ).snapshot()
+
+    companion object {
+        private const val TYPE = "world-environment"
+        fun decode(value: Any?): EnvironmentState? {
+            val payload = decodeChanponOpaqueState(
+                value, ENVIRONMENT_PROVIDER_ID, TYPE, setOf("worldUuid", "before", "expectedAfter"),
+            )?.payload ?: return null
+            return EnvironmentState(
+                payload.strictUuid("worldUuid") ?: return null,
+                decodeEnvironmentSnapshot(payload["before"]) ?: return null,
+                decodeEnvironmentSnapshot(payload["expectedAfter"]) ?: return null,
+            )
+        }
+    }
+}
 
 internal class EnvironmentProvider(
     private val storage: ChanponWorldStorage,
@@ -265,7 +340,7 @@ internal class EnvironmentProvider(
     }
 
     override fun restore(context: MenuReversibleStateRestoreContext): MenuReversibleProviderRestoreResult {
-        val state = context.state as? EnvironmentState
+        val state = EnvironmentState.decode(context.state.value)
             ?: return rejectRestore("invalid environment state type")
         val worldData = world(state.worldUuid) ?: return rejectRestore("environment world no longer exists: ${state.worldUuid}")
         val current = snapshot(worldData)
@@ -353,7 +428,27 @@ private data class PublicationState(
     val worldUuid: UUID,
     val before: ChanponWorldVisibility,
     val expectedAfter: ChanponWorldVisibility,
-) : MenuReversibleProviderState
+) : MenuReversibleOpaqueState {
+    override fun snapshot(): Any = ChanponReversibleOpaqueState.of(
+        PUBLICATION_PROVIDER_ID,
+        TYPE,
+        mapOf("worldUuid" to worldUuid, "before" to before.name, "expectedAfter" to expectedAfter.name),
+    ).snapshot()
+
+    companion object {
+        private const val TYPE = "world-publication"
+        fun decode(value: Any?): PublicationState? {
+            val payload = decodeChanponOpaqueState(
+                value, PUBLICATION_PROVIDER_ID, TYPE, setOf("worldUuid", "before", "expectedAfter"),
+            )?.payload ?: return null
+            return PublicationState(
+                payload.strictUuid("worldUuid") ?: return null,
+                payload.strictString("before")?.let(::visibilityOrNull) ?: return null,
+                payload.strictString("expectedAfter")?.let(::visibilityOrNull) ?: return null,
+            )
+        }
+    }
+}
 
 internal class PublicationProvider(private val storage: ChanponWorldStorage) : MenuReversibleStateProvider {
     override fun capture(context: MenuReversibleStateCaptureContext): MenuReversibleProviderCaptureResult {
@@ -365,7 +460,10 @@ internal class PublicationProvider(private val storage: ChanponWorldStorage) : M
     }
 
     override fun restore(context: MenuReversibleStateRestoreContext): MenuReversibleProviderRestoreResult {
-        val state = context.state as? PublicationState ?: return rejectRestore("invalid publication state type")
+        val state = PublicationState.decode(context.state.value) ?: return rejectRestore("invalid publication state type")
+        if (MyWorldManagerApi.getWorldRepository()?.findByUuid(state.worldUuid) == null) {
+            return rejectRestore("TARGET_MISSING: publication world no longer exists: ${state.worldUuid}")
+        }
         val current = storage.getVisibility(state.worldUuid)
         if (current != state.expectedAfter) return concurrent("publication ${state.worldUuid}", state.expectedAfter, current)
         storage.setVisibility(state.worldUuid, state.before)
@@ -373,7 +471,31 @@ internal class PublicationProvider(private val storage: ChanponWorldStorage) : M
     }
 }
 
-private data class NotificationState(val worldUuid: UUID, val before: Boolean, val expectedAfter: Boolean) : MenuReversibleProviderState
+private data class NotificationState(
+    val worldUuid: UUID,
+    val before: Boolean,
+    val expectedAfter: Boolean,
+) : MenuReversibleOpaqueState {
+    override fun snapshot(): Any = ChanponReversibleOpaqueState.of(
+        NOTIFICATION_PROVIDER_ID,
+        TYPE,
+        mapOf("worldUuid" to worldUuid, "before" to before, "expectedAfter" to expectedAfter),
+    ).snapshot()
+
+    companion object {
+        private const val TYPE = "world-notification"
+        fun decode(value: Any?): NotificationState? {
+            val payload = decodeChanponOpaqueState(
+                value, NOTIFICATION_PROVIDER_ID, TYPE, setOf("worldUuid", "before", "expectedAfter"),
+            )?.payload ?: return null
+            return NotificationState(
+                payload.strictUuid("worldUuid") ?: return null,
+                payload.strictBoolean("before") ?: return null,
+                payload.strictBoolean("expectedAfter") ?: return null,
+            )
+        }
+    }
+}
 
 internal object NotificationProvider : MenuReversibleStateProvider {
     override fun capture(context: MenuReversibleStateCaptureContext): MenuReversibleProviderCaptureResult {
@@ -386,7 +508,7 @@ internal object NotificationProvider : MenuReversibleStateProvider {
     }
 
     override fun restore(context: MenuReversibleStateRestoreContext): MenuReversibleProviderRestoreResult {
-        val state = context.state as? NotificationState ?: return rejectRestore("invalid notification state type")
+        val state = NotificationState.decode(context.state.value) ?: return rejectRestore("invalid notification state type")
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(state.worldUuid)
             ?: return rejectRestore("notification world no longer exists: ${state.worldUuid}")
         if (worldData.notificationEnabled != state.expectedAfter) {
@@ -398,14 +520,75 @@ internal object NotificationProvider : MenuReversibleStateProvider {
     }
 }
 
-private sealed interface SubmissionProviderState : MenuReversibleProviderState {
-    data class Closure(val before: Boolean, val expectedAfter: Boolean) : SubmissionProviderState
+private sealed interface SubmissionProviderState : MenuReversibleOpaqueState {
+    data class Closure(val before: Boolean, val expectedAfter: Boolean) : SubmissionProviderState {
+        override fun snapshot(): Any = ChanponReversibleOpaqueState.of(
+            SUBMISSION_PROVIDER_ID,
+            TYPE,
+            mapOf("before" to before, "expectedAfter" to expectedAfter),
+        ).snapshot()
+
+        companion object {
+            private const val TYPE = "submission-closure"
+            fun decode(value: Any?): Closure? {
+                val payload = decodeChanponOpaqueState(
+                    value, SUBMISSION_PROVIDER_ID, TYPE, setOf("before", "expectedAfter"),
+                )?.payload ?: return null
+                return Closure(
+                    payload.strictBoolean("before") ?: return null,
+                    payload.strictBoolean("expectedAfter") ?: return null,
+                )
+            }
+        }
+    }
+
     data class World(
         val worldUuid: UUID,
         val before: ChanponWorldStorage.SubmissionSnapshot,
         val expectedState: SubmissionState,
         val expectedRevision: Int,
-    ) : SubmissionProviderState
+        val expectedAction: String,
+        val expectedActorUuid: UUID,
+        val expectedActorName: String,
+    ) : SubmissionProviderState {
+        override fun snapshot(): Any = ChanponReversibleOpaqueState.of(
+            SUBMISSION_PROVIDER_ID,
+            TYPE,
+            mapOf(
+                "worldUuid" to worldUuid,
+                "before" to before.toOpaqueMap(),
+                "expectedState" to expectedState.name,
+                "expectedRevision" to expectedRevision,
+                "expectedAction" to expectedAction,
+                "expectedActorUuid" to expectedActorUuid,
+                "expectedActorName" to expectedActorName,
+            ),
+        ).snapshot()
+
+        companion object {
+            private const val TYPE = "submission-world"
+            fun decode(value: Any?): World? {
+                val payload = decodeChanponOpaqueState(
+                    value,
+                    SUBMISSION_PROVIDER_ID,
+                    TYPE,
+                    setOf(
+                        "worldUuid", "before", "expectedState", "expectedRevision",
+                        "expectedAction", "expectedActorUuid", "expectedActorName",
+                    ),
+                )?.payload ?: return null
+                return World(
+                    payload.strictUuid("worldUuid") ?: return null,
+                    decodeSubmissionSnapshot(payload["before"]) ?: return null,
+                    payload.strictString("expectedState")?.let(::submissionStateOrNull) ?: return null,
+                    payload.strictInt("expectedRevision") ?: return null,
+                    payload.strictString("expectedAction") ?: return null,
+                    payload.strictUuid("expectedActorUuid") ?: return null,
+                    payload.strictString("expectedActorName") ?: return null,
+                )
+            }
+        }
+    }
 }
 
 internal interface SubmissionGateway {
@@ -461,15 +644,28 @@ internal class SubmissionProvider(
             "uncomplete" -> SubmissionState.SUBMITTED
             else -> return rejectCapture("unsupported world submission operation: $operation")
         }
+        val expectedAction = when (operation) {
+            "complete" -> "mark_completed"
+            "uncomplete" -> "unmark_completed"
+            else -> return rejectCapture("unsupported world submission operation: $operation")
+        }
         return MenuReversibleProviderCaptureResult.Captured(
-            SubmissionProviderState.World(worldUuid, before, expectedState, before.revision + 1),
+            SubmissionProviderState.World(
+                worldUuid,
+                before,
+                expectedState,
+                before.revision + 1,
+                expectedAction,
+                context.player.uniqueId,
+                context.player.name,
+            ),
         )
     }
 
-    override fun restore(context: MenuReversibleStateRestoreContext): MenuReversibleProviderRestoreResult = when (val state = context.state) {
-        is SubmissionProviderState.Closure -> restoreClosure(state)
-        is SubmissionProviderState.World -> restoreWorld(state)
-        else -> rejectRestore("invalid submission state type")
+    override fun restore(context: MenuReversibleStateRestoreContext): MenuReversibleProviderRestoreResult {
+        SubmissionProviderState.Closure.decode(context.state.value)?.let { return restoreClosure(it) }
+        SubmissionProviderState.World.decode(context.state.value)?.let { return restoreWorld(it) }
+        return rejectRestore("invalid submission state type")
     }
 
     private fun restoreClosure(state: SubmissionProviderState.Closure): MenuReversibleProviderRestoreResult {
@@ -485,11 +681,12 @@ internal class SubmissionProvider(
         } catch (exception: IllegalStateException) {
             return rejectRestore(exception.message ?: "submission state is unavailable")
         }
-        if (current.state != state.expectedState || current.revision != state.expectedRevision) {
+        val expectedAfter = expectedSubmissionAfter(state, current)
+        if (expectedAfter == null || current != expectedAfter) {
             return concurrent(
                 "submission ${state.worldUuid}",
-                "${state.expectedState}/${state.expectedRevision}",
-                "${current.state}/${current.revision}",
+                "full expected transition from ${state.before}",
+                current,
             )
         }
         return try {
@@ -502,14 +699,46 @@ internal class SubmissionProvider(
     }
 }
 
-private sealed interface ToolPermissionState : MenuReversibleProviderState {
+private sealed interface ToolPermissionState : MenuReversibleOpaqueState {
     data class Toggle(
         val worldUuid: UUID,
         val targetPlayerUuid: UUID,
         val toolId: String,
         val before: Boolean?,
         val expectedAfter: Boolean,
-    ) : ToolPermissionState
+    ) : ToolPermissionState {
+        override fun snapshot(): Any = ChanponReversibleOpaqueState.of(
+            TOOL_PROVIDER_ID,
+            TYPE,
+            mapOf(
+                "worldUuid" to worldUuid,
+                "targetPlayerUuid" to targetPlayerUuid,
+                "toolId" to toolId,
+                "before" to before,
+                "expectedAfter" to expectedAfter,
+            ),
+        ).snapshot()
+
+        companion object {
+            private const val TYPE = "tool-permission-toggle"
+            fun decode(value: Any?): Toggle? {
+                val payload = decodeChanponOpaqueState(
+                    value,
+                    TOOL_PROVIDER_ID,
+                    TYPE,
+                    setOf("worldUuid", "targetPlayerUuid", "toolId", "before", "expectedAfter"),
+                )?.payload ?: return null
+                val before = decodeNullableBoolean(payload["before"]) ?: return null
+                return Toggle(
+                    payload.strictUuid("worldUuid") ?: return null,
+                    payload.strictUuid("targetPlayerUuid") ?: return null,
+                    payload.strictString("toolId") ?: return null,
+                    before.value,
+                    payload.strictBoolean("expectedAfter") ?: return null,
+                )
+            }
+        }
+    }
 
     data class Role(
         val worldUuid: UUID,
@@ -518,7 +747,43 @@ private sealed interface ToolPermissionState : MenuReversibleProviderState {
         val moderators: List<UUID>,
         val expectedMembers: List<UUID>,
         val expectedModerators: List<UUID>,
-    ) : ToolPermissionState
+    ) : ToolPermissionState {
+        override fun snapshot(): Any = ChanponReversibleOpaqueState.of(
+            TOOL_PROVIDER_ID,
+            TYPE,
+            mapOf(
+                "worldUuid" to worldUuid,
+                "targetPlayerUuid" to targetPlayerUuid,
+                "members" to members,
+                "moderators" to moderators,
+                "expectedMembers" to expectedMembers,
+                "expectedModerators" to expectedModerators,
+            ),
+        ).snapshot()
+
+        companion object {
+            private const val TYPE = "tool-permission-role"
+            fun decode(value: Any?): Role? {
+                val payload = decodeChanponOpaqueState(
+                    value,
+                    TOOL_PROVIDER_ID,
+                    TYPE,
+                    setOf(
+                        "worldUuid", "targetPlayerUuid", "members", "moderators",
+                        "expectedMembers", "expectedModerators",
+                    ),
+                )?.payload ?: return null
+                return Role(
+                    payload.strictUuid("worldUuid") ?: return null,
+                    payload.strictUuid("targetPlayerUuid") ?: return null,
+                    payload.strictUuidList("members") ?: return null,
+                    payload.strictUuidList("moderators") ?: return null,
+                    payload.strictUuidList("expectedMembers") ?: return null,
+                    payload.strictUuidList("expectedModerators") ?: return null,
+                )
+            }
+        }
+    }
 }
 
 internal interface ToolPermissionGateway {
@@ -590,10 +855,10 @@ internal class ToolPermissionProvider(
         }
     }
 
-    override fun restore(context: MenuReversibleStateRestoreContext): MenuReversibleProviderRestoreResult = when (val state = context.state) {
-        is ToolPermissionState.Toggle -> restoreToggle(state)
-        is ToolPermissionState.Role -> restoreRole(state)
-        else -> rejectRestore("invalid tool permission state type")
+    override fun restore(context: MenuReversibleStateRestoreContext): MenuReversibleProviderRestoreResult {
+        ToolPermissionState.Toggle.decode(context.state.value)?.let { return restoreToggle(it) }
+        ToolPermissionState.Role.decode(context.state.value)?.let { return restoreRole(it) }
+        return rejectRestore("invalid tool permission state type")
     }
 
     private fun restoreToggle(state: ToolPermissionState.Toggle): MenuReversibleProviderRestoreResult {
@@ -645,5 +910,210 @@ private fun rejectCapture(reason: String) = MenuReversibleProviderCaptureResult.
 private fun rejectRestore(reason: String) = MenuReversibleProviderRestoreResult.Rejected(reason)
 private fun concurrent(aggregate: String, expected: Any?, current: Any?) =
     MenuReversibleProviderRestoreResult.Rejected("$aggregate changed concurrently: expected=$expected, actual=$current")
+
+private fun ChanponGlobalStorage.AdminWorldControlsSnapshot.toOpaqueMap(): Map<String, Any?> = mapOf(
+    "buildingAllowed" to buildingAllowed,
+    "creationAvailability" to creationAvailability.name,
+    "spawnWorldUuid" to spawnWorldUuid,
+    "spawnPolicyInitializedUuid" to spawnPolicyInitializedUuid,
+)
+
+private fun decodeAdminWorldControls(value: Any?): ChanponGlobalStorage.AdminWorldControlsSnapshot? {
+    val map = strictMap(
+        value,
+        setOf("buildingAllowed", "creationAvailability", "spawnWorldUuid", "spawnPolicyInitializedUuid"),
+    ) ?: return null
+    val spawn = decodeNullableUuid(map["spawnWorldUuid"]) ?: return null
+    val initialized = decodeNullableUuid(map["spawnPolicyInitializedUuid"]) ?: return null
+    return ChanponGlobalStorage.AdminWorldControlsSnapshot(
+        map.strictBoolean("buildingAllowed") ?: return null,
+        map.strictString("creationAvailability")?.let(::creationAvailabilityOrNull) ?: return null,
+        spawn.value,
+        initialized.value,
+    )
+}
+
+private fun SpawnWorldProtectionService.DefaultsSnapshot.toOpaqueMap(): Map<String, Any?> = mapOf(
+    "worldUuid" to worldUuid,
+    "regionExisted" to regionExisted,
+    "otherExplosion" to otherExplosion?.name,
+    "chestAccess" to chestAccess?.name,
+    "pistons" to pistons?.name,
+    "potionSplash" to potionSplash?.name,
+    "use" to use?.name,
+    "passthrough" to passthrough?.name,
+    "passthroughGroup" to passthroughGroup?.name,
+    "creeperExplosion" to creeperExplosion?.name,
+    "destroyVehicle" to destroyVehicle?.name,
+    "interact" to interact?.name,
+    "ride" to ride?.name,
+    "placeVehicle" to placeVehicle?.name,
+)
+
+private fun decodeNullableSpawnDefaults(value: Any?): NullableDecoded<SpawnWorldProtectionService.DefaultsSnapshot>? {
+    if (value == null) return NullableDecoded(null)
+    val keys = setOf(
+        "worldUuid", "regionExisted", "otherExplosion", "chestAccess", "pistons", "potionSplash", "use",
+        "passthrough", "passthroughGroup", "creeperExplosion", "destroyVehicle", "interact", "ride", "placeVehicle",
+    )
+    val map = strictMap(value, keys) ?: return null
+    fun flag(key: String): NullableDecoded<StateFlag.State>? = decodeNullableEnum(map[key], StateFlag.State::valueOf)
+    val otherExplosion = flag("otherExplosion") ?: return null
+    val chestAccess = flag("chestAccess") ?: return null
+    val pistons = flag("pistons") ?: return null
+    val potionSplash = flag("potionSplash") ?: return null
+    val use = flag("use") ?: return null
+    val passthrough = flag("passthrough") ?: return null
+    val passthroughGroup = decodeNullableEnum(map["passthroughGroup"], RegionGroup::valueOf) ?: return null
+    val creeperExplosion = flag("creeperExplosion") ?: return null
+    val destroyVehicle = flag("destroyVehicle") ?: return null
+    val interact = flag("interact") ?: return null
+    val ride = flag("ride") ?: return null
+    val placeVehicle = flag("placeVehicle") ?: return null
+    return NullableDecoded(
+        SpawnWorldProtectionService.DefaultsSnapshot(
+            map.strictUuid("worldUuid") ?: return null,
+            map.strictBoolean("regionExisted") ?: return null,
+            otherExplosion.value,
+            chestAccess.value,
+            pistons.value,
+            potionSplash.value,
+            use.value,
+            passthrough.value,
+            passthroughGroup.value,
+            creeperExplosion.value,
+            destroyVehicle.value,
+            interact.value,
+            ride.value,
+            placeVehicle.value,
+        ),
+    )
+}
+
+private fun EnvironmentSnapshot.toOpaqueMap(): Map<String, Any?> = mapOf(
+    "fixedWeather" to fixedWeather,
+    "fixedTime" to fixedTime,
+    "gravity" to gravity,
+    "scale" to scale,
+    "allowFlight" to allowFlight,
+    "freecamAllowed" to freecamAllowed,
+    "protectionMode" to protectionMode.name,
+)
+
+private fun decodeEnvironmentSnapshot(value: Any?): EnvironmentSnapshot? {
+    val map = strictMap(
+        value,
+        setOf("fixedWeather", "fixedTime", "gravity", "scale", "allowFlight", "freecamAllowed", "protectionMode"),
+    ) ?: return null
+    val weather = decodeNullableTyped<String>(map["fixedWeather"]) ?: return null
+    val time = decodeNullableTyped<Long>(map["fixedTime"]) ?: return null
+    val gravity = decodeNullableTyped<Double>(map["gravity"]) ?: return null
+    val scale = decodeNullableTyped<Double>(map["scale"]) ?: return null
+    return EnvironmentSnapshot(
+        weather.value,
+        time.value,
+        gravity.value,
+        scale.value,
+        map.strictBoolean("allowFlight") ?: return null,
+        map.strictBoolean("freecamAllowed") ?: return null,
+        map.strictString("protectionMode")?.let(::protectionModeOrNull) ?: return null,
+    )
+}
+
+private fun ChanponWorldStorage.SubmissionSnapshot.toOpaqueMap(): Map<String, Any?> = mapOf(
+    "state" to state.name,
+    "history" to history.map { entry -> entry.toSortedMap() },
+)
+
+private fun decodeSubmissionSnapshot(value: Any?): ChanponWorldStorage.SubmissionSnapshot? {
+    val map = strictMap(value, setOf("state", "history")) ?: return null
+    val state = map.strictString("state")?.let(::submissionStateOrNull) ?: return null
+    val history = map["history"] as? List<*> ?: return null
+    val decodedHistory = history.map { rawEntry ->
+        val rawMap = rawEntry as? Map<*, *> ?: return null
+        val entry = linkedMapOf<String, Any?>()
+        rawMap.forEach { (key, nested) ->
+            if (key !is String || (nested != null && nested !is String)) return null
+            entry[key] = nested
+        }
+        entry.toMap()
+    }
+    return ChanponWorldStorage.SubmissionSnapshot(state, decodedHistory)
+}
+
+private fun expectedSubmissionAfter(
+    state: SubmissionProviderState.World,
+    current: ChanponWorldStorage.SubmissionSnapshot,
+): ChanponWorldStorage.SubmissionSnapshot? {
+    if (current.state != state.expectedState || current.revision != state.expectedRevision) return null
+    if (current.history.dropLast(1) != state.before.history) return null
+    val event = current.history.lastOrNull() ?: return null
+    if (event.keys != SUBMISSION_HISTORY_KEYS) return null
+    if (event["action"] != state.expectedAction) return null
+    if (event["state"] != state.expectedState.storageValue) return null
+    if (event["actor_uuid"] != state.expectedActorUuid.toString()) return null
+    if (event["actor_name"] != state.expectedActorName) return null
+    val at = event["at"] as? String ?: return null
+    if (runCatching { java.time.LocalDateTime.parse(at) }.isFailure) return null
+    return ChanponWorldStorage.SubmissionSnapshot(
+        state.expectedState,
+        state.before.history.map { it.toMap() } + event.toMap(),
+    )
+}
+
+private fun visibilityOrNull(value: String): ChanponWorldVisibility? =
+    runCatching { ChanponWorldVisibility.valueOf(value) }.getOrNull()
+
+private fun submissionStateOrNull(value: String): SubmissionState? =
+    runCatching { SubmissionState.valueOf(value) }.getOrNull()
+
+private fun creationAvailabilityOrNull(value: String): WorldCreationAvailability? =
+    runCatching { WorldCreationAvailability.valueOf(value) }.getOrNull()
+
+private fun protectionModeOrNull(value: String): ChanponWorldProtectionMode? =
+    runCatching { ChanponWorldProtectionMode.valueOf(value) }.getOrNull()
+
+private fun strictMap(value: Any?, keys: Set<String>): Map<String, Any?>? {
+    val raw = value as? Map<*, *> ?: return null
+    if (raw.keys != keys) return null
+    if (raw.keys.any { it !is String }) return null
+    @Suppress("UNCHECKED_CAST")
+    return raw as Map<String, Any?>
+}
+
+private data class NullableDecoded<T>(val value: T?)
+
+private fun decodeNullableUuid(value: Any?): NullableDecoded<UUID>? = when (value) {
+    null -> NullableDecoded(null)
+    is UUID -> NullableDecoded(value)
+    else -> null
+}
+
+private fun decodeNullableBoolean(value: Any?): NullableDecoded<Boolean>? = when (value) {
+    null -> NullableDecoded(null)
+    is Boolean -> NullableDecoded(value)
+    else -> null
+}
+
+private inline fun <reified T> decodeNullableTyped(value: Any?): NullableDecoded<T>? = when (value) {
+    null -> NullableDecoded(null)
+    is T -> NullableDecoded(value)
+    else -> null
+}
+
+private fun <T> decodeNullableEnum(value: Any?, parse: (String) -> T): NullableDecoded<T>? = when (value) {
+    null -> NullableDecoded(null)
+    is String -> runCatching { NullableDecoded(parse(value)) }.getOrNull()
+    else -> null
+}
+
+private const val AUTOMATION_PROVIDER_ID = "mwm-chanpon:automation-settings"
+private const val ADMIN_PROVIDER_ID = "mwm-chanpon:admin-world-controls"
+private const val ENVIRONMENT_PROVIDER_ID = "mwm-chanpon:world-environment"
+private const val PUBLICATION_PROVIDER_ID = "mwm-chanpon:world-publication"
+private const val NOTIFICATION_PROVIDER_ID = "mwm-chanpon:world-notification"
+private const val SUBMISSION_PROVIDER_ID = "mwm-chanpon:submission"
+private const val TOOL_PROVIDER_ID = "mwm-chanpon:tool-permission"
+private val SUBMISSION_HISTORY_KEYS = setOf("at", "action", "state", "actor_uuid", "actor_name")
 
 private const val TOOL_ID = "tool_id"

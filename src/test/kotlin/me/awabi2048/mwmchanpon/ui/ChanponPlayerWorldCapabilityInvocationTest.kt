@@ -17,8 +17,6 @@ import com.awabi2048.ccsystem.api.gui.MenuInteraction
 import com.awabi2048.ccsystem.api.gui.ResolvedMenuCapability
 import com.awabi2048.ccsystem.api.gui.ResolvedMenuCapabilityAction
 import me.awabi2048.mwmchanpon.service.ChanponReversibleActionClassification
-import me.awabi2048.mwmchanpon.service.EasyCreationReversibleProvider
-import me.awabi2048.mwmchanpon.service.EasyCreationReturnRouteContract
 import me.awabi2048.myworldmanager.service.MwmReversibleContracts
 import org.bukkit.Material
 import org.bukkit.event.inventory.ClickType
@@ -83,13 +81,11 @@ class ChanponPlayerWorldCapabilityInvocationTest {
                         ),
                         action(
                             MenuCapabilityTrigger.RIGHT,
-                            MenuActionSafety.REVERSIBLE,
-                            EasyCreationReversibleProvider.contract(),
-                            ChanponReversibleActionClassification.Operation.EASY_CREATION_START,
+                            MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE,
                         ),
                     ),
                 ),
-                attributes = mapOf("subject" to subject) + EasyCreationReturnRouteContract.attributes(returnRoute),
+                attributes = mapOf("subject" to subject),
             ),
             playerWorldCapabilityInvocation(
                 slot = 24,
@@ -126,12 +122,11 @@ class ChanponPlayerWorldCapabilityInvocationTest {
         )
 
         val providerOnlyViolations = MenuContractValidator.validate(definition, observations)
-        assertEquals(4, providerOnlyViolations.size)
+        assertEquals(3, providerOnlyViolations.size)
         assertEquals(
             setOf(
                 "reversible provider is not registered: myworldmanager:world-display-order",
                 "reversible provider is not registered: myworldmanager:creation-session",
-                "reversible provider is not registered: mwm-chanpon:easy-creation",
             ),
             providerOnlyViolations.map { it.message }.toSet(),
         )
@@ -151,7 +146,7 @@ class ChanponPlayerWorldCapabilityInvocationTest {
             worldInteraction.attributes,
         )
         assertEquals(
-            mapOf("subject" to subject) + EasyCreationReturnRouteContract.attributes(returnRoute),
+            mapOf("subject" to subject),
             assertInstanceOf(MenuInteraction.Capability::class.java, observations[2].interaction).attributes,
         )
         assertEquals(mapOf("subject" to subject), invocations[3].attributes)
@@ -164,8 +159,8 @@ class ChanponPlayerWorldCapabilityInvocationTest {
         assertEquals(MenuActionSafety.REVERSIBLE, worldInteraction.safetyFor(ClickType.SHIFT_LEFT))
         assertEquals(MenuActionSafety.REVERSIBLE,
             assertInstanceOf(MenuInteraction.Capability::class.java, observations[0].interaction).safety)
-        assertEquals(MenuActionSafety.REVERSIBLE,
-            assertInstanceOf(MenuInteraction.Capability::class.java, observations[2].interaction).safety)
+        assertEquals(MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE,
+            assertInstanceOf(MenuInteraction.Capability::class.java, observations[2].interaction).safetyFor(ClickType.RIGHT))
         assertEquals(0, invocations[3].capability.acceptedClicks.size)
         assertInstanceOf(MenuInteraction.DisplayOnly::class.java, observations[3].interaction)
     }

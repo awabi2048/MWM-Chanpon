@@ -17,7 +17,6 @@ import com.awabi2048.ccsystem.api.gui.MenuActionResult
 import com.awabi2048.ccsystem.api.gui.MenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuReversibleProviderCaptureResult
 import com.awabi2048.ccsystem.api.gui.MenuReversibleProviderRestoreResult
-import com.awabi2048.ccsystem.api.gui.MenuReversibleProviderState
 import com.awabi2048.ccsystem.api.gui.MenuReversibleStateCaptureContext
 import com.awabi2048.ccsystem.api.gui.MenuReversibleStateProvider
 import com.awabi2048.ccsystem.api.gui.MenuReversibleStateProviderDefinition
@@ -44,6 +43,8 @@ import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.storage.WorldCreationAvailability
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
+import me.awabi2048.mwmchanpon.service.ChanponReversibleOpaqueState
+import me.awabi2048.mwmchanpon.service.decodeChanponOpaqueState
 import me.awabi2048.mwmchanpon.storage.SubmissionState
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.mwmchanpon.ui.ChanponGuiElements
@@ -66,6 +67,7 @@ import org.bukkit.event.Listener
 
 internal class CreationProductionSelectionState {
     private val pendingProduction = ConcurrentHashMap<Pair<UUID, String>, Boolean>()
+    private val reversibleTargets = ConcurrentHashMap<UUID, ProductionToggleExtension.CreationProductionSelectionTarget>()
 
     fun takePending(playerUuid: UUID, worldName: String): Boolean? = pendingProduction.remove(playerUuid to worldName)
 
@@ -76,11 +78,13 @@ internal class CreationProductionSelectionState {
     fun capture(
         playerUuid: UUID,
         draft: WorldCreationDraft,
-    ): Pair<ProductionToggleExtension.CreationProductionSelectionTarget, ProductionToggleExtension.CreationProductionSelectionSnapshot> {
+    ): Pair<UUID, ProductionToggleExtension.CreationProductionSelectionSnapshot> {
         val target = ProductionToggleExtension.CreationProductionSelectionTarget(playerUuid, draft)
+        val operationId = UUID.randomUUID()
+        reversibleTargets[operationId] = target
         val beforeSelected = target.selected()
         val worldName = target.worldName()
-        return target to ProductionToggleExtension.CreationProductionSelectionSnapshot(
+        return operationId to ProductionToggleExtension.CreationProductionSelectionSnapshot(
             playerUuid = playerUuid,
             beforeSelected = beforeSelected,
             expectedSelected = !beforeSelected,
@@ -91,9 +95,10 @@ internal class CreationProductionSelectionState {
     }
 
     fun restore(
-        target: ProductionToggleExtension.CreationProductionSelectionTarget,
+        operationId: UUID,
         snapshot: ProductionToggleExtension.CreationProductionSelectionSnapshot,
     ): Boolean {
+        val target = reversibleTargets.remove(operationId) ?: return false
         if (target.playerUuid != snapshot.playerUuid || target.worldName() != snapshot.worldName) return false
         val currentPending = snapshot.worldName?.let { pendingProduction[snapshot.playerUuid to it] }
         if (target.selected() != snapshot.expectedSelected || currentPending != snapshot.expectedPending) return false
@@ -694,9 +699,55 @@ class ProductionToggleExtension(
 }
 
 internal data class CreationProductionSelectionProviderState(
-    val target: ProductionToggleExtension.CreationProductionSelectionTarget,
+    val operationId: UUID,
     val snapshot: ProductionToggleExtension.CreationProductionSelectionSnapshot,
-) : MenuReversibleProviderState
+) : com.awabi2048.ccsystem.api.gui.MenuReversibleOpaqueState {
+    override fun snapshot(): Any = ChanponReversibleOpaqueState.of(
+        CREATION_PRODUCTION_PROVIDER_ID,
+        "creation-production-selection",
+        mapOf(
+            "operationId" to operationId,
+            "playerUuid" to snapshot.playerUuid,
+            "beforeSelected" to snapshot.beforeSelected,
+            "expectedSelected" to snapshot.expectedSelected,
+            "worldName" to snapshot.worldName,
+            "beforePending" to snapshot.beforePending,
+            "expectedPending" to snapshot.expectedPending,
+        ),
+    ).snapshot()
+
+    companion object {
+        fun decode(value: Any?): CreationProductionSelectionProviderState? {
+            val payload = decodeChanponOpaqueState(
+                value,
+                CREATION_PRODUCTION_PROVIDER_ID,
+                "creation-production-selection",
+                setOf("operationId", "playerUuid", "beforeSelected", "expectedSelected", "worldName", "beforePending", "expectedPending"),
+            )?.payload ?: return null
+            val worldName = when (val value = payload["worldName"]) {
+                null -> null
+                is String -> value
+                else -> return null
+            }
+            fun nullableBoolean(key: String): Boolean? = when (val value = payload[key]) {
+                null -> null
+                is Boolean -> value
+                else -> return null
+            }
+            return CreationProductionSelectionProviderState(
+                payload["operationId"] as? UUID ?: return null,
+                ProductionToggleExtension.CreationProductionSelectionSnapshot(
+                    payload["playerUuid"] as? UUID ?: return null,
+                    payload["beforeSelected"] as? Boolean ?: return null,
+                    payload["expectedSelected"] as? Boolean ?: return null,
+                    worldName,
+                    nullableBoolean("beforePending"),
+                    nullableBoolean("expectedPending"),
+                ),
+            )
+        }
+    }
+}
 
 internal class CreationProductionSelectionProvider(
     private val stateStore: CreationProductionSelectionState,
@@ -705,14 +756,14 @@ internal class CreationProductionSelectionProvider(
         val draft = context.interaction.attributes[CreationConfirmationCapabilityContract.DRAFT_ATTRIBUTE]
             as? WorldCreationDraft
             ?: return MenuReversibleProviderCaptureResult.Rejected("creation draft is missing")
-        val (target, snapshot) = stateStore.capture(context.player.uniqueId, draft)
-        return MenuReversibleProviderCaptureResult.Captured(CreationProductionSelectionProviderState(target, snapshot))
+        val (operationId, snapshot) = stateStore.capture(context.player.uniqueId, draft)
+        return MenuReversibleProviderCaptureResult.Captured(CreationProductionSelectionProviderState(operationId, snapshot))
     }
 
     override fun restore(context: MenuReversibleStateRestoreContext): MenuReversibleProviderRestoreResult {
-        val state = context.state as? CreationProductionSelectionProviderState
+        val state = CreationProductionSelectionProviderState.decode(context.state.value)
             ?: return MenuReversibleProviderRestoreResult.Rejected("invalid creation production selection state type")
-        return if (stateStore.restore(state.target, state.snapshot)) {
+        return if (stateStore.restore(state.operationId, state.snapshot)) {
             MenuReversibleProviderRestoreResult.Restored
         } else {
             MenuReversibleProviderRestoreResult.Rejected("creation production selection changed concurrently")
@@ -731,3 +782,5 @@ internal class CreationProductionSelectionProvider(
         }
     }
 }
+
+private const val CREATION_PRODUCTION_PROVIDER_ID = "mwm-chanpon:creation-production-selection"

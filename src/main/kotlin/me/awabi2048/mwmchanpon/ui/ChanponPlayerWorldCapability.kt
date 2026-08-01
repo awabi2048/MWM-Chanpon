@@ -36,8 +36,6 @@ import com.awabi2048.ccsystem.api.gui.MenuElement
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.service.ChanponReversibleActionClassification
 import me.awabi2048.mwmchanpon.service.EasyVoidWorldCreationService
-import me.awabi2048.mwmchanpon.service.EasyCreationReversibleProvider
-import me.awabi2048.mwmchanpon.service.EasyCreationReturnRouteContract
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
@@ -237,9 +235,7 @@ class ChanponPlayerWorldCapability(
                             creationBlockReason(it) == null && hasCreatePermission(it.player)
                         },
                         handler = MenuCapabilityActionHandler(::handleCreate),
-                        safety = MenuActionSafety.REVERSIBLE,
-                        reversibleContract = EasyCreationReversibleProvider.contract(),
-                        classification = ChanponReversibleActionClassification.Operation.EASY_CREATION_START,
+                        safety = MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE,
                     ),
                 ),
             ),
@@ -848,7 +844,6 @@ class ChanponPlayerWorldCapability(
         worldData: WorldData? = null,
     ): Map<String, Any> = buildMap {
         put(PlayerWorldCapabilityContract.SUBJECT_ATTRIBUTE, subject)
-        putAll(EasyCreationReturnRouteContract.attributes(subject.returnRoute))
         worldData?.let { put(PlayerWorldCapabilityContract.WORLD_ATTRIBUTE, it) }
     }
 
