@@ -761,7 +761,7 @@ internal class CreationProductionSelectionProvider(
     }
 
     override fun restore(context: MenuReversibleStateRestoreContext): MenuReversibleProviderRestoreResult {
-        val state = CreationProductionSelectionProviderState.decode(context.state.value)
+        val state = CreationProductionSelectionProviderState.decode(context.stateSnapshot.value)
             ?: return MenuReversibleProviderRestoreResult.Rejected("invalid creation production selection state type")
         return if (stateStore.restore(state.operationId, state.snapshot)) {
             MenuReversibleProviderRestoreResult.Restored

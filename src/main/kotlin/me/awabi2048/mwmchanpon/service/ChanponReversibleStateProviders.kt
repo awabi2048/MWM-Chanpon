@@ -164,7 +164,7 @@ internal class AutomationSettingsProvider(
     }
 
     override fun restore(context: MenuReversibleStateRestoreContext): MenuReversibleProviderRestoreResult {
-        val state = AutomationSettingsState.decode(context.state.value)
+        val state = AutomationSettingsState.decode(context.stateSnapshot.value)
             ?: return rejectRestore("invalid automation settings state type")
         val current = gateway.getBoolean(state.configPath)
         if (current != state.expectedAfter) return concurrent("automation setting ${state.configPath}", state.expectedAfter, current)
@@ -254,7 +254,7 @@ internal class AdminWorldControlsProvider(
     }
 
     override fun restore(context: MenuReversibleStateRestoreContext): MenuReversibleProviderRestoreResult {
-        val state = AdminWorldControlsState.decode(context.state.value)
+        val state = AdminWorldControlsState.decode(context.stateSnapshot.value)
             ?: return rejectRestore("invalid admin world controls state type")
         val current = storage.captureAdminWorldControls()
         if (current != state.expectedAfter) return concurrent("admin world controls", state.expectedAfter, current)
@@ -340,7 +340,7 @@ internal class EnvironmentProvider(
     }
 
     override fun restore(context: MenuReversibleStateRestoreContext): MenuReversibleProviderRestoreResult {
-        val state = EnvironmentState.decode(context.state.value)
+        val state = EnvironmentState.decode(context.stateSnapshot.value)
             ?: return rejectRestore("invalid environment state type")
         val worldData = world(state.worldUuid) ?: return rejectRestore("environment world no longer exists: ${state.worldUuid}")
         val current = snapshot(worldData)
@@ -460,7 +460,7 @@ internal class PublicationProvider(private val storage: ChanponWorldStorage) : M
     }
 
     override fun restore(context: MenuReversibleStateRestoreContext): MenuReversibleProviderRestoreResult {
-        val state = PublicationState.decode(context.state.value) ?: return rejectRestore("invalid publication state type")
+        val state = PublicationState.decode(context.stateSnapshot.value) ?: return rejectRestore("invalid publication state type")
         if (MyWorldManagerApi.getWorldRepository()?.findByUuid(state.worldUuid) == null) {
             return rejectRestore("TARGET_MISSING: publication world no longer exists: ${state.worldUuid}")
         }
@@ -508,7 +508,7 @@ internal object NotificationProvider : MenuReversibleStateProvider {
     }
 
     override fun restore(context: MenuReversibleStateRestoreContext): MenuReversibleProviderRestoreResult {
-        val state = NotificationState.decode(context.state.value) ?: return rejectRestore("invalid notification state type")
+        val state = NotificationState.decode(context.stateSnapshot.value) ?: return rejectRestore("invalid notification state type")
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(state.worldUuid)
             ?: return rejectRestore("notification world no longer exists: ${state.worldUuid}")
         if (worldData.notificationEnabled != state.expectedAfter) {
@@ -663,8 +663,8 @@ internal class SubmissionProvider(
     }
 
     override fun restore(context: MenuReversibleStateRestoreContext): MenuReversibleProviderRestoreResult {
-        SubmissionProviderState.Closure.decode(context.state.value)?.let { return restoreClosure(it) }
-        SubmissionProviderState.World.decode(context.state.value)?.let { return restoreWorld(it) }
+        SubmissionProviderState.Closure.decode(context.stateSnapshot.value)?.let { return restoreClosure(it) }
+        SubmissionProviderState.World.decode(context.stateSnapshot.value)?.let { return restoreWorld(it) }
         return rejectRestore("invalid submission state type")
     }
 
@@ -856,8 +856,8 @@ internal class ToolPermissionProvider(
     }
 
     override fun restore(context: MenuReversibleStateRestoreContext): MenuReversibleProviderRestoreResult {
-        ToolPermissionState.Toggle.decode(context.state.value)?.let { return restoreToggle(it) }
-        ToolPermissionState.Role.decode(context.state.value)?.let { return restoreRole(it) }
+        ToolPermissionState.Toggle.decode(context.stateSnapshot.value)?.let { return restoreToggle(it) }
+        ToolPermissionState.Role.decode(context.stateSnapshot.value)?.let { return restoreRole(it) }
         return rejectRestore("invalid tool permission state type")
     }
 
