@@ -44,7 +44,7 @@ class ChanponMenuActionSafetyContractTest {
     @Test
     fun `capability entry boundaries reject unspecified actions`() {
         val unguarded = kotlinSources().flatMap { source ->
-            functionInvocations(source.content, "GuiMenuCapabilitySpec")
+            functionInvocations(source.content, "GuiMenuCapabilityInvocationSpec")
                 .filterNot { invocation -> invocation.contains("requireExplicitActionSafety()") }
                 .map { source.path }
         }

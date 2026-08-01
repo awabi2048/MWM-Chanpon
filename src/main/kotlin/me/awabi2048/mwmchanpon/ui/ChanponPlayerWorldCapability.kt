@@ -7,7 +7,7 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
-import com.awabi2048.ccsystem.api.gui.GuiMenuCapabilitySpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuCapabilityInvocationSpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
@@ -28,7 +28,6 @@ import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentationProvider
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
-import java.util.UUID
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
@@ -242,7 +241,6 @@ class ChanponPlayerWorldCapability(
                     ACTION_PAGE to MenuActionHandler(::changePage),
                     ACTION_SETTINGS to MenuActionHandler(::openUserSettings),
                     ACTION_PENDING to MenuActionHandler(::openPending),
-                    ACTION_CAPABILITY to MenuActionHandler(::executeCapability),
                     ACTION_BACK to MenuActionHandler {
                         MenuActionResult.Success(MenuUpdate.Back)
                     },
@@ -284,48 +282,43 @@ class ChanponPlayerWorldCapability(
                 )?.requireExplicitActionSafety() ?: return@forEachIndexed
                 elements += CCSystem.getAPI().getGuiElementService().menuCapabilityEntry(
                     player,
-                    GuiMenuCapabilitySpec(
+                    playerWorldCapabilityInvocation(
                         slot = layout.layout.itemSlots[index],
                         capability = capability.requireExplicitActionSafety(),
-                        actionId = ACTION_CAPABILITY,
-                        actionPayload = mapOf(
-                            PAYLOAD_CAPABILITY to capability.capabilityId,
-                            PAYLOAD_WORLD_UUID to worldData.uuid.toString(),
-                        ),
+                        attributes = attributes,
                     ),
                 )
             }
 
         if (request.targetPlayerUuid == player.uniqueId) {
+            val capabilityAttributes = attributes(subject)
             service.resolve(
                 "$CAPABILITY_OWNER:$CREATION_CAPABILITY_ID",
                 player,
-                attributes = attributes(subject),
+                attributes = capabilityAttributes,
             )?.requireExplicitActionSafety()?.let { capability ->
-                val capabilityAttributes = attributes(subject)
                 elements += CCSystem.getAPI().getGuiElementService().menuCapabilityEntry(
                     player,
-                    GuiMenuCapabilitySpec(
+                    playerWorldCapabilityInvocation(
                         slot = layout.layout.actionSlot - 2,
                         capability = capability.requireExplicitActionSafety(),
-                        actionId = ACTION_CAPABILITY,
-                        actionPayload = mapOf(PAYLOAD_CAPABILITY to capability.capabilityId),
+                        attributes = capabilityAttributes,
                     ),
                 )
             }
         }
+        val summaryAttributes = attributes(subject)
         service.resolve(
             "$CAPABILITY_OWNER:$SUMMARY_CAPABILITY_ID",
             player,
-            attributes = attributes(subject),
+            attributes = summaryAttributes,
         )?.requireExplicitActionSafety()?.let { capability ->
             elements += CCSystem.getAPI().getGuiElementService().menuCapabilityEntry(
                 player,
-                GuiMenuCapabilitySpec(
+                playerWorldCapabilityInvocation(
                     slot = layout.layout.actionSlot,
                     capability = capability.requireExplicitActionSafety(),
-                    actionId = ACTION_CAPABILITY,
-                    actionPayload = mapOf(PAYLOAD_CAPABILITY to capability.capabilityId),
+                    attributes = summaryAttributes,
                 ),
             )
         }
@@ -729,20 +722,6 @@ class ChanponPlayerWorldCapability(
         )
     }
 
-    private fun executeCapability(context: MenuActionContext): MenuActionResult {
-        val capabilityId = context.payload[PAYLOAD_CAPABILITY]
-            ?: return MenuActionResult.Ignored
-        val worldData = context.payload[PAYLOAD_WORLD_UUID]
-            ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-            ?.let { MyWorldManagerApi.getWorldRepository()?.findByUuid(it) }
-        return CCSystem.getAPI().getMenuCapabilityService().execute(
-            capabilityId,
-            context.player,
-            context.click,
-            attributes = attributes(subject(context.player, context.route), worldData),
-        )
-    }
-
     private fun navigationElement(
         slot: Int,
         player: Player,
@@ -912,13 +891,20 @@ class ChanponPlayerWorldCapability(
         const val ACTION_PAGE = "page"
         const val ACTION_SETTINGS = "settings"
         const val ACTION_PENDING = "pending"
-        const val ACTION_CAPABILITY = "capability"
         const val ACTION_BACK = "back"
-        const val PAYLOAD_CAPABILITY = "capability_id"
-        const val PAYLOAD_WORLD_UUID = "capability_world_uuid"
         const val PAYLOAD_PAGE = "page"
         const val PAYLOAD_SHOW_BACK = "show_back"
         const val PAYLOAD_TARGET_UUID = "target_uuid"
         const val PAYLOAD_TARGET_NAME = "target_name"
     }
 }
+
+internal fun playerWorldCapabilityInvocation(
+    slot: Int,
+    capability: com.awabi2048.ccsystem.api.gui.ResolvedMenuCapability,
+    attributes: Map<String, Any>,
+): GuiMenuCapabilityInvocationSpec = GuiMenuCapabilityInvocationSpec(
+    slot = slot,
+    capability = capability.requireExplicitActionSafety(),
+    attributes = attributes,
+)
