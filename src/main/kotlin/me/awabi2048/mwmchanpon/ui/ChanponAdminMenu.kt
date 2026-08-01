@@ -37,6 +37,7 @@ import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.storage.WorldCreationAvailability
 import me.awabi2048.mwmchanpon.protection.SpawnWorldProtectionService
 import me.awabi2048.mwmchanpon.service.ChanponReversibleContracts
+import me.awabi2048.mwmchanpon.service.ChanponReversibleActionClassification
 import me.awabi2048.mwmchanpon.service.ChanponReversibleStateProviders
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.AdminMenuCapabilityPlacements
@@ -212,6 +213,7 @@ class ChanponAdminMenu(
                     true,
                     ACTION_CONFIRM_SPAWN,
                     ChanponReversibleContracts.adminWorldControls("spawn", worldUuid.toString()),
+                    ChanponReversibleActionClassification.Operation.SPAWN_WORLD_SET,
                 ),
                 CCSystem.getAPI().getGuiElementService().menuDisplay(
                     com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec(
@@ -281,6 +283,7 @@ class ChanponAdminMenu(
                         payload,
                         safety = adminActionSafety(actionId),
                         reversibleContract = adminReversibleContract(actionId),
+                        classification = adminClassification(actionId),
                     ),
                 ),
             ),
@@ -308,6 +311,7 @@ class ChanponAdminMenu(
                     controlsI18n(player, if (allowed) "build.deny_action" else "build.allow_action"),
                     safety = MenuActionSafety.REVERSIBLE,
                     reversibleContract = ChanponReversibleContracts.adminWorldControls("building"),
+                    classification = ChanponReversibleActionClassification.Operation.BUILDING_TOGGLE,
                 )),
                 glint = null
             ),
@@ -350,6 +354,7 @@ class ChanponAdminMenu(
                     controlsI18n(player, "creation.cycle_action"),
                     safety = MenuActionSafety.REVERSIBLE,
                     reversibleContract = ChanponReversibleContracts.adminWorldControls("creation"),
+                    classification = ChanponReversibleActionClassification.Operation.CREATION_AVAILABILITY_CYCLE,
                 )),
                 glint = null
             ),
@@ -362,6 +367,7 @@ class ChanponAdminMenu(
         confirm: Boolean,
         actionId: String,
         reversibleContract: com.awabi2048.ccsystem.api.gui.MenuReversibleContract? = null,
+        classification: ChanponReversibleActionClassification.Operation? = null,
     ): MenuElement {
         val key = if (confirm) "confirm.button.confirm" else "confirm.button.cancel"
         return CCSystem.getAPI().getGuiElementService().menuEntry(
@@ -378,6 +384,7 @@ class ChanponAdminMenu(
                         i18n(player, "$key.action"),
                         safety = adminActionSafety(actionId),
                         reversibleContract = reversibleContract,
+                        classification = classification,
                     ),
                 ),
             ),
@@ -405,6 +412,12 @@ class ChanponAdminMenu(
     private fun adminReversibleContract(actionId: String) = when (actionId) {
         ACTION_BUILDING_ALLOWED -> ChanponReversibleContracts.adminWorldControls("building")
         ACTION_WORLD_CREATION -> ChanponReversibleContracts.adminWorldControls("creation")
+        else -> null
+    }
+
+    private fun adminClassification(actionId: String) = when (actionId) {
+        ACTION_BUILDING_ALLOWED -> ChanponReversibleActionClassification.Operation.BUILDING_TOGGLE
+        ACTION_WORLD_CREATION -> ChanponReversibleActionClassification.Operation.CREATION_AVAILABILITY_CYCLE
         else -> null
     }
 

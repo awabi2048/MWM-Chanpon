@@ -39,6 +39,7 @@ import me.awabi2048.mwmchanpon.storage.ChanponWorldProtectionMode
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.protection.WorldBuildPermissionService
 import me.awabi2048.mwmchanpon.service.ChanponReversibleContracts
+import me.awabi2048.mwmchanpon.service.ChanponReversibleActionClassification
 import me.awabi2048.mwmchanpon.service.ChanponReversibleStateProviders
 
 class ChanponEnvironmentGui(
@@ -342,6 +343,7 @@ class ChanponEnvironmentGui(
                 payload,
                 safety = MenuActionSafety.REVERSIBLE,
                 reversibleContract = ChanponReversibleContracts.environment(worldUuid),
+                classification = ChanponReversibleActionClassification.Operation.ENVIRONMENT_DIRECT_SETTING_CYCLE,
             ))
             if (customTimeAction) {
                 add(chanponGestureAction(
@@ -400,6 +402,7 @@ class ChanponEnvironmentGui(
                 payload,
                 safety = MenuActionSafety.REVERSIBLE,
                 reversibleContract = ChanponReversibleContracts.environment(worldData.uuid),
+                classification = ChanponReversibleActionClassification.Operation.ENVIRONMENT_PROTECTION_CYCLE,
             ))
             if (mode == ChanponWorldProtectionMode.PASSWORD) {
                 add(chanponGestureAction(

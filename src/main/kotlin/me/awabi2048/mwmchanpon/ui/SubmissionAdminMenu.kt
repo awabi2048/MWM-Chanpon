@@ -34,6 +34,7 @@ import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.storage.SubmissionState
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
+import me.awabi2048.mwmchanpon.service.ChanponReversibleActionClassification
 import me.awabi2048.mwmchanpon.service.ChanponReversibleContracts
 import me.awabi2048.mwmchanpon.service.ChanponReversibleStateProviders
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
@@ -409,6 +410,7 @@ class SubmissionAdminMenu(
             "confirm.close_submissions",
             ACTION_CONFIRM_CLOSE,
             ChanponReversibleContracts.submission("global", "close"),
+            ChanponReversibleActionClassification.Operation.SUBMISSION_CLOSURE,
         )
 
     private fun renderProductionToggleConfirmation(
@@ -435,6 +437,7 @@ class SubmissionAdminMenu(
             "confirm.complete_unsubmitted",
             ACTION_CONFIRM_COMPLETE,
             route.payload[WORLD_UUID]?.let { ChanponReversibleContracts.submission(it, "complete") },
+            ChanponReversibleActionClassification.Operation.SUBMISSION_COMPLETION,
         )
 
     private fun confirmationView(
@@ -444,6 +447,7 @@ class SubmissionAdminMenu(
         previewKey: String,
         confirmAction: String,
         reversibleContract: com.awabi2048.ccsystem.api.gui.MenuReversibleContract? = null,
+        classification: ChanponReversibleActionClassification.Operation? = null,
     ): InventoryMenuView {
         val layout = ChanponGuiElements.confirmationLayout()
         return InventoryMenuView(
@@ -459,7 +463,7 @@ class SubmissionAdminMenu(
                         GuiLoreFrame.BOTH,
                     ),
                 ),
-                confirmationEntry(player, layout.confirmSlot, true, confirmAction, reversibleContract),
+                confirmationEntry(player, layout.confirmSlot, true, confirmAction, reversibleContract, classification),
                 confirmationEntry(player, layout.cancelSlot, false, ACTION_CANCEL),
             ),
         )
@@ -552,6 +556,9 @@ class SubmissionAdminMenu(
                         SubmissionState.SUBMITTED -> ChanponReversibleContracts.submission(worldData.uuid.toString(), "complete")
                         SubmissionState.COMPLETED -> ChanponReversibleContracts.submission(worldData.uuid.toString(), "uncomplete")
                         SubmissionState.UNSUBMITTED -> null
+                    },
+                    classification = if (state == SubmissionState.UNSUBMITTED) null else {
+                        ChanponReversibleActionClassification.Operation.SUBMISSION_COMPLETION
                     },
                 ))
             }
@@ -661,6 +668,7 @@ class SubmissionAdminMenu(
                 i18n(player, "common.action_next"),
                 // フィルタ／並び順は次Routeの表示状態のみを変更します。
                 safety = MenuActionSafety.NAVIGATION_ONLY,
+                classification = submissionRouteClassification(actionId),
             )),
         ),
     )
@@ -690,6 +698,11 @@ class SubmissionAdminMenu(
                     } else {
                         null
                     },
+                    classification = if (plugin.isSubmissionClosed()) {
+                        ChanponReversibleActionClassification.Operation.SUBMISSION_CLOSURE
+                    } else {
+                        null
+                    },
                 )),
             ),
         )
@@ -701,6 +714,7 @@ class SubmissionAdminMenu(
         confirm: Boolean,
         actionId: String,
         reversibleContract: com.awabi2048.ccsystem.api.gui.MenuReversibleContract? = null,
+        classification: ChanponReversibleActionClassification.Operation? = null,
     ): MenuElement {
         val key = if (confirm) "confirm.button.confirm" else "confirm.button.cancel"
         return CCSystem.getAPI().getGuiElementService().menuEntry(
@@ -718,6 +732,7 @@ class SubmissionAdminMenu(
                         i18n(player, "$key.action"),
                         safety = submissionActionSafety(actionId),
                         reversibleContract = reversibleContract,
+                        classification = classification,
                     ),
                 ),
             ),
@@ -771,6 +786,12 @@ class SubmissionAdminMenu(
         ACTION_CONFIRM_CLOSE, ACTION_CONFIRM_COMPLETE -> MenuActionSafety.REVERSIBLE
         ACTION_CONFIRM_PRODUCTION -> MenuActionSafety.IRREVERSIBLE
         else -> error("Submission action must declare a dedicated safety mapping: $actionId")
+    }
+
+    private fun submissionRouteClassification(actionId: String): ChanponReversibleActionClassification.Operation? = when (actionId) {
+        ACTION_PROGRESS_FILTER -> ChanponReversibleActionClassification.Operation.SUBMISSION_LIST_FILTER
+        ACTION_SORT -> ChanponReversibleActionClassification.Operation.SUBMISSION_LIST_SORT
+        else -> null
     }
 
     private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): List<String> {

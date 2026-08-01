@@ -11,6 +11,7 @@ import com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger
 import com.awabi2048.ccsystem.api.gui.MenuGesture
 import com.awabi2048.ccsystem.api.gui.MenuReversibleContract
 import com.awabi2048.ccsystem.api.gui.ResolvedMenuCapability
+import me.awabi2048.mwmchanpon.service.ChanponReversibleActionClassification
 
 /** ChanponがRuntimeへ渡す通常操作に安全区分の省略を許さない境界です。 */
 internal fun chanponGestureAction(
@@ -21,12 +22,19 @@ internal fun chanponGestureAction(
     enabled: Boolean = true,
     safety: MenuActionSafety,
     reversibleContract: MenuReversibleContract? = null,
+    classification: ChanponReversibleActionClassification.Operation? = null,
 ): GuiMenuActionIntent.GestureAction {
     require(safety != MenuActionSafety.UNSPECIFIED) {
         "Chanpon GUI action must declare MenuActionSafety: $actionId/$gesture"
     }
     require((safety == MenuActionSafety.REVERSIBLE) == (reversibleContract != null)) {
         "Chanpon REVERSIBLE action must have exactly one restore contract: $actionId/$gesture"
+    }
+    if (safety == MenuActionSafety.REVERSIBLE) {
+        requireNotNull(classification) { "Chanpon REVERSIBLE action must declare a classified operation: $actionId/$gesture" }
+    }
+    classification?.let { operation ->
+        ChanponReversibleActionClassification.validateActionContract(operation, reversibleContract?.providerId, safety)
     }
     return GuiMenuActionIntent.GestureAction(
         actionId = actionId,
@@ -49,12 +57,19 @@ internal fun chanponCapabilityAction(
     handler: MenuCapabilityActionHandler,
     safety: MenuActionSafety,
     reversibleContract: MenuReversibleContract? = null,
+    classification: ChanponReversibleActionClassification.Operation? = null,
 ): MenuCapabilityAction {
     require(safety != MenuActionSafety.UNSPECIFIED) {
         "Chanpon capability action must declare MenuActionSafety: $id/$trigger"
     }
     require((safety == MenuActionSafety.REVERSIBLE) == (reversibleContract != null)) {
         "Chanpon REVERSIBLE capability must have exactly one restore contract: $id/$trigger"
+    }
+    if (safety == MenuActionSafety.REVERSIBLE) {
+        requireNotNull(classification) { "Chanpon REVERSIBLE capability must declare a classified operation: $id/$trigger" }
+    }
+    classification?.let { operation ->
+        ChanponReversibleActionClassification.validateActionContract(operation, reversibleContract?.providerId, safety)
     }
     return MenuCapabilityAction(
         id = id,

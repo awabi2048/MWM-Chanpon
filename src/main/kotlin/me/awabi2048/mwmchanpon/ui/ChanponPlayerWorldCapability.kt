@@ -34,6 +34,7 @@ import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
+import me.awabi2048.mwmchanpon.service.ChanponReversibleActionClassification
 import me.awabi2048.mwmchanpon.service.EasyVoidWorldCreationService
 import me.awabi2048.mwmchanpon.service.EasyCreationReversibleProvider
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
@@ -123,6 +124,7 @@ class ChanponPlayerWorldCapability(
                         handler = MenuCapabilityActionHandler(::handleWorld),
                         safety = MenuActionSafety.REVERSIBLE,
                         reversibleContract = MwmReversibleContracts.displayOrder(),
+                        classification = ChanponReversibleActionClassification.Operation.CURRENT_PLAYER_WORLD_DISPLAY_ORDER,
                     ),
                 ),
             ),
@@ -173,6 +175,7 @@ class ChanponPlayerWorldCapability(
                         handler = MenuCapabilityActionHandler(::handleWorld),
                         safety = MenuActionSafety.REVERSIBLE,
                         reversibleContract = MwmReversibleContracts.displayOrder(),
+                        classification = ChanponReversibleActionClassification.Operation.AWAY_PLAYER_WORLD_DISPLAY_ORDER,
                     ),
                 ),
             ),
@@ -218,6 +221,7 @@ class ChanponPlayerWorldCapability(
                         handler = MenuCapabilityActionHandler(::handleCreate),
                         safety = MenuActionSafety.REVERSIBLE,
                         reversibleContract = MwmReversibleContracts.creationSession(),
+                        classification = ChanponReversibleActionClassification.Operation.STANDARD_CREATION_SESSION,
                     ),
                     chanponCapabilityAction(
                         id = "easy-create",
@@ -234,6 +238,7 @@ class ChanponPlayerWorldCapability(
                         handler = MenuCapabilityActionHandler(::handleCreate),
                         safety = MenuActionSafety.REVERSIBLE,
                         reversibleContract = EasyCreationReversibleProvider.contract(),
+                        classification = ChanponReversibleActionClassification.Operation.EASY_CREATION_START,
                     ),
                 ),
             ),

@@ -27,6 +27,7 @@ import me.awabi2048.mwmchanpon.backup.BackupOperationStatus
 import me.awabi2048.mwmchanpon.backup.BackupService
 import me.awabi2048.mwmchanpon.service.BackupAutomationService
 import me.awabi2048.mwmchanpon.service.ChanponReversibleContracts
+import me.awabi2048.mwmchanpon.service.ChanponReversibleActionClassification
 import me.awabi2048.mwmchanpon.service.ChanponReversibleStateProviders
 import org.bukkit.Bukkit
 import org.bukkit.Material
@@ -179,6 +180,7 @@ class AutomationSettingsMenu(
                     ACTION_CONFIRM_TOGGLE,
                     i18n(player, "confirm.button.confirm_action"),
                     reversibleContract = ChanponReversibleContracts.automation(configPath),
+                    classification = ChanponReversibleActionClassification.Operation.AUTOMATION_TOGGLE,
                 ),
                 simpleActionEntry(
                     player,
@@ -342,6 +344,7 @@ class AutomationSettingsMenu(
         actionId: String,
         actionText: String,
         reversibleContract: com.awabi2048.ccsystem.api.gui.MenuReversibleContract? = null,
+        classification: ChanponReversibleActionClassification.Operation? = null,
     ): MenuElement {
         if (role == GuiElementRole.BACK) return CCSystem.getAPI().getGuiElementService().backEntry(player, slot)
         return CCSystem.getAPI().getGuiElementService().menuStructuredEntry(
@@ -361,6 +364,7 @@ class AutomationSettingsMenu(
                     actionText,
                     safety = automationActionSafety(actionId),
                     reversibleContract = reversibleContract,
+                    classification = classification,
                 )),
             ),
         )

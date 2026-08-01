@@ -32,7 +32,11 @@ internal object ChanponReversibleStateProviders {
         plugin: MWMChanponPlugin,
         onRestored: () -> Unit,
     ) = registry.register(
-        MenuReversibleStateProviderDefinition(OWNER, "automation-settings", AutomationSettingsProvider(plugin, onRestored)),
+        MenuReversibleStateProviderDefinition(
+            OWNER,
+            "automation-settings",
+            AutomationSettingsProvider(PluginAutomationSettingsGateway(plugin, onRestored)),
+        ),
     )
 
     fun registerAdminWorldControls(
@@ -43,7 +47,7 @@ internal object ChanponReversibleStateProviders {
         MenuReversibleStateProviderDefinition(
             OWNER,
             "admin-world-controls",
-            AdminWorldControlsProvider(storage, spawnProtection),
+            AdminWorldControlsProvider(storage, spawnProtection, MyWorldManagerApi::syncOnlineWorldPlayerStates),
         ),
     )
 
@@ -52,7 +56,17 @@ internal object ChanponReversibleStateProviders {
         storage: ChanponWorldStorage,
         buildPermissionService: WorldBuildPermissionService,
     ) = registry.register(
-        MenuReversibleStateProviderDefinition(OWNER, "world-environment", EnvironmentProvider(storage, buildPermissionService)),
+        MenuReversibleStateProviderDefinition(
+            OWNER,
+            "world-environment",
+            EnvironmentProvider(storage) { worldData ->
+                MyWorldManagerApi.getWorldEnvironmentService()?.applyWeather(worldData.uuid)
+                MyWorldManagerApi.getWorldEnvironmentService()?.applyTime(worldData.uuid)
+                MyWorldManagerApi.getWorldEnvironmentService()?.applyAttributes(worldData.uuid)
+                MyWorldManagerApi.getWorldEnvironmentService()?.applyFlight(worldData.uuid)
+                buildPermissionService.sync(worldData)
+            },
+        ),
     )
 
     fun registerPublication(
@@ -76,7 +90,10 @@ internal object ChanponReversibleStateProviders {
         MenuReversibleStateProviderDefinition(
             OWNER,
             "submission",
-            SubmissionProvider(plugin, storage, protectionService, toolPermissionController),
+            SubmissionProvider(
+                PluginSubmissionGateway(plugin, protectionService, toolPermissionController),
+                storage,
+            ),
         ),
     )
 
@@ -85,7 +102,7 @@ internal object ChanponReversibleStateProviders {
         storage: ChanponWorldStorage,
         controller: ToolPermissionController,
     ) = registry.register(
-        MenuReversibleStateProviderDefinition(OWNER, "tool-permission", ToolPermissionProvider(storage, controller)),
+        MenuReversibleStateProviderDefinition(OWNER, "tool-permission", ToolPermissionProvider(storage, ControllerToolPermissionGateway(controller))),
     )
 }
 
@@ -95,26 +112,41 @@ private data class AutomationSettingsState(
     val expectedAfter: Boolean,
 ) : MenuReversibleProviderState
 
-private class AutomationSettingsProvider(
+internal interface AutomationSettingsGateway {
+    fun getBoolean(path: String): Boolean
+    fun restoreBoolean(path: String, value: Boolean)
+}
+
+private class PluginAutomationSettingsGateway(
     private val plugin: MWMChanponPlugin,
     private val onRestored: () -> Unit,
+) : AutomationSettingsGateway {
+    override fun getBoolean(path: String): Boolean = plugin.config.getBoolean(path, false)
+
+    override fun restoreBoolean(path: String, value: Boolean) {
+        plugin.config.set(path, value)
+        plugin.saveConfig()
+        onRestored()
+    }
+}
+
+internal class AutomationSettingsProvider(
+    private val gateway: AutomationSettingsGateway,
 ) : MenuReversibleStateProvider {
     override fun capture(context: MenuReversibleStateCaptureContext): MenuReversibleProviderCaptureResult {
         val path = context.interaction.contract.arguments[ChanponReversibleContracts.TARGET_ID]
             ?: return rejectCapture("automation config path is missing")
         if (path !in AUTOMATION_PATHS) return rejectCapture("unsupported automation config path: $path")
-        val before = plugin.config.getBoolean(path, false)
+        val before = gateway.getBoolean(path)
         return MenuReversibleProviderCaptureResult.Captured(AutomationSettingsState(path, before, !before))
     }
 
     override fun restore(context: MenuReversibleStateRestoreContext): MenuReversibleProviderRestoreResult {
         val state = context.state as? AutomationSettingsState
             ?: return rejectRestore("invalid automation settings state type")
-        val current = plugin.config.getBoolean(state.configPath, false)
+        val current = gateway.getBoolean(state.configPath)
         if (current != state.expectedAfter) return concurrent("automation setting ${state.configPath}", state.expectedAfter, current)
-        plugin.config.set(state.configPath, state.before)
-        plugin.saveConfig()
-        onRestored()
+        gateway.restoreBoolean(state.configPath, state.before)
         return MenuReversibleProviderRestoreResult.Restored
     }
 
@@ -130,9 +162,10 @@ private data class AdminWorldControlsState(
     val spawnDefaultsExpectedAfter: SpawnWorldProtectionService.DefaultsSnapshot? = null,
 ) : MenuReversibleProviderState
 
-private class AdminWorldControlsProvider(
+internal class AdminWorldControlsProvider(
     private val storage: ChanponGlobalStorage,
     private val spawnProtection: SpawnWorldProtectionService,
+    private val onRestored: () -> Unit,
 ) : MenuReversibleStateProvider {
     override fun capture(context: MenuReversibleStateCaptureContext): MenuReversibleProviderCaptureResult {
         val operation = context.interaction.contract.arguments[ChanponReversibleContracts.OPERATION]
@@ -187,7 +220,7 @@ private class AdminWorldControlsProvider(
             }
         }
         storage.restoreAdminWorldControls(state.before)
-        MyWorldManagerApi.syncOnlineWorldPlayerStates()
+        onRestored()
         return MenuReversibleProviderRestoreResult.Restored
     }
 
@@ -213,9 +246,9 @@ private data class EnvironmentState(
     val expectedAfter: EnvironmentSnapshot,
 ) : MenuReversibleProviderState
 
-private class EnvironmentProvider(
+internal class EnvironmentProvider(
     private val storage: ChanponWorldStorage,
-    private val buildPermissionService: WorldBuildPermissionService,
+    private val onApplied: (WorldData) -> Unit,
 ) : MenuReversibleStateProvider {
     override fun capture(context: MenuReversibleStateCaptureContext): MenuReversibleProviderCaptureResult {
         val worldUuid = context.interaction.contract.arguments[ChanponReversibleContracts.TARGET_ID]
@@ -278,11 +311,7 @@ private class EnvironmentProvider(
         MyWorldManagerApi.getWorldRepository()?.save(worldData)
         storage.setFreecamAllowed(worldData.uuid, state.freecamAllowed)
         storage.setProtectionMode(worldData.uuid, state.protectionMode)
-        MyWorldManagerApi.getWorldEnvironmentService()?.applyWeather(worldData.uuid)
-        MyWorldManagerApi.getWorldEnvironmentService()?.applyTime(worldData.uuid)
-        MyWorldManagerApi.getWorldEnvironmentService()?.applyAttributes(worldData.uuid)
-        MyWorldManagerApi.getWorldEnvironmentService()?.applyFlight(worldData.uuid)
-        buildPermissionService.sync(worldData)
+        onApplied(worldData)
     }
 
     private fun direction(context: MenuReversibleStateCaptureContext): Int? = when {
@@ -326,7 +355,7 @@ private data class PublicationState(
     val expectedAfter: ChanponWorldVisibility,
 ) : MenuReversibleProviderState
 
-private class PublicationProvider(private val storage: ChanponWorldStorage) : MenuReversibleStateProvider {
+internal class PublicationProvider(private val storage: ChanponWorldStorage) : MenuReversibleStateProvider {
     override fun capture(context: MenuReversibleStateCaptureContext): MenuReversibleProviderCaptureResult {
         val worldUuid = argumentTarget(context) ?: return rejectCapture("publication world target is invalid")
         val before = storage.getVisibility(worldUuid)
@@ -346,7 +375,7 @@ private class PublicationProvider(private val storage: ChanponWorldStorage) : Me
 
 private data class NotificationState(val worldUuid: UUID, val before: Boolean, val expectedAfter: Boolean) : MenuReversibleProviderState
 
-private object NotificationProvider : MenuReversibleStateProvider {
+internal object NotificationProvider : MenuReversibleStateProvider {
     override fun capture(context: MenuReversibleStateCaptureContext): MenuReversibleProviderCaptureResult {
         val worldUuid = argumentTarget(context) ?: return rejectCapture("notification world target is invalid")
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
@@ -379,11 +408,33 @@ private sealed interface SubmissionProviderState : MenuReversibleProviderState {
     ) : SubmissionProviderState
 }
 
-private class SubmissionProvider(
+internal interface SubmissionGateway {
+    fun isClosed(): Boolean
+    fun restoreClosed(value: Boolean)
+    fun syncWorld(worldData: WorldData)
+}
+
+private class PluginSubmissionGateway(
     private val plugin: MWMChanponPlugin,
-    private val storage: ChanponWorldStorage,
     private val protectionService: SubmittedWorldProtectionService,
     private val toolPermissionController: ToolPermissionController,
+) : SubmissionGateway {
+    override fun isClosed(): Boolean = plugin.isSubmissionClosed()
+
+    override fun restoreClosed(value: Boolean) {
+        plugin.config.set("submission.closed", value)
+        plugin.saveConfig()
+    }
+
+    override fun syncWorld(worldData: WorldData) {
+        protectionService.sync(worldData)
+        toolPermissionController.syncWorld(worldData)
+    }
+}
+
+internal class SubmissionProvider(
+    private val gateway: SubmissionGateway,
+    private val storage: ChanponWorldStorage,
 ) : MenuReversibleStateProvider {
     override fun capture(context: MenuReversibleStateCaptureContext): MenuReversibleProviderCaptureResult {
         val operation = context.interaction.contract.arguments[ChanponReversibleContracts.OPERATION]
@@ -391,7 +442,7 @@ private class SubmissionProvider(
         val target = context.interaction.contract.arguments[ChanponReversibleContracts.TARGET_ID]
             ?: return rejectCapture("submission target id is missing")
         if (target == "global") {
-            val before = plugin.isSubmissionClosed()
+            val before = gateway.isClosed()
             val expectedAfter = when (operation) {
                 "close" -> true
                 "reopen" -> false
@@ -422,10 +473,9 @@ private class SubmissionProvider(
     }
 
     private fun restoreClosure(state: SubmissionProviderState.Closure): MenuReversibleProviderRestoreResult {
-        val current = plugin.isSubmissionClosed()
+        val current = gateway.isClosed()
         if (current != state.expectedAfter) return concurrent("submission closure", state.expectedAfter, current)
-        plugin.config.set("submission.closed", state.before)
-        plugin.saveConfig()
+        gateway.restoreClosed(state.before)
         return MenuReversibleProviderRestoreResult.Restored
     }
 
@@ -444,10 +494,7 @@ private class SubmissionProvider(
         }
         return try {
             storage.restoreSubmissionSnapshot(state.worldUuid, state.before)
-            MyWorldManagerApi.getWorldRepository()?.findByUuid(state.worldUuid)?.let { worldData ->
-                protectionService.sync(worldData)
-                toolPermissionController.syncWorld(worldData)
-            }
+            MyWorldManagerApi.getWorldRepository()?.findByUuid(state.worldUuid)?.let(gateway::syncWorld)
             MenuReversibleProviderRestoreResult.Restored
         } catch (exception: RuntimeException) {
             rejectRestore("failed to restore submission ${state.worldUuid}: ${exception.message ?: exception.javaClass.simpleName}")
@@ -474,9 +521,27 @@ private sealed interface ToolPermissionState : MenuReversibleProviderState {
     ) : ToolPermissionState
 }
 
-private class ToolPermissionProvider(
-    private val storage: ChanponWorldStorage,
+internal interface ToolPermissionGateway {
+    fun isEnabled(worldData: WorldData, playerUuid: UUID, toolId: String): Boolean
+    fun storedEnabledAfterSet(worldData: WorldData, enabled: Boolean): Boolean
+    fun syncWorld(worldData: WorldData)
+}
+
+private class ControllerToolPermissionGateway(
     private val controller: ToolPermissionController,
+) : ToolPermissionGateway {
+    override fun isEnabled(worldData: WorldData, playerUuid: UUID, toolId: String): Boolean =
+        controller.isEnabled(worldData, playerUuid, toolId)
+
+    override fun storedEnabledAfterSet(worldData: WorldData, enabled: Boolean): Boolean =
+        controller.storedEnabledAfterSet(worldData, enabled)
+
+    override fun syncWorld(worldData: WorldData) = controller.syncWorld(worldData)
+}
+
+internal class ToolPermissionProvider(
+    private val storage: ChanponWorldStorage,
+    private val gateway: ToolPermissionGateway,
 ) : MenuReversibleStateProvider {
     override fun capture(context: MenuReversibleStateCaptureContext): MenuReversibleProviderCaptureResult {
         val (worldUuid, targetPlayerUuid) = toolTarget(context)
@@ -488,14 +553,14 @@ private class ToolPermissionProvider(
                 val toolId = context.interaction.arguments[TOOL_ID]
                     ?: return rejectCapture("tool permission id is missing")
                 val before = storage.getToolEnabledState(worldUuid, targetPlayerUuid, toolId)
-                val requested = !controller.isEnabled(worldData, targetPlayerUuid, toolId)
+                val requested = !gateway.isEnabled(worldData, targetPlayerUuid, toolId)
                 MenuReversibleProviderCaptureResult.Captured(
                     ToolPermissionState.Toggle(
                         worldUuid,
                         targetPlayerUuid,
                         toolId,
                         before,
-                        controller.storedEnabledAfterSet(worldData, requested),
+                        gateway.storedEnabledAfterSet(worldData, requested),
                     ),
                 )
             }
@@ -536,7 +601,7 @@ private class ToolPermissionProvider(
         if (current != state.expectedAfter) return concurrent("tool permission ${state.worldUuid}/${state.toolId}", state.expectedAfter, current)
         return try {
             storage.restoreToolEnabledState(state.worldUuid, state.targetPlayerUuid, state.toolId, state.before)
-            MyWorldManagerApi.getWorldRepository()?.findByUuid(state.worldUuid)?.let(controller::syncWorld)
+            MyWorldManagerApi.getWorldRepository()?.findByUuid(state.worldUuid)?.let(gateway::syncWorld)
             MenuReversibleProviderRestoreResult.Restored
         } catch (exception: RuntimeException) {
             rejectRestore("failed to restore tool permission: ${exception.message ?: exception.javaClass.simpleName}")
@@ -554,7 +619,7 @@ private class ToolPermissionProvider(
         worldData.moderators.clear()
         worldData.moderators.addAll(state.moderators)
         MyWorldManagerApi.getWorldRepository()?.save(worldData)
-        controller.syncWorld(worldData)
+        gateway.syncWorld(worldData)
         return MenuReversibleProviderRestoreResult.Restored
     }
 }

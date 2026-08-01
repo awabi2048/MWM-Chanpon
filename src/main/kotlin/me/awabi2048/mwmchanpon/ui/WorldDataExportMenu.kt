@@ -26,6 +26,7 @@ import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import java.util.UUID
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
+import me.awabi2048.mwmchanpon.service.ChanponReversibleActionClassification
 import me.awabi2048.mwmchanpon.service.WorldDataExportService
 import me.awabi2048.myworldmanager.model.WorldData
 import net.kyori.adventure.text.Component
@@ -229,6 +230,7 @@ class WorldDataExportMenu(
                 mapOf(WORLD_UUID to world.uuid.toString()),
                 // 選択集合は次Routeにのみ保持され、サーバー状態を変更しません。
                 safety = MenuActionSafety.NAVIGATION_ONLY,
+                classification = ChanponReversibleActionClassification.Operation.EXPORT_SELECTION_TOGGLE,
             )),
             glint = selected,
         ),
@@ -282,6 +284,7 @@ class WorldDataExportMenu(
                 MenuGesture.ANY,
                 i18n(player, "$key.action"),
                 safety = exportActionSafety(actionId),
+                classification = exportRouteClassification(actionId),
             )) else emptyList(),
         ),
     )
@@ -399,6 +402,12 @@ class WorldDataExportMenu(
         ACTION_EXPORT_SELECTION -> MenuActionSafety.CONFIRM_ENTRY
         ACTION_CONFIRM -> MenuActionSafety.IRREVERSIBLE
         else -> error("World-data export action must declare a dedicated safety mapping: $actionId")
+    }
+
+    private fun exportRouteClassification(actionId: String): ChanponReversibleActionClassification.Operation? = when (actionId) {
+        ACTION_TOGGLE -> ChanponReversibleActionClassification.Operation.EXPORT_SELECTION_TOGGLE
+        ACTION_SELECT_ALL, ACTION_CLEAR_SELECTION -> ChanponReversibleActionClassification.Operation.EXPORT_SELECTION_CONTROLS
+        else -> null
     }
 
     private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =

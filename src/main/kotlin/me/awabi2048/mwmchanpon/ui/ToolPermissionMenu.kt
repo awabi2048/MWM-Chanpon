@@ -26,6 +26,7 @@ import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.mwmchanpon.tool.ToolPermissionDefinition
 import me.awabi2048.mwmchanpon.service.ChanponReversibleContracts
+import me.awabi2048.mwmchanpon.service.ChanponReversibleActionClassification
 import me.awabi2048.mwmchanpon.service.ChanponReversibleStateProviders
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
@@ -177,6 +178,7 @@ class ToolPermissionMenu(
                         targetUuid,
                         "role",
                     ),
+                    classification = ChanponReversibleActionClassification.Operation.MEMBER_ROLE_TOGGLE,
                 )),
             ),
         )
@@ -245,6 +247,7 @@ class ToolPermissionMenu(
                         targetPlayerUuid,
                         "toggle",
                     ),
+                    classification = ChanponReversibleActionClassification.Operation.TOOL_ENABLE_TOGGLE,
                 )),
                 glint = enabled,
             ),

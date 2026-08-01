@@ -25,6 +25,8 @@ import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.Collections
+import java.util.LinkedHashMap
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.ui.chanponGestureAction
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
@@ -56,25 +58,62 @@ object EasyPlatformMaterialPolicy {
 /**
  * Chanpon専用の入力とVoid仕様だけを所有し、作成確定はMWM共通パイプラインへ委譲する。
  */
+interface EasyCreationFlowStateStore {
+    fun captureFlowState(playerId: UUID): EasyVoidWorldCreationService.FlowState
+    fun expectedFlowStateAfterStart(returnRoute: MenuRoute): EasyVoidWorldCreationService.FlowState
+    fun restoreFlowState(playerId: UUID, state: EasyVoidWorldCreationService.FlowState)
+}
+
 class EasyVoidWorldCreationService(
     private val plugin: MWMChanponPlugin
-) {
+) : EasyCreationFlowStateStore {
     private data class PendingCreation(val worldName: String)
 
     private val pendingCreations = ConcurrentHashMap<UUID, PendingCreation>()
     private val returnRoutes = ConcurrentHashMap<UUID, MenuRoute>()
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
-    data class FlowState(val pendingWorldName: String?, val returnRoute: MenuRoute?)
+    /**
+     * 可逆復元用の不変フローsnapshotです。
+     *
+     * MenuRouteはpayloadの防御コピーを保証しないため、Route実体を保存せず
+     * owner/id/payloadを個別に不変化して保持します。
+     */
+    @ConsistentCopyVisibility
+    data class FlowState private constructor(
+        val pendingWorldName: String?,
+        private val returnRouteOwner: String?,
+        private val returnRouteId: String?,
+        private val returnRoutePayload: Map<String, String>,
+    ) {
+        fun returnRoute(): MenuRoute? = returnRouteOwner?.let { owner ->
+            MenuRoute(owner, requireNotNull(returnRouteId), returnRoutePayload)
+        }
 
-    fun captureFlowState(playerId: UUID): FlowState =
-        FlowState(pendingCreations[playerId]?.worldName, returnRoutes[playerId])
+        companion object {
+            fun of(pendingWorldName: String?, returnRoute: MenuRoute?): FlowState = FlowState(
+                pendingWorldName,
+                returnRoute?.owner,
+                returnRoute?.id,
+                immutablePayload(returnRoute?.payload.orEmpty()),
+            )
 
-    fun restoreFlowState(playerId: UUID, state: FlowState) {
+            private fun immutablePayload(payload: Map<String, String>): Map<String, String> =
+                Collections.unmodifiableMap(LinkedHashMap(payload))
+        }
+    }
+
+    override fun captureFlowState(playerId: UUID): FlowState =
+        FlowState.of(pendingCreations[playerId]?.worldName, returnRoutes[playerId])
+
+    override fun expectedFlowStateAfterStart(returnRoute: MenuRoute): FlowState = FlowState.of(null, returnRoute)
+
+    override fun restoreFlowState(playerId: UUID, state: FlowState) {
         if (state.pendingWorldName == null) pendingCreations.remove(playerId)
         else pendingCreations[playerId] = PendingCreation(state.pendingWorldName)
-        if (state.returnRoute == null) returnRoutes.remove(playerId)
-        else returnRoutes[playerId] = state.returnRoute
+        state.returnRoute()?.let { route ->
+            returnRoutes[playerId] = MenuRoute(route.owner, route.id, route.payload.toMap())
+        } ?: returnRoutes.remove(playerId)
     }
 
     init {

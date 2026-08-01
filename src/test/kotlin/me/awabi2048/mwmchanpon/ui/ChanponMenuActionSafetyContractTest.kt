@@ -6,7 +6,8 @@ import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionTextProvider
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger
 import com.awabi2048.ccsystem.api.gui.MenuGesture
-import com.awabi2048.ccsystem.api.gui.MenuReversibleContract
+import me.awabi2048.mwmchanpon.service.ChanponReversibleActionClassification
+import me.awabi2048.mwmchanpon.service.ChanponReversibleContracts
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -97,7 +98,8 @@ class ChanponMenuActionSafetyContractTest {
             gesture = MenuGesture.ANY,
             label = "test",
             safety = MenuActionSafety.REVERSIBLE,
-            reversibleContract = MenuReversibleContract("test:provider"),
+            reversibleContract = ChanponReversibleContracts.automation("test.path"),
+            classification = ChanponReversibleActionClassification.Operation.AUTOMATION_TOGGLE,
         )
     }
 

@@ -15,6 +15,9 @@ import com.awabi2048.ccsystem.api.gui.MenuContractValidator
 import com.awabi2048.ccsystem.api.gui.MenuInteraction
 import com.awabi2048.ccsystem.api.gui.ResolvedMenuCapability
 import com.awabi2048.ccsystem.api.gui.ResolvedMenuCapabilityAction
+import me.awabi2048.mwmchanpon.service.ChanponReversibleActionClassification
+import me.awabi2048.mwmchanpon.service.EasyCreationReversibleProvider
+import me.awabi2048.myworldmanager.service.MwmReversibleContracts
 import org.bukkit.Material
 import org.bukkit.event.inventory.ClickType
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -24,18 +27,38 @@ import org.junit.jupiter.api.Test
 
 class ChanponPlayerWorldCapabilityInvocationTest {
     @Test
-    fun `player world capability entries retain their direct runtime contracts`() {
+    fun `player world capability entries retain their production restore contracts`() {
         val subject = Any()
         val world = Any()
         val invocations = listOf(
             playerWorldCapabilityInvocation(
                 slot = 10,
                 capability = capability(
+                    "mwm-chanpon:player-world-item-current",
+                    listOf(
+                        action(
+                            MenuCapabilityTrigger.SHIFT_LEFT,
+                            MenuActionSafety.REVERSIBLE,
+                            MwmReversibleContracts.displayOrder(),
+                            ChanponReversibleActionClassification.Operation.CURRENT_PLAYER_WORLD_DISPLAY_ORDER,
+                        ),
+                    ),
+                ),
+                attributes = mapOf("subject" to subject, "world" to world),
+            ),
+            playerWorldCapabilityInvocation(
+                slot = 19,
+                capability = capability(
                     "mwm-chanpon:player-world-item-away",
                     listOf(
-                        MenuCapabilityTrigger.LEFT to MenuActionSafety.EXTERNAL_SIDE_EFFECT,
-                        MenuCapabilityTrigger.RIGHT to MenuActionSafety.NAVIGATION_ONLY,
-                        MenuCapabilityTrigger.SHIFT_LEFT to MenuActionSafety.REVERSIBLE,
+                        action(MenuCapabilityTrigger.LEFT, MenuActionSafety.EXTERNAL_SIDE_EFFECT),
+                        action(MenuCapabilityTrigger.RIGHT, MenuActionSafety.NAVIGATION_ONLY),
+                        action(
+                            MenuCapabilityTrigger.SHIFT_LEFT,
+                            MenuActionSafety.REVERSIBLE,
+                            MwmReversibleContracts.displayOrder(),
+                            ChanponReversibleActionClassification.Operation.AWAY_PLAYER_WORLD_DISPLAY_ORDER,
+                        ),
                     ),
                 ),
                 attributes = mapOf("subject" to subject, "world" to world),
@@ -45,8 +68,18 @@ class ChanponPlayerWorldCapabilityInvocationTest {
                 capability = capability(
                     "mwm-chanpon:player-world-creation",
                     listOf(
-                        MenuCapabilityTrigger.LEFT to MenuActionSafety.REVERSIBLE,
-                        MenuCapabilityTrigger.RIGHT to MenuActionSafety.REVERSIBLE,
+                        action(
+                            MenuCapabilityTrigger.LEFT,
+                            MenuActionSafety.REVERSIBLE,
+                            MwmReversibleContracts.creationSession(),
+                            ChanponReversibleActionClassification.Operation.STANDARD_CREATION_SESSION,
+                        ),
+                        action(
+                            MenuCapabilityTrigger.RIGHT,
+                            MenuActionSafety.REVERSIBLE,
+                            EasyCreationReversibleProvider.contract(),
+                            ChanponReversibleActionClassification.Operation.EASY_CREATION_START,
+                        ),
                     ),
                 ),
                 attributes = mapOf("subject" to subject),
@@ -86,10 +119,18 @@ class ChanponPlayerWorldCapabilityInvocationTest {
         )
 
         val providerOnlyViolations = MenuContractValidator.validate(definition, observations)
-        assertEquals(3, providerOnlyViolations.size)
-        assertTrue(providerOnlyViolations.all { it.message == "reversible provider is not registered: test:state" })
+        assertEquals(4, providerOnlyViolations.size)
+        assertEquals(
+            setOf(
+                "reversible provider is not registered: myworldmanager:world-display-order",
+                "reversible provider is not registered: myworldmanager:creation-session",
+                "reversible provider is not registered: mwm-chanpon:easy-creation",
+            ),
+            providerOnlyViolations.map { it.message }.toSet(),
+        )
         assertEquals(
             listOf(
+                "mwm-chanpon:player-world-item-current",
                 "mwm-chanpon:player-world-item-away",
                 "mwm-chanpon:player-world-creation",
                 "mwm-chanpon:player-world-summary",
@@ -97,14 +138,14 @@ class ChanponPlayerWorldCapabilityInvocationTest {
             invocations.map { it.capability.capabilityId },
         )
         val worldInteraction =
-            assertInstanceOf(MenuInteraction.Capability::class.java, observations[0].interaction)
+            assertInstanceOf(MenuInteraction.Capability::class.java, observations[1].interaction)
         assertEquals(
             mapOf("subject" to subject, "world" to world),
             worldInteraction.attributes,
         )
         assertEquals(mapOf("subject" to subject),
-            assertInstanceOf(MenuInteraction.Capability::class.java, observations[1].interaction).attributes)
-        assertEquals(mapOf("subject" to subject), invocations[2].attributes)
+            assertInstanceOf(MenuInteraction.Capability::class.java, observations[2].interaction).attributes)
+        assertEquals(mapOf("subject" to subject), invocations[3].attributes)
         assertEquals(
             setOf(ClickType.LEFT, ClickType.RIGHT, ClickType.SHIFT_LEFT),
             worldInteraction.acceptedClicks,
@@ -113,24 +154,46 @@ class ChanponPlayerWorldCapabilityInvocationTest {
         assertEquals(MenuActionSafety.NAVIGATION_ONLY, worldInteraction.safetyFor(ClickType.RIGHT))
         assertEquals(MenuActionSafety.REVERSIBLE, worldInteraction.safetyFor(ClickType.SHIFT_LEFT))
         assertEquals(MenuActionSafety.REVERSIBLE,
-            assertInstanceOf(MenuInteraction.Capability::class.java, observations[1].interaction).safety)
-        assertEquals(0, invocations[2].capability.acceptedClicks.size)
-        assertInstanceOf(MenuInteraction.DisplayOnly::class.java, observations[2].interaction)
+            assertInstanceOf(MenuInteraction.Capability::class.java, observations[0].interaction).safety)
+        assertEquals(MenuActionSafety.REVERSIBLE,
+            assertInstanceOf(MenuInteraction.Capability::class.java, observations[2].interaction).safety)
+        assertEquals(0, invocations[3].capability.acceptedClicks.size)
+        assertInstanceOf(MenuInteraction.DisplayOnly::class.java, observations[3].interaction)
     }
 
     private fun capability(
         capabilityId: String,
-        actions: List<Pair<MenuCapabilityTrigger, MenuActionSafety>>,
+        actions: List<CapabilityAction>,
     ): ResolvedMenuCapability = ResolvedMenuCapability(
         capabilityId = capabilityId,
         presentation = MenuCapabilityPresentation(
             GuiItemSpec(Material.STONE, GuiNameSpec.Empty, GuiLoreSpec.None, GuiElementRole.ACTION, 1),
         ),
-        actions = actions.mapIndexed { index, (trigger, safety) ->
+        actions = actions.mapIndexed { index, action ->
+            action.classification?.let { classification ->
+                ChanponReversibleActionClassification.validateActionContract(
+                    classification,
+                    action.reversibleContract?.providerId,
+                    action.safety,
+                )
+            }
             ResolvedMenuCapabilityAction(
-                "action-$index", trigger, "クリック", safety,
-                if (safety == MenuActionSafety.REVERSIBLE) MenuReversibleContract("test:state") else null,
+                "action-$index", action.trigger, "クリック", action.safety, action.reversibleContract,
             )
         },
+    )
+
+    private fun action(
+        trigger: MenuCapabilityTrigger,
+        safety: MenuActionSafety,
+        reversibleContract: MenuReversibleContract? = null,
+        classification: ChanponReversibleActionClassification.Operation? = null,
+    ) = CapabilityAction(trigger, safety, reversibleContract, classification)
+
+    private data class CapabilityAction(
+        val trigger: MenuCapabilityTrigger,
+        val safety: MenuActionSafety,
+        val reversibleContract: MenuReversibleContract?,
+        val classification: ChanponReversibleActionClassification.Operation?,
     )
 }

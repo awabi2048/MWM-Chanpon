@@ -11,13 +11,13 @@ import com.awabi2048.ccsystem.api.gui.MenuReversibleStateProviderRegistry
 import com.awabi2048.ccsystem.api.gui.MenuReversibleStateRestoreContext
 
 class EasyCreationReversibleProvider(
-    private val service: EasyVoidWorldCreationService,
+    private val service: EasyCreationFlowStateStore,
 ) : MenuReversibleStateProvider {
     override fun capture(context: MenuReversibleStateCaptureContext): MenuReversibleProviderCaptureResult =
         MenuReversibleProviderCaptureResult.Captured(
             State(
                 before = service.captureFlowState(context.player.uniqueId),
-                expectedAfter = EasyVoidWorldCreationService.FlowState(null, context.route),
+                expectedAfter = service.expectedFlowStateAfterStart(context.route),
             ),
         )
 
@@ -51,7 +51,7 @@ class EasyCreationReversibleProvider(
 
         fun contract(): MenuReversibleContract = ChanponReversibleContracts.easyCreation()
 
-        fun register(registry: MenuReversibleStateProviderRegistry, service: EasyVoidWorldCreationService) {
+        fun register(registry: MenuReversibleStateProviderRegistry, service: EasyCreationFlowStateStore) {
             registry.register(MenuReversibleStateProviderDefinition(OWNER, ID, EasyCreationReversibleProvider(service)))
         }
     }

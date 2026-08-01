@@ -37,6 +37,7 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
+import me.awabi2048.mwmchanpon.service.ChanponReversibleActionClassification
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
@@ -400,6 +401,7 @@ class ChanponAdminWorldListMenu(
                 i18n(player, "common.action_next"),
                 // Route payloadだけを置換する一覧表示の操作で、ワールド状態は変更しません。
                 safety = MenuActionSafety.NAVIGATION_ONLY,
+                classification = adminListRouteClassification(actionId),
             )),
         ),
     )
@@ -487,6 +489,12 @@ class ChanponAdminWorldListMenu(
     private fun adminListActionSafety(actionId: String): MenuActionSafety = when (actionId) {
         ACTION_BACK, ACTION_PAGE, ACTION_VISIBILITY_FILTER, ACTION_SORT -> MenuActionSafety.NAVIGATION_ONLY
         else -> error("Chanpon admin world-list action must declare a dedicated safety mapping: $actionId")
+    }
+
+    private fun adminListRouteClassification(actionId: String): ChanponReversibleActionClassification.Operation? = when (actionId) {
+        ACTION_VISIBILITY_FILTER -> ChanponReversibleActionClassification.Operation.ADMIN_WORLD_LIST_FILTER
+        ACTION_SORT -> ChanponReversibleActionClassification.Operation.ADMIN_WORLD_LIST_SORT
+        else -> null
     }
 
     private fun settingsRoute(player: Player, worldData: WorldData): MenuRoute? =

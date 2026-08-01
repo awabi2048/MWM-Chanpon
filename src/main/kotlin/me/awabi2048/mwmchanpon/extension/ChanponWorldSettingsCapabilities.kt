@@ -16,6 +16,7 @@ import me.awabi2048.mwmchanpon.ui.ChanponWorldSettingsMenu
 import me.awabi2048.mwmchanpon.ui.WorldSettingsFeature
 import me.awabi2048.mwmchanpon.ui.chanponCapabilityAction
 import me.awabi2048.mwmchanpon.service.ChanponReversibleContracts
+import me.awabi2048.mwmchanpon.service.ChanponReversibleActionClassification
 import me.awabi2048.mwmchanpon.service.ChanponReversibleStateProviders
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
@@ -96,6 +97,7 @@ internal class ChanponWorldSettingsCapabilities(
                         },
                         safety = featureActionSafety(feature),
                         reversibleContract = featureReversibleContract(feature),
+                        classification = featureClassification(feature),
                     ),
                 ),
             ),
@@ -121,6 +123,12 @@ internal class ChanponWorldSettingsCapabilities(
     private fun featureReversibleContract(feature: WorldSettingsFeature) = when (feature) {
         WorldSettingsFeature.PUBLISH -> ChanponReversibleContracts.publication()
         WorldSettingsFeature.NOTIFICATION -> ChanponReversibleContracts.notification()
+        else -> null
+    }
+
+    private fun featureClassification(feature: WorldSettingsFeature) = when (feature) {
+        WorldSettingsFeature.PUBLISH -> ChanponReversibleActionClassification.Operation.PUBLICATION_CYCLE
+        WorldSettingsFeature.NOTIFICATION -> ChanponReversibleActionClassification.Operation.WORLD_NOTIFICATION_TOGGLE
         else -> null
     }
 
