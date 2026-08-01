@@ -193,8 +193,8 @@ class BackupListMenu(
                 displayEntry(
                     layout.previewSlot,
                     material,
-                    GuiNameSpec.Component(i18nComponent(player, "$key.display")),
-                    GuiLoreSpec.Rich(
+                    GuiNameSpec.FixedLabel(i18nComponent(player, "$key.display")),
+                    me.awabi2048.mwmchanpon.ui.framedLore(
                         i18nList(player, "$key.lore").map(GuiLoreLine::Text),
                         GuiLoreFrame.BOTH,
                     ),
@@ -418,7 +418,7 @@ class BackupListMenu(
         GuiMenuEntrySpec(
             slot = slot,
             material = materialFor(backup.kind),
-            name = GuiNameSpec.Component(
+            name = GuiNameSpec.TargetIdentity(
                 i18nComponent(
                     player,
                     "backup_list.item.display",
@@ -466,7 +466,7 @@ class BackupListMenu(
         GuiMenuEntrySpec(
             slot = slot,
             material = material,
-            name = GuiNameSpec.Text(text, GuiNameStyle.DEFAULT),
+            name = me.awabi2048.mwmchanpon.ui.fixedName(text, GuiNameStyle.DEFAULT),
             role = role,
             actions = listOf(
                 chanponGestureAction(actionId, MenuGesture.ANY, actionText, payload, safety = safety),
@@ -496,8 +496,8 @@ class BackupListMenu(
     ): MenuElement = displayEntry(
         slot,
         Material.BOOK,
-        GuiNameSpec.Component(i18nComponent(player, "backup_list.info.display")),
-        GuiLoreSpec.Rich(
+        GuiNameSpec.FixedLabel(i18nComponent(player, "backup_list.info.display")),
+        me.awabi2048.mwmchanpon.ui.framedLore(
             i18nList(
                 player,
                 "backup_list.info.lore",

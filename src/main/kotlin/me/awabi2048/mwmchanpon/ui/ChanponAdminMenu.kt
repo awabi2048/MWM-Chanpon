@@ -108,7 +108,9 @@ class ChanponAdminMenu(
                 owner = OWNER,
                 id = MENU_SWITCH_CAPABILITY,
                 placement = AdminMenuCapabilityPlacements.MENU_SWITCH,
-                availability = MenuCapabilityAvailability {
+                availability = reasonedAvailability(
+                    reason = { i18nComponent(it.player, "error.no_permission") },
+                ) {
                     it.player.hasPermission("mwmchanpon.admin")
                 },
                 presentationProvider = MenuCapabilityPresentationProvider {
@@ -220,14 +222,14 @@ class ChanponAdminMenu(
                         layout.previewSlot,
                         GuiItemSpec(
                             Material.COMPASS,
-                            GuiNameSpec.Component(
+                            GuiNameSpec.FixedLabel(
                                 i18nComponent(
                                     player,
                                     "spawn_world.confirm.center.display",
                                     mapOf("world" to worldData.name),
                                 ),
                             ),
-                            GuiLoreSpec.Rich(
+                            me.awabi2048.mwmchanpon.ui.framedLore(
                                 i18nList(
                                     player,
                                     "spawn_world.confirm.center.lore",
@@ -272,7 +274,7 @@ class ChanponAdminMenu(
             GuiMenuEntrySpec(
                 slot = slot,
                 material = material,
-                name = GuiNameSpec.Component(i18nComponent(player, "$key.display")),
+                name = GuiNameSpec.FixedLabel(i18nComponent(player, "$key.display")),
                 role = GuiElementRole.ACTION,
                 description = i18nList(player, "$key.lore"),
                 actions = listOf(
@@ -296,7 +298,7 @@ class ChanponAdminMenu(
             GuiMenuEntrySpec(
                 slot = ChanponAdminMenuLayout.FOOTER_BUILDING_PERMISSION,
                 material = if (allowed) Material.BRICKS else Material.BARRIER,
-                name = GuiNameSpec.Text(controlsI18n(player, "build.display"), GuiNameStyle.PRIMARY),
+                name = me.awabi2048.mwmchanpon.ui.fixedName(controlsI18n(player, "build.display"), GuiNameStyle.PRIMARY),
                 role = GuiElementRole.ACTION,
                 amount = 1,
                 description = listOf(controlsI18n(player, if (allowed) "build.allowed_description" else "build.denied_description")),
@@ -331,7 +333,7 @@ class ChanponAdminMenu(
             GuiMenuEntrySpec(
                 slot = ChanponAdminMenuLayout.FOOTER_WORLD_CREATION,
                 material = material,
-                name = GuiNameSpec.Text(controlsI18n(player, "creation.display"), GuiNameStyle.PRIMARY),
+                name = me.awabi2048.mwmchanpon.ui.fixedName(controlsI18n(player, "creation.display"), GuiNameStyle.PRIMARY),
                 role = GuiElementRole.ACTION,
                 amount = 1,
                 description = listOf(controlsI18n(player, "creation.$key.description")),
@@ -375,7 +377,7 @@ class ChanponAdminMenu(
             GuiMenuEntrySpec(
                 slot = slot,
                 material = if (confirm) Material.LIME_CONCRETE else Material.RED_CONCRETE,
-                name = GuiNameSpec.Component(i18nComponent(player, key)),
+                name = GuiNameSpec.FixedLabel(i18nComponent(player, key)),
                 role = if (confirm) GuiElementRole.CONFIRM else GuiElementRole.CANCEL,
                 actions = listOf(
                     chanponGestureAction(
@@ -427,7 +429,7 @@ class ChanponAdminMenu(
             GuiMenuEntrySpec(
                 slot = ChanponAdminMenuLayout.FOOTER_MAIN_SWITCH,
                 material = Material.NETHER_STAR,
-                name = GuiNameSpec.Component(i18nComponent(player, "admin.switch_mwm.display")),
+                name = GuiNameSpec.FixedLabel(i18nComponent(player, "admin.switch_mwm.display")),
                 role = GuiElementRole.NAVIGATION,
                 description = listOf(i18n(player, "admin.switch_mwm.description")),
                 actions = listOf(chanponGestureAction(
@@ -443,7 +445,7 @@ class ChanponAdminMenu(
         return MenuCapabilityPresentation(
             GuiItemSpec(
                 material = Material.NETHER_STAR,
-                name = GuiNameSpec.Text(
+                name = me.awabi2048.mwmchanpon.ui.fixedName(
                     CCSystem.getAPI().getI18nString(
                         player,
                         "gui.admin_menu.menu_switch.display",

@@ -181,8 +181,8 @@ class WorldDataManagementMenu(
                 displayEntry(
                     layout.previewSlot,
                     previewMaterial,
-                    GuiNameSpec.Component(i18nComponent(player, "$previewKey.display")),
-                    GuiLoreSpec.Rich(
+                    GuiNameSpec.FixedLabel(i18nComponent(player, "$previewKey.display")),
+                    me.awabi2048.mwmchanpon.ui.framedLore(
                         i18nList(player, "$previewKey.lore").map(GuiLoreLine::Text),
                         GuiLoreFrame.BOTH,
                     ),
@@ -336,7 +336,7 @@ class WorldDataManagementMenu(
         GuiMenuEntrySpec(
             slot = slot,
             material = world.icon,
-            name = GuiNameSpec.Component(
+            name = GuiNameSpec.TargetIdentity(
                 i18nComponent(player, "world_data.world.display", mapOf("world" to world.name)),
             ),
             role = GuiElementRole.ACTION,
@@ -375,7 +375,7 @@ class WorldDataManagementMenu(
         GuiMenuEntrySpec(
             slot = slot,
             material = material,
-            name = GuiNameSpec.Component(i18nComponent(player, "$key.display")),
+            name = GuiNameSpec.FixedLabel(i18nComponent(player, "$key.display")),
             role = GuiElementRole.ACTION,
             description = listOf(i18n(player, "$key.description")),
             warnings = if (warning) listOf(i18n(player, "$key.warning")) else emptyList(),
@@ -405,7 +405,7 @@ class WorldDataManagementMenu(
         GuiMenuEntrySpec(
             slot = slot,
             material = material,
-            name = GuiNameSpec.Text(text, GuiNameStyle.DEFAULT),
+            name = opaqueName(text, GuiNameStyle.DEFAULT),
             role = role,
             actions = listOf(
                 chanponGestureAction(actionId, MenuGesture.ANY, actionText, payload, safety = worldDataActionSafety(actionId)),
@@ -435,8 +435,8 @@ class WorldDataManagementMenu(
     ): MenuElement = displayEntry(
         slot,
         Material.BOOK,
-        GuiNameSpec.Component(i18nComponent(player, "world_data.info.display")),
-        GuiLoreSpec.Rich(
+        GuiNameSpec.FixedLabel(i18nComponent(player, "world_data.info.display")),
+        me.awabi2048.mwmchanpon.ui.framedLore(
             i18nList(
                 player,
                 "world_data.info.lore",

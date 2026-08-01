@@ -143,7 +143,7 @@ class ProductionToggleExtension(
                 owner = RUNTIME_OWNER,
                 id = CAPABILITY_ID,
                 placement = WorldSettingsCapabilityPlacements.FOOTER_ACTIONS,
-                availability = MenuCapabilityAvailability(::isCapabilityAvailable),
+                availability = me.awabi2048.mwmchanpon.ui.optionalAvailability(::isCapabilityAvailable),
                 presentationProvider =
                     MenuCapabilityPresentationProvider(::resolveCapabilityPresentation),
                 actions = listOf(
@@ -153,7 +153,7 @@ class ProductionToggleExtension(
                         textProvider =
                             MenuCapabilityActionTextProvider(::capabilityActionText),
                         availability =
-                            MenuCapabilityAvailability { resolveCapabilityRoute(it) != null },
+                            me.awabi2048.mwmchanpon.ui.optionalAvailability { resolveCapabilityRoute(it) != null },
                         handler = MenuCapabilityActionHandler(::handleCapabilityAction),
                         safety = MenuActionSafety.CONFIRM_ENTRY,
                     ),
@@ -165,7 +165,7 @@ class ProductionToggleExtension(
                 owner = RUNTIME_OWNER,
                 id = CREATION_CAPABILITY_LOCAL_ID,
                 placement = CreationConfirmationCapabilityContract.PLACEMENT,
-                availability = MenuCapabilityAvailability { creationDraft(it) != null },
+                availability = me.awabi2048.mwmchanpon.ui.optionalAvailability { creationDraft(it) != null },
                 presentationProvider = MenuCapabilityPresentationProvider {
                     creationPresentation(
                         creationDraft(it)?.getBoolean(EXTRA_KEY) ?: false,
@@ -360,8 +360,8 @@ class ProductionToggleExtension(
                         layout.previewSlot,
                         GuiItemSpec(
                             Material.PAPER,
-                            GuiNameSpec.Component(title),
-                            GuiLoreSpec.Rich(
+                            GuiNameSpec.FixedLabel(title),
+                            me.awabi2048.mwmchanpon.ui.framedLore(
                                 i18nList(player, "confirm.${action.key}.lore")
                                     .map(GuiLoreLine::Text),
                                 GuiLoreFrame.NONE,
@@ -406,7 +406,7 @@ class ProductionToggleExtension(
                 slot = slot,
                 item = GuiItemSpec(
                     material,
-                    GuiNameSpec.Component(i18nComponent(player, textKey)),
+                    GuiNameSpec.FixedLabel(i18nComponent(player, textKey)),
                     GuiLoreSpec.None,
                     role,
                     1,
@@ -554,8 +554,8 @@ class ProductionToggleExtension(
     private fun creationPresentation(enabled: Boolean) = MenuCapabilityPresentation(
         item = GuiItemSpec(
             material = if (enabled) Material.YELLOW_WOOL else Material.GRAY_WOOL,
-            name = GuiNameSpec.Component(i18nComponent(null, "creation.display")),
-            lore = GuiLoreSpec.Rich(
+            name = GuiNameSpec.FixedLabel(i18nComponent(null, "creation.display")),
+            lore = me.awabi2048.mwmchanpon.ui.framedLore(
                 listOf(
                     GuiLoreLine.Text(i18n(null, "creation.lore.description")),
                     GuiLoreLine.Warning(i18n(null, "creation.lore.delete_guard")),
@@ -593,7 +593,7 @@ class ProductionToggleExtension(
                 return capabilityPresentation(
                     Material.BARRIER,
                     i18nComponent(player, "error.display"),
-                    GuiLoreSpec.Rich(
+                    me.awabi2048.mwmchanpon.ui.framedLore(
                         i18nList(player, "error.lore").map(GuiLoreLine::Text),
                         GuiLoreFrame.BOTH,
                     ),
@@ -625,7 +625,7 @@ class ProductionToggleExtension(
     ) = MenuCapabilityPresentation(
         GuiItemSpec(
             material = material,
-            name = GuiNameSpec.Component(name),
+            name = GuiNameSpec.FixedLabel(name),
             lore = lore,
             role = role,
             amount = 1,
@@ -662,7 +662,7 @@ class ProductionToggleExtension(
     }
 
     private fun structuredLore(lines: List<GuiLoreLine>): GuiLoreSpec =
-        GuiLoreSpec.Rich(lines, GuiLoreFrame.BOTH)
+        me.awabi2048.mwmchanpon.ui.framedLore(lines, GuiLoreFrame.BOTH)
 
     private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): String {
         return CCSystem.getAPI().getI18nString(player, "chanpon.submission.$key", placeholders)

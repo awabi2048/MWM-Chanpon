@@ -386,8 +386,8 @@ class SubmissionAdminMenu(
         return displayEntry(
             slot,
             Material.WRITABLE_BOOK,
-            GuiNameSpec.Component(i18nComponent(player, "admin_menu.stats.display")),
-            GuiLoreSpec.Rich(
+            GuiNameSpec.FixedLabel(i18nComponent(player, "admin_menu.stats.display")),
+            me.awabi2048.mwmchanpon.ui.framedLore(
                 i18nList(
                     player,
                     "admin_menu.stats.lore",
@@ -457,8 +457,8 @@ class SubmissionAdminMenu(
                 displayEntry(
                     layout.previewSlot,
                     previewMaterial,
-                    GuiNameSpec.Component(i18nComponent(player, "$previewKey.display")),
-                    GuiLoreSpec.Rich(
+                    GuiNameSpec.FixedLabel(i18nComponent(player, "$previewKey.display")),
+                    me.awabi2048.mwmchanpon.ui.framedLore(
                         i18nList(player, "$previewKey.lore").map(GuiLoreLine::Text),
                         GuiLoreFrame.BOTH,
                     ),
@@ -571,7 +571,7 @@ class SubmissionAdminMenu(
             GuiMenuEntrySpec(
                 slot = slot,
                 material = worldData.icon,
-                name = GuiNameSpec.Component(i18nComponent(player, "admin_menu.world.display", mapOf("world" to worldData.name))),
+                name = GuiNameSpec.TargetIdentity(i18nComponent(player, "admin_menu.world.display", mapOf("world" to worldData.name))),
                 role = GuiElementRole.ACTION,
                 data = listOf(
                     GuiMenuEntryData(i18n(player, "admin_menu.world.owner_label"), ownerName),
@@ -659,7 +659,7 @@ class SubmissionAdminMenu(
         GuiMenuEntrySpec(
             slot = slot,
             material = material,
-            name = GuiNameSpec.Component(i18nComponent(player, displayKey)),
+            name = GuiNameSpec.FixedLabel(i18nComponent(player, displayKey)),
             role = GuiElementRole.ACTION,
             options = optionKeys.map { GuiMenuEntryOption(i18n(player, it), it == selectedKey) },
             actions = listOf(chanponGestureAction(
@@ -685,7 +685,7 @@ class SubmissionAdminMenu(
             GuiMenuEntrySpec(
                 slot = 52,
                 material = if (plugin.isSubmissionClosed()) Material.BARRIER else Material.REDSTONE_BLOCK,
-                name = GuiNameSpec.Component(i18nComponent(player, "$key.display")),
+                name = GuiNameSpec.FixedLabel(i18nComponent(player, "$key.display")),
                 role = GuiElementRole.ACTION,
                 description = i18nList(player, "$key.lore"),
                 actions = listOf(chanponGestureAction(
@@ -722,7 +722,7 @@ class SubmissionAdminMenu(
             GuiMenuEntrySpec(
                 slot = slot,
                 material = if (confirm) Material.LIME_CONCRETE else Material.RED_CONCRETE,
-                name = GuiNameSpec.Component(i18nComponent(player, "$key.display")),
+                name = GuiNameSpec.FixedLabel(i18nComponent(player, "$key.display")),
                 role = if (confirm) GuiElementRole.CONFIRM else GuiElementRole.CANCEL,
                 description = i18nList(player, "$key.lore"),
                 actions = listOf(
@@ -755,7 +755,7 @@ class SubmissionAdminMenu(
         GuiMenuEntrySpec(
             slot = slot,
             material = material,
-            name = GuiNameSpec.Text(text, GuiNameStyle.DEFAULT),
+            name = opaqueName(text, GuiNameStyle.DEFAULT),
             role = role,
             actions = listOf(
                 chanponGestureAction(actionId, MenuGesture.ANY, actionText, payload, safety = submissionActionSafety(actionId)),

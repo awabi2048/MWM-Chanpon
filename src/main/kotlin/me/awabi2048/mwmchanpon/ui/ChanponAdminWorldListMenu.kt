@@ -77,7 +77,9 @@ class ChanponAdminWorldListMenu(
                 owner = OWNER,
                 id = WORLD_LIST_CAPABILITY,
                 placement = AdminMenuCapabilityPlacements.WORLD_LIST_ACTION,
-                availability = MenuCapabilityAvailability {
+                availability = reasonedAvailability(
+                    reason = { i18nComponent(it.player, "error.no_permission") },
+                ) {
                     it.player.hasPermission("mwmchanpon.admin")
                 },
                 presentationProvider = MenuCapabilityPresentationProvider {
@@ -174,7 +176,7 @@ class ChanponAdminWorldListMenu(
         return MenuCapabilityPresentation(
             GuiItemSpec(
                 material = Material.FILLED_MAP,
-                name = GuiNameSpec.Text(
+                name = me.awabi2048.mwmchanpon.ui.fixedName(
                     CCSystem.getAPI().getI18nString(player, "gui.admin_menu.info.display"),
                     GuiNameStyle.DEFAULT,
                 ),
@@ -323,7 +325,7 @@ class ChanponAdminWorldListMenu(
             GuiMenuEntrySpec(
                 slot = slot,
                 material = worldData.icon,
-                name = GuiNameSpec.Component(
+                name = GuiNameSpec.TargetIdentity(
                     i18nComponent(player, "admin_list.world.display", mapOf("world" to worldData.name)),
                 ),
                 role = GuiElementRole.ACTION,
@@ -392,7 +394,7 @@ class ChanponAdminWorldListMenu(
         GuiMenuEntrySpec(
             slot = slot,
             material = material,
-            name = GuiNameSpec.Component(i18nComponent(player, "$key.display")),
+            name = GuiNameSpec.FixedLabel(i18nComponent(player, "$key.display")),
             role = GuiElementRole.ACTION,
             options = optionKeys.map { GuiMenuEntryOption(i18n(player, it), it == selectedKey) },
             actions = listOf(chanponGestureAction(
@@ -418,8 +420,8 @@ class ChanponAdminWorldListMenu(
             slot,
             GuiItemSpec(
                 Material.BOOK,
-                GuiNameSpec.Component(i18nComponent(player, "admin_list.info.display")),
-                GuiLoreSpec.Rich(
+                GuiNameSpec.FixedLabel(i18nComponent(player, "admin_list.info.display")),
+                me.awabi2048.mwmchanpon.ui.framedLore(
                     i18nList(
                         player,
                         "admin_list.info.lore",
@@ -449,7 +451,7 @@ class ChanponAdminWorldListMenu(
         GuiMenuEntrySpec(
             slot = slot,
             material = material,
-            name = GuiNameSpec.Text(text, GuiNameStyle.DEFAULT),
+            name = me.awabi2048.mwmchanpon.ui.fixedName(text, GuiNameStyle.DEFAULT),
             role = role,
             actions = listOf(
                 chanponGestureAction(actionId, MenuGesture.ANY, actionText, payload, safety = adminListActionSafety(actionId)),

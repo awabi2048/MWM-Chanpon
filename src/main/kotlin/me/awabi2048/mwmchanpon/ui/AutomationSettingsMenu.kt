@@ -137,7 +137,7 @@ class AutomationSettingsMenu(
                 GuiMenuEntrySpec(
                     slot = 36,
                     material = Material.END_CRYSTAL,
-                    name = GuiNameSpec.Component(i18nComponent(player, "automation.restore_point.display")),
+                    name = GuiNameSpec.FixedLabel(i18nComponent(player, "automation.restore_point.display")),
                     role = GuiElementRole.ACTION,
                     description = i18nList(player, "automation.restore_point.lore"),
                     actions = listOf(chanponGestureAction(
@@ -294,7 +294,7 @@ class AutomationSettingsMenu(
         GuiMenuEntrySpec(
             slot = slot,
             material = material,
-            name = GuiNameSpec.Component(i18nComponent(player, "$key.display")),
+            name = GuiNameSpec.FixedLabel(i18nComponent(player, "$key.display")),
             role = GuiElementRole.ACTION,
             description = i18nList(
                 player,
@@ -324,8 +324,8 @@ class AutomationSettingsMenu(
                 slot,
                 GuiItemSpec(
                     material,
-                    GuiNameSpec.Component(i18nComponent(player, "$key.display", placeholders)),
-                    GuiLoreSpec.Rich(
+                    GuiNameSpec.FixedLabel(i18nComponent(player, "$key.display", placeholders)),
+                    me.awabi2048.mwmchanpon.ui.framedLore(
                         i18nList(player, "$key.lore", placeholders).map(GuiLoreLine::Text),
                         GuiLoreFrame.BOTH,
                     ),
@@ -353,7 +353,7 @@ class AutomationSettingsMenu(
                 slot,
                 GuiItemSpec(
                     material,
-                    GuiNameSpec.Text(text, com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT),
+                    me.awabi2048.mwmchanpon.ui.fixedName(text, com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT),
                     GuiLoreSpec.None,
                     role,
                     1,

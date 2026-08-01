@@ -360,7 +360,7 @@ class ChanponEnvironmentGui(
             GuiMenuEntrySpec(
                 slot = slot,
                 material = material,
-                name = GuiNameSpec.Component(i18nComponent(player, "$key.display")),
+                name = GuiNameSpec.FixedLabel(i18nComponent(player, "$key.display")),
                 role = GuiElementRole.ACTION,
                 description = listOf(i18n(player, "$key.description")),
                 data = listOf(GuiMenuEntryData(
@@ -419,7 +419,7 @@ class ChanponEnvironmentGui(
             GuiMenuEntrySpec(
                 slot = slot,
                 material = Material.IRON_DOOR,
-                name = GuiNameSpec.Component(i18nComponent(player, "protection.display")),
+                name = GuiNameSpec.FixedLabel(i18nComponent(player, "protection.display")),
                 role = GuiElementRole.ACTION,
                 description = listOf(i18n(player, "protection.description")),
                 data = buildList {

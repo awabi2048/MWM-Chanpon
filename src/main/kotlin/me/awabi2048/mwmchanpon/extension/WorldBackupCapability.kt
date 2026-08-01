@@ -111,10 +111,10 @@ class WorldBackupCapability(
                 owner = RUNTIME_OWNER,
                 id = CAPABILITY_ID,
                 placement = WorldSettingsCapabilityPlacements.FOOTER_RIGHT_ACTIONS,
-                availability = MenuCapabilityAvailability { context ->
+                availability = me.awabi2048.mwmchanpon.ui.optionalAvailability { context ->
                     val world = worldUuid(context.arguments)
                         ?.let { ownedProductionWorld(context.player, it) }
-                        ?: return@MenuCapabilityAvailability false
+                        ?: return@optionalAvailability false
                     !protectionService.isProtected(world)
                 },
                 presentationProvider = MenuCapabilityPresentationProvider { context ->
@@ -425,8 +425,8 @@ class WorldBackupCapability(
                 displayEntry(
                     layout.previewSlot,
                     Material.PAPER,
-                    GuiNameSpec.Component(title),
-                    GuiLoreSpec.Rich(body.map(GuiLoreLine::Text), GuiLoreFrame.NONE),
+                    GuiNameSpec.FixedLabel(title),
+                    me.awabi2048.mwmchanpon.ui.framedLore(body.map(GuiLoreLine::Text), GuiLoreFrame.NONE),
                 ),
                 simpleActionEntry(
                     player, layout.cancelSlot, Material.RED_CONCRETE,
@@ -461,7 +461,7 @@ class WorldBackupCapability(
     private fun entryPresentation(player: Player) = MenuCapabilityPresentation(
         GuiItemSpec(
             material = Material.CHEST,
-            name = GuiNameSpec.Component(i18nComponent(player, "owner_backup.display")),
+            name = GuiNameSpec.FixedLabel(i18nComponent(player, "owner_backup.display")),
             lore = GuiLoreSpec.Blocks(
                 listOf(
                     GuiLoreBlock(
@@ -485,7 +485,7 @@ class WorldBackupCapability(
         GuiMenuEntrySpec(
             slot = slot,
             material = materialFor(backup),
-            name = GuiNameSpec.Component(
+            name = GuiNameSpec.TargetIdentity(
                 i18nComponent(player, "owner_backup.item.display", mapOf("name" to BackupDisplay.displayName(backup))),
             ),
             role = GuiElementRole.ACTION,
@@ -523,7 +523,7 @@ class WorldBackupCapability(
             GuiMenuEntrySpec(
                 slot = slot,
                 material = if (remaining > 0) Material.CLOCK else Material.CHEST,
-                name = GuiNameSpec.Component(i18nComponent(
+                name = GuiNameSpec.FixedLabel(i18nComponent(
                     player,
                     "$key.display",
                     mapOf("remaining" to BackupDisplay.formatDuration(remaining)),
@@ -561,7 +561,7 @@ class WorldBackupCapability(
         GuiMenuEntrySpec(
             slot = slot,
             material = material,
-            name = GuiNameSpec.Text(text, GuiNameStyle.DEFAULT),
+            name = me.awabi2048.mwmchanpon.ui.fixedName(text, GuiNameStyle.DEFAULT),
             role = role,
             actions = listOf(
                 chanponGestureAction(actionId, MenuGesture.ANY, actionText, payload, safety = ownerBackupActionSafety(actionId)),
@@ -592,10 +592,10 @@ class WorldBackupCapability(
     ): MenuElement = displayEntry(
         slot,
         world.icon,
-        GuiNameSpec.Component(
+        GuiNameSpec.TargetIdentity(
             i18nComponent(player, "owner_backup.info.display", mapOf("world" to world.name)),
         ),
-        GuiLoreSpec.Rich(
+        me.awabi2048.mwmchanpon.ui.framedLore(
             i18nList(
                 player,
                 "owner_backup.info.lore",

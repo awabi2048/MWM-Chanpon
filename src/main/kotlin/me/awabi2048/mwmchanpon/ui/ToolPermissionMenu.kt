@@ -86,7 +86,7 @@ class ToolPermissionMenu(
             elements += displayEntry(
                 4,
                 Material.PLAYER_HEAD,
-                GuiNameSpec.Text("§e${targetPlayer.name ?: "Unknown"}", GuiNameStyle.DEFAULT),
+                targetIdentityName("§e${targetPlayer.name ?: "Unknown"}", GuiNameStyle.DEFAULT),
                 GuiElementRole.CONTENT,
                 targetUuid,
             )
@@ -161,7 +161,7 @@ class ToolPermissionMenu(
             GuiMenuEntrySpec(
                 slot = slot,
                 material = Material.PLAYER_HEAD,
-                name = GuiNameSpec.Text(i18n("role.display"), GuiNameStyle.DEFAULT),
+                name = fixedName(i18n("role.display"), GuiNameStyle.DEFAULT),
                 role = GuiElementRole.ACTION,
                 data = listOf(GuiMenuEntryData(
                     i18n("role.state_label"),
@@ -229,7 +229,7 @@ class ToolPermissionMenu(
             GuiMenuEntrySpec(
                 slot = slot,
                 material = definition.material,
-                name = GuiNameSpec.Text(definition.displayName, GuiNameStyle.DEFAULT),
+                name = fixedName(definition.displayName, GuiNameStyle.DEFAULT),
                 role = GuiElementRole.ACTION,
                 data = listOf(GuiMenuEntryData(
                     i18n("state_label"),

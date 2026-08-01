@@ -32,8 +32,8 @@ class LinkedPortalCapability {
                 owner = OWNER,
                 id = CAPABILITY_ID,
                 placement = WorldSettingsCapabilityPlacements.FOOTER_LEFT_ACTIONS,
-                availability = MenuCapabilityAvailability { context ->
-                    val world = worldData(context.arguments) ?: return@MenuCapabilityAvailability false
+                availability = me.awabi2048.mwmchanpon.ui.optionalAvailability { context ->
+                    val world = worldData(context.arguments) ?: return@optionalAvailability false
                     context.player.uniqueId == world.owner ||
                         world.members.contains(context.player.uniqueId) ||
                         context.player.hasPermission("myworldmanager.admin")
@@ -77,7 +77,7 @@ class LinkedPortalCapability {
     private fun portalPresentation(player: Player) = MenuCapabilityPresentation(
         GuiItemSpec(
             material = Material.END_PORTAL_FRAME,
-            name = GuiNameSpec.Component(i18nComponent(player, "linked_portal.display")),
+            name = GuiNameSpec.FixedLabel(i18nComponent(player, "linked_portal.display")),
             lore = GuiLoreSpec.NameOnly,
             role = GuiElementRole.ACTION,
             amount = 1,

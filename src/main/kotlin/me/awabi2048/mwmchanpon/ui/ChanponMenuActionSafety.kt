@@ -7,6 +7,10 @@ import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionTextProvider
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailabilityProvider
+import com.awabi2048.ccsystem.api.gui.MenuAvailabilityResult
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityContext
+import net.kyori.adventure.text.Component
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger
 import com.awabi2048.ccsystem.api.gui.MenuGesture
 import com.awabi2048.ccsystem.api.gui.MenuReversibleContract
@@ -52,7 +56,7 @@ internal fun chanponCapabilityAction(
     id: String,
     trigger: MenuCapabilityTrigger,
     textProvider: MenuCapabilityActionTextProvider,
-    availability: MenuCapabilityAvailability = MenuCapabilityAvailability { true },
+    availability: MenuCapabilityAvailability = optionalAvailability { true },
     sounds: MenuActionSoundPolicy = MenuActionSoundPolicy(),
     handler: MenuCapabilityActionHandler,
     safety: MenuActionSafety,
@@ -82,6 +86,23 @@ internal fun chanponCapabilityAction(
         reversibleContract = reversibleContract,
     )
 }
+
+internal fun optionalAvailability(
+    predicate: (MenuCapabilityContext) -> Boolean,
+): MenuCapabilityAvailability = MenuCapabilityAvailability.reasoned(
+    MenuCapabilityAvailabilityProvider { context ->
+        if (predicate(context)) MenuAvailabilityResult.Available else MenuAvailabilityResult.UnavailableUnknown
+    },
+)
+
+internal fun reasonedAvailability(
+    reason: (MenuCapabilityContext) -> Component,
+    predicate: (MenuCapabilityContext) -> Boolean,
+): MenuCapabilityAvailability = MenuCapabilityAvailability.reasoned(
+    MenuCapabilityAvailabilityProvider { context ->
+        if (predicate(context)) MenuAvailabilityResult.Available else MenuAvailabilityResult.Unavailable(reason(context))
+    },
+)
 
 /** 外部Capabilityを表示へ接続する直前にも未分類操作を拒否します。 */
 internal fun ResolvedMenuCapability.requireExplicitActionSafety(): ResolvedMenuCapability {

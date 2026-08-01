@@ -238,7 +238,7 @@ class EasyVoidWorldCreationService(
         val preview = guiItem(
             Material.PAPER,
             i18n(player, "confirm_title"),
-            GuiLoreSpec.Rich(
+            me.awabi2048.mwmchanpon.ui.framedLore(
                 listOf(
                     GuiLoreLine.Text(i18n(player, "confirm_body", "world" to pending.worldName)),
                     GuiLoreLine.Text(
@@ -388,7 +388,7 @@ class EasyVoidWorldCreationService(
         role: GuiElementRole,
     ) = GuiItemSpec(
             material = material,
-            name = GuiNameSpec.Text(name, GuiNameStyle.DEFAULT),
+            name = me.awabi2048.mwmchanpon.ui.fixedName(name, GuiNameStyle.DEFAULT),
             lore = lore,
             role = role,
             amount = 1,

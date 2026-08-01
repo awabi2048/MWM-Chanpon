@@ -24,6 +24,7 @@ import com.awabi2048.ccsystem.api.gui.MenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
+import com.awabi2048.ccsystem.api.gui.menuUnavailable
 import java.util.UUID
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.service.ChanponReversibleActionClassification
@@ -208,7 +209,7 @@ class WorldDataExportMenu(
         GuiMenuEntrySpec(
             slot = slot,
             material = world.icon,
-            name = GuiNameSpec.Component(
+            name = GuiNameSpec.TargetIdentity(
                 i18nComponent(player, "export_menu.world.display", mapOf("world" to world.name)),
             ),
             role = GuiElementRole.ACTION,
@@ -239,12 +240,11 @@ class WorldDataExportMenu(
 
     private fun exportSelectionItem(player: Player, slot: Int, selectedCount: Int): MenuElement {
         val enabled = selectedCount > 0
-        return CCSystem.getAPI().getGuiElementService().menuEntry(
-            player,
-            GuiMenuEntrySpec(
+        val gui = CCSystem.getAPI().getGuiElementService()
+        val spec = GuiMenuEntrySpec(
                 slot = slot,
                 material = if (enabled) Material.DISPENSER else Material.GRAY_DYE,
-                name = GuiNameSpec.Component(i18nComponent(player, "export_menu.execute.display")),
+                name = GuiNameSpec.FixedLabel(i18nComponent(player, "export_menu.execute.display")),
                 role = if (enabled) GuiElementRole.CONFIRM else GuiElementRole.CONTENT,
                 data = listOf(GuiMenuEntryData(
                     i18n(player, "export_menu.execute.selected_label"),
@@ -259,7 +259,11 @@ class WorldDataExportMenu(
                     i18n(player, "export_menu.execute.action"),
                     safety = MenuActionSafety.CONFIRM_ENTRY,
                 )) else emptyList(),
-            ),
+            )
+        return if (enabled) gui.menuEntry(player, spec) else gui.menuUnavailable(
+            player,
+            spec,
+            i18nComponent(player, "export_menu.execute.disabled"),
         )
     }
 
@@ -271,12 +275,12 @@ class WorldDataExportMenu(
         actionId: String,
         role: GuiElementRole = GuiElementRole.ACTION,
         enabled: Boolean = true,
-    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
-        player,
-        GuiMenuEntrySpec(
+    ): MenuElement {
+        val gui = CCSystem.getAPI().getGuiElementService()
+        val spec = GuiMenuEntrySpec(
             slot = slot,
             material = material,
-            name = GuiNameSpec.Component(i18nComponent(player, "$key.display")),
+            name = GuiNameSpec.FixedLabel(i18nComponent(player, "$key.display")),
             role = if (enabled) role else GuiElementRole.CONTENT,
             description = listOf(i18n(player, "$key.description")),
             actions = if (enabled) listOf(chanponGestureAction(
@@ -286,8 +290,13 @@ class WorldDataExportMenu(
                 safety = exportActionSafety(actionId),
                 classification = exportRouteClassification(actionId),
             )) else emptyList(),
-        ),
-    )
+        )
+        return if (enabled) gui.menuEntry(player, spec) else gui.menuUnavailable(
+            player,
+            spec,
+            i18nComponent(player, "export_menu.execute.disabled"),
+        )
+    }
 
     private fun confirmationInfoEntry(
         player: Player,
@@ -298,8 +307,8 @@ class WorldDataExportMenu(
     ): MenuElement = displayEntry(
         slot,
         Material.BOOK,
-        GuiNameSpec.Component(i18nComponent(player, "export_menu.confirm.info.display")),
-        GuiLoreSpec.Rich(
+        GuiNameSpec.FixedLabel(i18nComponent(player, "export_menu.confirm.info.display")),
+        me.awabi2048.mwmchanpon.ui.framedLore(
                     listOf(
                         GuiLoreLine.Data(i18n(player, "export_menu.confirm.info.primary_label"), primaryName, "§f"),
                         GuiLoreLine.Data(i18n(player, "export_menu.confirm.info.count_label"), selectedCount, "§f"),
@@ -336,8 +345,8 @@ class WorldDataExportMenu(
     ): MenuElement = displayEntry(
         slot,
         Material.BOOK,
-        GuiNameSpec.Component(i18nComponent(player, "export_menu.info.display")),
-        GuiLoreSpec.Rich(
+        GuiNameSpec.FixedLabel(i18nComponent(player, "export_menu.info.display")),
+        me.awabi2048.mwmchanpon.ui.framedLore(
                     i18nList(
                         player,
                         "export_menu.info.lore",
@@ -363,7 +372,7 @@ class WorldDataExportMenu(
         GuiMenuEntrySpec(
             slot = slot,
             material = material,
-            name = GuiNameSpec.Text(text, GuiNameStyle.DEFAULT),
+            name = opaqueName(text, GuiNameStyle.DEFAULT),
             role = role,
             actions = listOf(
                 chanponGestureAction(actionId, MenuGesture.ANY, actionText, payload, safety = exportActionSafety(actionId)),

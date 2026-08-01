@@ -63,7 +63,7 @@ internal class ChanponWorldSettingsCapabilities(
                 owner = OWNER,
                 id = "world-settings-${feature.name.lowercase()}",
                 placement = placement,
-                availability = MenuCapabilityAvailability { context ->
+                availability = me.awabi2048.mwmchanpon.ui.optionalAvailability { context ->
                     worldData(context)?.let {
                         menu.isFeatureVisible(context.player, it, feature)
                     } == true
@@ -82,7 +82,15 @@ internal class ChanponWorldSettingsCapabilities(
                         textProvider = MenuCapabilityActionTextProvider { context ->
                             menu.featureActionText(context.player, feature)
                         },
-                        availability = MenuCapabilityAvailability { context ->
+                        availability = me.awabi2048.mwmchanpon.ui.reasonedAvailability(
+                            reason = { context ->
+                                menu.featureUnavailableReason(
+                                    context.player,
+                                    requireNotNull(worldData(context)),
+                                    feature,
+                                )
+                            },
+                        ) { context ->
                             worldData(context)?.let {
                                 menu.isFeatureActionable(context.player, it, feature)
                             } == true

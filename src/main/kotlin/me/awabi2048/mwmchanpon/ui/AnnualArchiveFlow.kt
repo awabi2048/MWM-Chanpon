@@ -198,7 +198,7 @@ class AnnualArchiveFlow(
             GuiMenuEntrySpec(
                 slot = slot,
                 material = material,
-                name = GuiNameSpec.Component(i18nComponent(player, textKey)),
+                name = GuiNameSpec.FixedLabel(i18nComponent(player, textKey)),
                 role = role,
                 actions = listOf(
                     chanponGestureAction(

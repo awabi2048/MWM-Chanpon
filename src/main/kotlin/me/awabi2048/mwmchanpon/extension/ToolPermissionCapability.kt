@@ -47,7 +47,7 @@ class ToolPermissionCapability(
                 owner = CAPABILITY_OWNER,
                 id = CAPABILITY_ID,
                 placement = MemberManagementCapabilityContract.PLACEMENT,
-                availability = MenuCapabilityAvailability {
+                availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
                     subject(it)?.let { subject ->
                         canManage(it.player, subject.worldData)
                     } == true
@@ -124,7 +124,7 @@ class ToolPermissionCapability(
         return MenuCapabilityPresentation(
             item = GuiItemSpec(
                 material = Material.PLAYER_HEAD,
-                name = GuiNameSpec.Text("", GuiNameStyle.DEFAULT),
+                name = me.awabi2048.mwmchanpon.ui.fixedName("", GuiNameStyle.DEFAULT),
                 lore = GuiLoreSpec.None,
                 role = GuiElementRole.ACTION,
                 amount = 1,

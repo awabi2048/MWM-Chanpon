@@ -413,7 +413,7 @@ class ChanponWorldSettingsMenu(
         })
         val centerItem = GuiItemSpec(
             material = Material.TNT,
-            name = GuiNameSpec.Text(i18n(player, "${key}_display"), GuiNameStyle.DEFAULT),
+            name = me.awabi2048.mwmchanpon.ui.fixedName(i18n(player, "${key}_display"), GuiNameStyle.DEFAULT),
             lore = lore,
             role = GuiElementRole.CONTENT,
             amount = 1,
@@ -503,7 +503,7 @@ class ChanponWorldSettingsMenu(
         return MenuCapabilityPresentation(
             GuiItemSpec(
                 material = Material.BELL,
-                name = GuiNameSpec.Text(
+                name = fixedName(
                     text(player, "gui.settings.notification.display"),
                     GuiNameStyle.DEFAULT,
                 ),
@@ -604,7 +604,7 @@ class ChanponWorldSettingsMenu(
     ) = MenuCapabilityPresentation(
         GuiItemSpec(
             material = material,
-            name = GuiNameSpec.Text(display, GuiNameStyle.DEFAULT),
+            name = me.awabi2048.mwmchanpon.ui.fixedName(display, GuiNameStyle.DEFAULT),
             lore = GuiLoreSpec.None,
             role = role,
             amount = 1,
@@ -645,7 +645,7 @@ class ChanponWorldSettingsMenu(
             GuiMenuEntrySpec(
                 slot = slot,
                 material = material,
-                name = GuiNameSpec.Text(i18n(player, nameKey), GuiNameStyle.DEFAULT),
+                name = me.awabi2048.mwmchanpon.ui.fixedName(i18n(player, nameKey), GuiNameStyle.DEFAULT),
                 role = GuiElementRole.ACTION,
                 description = listOf(i18n(player, descriptionKey)),
                 warnings = warnings,
@@ -665,7 +665,7 @@ class ChanponWorldSettingsMenu(
     private fun modifiedWarningItem(player: Player): GuiItemSpec =
         GuiItemSpec(
             material = Material.REDSTONE_TORCH,
-            name = GuiNameSpec.Text(i18n(player, "modified_warning.display"), GuiNameStyle.DEFAULT),
+            name = me.awabi2048.mwmchanpon.ui.fixedName(i18n(player, "modified_warning.display"), GuiNameStyle.DEFAULT),
             lore = GuiLoreSpec.Blocks(
                 listOf(
                     GuiLoreBlock(
@@ -697,7 +697,7 @@ class ChanponWorldSettingsMenu(
         }
         return GuiItemSpec(
             material = action.material,
-            name = GuiNameSpec.Text(i18n(player, "confirm.${action.key}.display"), GuiNameStyle.DEFAULT),
+            name = me.awabi2048.mwmchanpon.ui.fixedName(i18n(player, "confirm.${action.key}.display"), GuiNameStyle.DEFAULT),
             lore = GuiLoreSpec.Blocks(listOf(GuiLoreBlock(lines))),
             role = GuiElementRole.CONTENT,
             amount = 1,
@@ -720,7 +720,7 @@ class ChanponWorldSettingsMenu(
     private fun confirmButton(player: Player, confirm: Boolean): GuiItemSpec {
         return GuiItemSpec(
             material = if (confirm) Material.LIME_CONCRETE else Material.RED_CONCRETE,
-            name = GuiNameSpec.Text(
+            name = me.awabi2048.mwmchanpon.ui.fixedName(
                 i18n(player, if (confirm) "confirm.button.confirm" else "confirm.button.cancel"),
                 GuiNameStyle.DEFAULT,
             ),
@@ -733,7 +733,7 @@ class ChanponWorldSettingsMenu(
     private fun warningButton(player: Player, continueAction: Boolean): GuiItemSpec {
         return GuiItemSpec(
             material = if (continueAction) Material.LIME_CONCRETE else Material.RED_CONCRETE,
-            name = GuiNameSpec.Text(
+            name = me.awabi2048.mwmchanpon.ui.fixedName(
                 i18n(player, if (continueAction) "modified_warning.button.continue" else "modified_warning.button.cancel"),
                 GuiNameStyle.DEFAULT,
             ),
@@ -963,6 +963,26 @@ class ChanponWorldSettingsMenu(
             ),
         ),
         )
+    }
+
+    internal fun featureUnavailableReason(
+        player: Player,
+        worldData: WorldData,
+        feature: WorldSettingsFeature,
+    ): Component {
+        if (!isCurrentWorld(player, worldData)) {
+            return i18nComponent(player, "common.must_be_in_world_warning")
+        }
+        return when (feature) {
+            WorldSettingsFeature.EXPANSION -> i18nComponent(player, "message.expand_max")
+            WorldSettingsFeature.CRITICAL -> i18nComponent(
+                player,
+                criticalUnavailableLoreKey(player, worldData) ?: "critical.unavailable_message",
+            )
+            WorldSettingsFeature.ENVIRONMENT,
+            WorldSettingsFeature.PUBLISH,
+            WorldSettingsFeature.NOTIFICATION -> i18nComponent(player, "common.must_be_in_world_warning")
+        }
     }
 
     private data class Source(
