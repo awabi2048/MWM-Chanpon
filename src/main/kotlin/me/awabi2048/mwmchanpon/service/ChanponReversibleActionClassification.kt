@@ -36,7 +36,6 @@ internal object ChanponReversibleActionClassification {
         CREATION_PRODUCTION_SELECTION("creation-production-selection", Kind.STATE_AGGREGATE, "creation-production-selection", "mwm-chanpon:creation-production-selection"),
         CURRENT_PLAYER_WORLD_DISPLAY_ORDER("current-player-world-display-order", Kind.STATE_AGGREGATE, "world-display-order", "myworldmanager:world-display-order"),
         AWAY_PLAYER_WORLD_DISPLAY_ORDER("away-player-world-display-order", Kind.STATE_AGGREGATE, "world-display-order", "myworldmanager:world-display-order"),
-        STANDARD_CREATION_SESSION("standard-creation-session", Kind.STATE_AGGREGATE, "creation-session", "myworldmanager:creation-session"),
         ADMIN_WORLD_LIST_FILTER("admin-world-list-filter", Kind.ROUTE_ONLY, "route-payload"),
         ADMIN_WORLD_LIST_SORT("admin-world-list-sort", Kind.ROUTE_ONLY, "route-payload"),
         SUBMISSION_LIST_FILTER("submission-list-filter", Kind.ROUTE_ONLY, "route-payload"),

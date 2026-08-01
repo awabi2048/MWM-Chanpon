@@ -14,7 +14,7 @@ class ChanponReversibleActionClassificationTest {
     @Test
     fun `reversible action classification has a provider for every state aggregate`() {
         assertEquals(emptyList<String>(), ChanponReversibleActionClassification.validate())
-        assertEquals(22, ChanponReversibleActionClassification.entries.size)
+        assertEquals(21, ChanponReversibleActionClassification.entries.size)
         val providerIds = ChanponReversibleActionClassification.entries
             .filter { it.kind == ChanponReversibleActionClassification.Kind.STATE_AGGREGATE }
             .mapNotNull { it.providerId }
@@ -90,16 +90,11 @@ class ChanponReversibleActionClassificationTest {
                 ChanponReversibleActionClassification.Operation.AWAY_PLAYER_WORLD_DISPLAY_ORDER,
                 MwmReversibleContracts.displayOrder(),
             ),
-            MwmProviderReference(
-                ChanponReversibleActionClassification.Operation.STANDARD_CREATION_SESSION,
-                MwmReversibleContracts.creationSession(),
-            ),
         )
         assertEquals(
             setOf(
                 ChanponReversibleActionClassification.Operation.CURRENT_PLAYER_WORLD_DISPLAY_ORDER,
                 ChanponReversibleActionClassification.Operation.AWAY_PLAYER_WORLD_DISPLAY_ORDER,
-                ChanponReversibleActionClassification.Operation.STANDARD_CREATION_SESSION,
             ),
             references.map(MwmProviderReference::operation).toSet(),
         )
@@ -113,7 +108,6 @@ class ChanponReversibleActionClassificationTest {
         }
         assertEquals(emptyMap<String, String>(), references[0].contract.arguments)
         assertEquals(emptyMap<String, String>(), references[1].contract.arguments)
-        assertEquals(mapOf("operation" to "start"), references[2].contract.arguments)
 
     }
 
@@ -146,7 +140,6 @@ class ChanponReversibleActionClassificationTest {
                 ChanponReversibleContracts.creationProductionSelection()
             ChanponReversibleActionClassification.Operation.CURRENT_PLAYER_WORLD_DISPLAY_ORDER,
             ChanponReversibleActionClassification.Operation.AWAY_PLAYER_WORLD_DISPLAY_ORDER -> MwmReversibleContracts.displayOrder()
-            ChanponReversibleActionClassification.Operation.STANDARD_CREATION_SESSION -> MwmReversibleContracts.creationSession()
             ChanponReversibleActionClassification.Operation.ADMIN_WORLD_LIST_FILTER,
             ChanponReversibleActionClassification.Operation.ADMIN_WORLD_LIST_SORT,
             ChanponReversibleActionClassification.Operation.SUBMISSION_LIST_FILTER,

@@ -10,6 +10,7 @@ import com.awabi2048.ccsystem.api.gui.MenuActionObservation
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
 import com.awabi2048.ccsystem.api.gui.MenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuReversibleContract
+import com.awabi2048.ccsystem.api.gui.MenuReversibleInteractionContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger
 import com.awabi2048.ccsystem.api.gui.MenuContractValidator
@@ -20,6 +21,7 @@ import me.awabi2048.mwmchanpon.service.ChanponReversibleActionClassification
 import me.awabi2048.myworldmanager.service.MwmReversibleContracts
 import org.bukkit.Material
 import org.bukkit.event.inventory.ClickType
+import java.util.UUID
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -30,6 +32,8 @@ class ChanponPlayerWorldCapabilityInvocationTest {
     fun `player world capability entries retain their production restore contracts`() {
         val subject = Any()
         val world = Any()
+        val currentWorldUuid = UUID.fromString("00000000-0000-0000-0000-000000000011")
+        val awayWorldUuid = UUID.fromString("00000000-0000-0000-0000-000000000019")
         val returnRoute = com.awabi2048.ccsystem.api.gui.MenuRoute(
             "mwm-chanpon",
             "player-worlds",
@@ -50,6 +54,7 @@ class ChanponPlayerWorldCapabilityInvocationTest {
                     ),
                 ),
                 attributes = mapOf("subject" to subject, "world" to world),
+                worldUuid = currentWorldUuid,
             ),
             playerWorldCapabilityInvocation(
                 slot = 19,
@@ -67,6 +72,7 @@ class ChanponPlayerWorldCapabilityInvocationTest {
                     ),
                 ),
                 attributes = mapOf("subject" to subject, "world" to world),
+                worldUuid = awayWorldUuid,
             ),
             playerWorldCapabilityInvocation(
                 slot = 20,
@@ -75,9 +81,7 @@ class ChanponPlayerWorldCapabilityInvocationTest {
                     listOf(
                         action(
                             MenuCapabilityTrigger.LEFT,
-                            MenuActionSafety.REVERSIBLE,
-                            MwmReversibleContracts.creationSession(),
-                            ChanponReversibleActionClassification.Operation.STANDARD_CREATION_SESSION,
+                            MenuActionSafety.NAVIGATION_ONLY,
                         ),
                         action(
                             MenuCapabilityTrigger.RIGHT,
@@ -122,11 +126,10 @@ class ChanponPlayerWorldCapabilityInvocationTest {
         )
 
         val providerOnlyViolations = MenuContractValidator.validate(definition, observations)
-        assertEquals(3, providerOnlyViolations.size)
+        assertEquals(2, providerOnlyViolations.size)
         assertEquals(
             setOf(
                 "reversible provider is not registered: myworldmanager:world-display-order",
-                "reversible provider is not registered: myworldmanager:creation-session",
             ),
             providerOnlyViolations.map { it.message }.toSet(),
         )
@@ -145,6 +148,25 @@ class ChanponPlayerWorldCapabilityInvocationTest {
             mapOf("subject" to subject, "world" to world),
             worldInteraction.attributes,
         )
+        assertEquals(mapOf(PLAYER_WORLD_UUID_ARGUMENT to awayWorldUuid.toString()), worldInteraction.arguments)
+        val providerCaptureInteraction = MenuReversibleInteractionContext(
+            slot = invocations[1].slot,
+            click = ClickType.SHIFT_LEFT,
+            actionId = null,
+            capabilityId = worldInteraction.capabilityId,
+            contract = requireNotNull(worldInteraction.reversibleContractFor(ClickType.SHIFT_LEFT)),
+            revision = 1L,
+            arguments = worldInteraction.arguments,
+            attributes = worldInteraction.attributes,
+        )
+        assertEquals(
+            awayWorldUuid,
+            UUID.fromString(providerCaptureInteraction.arguments.getValue(PLAYER_WORLD_UUID_ARGUMENT)),
+        )
+        assertEquals(
+            mapOf(PLAYER_WORLD_UUID_ARGUMENT to currentWorldUuid.toString()),
+            assertInstanceOf(MenuInteraction.Capability::class.java, observations[0].interaction).arguments,
+        )
         assertEquals(
             mapOf("subject" to subject),
             assertInstanceOf(MenuInteraction.Capability::class.java, observations[2].interaction).attributes,
@@ -161,6 +183,9 @@ class ChanponPlayerWorldCapabilityInvocationTest {
             assertInstanceOf(MenuInteraction.Capability::class.java, observations[0].interaction).safety)
         assertEquals(MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE,
             assertInstanceOf(MenuInteraction.Capability::class.java, observations[2].interaction).safetyFor(ClickType.RIGHT))
+        assertEquals(MenuActionSafety.NAVIGATION_ONLY,
+            assertInstanceOf(MenuInteraction.Capability::class.java, observations[2].interaction).safetyFor(ClickType.LEFT))
+        assertTrue(assertInstanceOf(MenuInteraction.Capability::class.java, observations[2].interaction).reversibleContractByClick.isEmpty())
         assertEquals(0, invocations[3].capability.acceptedClicks.size)
         assertInstanceOf(MenuInteraction.DisplayOnly::class.java, observations[3].interaction)
     }

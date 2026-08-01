@@ -218,9 +218,7 @@ class ChanponPlayerWorldCapability(
                             creationBlockReason(it) == null && hasCreatePermission(it.player)
                         },
                         handler = MenuCapabilityActionHandler(::handleCreate),
-                        safety = MenuActionSafety.REVERSIBLE,
-                        reversibleContract = MwmReversibleContracts.creationSession(),
-                        classification = ChanponReversibleActionClassification.Operation.STANDARD_CREATION_SESSION,
+                        safety = MenuActionSafety.NAVIGATION_ONLY,
                     ),
                     chanponCapabilityAction(
                         id = "easy-create",
@@ -294,6 +292,7 @@ class ChanponPlayerWorldCapability(
                         slot = layout.layout.itemSlots[index],
                         capability = capability.requireExplicitActionSafety(),
                         attributes = attributes,
+                        worldUuid = worldData.uuid,
                     ),
                 )
             }
@@ -911,8 +910,15 @@ internal fun playerWorldCapabilityInvocation(
     slot: Int,
     capability: com.awabi2048.ccsystem.api.gui.ResolvedMenuCapability,
     attributes: Map<String, Any>,
+    worldUuid: java.util.UUID? = null,
 ): GuiMenuCapabilityInvocationSpec = GuiMenuCapabilityInvocationSpec(
     slot = slot,
     capability = capability.requireExplicitActionSafety(),
+    arguments = worldUuid?.let(::playerWorldCapabilityArguments).orEmpty(),
     attributes = attributes,
 )
+
+internal fun playerWorldCapabilityArguments(worldUuid: java.util.UUID): Map<String, String> =
+    mapOf(PLAYER_WORLD_UUID_ARGUMENT to worldUuid.toString())
+
+internal const val PLAYER_WORLD_UUID_ARGUMENT = "capability_world_uuid"
