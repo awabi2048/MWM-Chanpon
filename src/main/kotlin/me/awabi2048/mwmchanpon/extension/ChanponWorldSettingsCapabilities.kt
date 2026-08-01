@@ -15,14 +15,25 @@ import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import me.awabi2048.mwmchanpon.ui.ChanponWorldSettingsMenu
 import me.awabi2048.mwmchanpon.ui.WorldSettingsFeature
 import me.awabi2048.mwmchanpon.ui.chanponCapabilityAction
+import me.awabi2048.mwmchanpon.service.ChanponReversibleContracts
+import me.awabi2048.mwmchanpon.service.ChanponReversibleStateProviders
+import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsCapabilityPlacements
 import me.awabi2048.myworldmanager.model.WorldData
 
 internal class ChanponWorldSettingsCapabilities(
     private val menu: ChanponWorldSettingsMenu,
+    storage: ChanponWorldStorage,
 ) {
     init {
+        ChanponReversibleStateProviders.registerPublication(
+            CCSystem.getAPI().getMenuReversibleStateProviderRegistry(),
+            storage,
+        )
+        ChanponReversibleStateProviders.registerNotification(
+            CCSystem.getAPI().getMenuReversibleStateProviderRegistry(),
+        )
         register(
             WorldSettingsFeature.EXPANSION,
             WorldSettingsCapabilityPlacements.EXPANSION_ACTION,
@@ -84,6 +95,7 @@ internal class ChanponWorldSettingsCapabilities(
                             )
                         },
                         safety = featureActionSafety(feature),
+                        reversibleContract = featureReversibleContract(feature),
                     ),
                 ),
             ),
@@ -104,6 +116,12 @@ internal class ChanponWorldSettingsCapabilities(
         WorldSettingsFeature.EXPANSION -> MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE
         WorldSettingsFeature.PUBLISH, WorldSettingsFeature.NOTIFICATION -> MenuActionSafety.REVERSIBLE
         WorldSettingsFeature.ENVIRONMENT, WorldSettingsFeature.CRITICAL -> MenuActionSafety.NAVIGATION_ONLY
+    }
+
+    private fun featureReversibleContract(feature: WorldSettingsFeature) = when (feature) {
+        WorldSettingsFeature.PUBLISH -> ChanponReversibleContracts.publication()
+        WorldSettingsFeature.NOTIFICATION -> ChanponReversibleContracts.notification()
+        else -> null
     }
 
     companion object {

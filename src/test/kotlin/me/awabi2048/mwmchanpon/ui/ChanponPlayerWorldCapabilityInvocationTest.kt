@@ -8,6 +8,7 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuRenderer
 import com.awabi2048.ccsystem.api.gui.MenuActionObservation
 import com.awabi2048.ccsystem.api.gui.MenuActionSafety
+import com.awabi2048.ccsystem.api.gui.MenuReversibleContract
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger
 import com.awabi2048.ccsystem.api.gui.MenuContractValidator
@@ -70,6 +71,7 @@ class ChanponPlayerWorldCapabilityInvocationTest {
                         acceptedClicks = invocation.capability.acceptedClicks,
                         safety = invocation.capability.safety,
                         safetyByClick = invocation.capability.safetyByClick,
+                        reversibleContractByClick = invocation.capability.reversibleContractByClick,
                     )
                 } else {
                     MenuInteraction.DisplayOnly
@@ -83,7 +85,9 @@ class ChanponPlayerWorldCapabilityInvocationTest {
             actions = emptyMap(),
         )
 
-        assertTrue(MenuContractValidator.validate(definition, observations).isEmpty())
+        val providerOnlyViolations = MenuContractValidator.validate(definition, observations)
+        assertEquals(3, providerOnlyViolations.size)
+        assertTrue(providerOnlyViolations.all { it.message == "reversible provider is not registered: test:state" })
         assertEquals(
             listOf(
                 "mwm-chanpon:player-world-item-away",
@@ -123,7 +127,10 @@ class ChanponPlayerWorldCapabilityInvocationTest {
             GuiItemSpec(Material.STONE, GuiNameSpec.Empty, GuiLoreSpec.None, GuiElementRole.ACTION, 1),
         ),
         actions = actions.mapIndexed { index, (trigger, safety) ->
-            ResolvedMenuCapabilityAction("action-$index", trigger, "クリック", safety)
+            ResolvedMenuCapabilityAction(
+                "action-$index", trigger, "クリック", safety,
+                if (safety == MenuActionSafety.REVERSIBLE) MenuReversibleContract("test:state") else null,
+            )
         },
     )
 }

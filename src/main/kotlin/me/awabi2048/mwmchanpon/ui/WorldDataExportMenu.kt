@@ -227,7 +227,8 @@ class WorldDataExportMenu(
                 MenuGesture.ANY,
                 i18n(player, "export_menu.world.action"),
                 mapOf(WORLD_UUID to world.uuid.toString()),
-                safety = MenuActionSafety.REVERSIBLE,
+                // 選択集合は次Routeにのみ保持され、サーバー状態を変更しません。
+                safety = MenuActionSafety.NAVIGATION_ONLY,
             )),
             glint = selected,
         ),
@@ -394,8 +395,7 @@ class WorldDataExportMenu(
         CCSystem.getAPI().getI18nString(player, "chanpon.backup.$key", placeholders)
 
     private fun exportActionSafety(actionId: String): MenuActionSafety = when (actionId) {
-        ACTION_BACK, ACTION_PAGE -> MenuActionSafety.NAVIGATION_ONLY
-        ACTION_TOGGLE, ACTION_SELECT_ALL, ACTION_CLEAR_SELECTION -> MenuActionSafety.REVERSIBLE
+        ACTION_BACK, ACTION_PAGE, ACTION_TOGGLE, ACTION_SELECT_ALL, ACTION_CLEAR_SELECTION -> MenuActionSafety.NAVIGATION_ONLY
         ACTION_EXPORT_SELECTION -> MenuActionSafety.CONFIRM_ENTRY
         ACTION_CONFIRM -> MenuActionSafety.IRREVERSIBLE
         else -> error("World-data export action must declare a dedicated safety mapping: $actionId")

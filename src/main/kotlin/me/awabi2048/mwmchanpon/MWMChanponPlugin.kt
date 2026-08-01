@@ -34,6 +34,7 @@ import me.awabi2048.mwmchanpon.protection.WorldBuildPermissionService
 import me.awabi2048.mwmchanpon.service.BackupAutomationService
 import me.awabi2048.mwmchanpon.service.ChanponSpawnWorldService
 import me.awabi2048.mwmchanpon.service.EasyVoidWorldCreationService
+import me.awabi2048.mwmchanpon.service.EasyCreationReversibleProvider
 import me.awabi2048.mwmchanpon.service.ArchiveOperationGuard
 import me.awabi2048.mwmchanpon.service.ManualRollbackService
 import me.awabi2048.mwmchanpon.service.PublishLevelSynchronizer
@@ -250,8 +251,13 @@ class MWMChanponPlugin : JavaPlugin() {
         chanponWorldSettingsMenu = ChanponWorldSettingsMenu(this, chanponStorage, submittedProtectionService, environmentGui)
         worldSettingsCapabilities = ChanponWorldSettingsCapabilities(
             chanponWorldSettingsMenu,
+            chanponStorage,
         )
         easyVoidWorldCreationService = EasyVoidWorldCreationService(this)
+        EasyCreationReversibleProvider.register(
+            CCSystem.getAPI().getMenuReversibleStateProviderRegistry(),
+            easyVoidWorldCreationService,
+        )
         val archiveOperationGuard = ArchiveOperationGuard(globalStorage)
         playerWorldCapability = ChanponPlayerWorldCapability(this, chanponStorage, easyVoidWorldCreationService)
         MyWorldManagerApi.registerPlayerWorldRouteCapability(playerWorldCapability)
@@ -295,7 +301,7 @@ class MWMChanponPlugin : JavaPlugin() {
         server.pluginManager.registerEvents(SubmittedWorldProtectionListener(submittedProtectionService), this)
         server.pluginManager.registerEvents(SpawnWorldProtectionListener(globalStorage, spawnProtectionService), this)
 
-        val toolMenu = ToolPermissionMenu(this, toolController, toolDefinitions)
+        val toolMenu = ToolPermissionMenu(this, toolController, toolDefinitions, chanponStorage)
         toolPermissionCapability =
             ToolPermissionCapability(toolMenu, toolController, toolDefinitions)
         worldBackupCapability = WorldBackupCapability(
@@ -338,6 +344,7 @@ class MWMChanponPlugin : JavaPlugin() {
         if (::playerWorldCapability.isInitialized) {
             MyWorldManagerApi.unregisterPlayerWorldRouteCapability(playerWorldCapability)
         }
+        runCatching { CCSystem.getAPI().getMenuReversibleStateProviderRegistry().unregisterOwner("mwm-chanpon") }
         runCatching { CCSystem.getAPI().getConfigSchemaService().unregister("mwm-chanpon") }
         runCatching { CCSystem.getAPI().getMenuCommandService().unregisterOwner("mwm-chanpon") }
         runCatching { CCSystem.getAPI().getMenuCapabilityService().unregisterOwner("mwm-chanpon") }

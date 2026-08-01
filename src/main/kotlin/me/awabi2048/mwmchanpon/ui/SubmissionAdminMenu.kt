@@ -34,6 +34,8 @@ import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.storage.SubmissionState
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
+import me.awabi2048.mwmchanpon.service.ChanponReversibleContracts
+import me.awabi2048.mwmchanpon.service.ChanponReversibleStateProviders
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.model.WorldData
 import net.kyori.adventure.text.Component
@@ -53,6 +55,13 @@ class SubmissionAdminMenu(
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
     init {
+        ChanponReversibleStateProviders.registerSubmission(
+            CCSystem.getAPI().getMenuReversibleStateProviderRegistry(),
+            plugin,
+            storage,
+            protectionService,
+            toolPermissionController,
+        )
         runtime.register(
             InventoryMenuDefinition(
                 owner = OWNER,
@@ -90,7 +99,7 @@ class SubmissionAdminMenu(
             InventoryMenuDefinition(
                 owner = OWNER,
                 id = ROUTE_COMPLETE_CONFIRM,
-                renderer = { context -> renderCompleteConfirmation(context.player) },
+                renderer = { context -> renderCompleteConfirmation(context.player, context.route) },
                 actions = confirmationActions(ACTION_CONFIRM_COMPLETE, ::confirmCompleteUnsubmitted),
             ),
         )
@@ -399,6 +408,7 @@ class SubmissionAdminMenu(
             Material.REDSTONE_BLOCK,
             "confirm.close_submissions",
             ACTION_CONFIRM_CLOSE,
+            ChanponReversibleContracts.submission("global", "close"),
         )
 
     private fun renderProductionToggleConfirmation(
@@ -417,13 +427,14 @@ class SubmissionAdminMenu(
         )
     }
 
-    private fun renderCompleteConfirmation(player: Player): InventoryMenuView =
+    private fun renderCompleteConfirmation(player: Player, route: MenuRoute): InventoryMenuView =
         confirmationView(
             player,
             "confirm.complete_unsubmitted.title",
             Material.GOLDEN_APPLE,
             "confirm.complete_unsubmitted",
             ACTION_CONFIRM_COMPLETE,
+            route.payload[WORLD_UUID]?.let { ChanponReversibleContracts.submission(it, "complete") },
         )
 
     private fun confirmationView(
@@ -432,6 +443,7 @@ class SubmissionAdminMenu(
         previewMaterial: Material,
         previewKey: String,
         confirmAction: String,
+        reversibleContract: com.awabi2048.ccsystem.api.gui.MenuReversibleContract? = null,
     ): InventoryMenuView {
         val layout = ChanponGuiElements.confirmationLayout()
         return InventoryMenuView(
@@ -447,7 +459,7 @@ class SubmissionAdminMenu(
                         GuiLoreFrame.BOTH,
                     ),
                 ),
-                confirmationEntry(player, layout.confirmSlot, true, confirmAction),
+                confirmationEntry(player, layout.confirmSlot, true, confirmAction, reversibleContract),
                 confirmationEntry(player, layout.cancelSlot, false, ACTION_CANCEL),
             ),
         )
@@ -536,6 +548,11 @@ class SubmissionAdminMenu(
                     i18n(player, "admin_menu.world.action_complete"),
                     payload,
                     safety = if (state == SubmissionState.UNSUBMITTED) MenuActionSafety.CONFIRM_ENTRY else MenuActionSafety.REVERSIBLE,
+                    reversibleContract = when (state) {
+                        SubmissionState.SUBMITTED -> ChanponReversibleContracts.submission(worldData.uuid.toString(), "complete")
+                        SubmissionState.COMPLETED -> ChanponReversibleContracts.submission(worldData.uuid.toString(), "uncomplete")
+                        SubmissionState.UNSUBMITTED -> null
+                    },
                 ))
             }
             if (production) {
@@ -642,7 +659,8 @@ class SubmissionAdminMenu(
                 actionId,
                 MenuGesture.ANY,
                 i18n(player, "common.action_next"),
-                safety = MenuActionSafety.REVERSIBLE,
+                // フィルタ／並び順は次Routeの表示状態のみを変更します。
+                safety = MenuActionSafety.NAVIGATION_ONLY,
             )),
         ),
     )
@@ -667,6 +685,11 @@ class SubmissionAdminMenu(
                     MenuGesture.ANY,
                     i18n(player, "$key.action"),
                     safety = if (plugin.isSubmissionClosed()) MenuActionSafety.REVERSIBLE else MenuActionSafety.CONFIRM_ENTRY,
+                    reversibleContract = if (plugin.isSubmissionClosed()) {
+                        ChanponReversibleContracts.submission("global", "reopen")
+                    } else {
+                        null
+                    },
                 )),
             ),
         )
@@ -677,6 +700,7 @@ class SubmissionAdminMenu(
         slot: Int,
         confirm: Boolean,
         actionId: String,
+        reversibleContract: com.awabi2048.ccsystem.api.gui.MenuReversibleContract? = null,
     ): MenuElement {
         val key = if (confirm) "confirm.button.confirm" else "confirm.button.cancel"
         return CCSystem.getAPI().getGuiElementService().menuEntry(
@@ -693,6 +717,7 @@ class SubmissionAdminMenu(
                         MenuGesture.ANY,
                         i18n(player, "$key.action"),
                         safety = submissionActionSafety(actionId),
+                        reversibleContract = reversibleContract,
                     ),
                 ),
             ),
@@ -741,8 +766,7 @@ class SubmissionAdminMenu(
     }
 
     private fun submissionActionSafety(actionId: String): MenuActionSafety = when (actionId) {
-        ACTION_BACK, ACTION_PAGE, ACTION_CANCEL -> MenuActionSafety.NAVIGATION_ONLY
-        ACTION_PROGRESS_FILTER, ACTION_SORT -> MenuActionSafety.REVERSIBLE
+        ACTION_BACK, ACTION_PAGE, ACTION_CANCEL, ACTION_PROGRESS_FILTER, ACTION_SORT -> MenuActionSafety.NAVIGATION_ONLY
         ACTION_CLOSE_SUBMISSIONS -> MenuActionSafety.CONFIRM_ENTRY
         ACTION_CONFIRM_CLOSE, ACTION_CONFIRM_COMPLETE -> MenuActionSafety.REVERSIBLE
         ACTION_CONFIRM_PRODUCTION -> MenuActionSafety.IRREVERSIBLE

@@ -25,6 +25,9 @@ import java.util.UUID
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.mwmchanpon.tool.ToolPermissionDefinition
+import me.awabi2048.mwmchanpon.service.ChanponReversibleContracts
+import me.awabi2048.mwmchanpon.service.ChanponReversibleStateProviders
+import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.model.WorldData
 import org.bukkit.Bukkit
@@ -35,10 +38,16 @@ class ToolPermissionMenu(
     private val plugin: MWMChanponPlugin,
     private val controller: ToolPermissionController,
     private val definitions: List<ToolPermissionDefinition>,
+    private val storage: ChanponWorldStorage,
 ) {
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
     init {
+        ChanponReversibleStateProviders.registerToolPermission(
+            CCSystem.getAPI().getMenuReversibleStateProviderRegistry(),
+            storage,
+            controller,
+        )
         runtime.register(
             InventoryMenuDefinition(
                 owner = OWNER,
@@ -163,6 +172,11 @@ class ToolPermissionMenu(
                     MenuGesture.ANY,
                     i18n("role.action"),
                     safety = MenuActionSafety.REVERSIBLE,
+                    reversibleContract = ChanponReversibleContracts.toolPermission(
+                        worldData.uuid,
+                        targetUuid,
+                        "role",
+                    ),
                 )),
             ),
         )
@@ -226,6 +240,11 @@ class ToolPermissionMenu(
                     i18n("toggle_action"),
                     mapOf(TOOL_ID to definition.id),
                     safety = MenuActionSafety.REVERSIBLE,
+                    reversibleContract = ChanponReversibleContracts.toolPermission(
+                        worldData.uuid,
+                        targetPlayerUuid,
+                        "toggle",
+                    ),
                 )),
                 glint = enabled,
             ),

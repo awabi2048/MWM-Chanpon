@@ -200,6 +200,38 @@ class ChanponWorldStorage(dataFolder: File) {
         saveAtomic(worldUuid, config)
     }
 
+    /** 提出状態と履歴件数をCASに利用する、提出aggregateの不変スナップショットです。 */
+    data class SubmissionSnapshot(
+        val state: SubmissionState,
+        val history: List<Map<String, Any?>>,
+    ) {
+        val revision: Int
+            get() = history.size
+    }
+
+    @Synchronized
+    fun captureSubmissionSnapshot(worldUuid: UUID): SubmissionSnapshot {
+        val config = load(worldUuid)
+            ?: error("MWM-Chanpon world data is missing: $worldUuid")
+        val state = SubmissionState.fromStorageValue(config.getString("submission.state"))
+            ?: error("Submission state is missing or invalid: $worldUuid")
+        return SubmissionSnapshot(
+            state,
+            config.getMapList("submission.history").map { entry ->
+                entry.entries.associate { (key, value) -> key.toString() to value }
+            },
+        )
+    }
+
+    @Synchronized
+    fun restoreSubmissionSnapshot(worldUuid: UUID, snapshot: SubmissionSnapshot) {
+        val config = load(worldUuid)
+            ?: error("MWM-Chanpon world data is missing: $worldUuid")
+        config.set("submission.state", snapshot.state.storageValue)
+        config.set("submission.history", snapshot.history.map { LinkedHashMap(it) })
+        saveAtomic(worldUuid, config)
+    }
+
     fun isToolEnabled(worldUuid: UUID, playerUuid: UUID, toolId: String): Boolean {
         val config = load(worldUuid) ?: return false
         return config.getBoolean("tool_permissions.${playerUuid}.${toolId}", false)
@@ -213,6 +245,13 @@ class ChanponWorldStorage(dataFolder: File) {
 
     @Synchronized
     fun setToolEnabled(worldUuid: UUID, playerUuid: UUID, toolId: String, enabled: Boolean) {
+        val config = loadOrCreate(worldUuid)
+        config.set("tool_permissions.${playerUuid}.${toolId}", enabled)
+        saveAtomic(worldUuid, config)
+    }
+
+    @Synchronized
+    fun restoreToolEnabledState(worldUuid: UUID, playerUuid: UUID, toolId: String, enabled: Boolean?) {
         val config = loadOrCreate(worldUuid)
         config.set("tool_permissions.${playerUuid}.${toolId}", enabled)
         saveAtomic(worldUuid, config)

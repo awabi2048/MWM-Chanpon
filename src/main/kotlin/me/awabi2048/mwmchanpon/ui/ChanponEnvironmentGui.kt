@@ -38,6 +38,8 @@ import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponWorldProtectionMode
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.protection.WorldBuildPermissionService
+import me.awabi2048.mwmchanpon.service.ChanponReversibleContracts
+import me.awabi2048.mwmchanpon.service.ChanponReversibleStateProviders
 
 class ChanponEnvironmentGui(
     private val plugin: MWMChanponPlugin,
@@ -49,6 +51,11 @@ class ChanponEnvironmentGui(
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
     init {
+        ChanponReversibleStateProviders.registerEnvironment(
+            CCSystem.getAPI().getMenuReversibleStateProviderRegistry(),
+            storage,
+            buildPermissionService,
+        )
         runtime.register(
             InventoryMenuDefinition(
                 owner = RUNTIME_OWNER,
@@ -334,6 +341,7 @@ class ChanponEnvironmentGui(
                 i18n(player, "common.action_next"),
                 payload,
                 safety = MenuActionSafety.REVERSIBLE,
+                reversibleContract = ChanponReversibleContracts.environment(worldUuid),
             ))
             if (customTimeAction) {
                 add(chanponGestureAction(
@@ -391,6 +399,7 @@ class ChanponEnvironmentGui(
                 i18n(player, "common.action_next"),
                 payload,
                 safety = MenuActionSafety.REVERSIBLE,
+                reversibleContract = ChanponReversibleContracts.environment(worldData.uuid),
             ))
             if (mode == ChanponWorldProtectionMode.PASSWORD) {
                 add(chanponGestureAction(

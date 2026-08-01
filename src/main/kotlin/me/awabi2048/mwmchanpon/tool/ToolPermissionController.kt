@@ -21,9 +21,13 @@ class ToolPermissionController(
     }
 
     fun setEnabled(worldData: WorldData, playerUuid: UUID, toolId: String, enabled: Boolean) {
-        storage.setToolEnabled(worldData.uuid, playerUuid, toolId, if (isSubmissionLocked(worldData.uuid)) false else enabled)
+        storage.setToolEnabled(worldData.uuid, playerUuid, toolId, storedEnabledAfterSet(worldData, enabled))
         Bukkit.getPlayer(playerUuid)?.let(::syncPlayerLocation)
     }
+
+    /** 実際に保存される値を公開し、可逆操作のCAS期待値と通常操作を一致させます。 */
+    fun storedEnabledAfterSet(worldData: WorldData, enabled: Boolean): Boolean =
+        if (isSubmissionLocked(worldData.uuid)) false else enabled
 
     fun syncWorld(worldData: WorldData) {
         val participants = linkedSetOf<UUID>()

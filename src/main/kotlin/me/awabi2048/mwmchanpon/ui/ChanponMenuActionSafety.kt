@@ -9,6 +9,7 @@ import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionTextProvider
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger
 import com.awabi2048.ccsystem.api.gui.MenuGesture
+import com.awabi2048.ccsystem.api.gui.MenuReversibleContract
 import com.awabi2048.ccsystem.api.gui.ResolvedMenuCapability
 
 /** ChanponがRuntimeへ渡す通常操作に安全区分の省略を許さない境界です。 */
@@ -19,9 +20,13 @@ internal fun chanponGestureAction(
     payload: Map<String, String> = emptyMap(),
     enabled: Boolean = true,
     safety: MenuActionSafety,
+    reversibleContract: MenuReversibleContract? = null,
 ): GuiMenuActionIntent.GestureAction {
     require(safety != MenuActionSafety.UNSPECIFIED) {
         "Chanpon GUI action must declare MenuActionSafety: $actionId/$gesture"
+    }
+    require((safety == MenuActionSafety.REVERSIBLE) == (reversibleContract != null)) {
+        "Chanpon REVERSIBLE action must have exactly one restore contract: $actionId/$gesture"
     }
     return GuiMenuActionIntent.GestureAction(
         actionId = actionId,
@@ -30,6 +35,7 @@ internal fun chanponGestureAction(
         payload = payload,
         enabled = enabled,
         safety = safety,
+        reversibleContract = reversibleContract,
     )
 }
 
@@ -42,9 +48,13 @@ internal fun chanponCapabilityAction(
     sounds: MenuActionSoundPolicy = MenuActionSoundPolicy(),
     handler: MenuCapabilityActionHandler,
     safety: MenuActionSafety,
+    reversibleContract: MenuReversibleContract? = null,
 ): MenuCapabilityAction {
     require(safety != MenuActionSafety.UNSPECIFIED) {
         "Chanpon capability action must declare MenuActionSafety: $id/$trigger"
+    }
+    require((safety == MenuActionSafety.REVERSIBLE) == (reversibleContract != null)) {
+        "Chanpon REVERSIBLE capability must have exactly one restore contract: $id/$trigger"
     }
     return MenuCapabilityAction(
         id = id,
@@ -54,6 +64,7 @@ internal fun chanponCapabilityAction(
         sounds = sounds,
         handler = handler,
         safety = safety,
+        reversibleContract = reversibleContract,
     )
 }
 

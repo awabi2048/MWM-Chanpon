@@ -398,7 +398,8 @@ class ChanponAdminWorldListMenu(
                 actionId,
                 MenuGesture.ANY,
                 i18n(player, "common.action_next"),
-                safety = MenuActionSafety.REVERSIBLE,
+                // Route payloadだけを置換する一覧表示の操作で、ワールド状態は変更しません。
+                safety = MenuActionSafety.NAVIGATION_ONLY,
             )),
         ),
     )
@@ -484,8 +485,7 @@ class ChanponAdminWorldListMenu(
     }
 
     private fun adminListActionSafety(actionId: String): MenuActionSafety = when (actionId) {
-        ACTION_BACK, ACTION_PAGE -> MenuActionSafety.NAVIGATION_ONLY
-        ACTION_VISIBILITY_FILTER, ACTION_SORT -> MenuActionSafety.REVERSIBLE
+        ACTION_BACK, ACTION_PAGE, ACTION_VISIBILITY_FILTER, ACTION_SORT -> MenuActionSafety.NAVIGATION_ONLY
         else -> error("Chanpon admin world-list action must declare a dedicated safety mapping: $actionId")
     }
 

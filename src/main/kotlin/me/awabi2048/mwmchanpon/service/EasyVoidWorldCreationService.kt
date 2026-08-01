@@ -65,6 +65,18 @@ class EasyVoidWorldCreationService(
     private val returnRoutes = ConcurrentHashMap<UUID, MenuRoute>()
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
+    data class FlowState(val pendingWorldName: String?, val returnRoute: MenuRoute?)
+
+    fun captureFlowState(playerId: UUID): FlowState =
+        FlowState(pendingCreations[playerId]?.worldName, returnRoutes[playerId])
+
+    fun restoreFlowState(playerId: UUID, state: FlowState) {
+        if (state.pendingWorldName == null) pendingCreations.remove(playerId)
+        else pendingCreations[playerId] = PendingCreation(state.pendingWorldName)
+        if (state.returnRoute == null) returnRoutes.remove(playerId)
+        else returnRoutes[playerId] = state.returnRoute
+    }
+
     init {
         runtime.register(
             InventoryMenuDefinition(

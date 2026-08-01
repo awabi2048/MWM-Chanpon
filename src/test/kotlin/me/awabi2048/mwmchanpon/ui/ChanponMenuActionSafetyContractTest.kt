@@ -6,6 +6,7 @@ import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionTextProvider
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger
 import com.awabi2048.ccsystem.api.gui.MenuGesture
+import com.awabi2048.ccsystem.api.gui.MenuReversibleContract
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -70,6 +71,34 @@ class ChanponMenuActionSafetyContractTest {
                 safety = MenuActionSafety.UNSPECIFIED,
             )
         }
+    }
+
+    @Test
+    fun `reversible actions require a typed restore contract`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            chanponGestureAction(
+                actionId = "test",
+                gesture = MenuGesture.ANY,
+                label = "test",
+                safety = MenuActionSafety.REVERSIBLE,
+            )
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            chanponCapabilityAction(
+                id = "test",
+                trigger = MenuCapabilityTrigger.ANY,
+                textProvider = MenuCapabilityActionTextProvider { "test" },
+                handler = MenuCapabilityActionHandler { MenuActionResult.Ignored },
+                safety = MenuActionSafety.REVERSIBLE,
+            )
+        }
+        chanponGestureAction(
+            actionId = "test",
+            gesture = MenuGesture.ANY,
+            label = "test",
+            safety = MenuActionSafety.REVERSIBLE,
+            reversibleContract = MenuReversibleContract("test:provider"),
+        )
     }
 
     private fun kotlinSources(): List<KotlinSource> = Files.walk(Path.of("src", "main", "kotlin")).use { paths ->

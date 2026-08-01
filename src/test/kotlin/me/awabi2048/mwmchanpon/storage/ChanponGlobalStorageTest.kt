@@ -1,6 +1,7 @@
 package me.awabi2048.mwmchanpon.storage
 
 import java.nio.file.Files
+import java.util.UUID
 import org.bukkit.configuration.file.YamlConfiguration
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -42,6 +43,31 @@ class ChanponGlobalStorageTest {
             assertEquals(WorldCreationAvailability.DENIED, storage.getWorldCreationAvailability())
             val migrated = YamlConfiguration.loadConfiguration(settings)
             assertFalse(migrated.contains("phase"))
+        } finally {
+            folder.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `admin world controls snapshot restores every aggregate member`() {
+        val folder = Files.createTempDirectory("chanpon-global-storage-snapshot").toFile()
+        try {
+            val storage = ChanponGlobalStorage(folder)
+            val firstSpawn = UUID.randomUUID()
+            val secondSpawn = UUID.randomUUID()
+            storage.setBuildingAllowed(false)
+            storage.setWorldCreationAvailability(WorldCreationAvailability.NON_PRODUCTION)
+            storage.setSpawnWorldUuid(firstSpawn)
+            storage.setSpawnPolicyInitialized(firstSpawn)
+            val before = storage.captureAdminWorldControls()
+
+            storage.setBuildingAllowed(true)
+            storage.setWorldCreationAvailability(WorldCreationAvailability.DENIED)
+            storage.setSpawnWorldUuid(secondSpawn)
+            storage.setSpawnPolicyInitialized(secondSpawn)
+            storage.restoreAdminWorldControls(before)
+
+            assertEquals(before, storage.captureAdminWorldControls())
         } finally {
             folder.deleteRecursively()
         }

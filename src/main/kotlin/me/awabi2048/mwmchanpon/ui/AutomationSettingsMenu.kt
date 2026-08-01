@@ -26,6 +26,8 @@ import me.awabi2048.mwmchanpon.backup.BackupKind
 import me.awabi2048.mwmchanpon.backup.BackupOperationStatus
 import me.awabi2048.mwmchanpon.backup.BackupService
 import me.awabi2048.mwmchanpon.service.BackupAutomationService
+import me.awabi2048.mwmchanpon.service.ChanponReversibleContracts
+import me.awabi2048.mwmchanpon.service.ChanponReversibleStateProviders
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
@@ -39,6 +41,13 @@ class AutomationSettingsMenu(
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
     init {
+        ChanponReversibleStateProviders.registerAutomation(
+            CCSystem.getAPI().getMenuReversibleStateProviderRegistry(),
+            plugin,
+        ) {
+            automationService.start()
+            onSettingsChanged()
+        }
         runtime.register(
             InventoryMenuDefinition(
                 owner = OWNER,
@@ -169,6 +178,7 @@ class AutomationSettingsMenu(
                     GuiElementRole.CONFIRM,
                     ACTION_CONFIRM_TOGGLE,
                     i18n(player, "confirm.button.confirm_action"),
+                    reversibleContract = ChanponReversibleContracts.automation(configPath),
                 ),
                 simpleActionEntry(
                     player,
@@ -331,6 +341,7 @@ class AutomationSettingsMenu(
         role: GuiElementRole,
         actionId: String,
         actionText: String,
+        reversibleContract: com.awabi2048.ccsystem.api.gui.MenuReversibleContract? = null,
     ): MenuElement {
         if (role == GuiElementRole.BACK) return CCSystem.getAPI().getGuiElementService().backEntry(player, slot)
         return CCSystem.getAPI().getGuiElementService().menuStructuredEntry(
@@ -349,6 +360,7 @@ class AutomationSettingsMenu(
                     MenuGesture.ANY,
                     actionText,
                     safety = automationActionSafety(actionId),
+                    reversibleContract = reversibleContract,
                 )),
             ),
         )

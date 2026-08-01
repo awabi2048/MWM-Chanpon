@@ -36,6 +36,8 @@ import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.storage.WorldCreationAvailability
 import me.awabi2048.mwmchanpon.protection.SpawnWorldProtectionService
+import me.awabi2048.mwmchanpon.service.ChanponReversibleContracts
+import me.awabi2048.mwmchanpon.service.ChanponReversibleStateProviders
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.AdminMenuCapabilityPlacements
 import net.kyori.adventure.text.Component
@@ -55,6 +57,11 @@ class ChanponAdminMenu(
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
     init {
+        ChanponReversibleStateProviders.registerAdminWorldControls(
+            CCSystem.getAPI().getMenuReversibleStateProviderRegistry(),
+            globalStorage,
+            spawnProtection,
+        )
         runtime.register(
             InventoryMenuDefinition(
                 OWNER,
@@ -199,7 +206,13 @@ class ChanponAdminMenu(
             layout.size,
             i18nComponent(player, "spawn_world.confirm.title"),
             listOf(
-                confirmationEntry(player, layout.confirmSlot, true, ACTION_CONFIRM_SPAWN),
+                confirmationEntry(
+                    player,
+                    layout.confirmSlot,
+                    true,
+                    ACTION_CONFIRM_SPAWN,
+                    ChanponReversibleContracts.adminWorldControls("spawn", worldUuid.toString()),
+                ),
                 CCSystem.getAPI().getGuiElementService().menuDisplay(
                     com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec(
                         layout.previewSlot,
@@ -267,6 +280,7 @@ class ChanponAdminMenu(
                         i18n(player, "$key.action"),
                         payload,
                         safety = adminActionSafety(actionId),
+                        reversibleContract = adminReversibleContract(actionId),
                     ),
                 ),
             ),
@@ -293,6 +307,7 @@ class ChanponAdminMenu(
                     MenuGesture.ANY,
                     controlsI18n(player, if (allowed) "build.deny_action" else "build.allow_action"),
                     safety = MenuActionSafety.REVERSIBLE,
+                    reversibleContract = ChanponReversibleContracts.adminWorldControls("building"),
                 )),
                 glint = null
             ),
@@ -334,6 +349,7 @@ class ChanponAdminMenu(
                     MenuGesture.ANY,
                     controlsI18n(player, "creation.cycle_action"),
                     safety = MenuActionSafety.REVERSIBLE,
+                    reversibleContract = ChanponReversibleContracts.adminWorldControls("creation"),
                 )),
                 glint = null
             ),
@@ -345,6 +361,7 @@ class ChanponAdminMenu(
         slot: Int,
         confirm: Boolean,
         actionId: String,
+        reversibleContract: com.awabi2048.ccsystem.api.gui.MenuReversibleContract? = null,
     ): MenuElement {
         val key = if (confirm) "confirm.button.confirm" else "confirm.button.cancel"
         return CCSystem.getAPI().getGuiElementService().menuEntry(
@@ -360,6 +377,7 @@ class ChanponAdminMenu(
                         MenuGesture.ANY,
                         i18n(player, "$key.action"),
                         safety = adminActionSafety(actionId),
+                        reversibleContract = reversibleContract,
                     ),
                 ),
             ),
@@ -382,6 +400,12 @@ class ChanponAdminMenu(
         ACTION_WORLD_CREATION,
         ACTION_CONFIRM_SPAWN -> MenuActionSafety.REVERSIBLE
         else -> error("Chanpon admin action must declare a dedicated safety mapping: $actionId")
+    }
+
+    private fun adminReversibleContract(actionId: String) = when (actionId) {
+        ACTION_BUILDING_ALLOWED -> ChanponReversibleContracts.adminWorldControls("building")
+        ACTION_WORLD_CREATION -> ChanponReversibleContracts.adminWorldControls("creation")
+        else -> null
     }
 
     private fun switchToMwmItem(player: Player): MenuElement =

@@ -15,6 +15,14 @@ import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
 import com.awabi2048.ccsystem.api.gui.MenuActionSafety
+import com.awabi2048.ccsystem.api.gui.MenuReversibleProviderCaptureResult
+import com.awabi2048.ccsystem.api.gui.MenuReversibleProviderRestoreResult
+import com.awabi2048.ccsystem.api.gui.MenuReversibleProviderState
+import com.awabi2048.ccsystem.api.gui.MenuReversibleStateCaptureContext
+import com.awabi2048.ccsystem.api.gui.MenuReversibleStateProvider
+import com.awabi2048.ccsystem.api.gui.MenuReversibleStateProviderDefinition
+import com.awabi2048.ccsystem.api.gui.MenuReversibleStateProviderRegistry
+import com.awabi2048.ccsystem.api.gui.MenuReversibleStateRestoreContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
@@ -41,6 +49,7 @@ import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.mwmchanpon.ui.ChanponGuiElements
 import me.awabi2048.mwmchanpon.ui.chanponCapabilityAction
 import me.awabi2048.mwmchanpon.ui.chanponGestureAction
+import me.awabi2048.mwmchanpon.service.ChanponReversibleContracts
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.event.MwmWorldCreatedEvent
 import me.awabi2048.myworldmanager.api.extension.CreationConfirmationCapabilityContract
@@ -65,6 +74,10 @@ class ProductionToggleExtension(
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
     init {
+        CreationProductionSelectionProvider.register(
+            CCSystem.getAPI().getMenuReversibleStateProviderRegistry(),
+            this,
+        )
         runtime.register(
             InventoryMenuDefinition(
                 owner = RUNTIME_OWNER,
@@ -123,6 +136,7 @@ class ProductionToggleExtension(
                             MenuActionResult.Success(MenuUpdate.Refresh)
                         },
                         safety = MenuActionSafety.REVERSIBLE,
+                        reversibleContract = ChanponReversibleContracts.creationProductionSelection(),
                     ),
                 ),
             ),
@@ -161,6 +175,48 @@ class ProductionToggleExtension(
         }
         draft.setBoolean(EXTRA_KEY, next)
         draft.worldName?.let { pendingProduction[player.uniqueId to it] = next }
+    }
+
+    internal data class CreationProductionSelectionSnapshot(
+        val playerUuid: UUID,
+        val draft: WorldCreationDraft,
+        val beforeSelected: Boolean,
+        val expectedSelected: Boolean,
+        val worldName: String?,
+        val beforePending: Boolean?,
+        val expectedPending: Boolean?,
+    )
+
+    internal fun captureCreationProductionSelection(
+        playerUuid: UUID,
+        draft: WorldCreationDraft,
+    ): CreationProductionSelectionSnapshot {
+        val beforeSelected = draft.getBoolean(EXTRA_KEY) ?: false
+        val expectedSelected = !beforeSelected
+        val worldName = draft.worldName
+        val beforePending = worldName?.let { pendingProduction[playerUuid to it] }
+        return CreationProductionSelectionSnapshot(
+            playerUuid,
+            draft,
+            beforeSelected,
+            expectedSelected,
+            worldName,
+            beforePending,
+            worldName?.let { expectedSelected },
+        )
+    }
+
+    internal fun restoreCreationProductionSelection(snapshot: CreationProductionSelectionSnapshot): Boolean {
+        val currentSelected = snapshot.draft.getBoolean(EXTRA_KEY) ?: false
+        val currentPending = snapshot.worldName?.let { pendingProduction[snapshot.playerUuid to it] }
+        if (currentSelected != snapshot.expectedSelected || currentPending != snapshot.expectedPending) return false
+        snapshot.draft.setBoolean(EXTRA_KEY, snapshot.beforeSelected)
+        snapshot.worldName?.let { worldName ->
+            val key = snapshot.playerUuid to worldName
+            if (snapshot.beforePending == null) pendingProduction.remove(key)
+            else pendingProduction[key] = snapshot.beforePending
+        }
+        return true
     }
 
     private fun isCapabilityAvailable(context: com.awabi2048.ccsystem.api.gui.MenuCapabilityContext): Boolean {
@@ -603,4 +659,45 @@ class ProductionToggleExtension(
         SUBMIT("submit")
     }
 
+}
+
+private data class CreationProductionSelectionProviderState(
+    val snapshot: ProductionToggleExtension.CreationProductionSelectionSnapshot,
+) : MenuReversibleProviderState
+
+private class CreationProductionSelectionProvider(
+    private val extension: ProductionToggleExtension,
+) : MenuReversibleStateProvider {
+    override fun capture(context: MenuReversibleStateCaptureContext): MenuReversibleProviderCaptureResult {
+        val draft = context.interaction.attributes[CreationConfirmationCapabilityContract.DRAFT_ATTRIBUTE]
+            as? WorldCreationDraft
+            ?: return MenuReversibleProviderCaptureResult.Rejected("creation draft is missing")
+        return MenuReversibleProviderCaptureResult.Captured(
+            CreationProductionSelectionProviderState(
+                extension.captureCreationProductionSelection(context.player.uniqueId, draft),
+            ),
+        )
+    }
+
+    override fun restore(context: MenuReversibleStateRestoreContext): MenuReversibleProviderRestoreResult {
+        val state = context.state as? CreationProductionSelectionProviderState
+            ?: return MenuReversibleProviderRestoreResult.Rejected("invalid creation production selection state type")
+        return if (extension.restoreCreationProductionSelection(state.snapshot)) {
+            MenuReversibleProviderRestoreResult.Restored
+        } else {
+            MenuReversibleProviderRestoreResult.Rejected("creation production selection changed concurrently")
+        }
+    }
+
+    companion object {
+        fun register(registry: MenuReversibleStateProviderRegistry, extension: ProductionToggleExtension) {
+            registry.register(
+                MenuReversibleStateProviderDefinition(
+                    "mwm-chanpon",
+                    "creation-production-selection",
+                    CreationProductionSelectionProvider(extension),
+                ),
+            )
+        }
+    }
 }

@@ -35,6 +35,7 @@ import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.service.EasyVoidWorldCreationService
+import me.awabi2048.mwmchanpon.service.EasyCreationReversibleProvider
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
@@ -46,6 +47,7 @@ import me.awabi2048.myworldmanager.api.extension.WorldCreationOperation
 import me.awabi2048.myworldmanager.api.extension.WorldCreationRequest
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsNavigationRequest
 import me.awabi2048.myworldmanager.api.service.WorldPointBillingMode
+import me.awabi2048.myworldmanager.service.MwmReversibleContracts
 import me.awabi2048.myworldmanager.model.WorldData
 import net.kyori.adventure.text.format.TextDecoration
 import org.bukkit.Bukkit
@@ -120,6 +122,7 @@ class ChanponPlayerWorldCapability(
                         },
                         handler = MenuCapabilityActionHandler(::handleWorld),
                         safety = MenuActionSafety.REVERSIBLE,
+                        reversibleContract = MwmReversibleContracts.displayOrder(),
                     ),
                 ),
             ),
@@ -169,6 +172,7 @@ class ChanponPlayerWorldCapability(
                         },
                         handler = MenuCapabilityActionHandler(::handleWorld),
                         safety = MenuActionSafety.REVERSIBLE,
+                        reversibleContract = MwmReversibleContracts.displayOrder(),
                     ),
                 ),
             ),
@@ -213,6 +217,7 @@ class ChanponPlayerWorldCapability(
                         },
                         handler = MenuCapabilityActionHandler(::handleCreate),
                         safety = MenuActionSafety.REVERSIBLE,
+                        reversibleContract = MwmReversibleContracts.creationSession(),
                     ),
                     chanponCapabilityAction(
                         id = "easy-create",
@@ -228,6 +233,7 @@ class ChanponPlayerWorldCapability(
                         },
                         handler = MenuCapabilityActionHandler(::handleCreate),
                         safety = MenuActionSafety.REVERSIBLE,
+                        reversibleContract = EasyCreationReversibleProvider.contract(),
                     ),
                 ),
             ),
