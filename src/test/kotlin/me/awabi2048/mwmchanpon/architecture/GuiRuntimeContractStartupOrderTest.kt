@@ -24,6 +24,11 @@ class GuiRuntimeContractStartupOrderTest {
         val prefix = onEnable.substring(0, checkIndex).trim()
         assertTrue(prefix.isEmpty(), "the contract check must be the first onEnable statement")
         assertTrue(source.contains("actualVersion != CCSystemAPI.GUI_RUNTIME_CONTRACT_VERSION"))
+        assertTrue(
+            source.contains("runCatching { CCSystem.getAPI().guiRuntimeContractVersion }"),
+            "NoSuchMethodError等のLinkageErrorも初期化前に捕捉する必要があります",
+        )
+        assertTrue(source.contains("getOrElse { exception ->"))
         assertTrue(source.contains("logger.severe("))
         assertTrue(source.contains("server.pluginManager.disablePlugin(this)"))
     }
