@@ -1,6 +1,7 @@
 package me.awabi2048.mwmchanpon
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.CCSystemAPI
 import com.awabi2048.ccsystem.api.gui.MenuTargetPolicy
 import com.awabi2048.ccsystem.api.gui.PublicMenuDefinition
 import me.awabi2048.mwmchanpon.backup.BackupService
@@ -433,7 +434,7 @@ class MWMChanponPlugin : JavaPlugin() {
 
     private companion object {
         private const val MENU_OWNER = "mwm-chanpon"
-        private const val REQUIRED_GUI_RUNTIME_CONTRACT_VERSION = 6
+        private const val REQUIRED_GUI_RUNTIME_CONTRACT_VERSION = CCSystemAPI.GUI_RUNTIME_CONTRACT_VERSION
     }
 
 }

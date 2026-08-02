@@ -1,7 +1,11 @@
 package me.awabi2048.mwmchanpon.architecture
 
+import com.awabi2048.ccsystem.api.CCSystemAPI
 import java.nio.file.Path
 import kotlin.io.path.readText
+import me.awabi2048.mwmchanpon.MWMChanponPlugin
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -24,7 +28,17 @@ class GuiRuntimeContractStartupOrderTest {
         val prefix = onEnable.substring(0, checkIndex).trim()
         assertTrue(prefix.isEmpty(), "the contract check must be the first onEnable statement")
         assertTrue(source.contains("actualVersion != REQUIRED_GUI_RUNTIME_CONTRACT_VERSION"))
-        assertTrue(source.contains("REQUIRED_GUI_RUNTIME_CONTRACT_VERSION = 6"))
+        assertTrue(
+            source.contains(
+                "REQUIRED_GUI_RUNTIME_CONTRACT_VERSION = CCSystemAPI.GUI_RUNTIME_CONTRACT_VERSION",
+            ),
+        )
+        assertFalse(Regex("REQUIRED_GUI_RUNTIME_CONTRACT_VERSION\\s*=\\s*\\d").containsMatchIn(source))
+        val compiledContract = MWMChanponPlugin::class.java
+            .getDeclaredField("REQUIRED_GUI_RUNTIME_CONTRACT_VERSION")
+            .also { it.isAccessible = true }
+            .getInt(null)
+        assertEquals(CCSystemAPI.GUI_RUNTIME_CONTRACT_VERSION, compiledContract)
         assertTrue(
             source.contains("runCatching { CCSystem.getAPI().guiRuntimeContractVersion }"),
             "NoSuchMethodError等のLinkageErrorも初期化前に捕捉する必要があります",
