@@ -250,6 +250,7 @@ class MWMChanponPlugin : JavaPlugin() {
         chanponAdminWorldListMenu = ChanponAdminWorldListMenu(this, chanponStorage)
         environmentGui = ChanponEnvironmentGui(this, chanponStorage, submittedProtectionService, buildPermissionService)
         chanponWorldSettingsMenu = ChanponWorldSettingsMenu(this, chanponStorage, submittedProtectionService, environmentGui)
+        MyWorldManagerApi.registerWorldSettingsRouteCapability(chanponWorldSettingsMenu)
         worldSettingsCapabilities = ChanponWorldSettingsCapabilities(
             chanponWorldSettingsMenu,
             chanponStorage,
@@ -362,6 +363,9 @@ class MWMChanponPlugin : JavaPlugin() {
     }
 
     override fun onDisable() {
+        if (::chanponWorldSettingsMenu.isInitialized) {
+            MyWorldManagerApi.unregisterWorldSettingsRouteCapability(chanponWorldSettingsMenu)
+        }
         if (::playerWorldCapability.isInitialized) {
             MyWorldManagerApi.unregisterPlayerWorldRouteCapability(playerWorldCapability)
         }
