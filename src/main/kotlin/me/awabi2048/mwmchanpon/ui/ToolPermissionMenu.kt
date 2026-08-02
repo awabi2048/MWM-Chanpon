@@ -5,18 +5,19 @@ import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
-import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import com.awabi2048.ccsystem.api.gui.GuiValueTone
-import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
+import com.awabi2048.ccsystem.api.gui.MenuGesture
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
@@ -24,6 +25,10 @@ import java.util.UUID
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.mwmchanpon.tool.ToolPermissionDefinition
+import me.awabi2048.mwmchanpon.service.ChanponReversibleContracts
+import me.awabi2048.mwmchanpon.service.ChanponReversibleActionClassification
+import me.awabi2048.mwmchanpon.service.ChanponReversibleStateProviders
+import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.model.WorldData
 import org.bukkit.Bukkit
@@ -34,10 +39,16 @@ class ToolPermissionMenu(
     private val plugin: MWMChanponPlugin,
     private val controller: ToolPermissionController,
     private val definitions: List<ToolPermissionDefinition>,
+    private val storage: ChanponWorldStorage,
 ) {
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
     init {
+        ChanponReversibleStateProviders.registerToolPermission(
+            CCSystem.getAPI().getMenuReversibleStateProviderRegistry(),
+            storage,
+            controller,
+        )
         runtime.register(
             InventoryMenuDefinition(
                 owner = OWNER,
@@ -75,7 +86,7 @@ class ToolPermissionMenu(
             elements += displayEntry(
                 4,
                 Material.PLAYER_HEAD,
-                GuiNameSpec.Text("§e${targetPlayer.name ?: "Unknown"}", GuiNameStyle.DEFAULT),
+                targetIdentityName("§e${targetPlayer.name ?: "Unknown"}", GuiNameStyle.DEFAULT),
                 GuiElementRole.CONTENT,
                 targetUuid,
             )
@@ -92,22 +103,7 @@ class ToolPermissionMenu(
         }
         elements += decorationEntry(24)
         elements += decorationEntry(25)
-        elements += CCSystem.getAPI().getGuiElementService().menuEntry(
-            player,
-            GuiMenuEntrySpec(
-                slot = 40,
-                material = Material.REDSTONE,
-                name = GuiNameSpec.Text("§7戻る", GuiNameStyle.DEFAULT),
-                role = GuiElementRole.BACK,
-                actions = listOf(
-                    GuiMenuEntryAction(
-                        ACTION_BACK,
-                        MenuAcceptedClicks.LEFT_RIGHT,
-                        "§7戻る",
-                    ),
-                ),
-            ),
-        )
+        elements += CCSystem.getAPI().getGuiElementService().backEntry(player, 40)
         return InventoryMenuView(
             45,
             CCSystem.getAPI().getGuiElementService().name(i18n("title")),
@@ -165,17 +161,24 @@ class ToolPermissionMenu(
             GuiMenuEntrySpec(
                 slot = slot,
                 material = Material.PLAYER_HEAD,
-                name = GuiNameSpec.Text(i18n("role.display"), GuiNameStyle.DEFAULT),
+                name = fixedName(i18n("role.display"), GuiNameStyle.DEFAULT),
                 role = GuiElementRole.ACTION,
                 data = listOf(GuiMenuEntryData(
                     i18n("role.state_label"),
                     i18n(if (moderator) "role.moderator" else "role.member"),
                     if (moderator) GuiValueTone.PRIMARY else GuiValueTone.DEFAULT,
                 )),
-                actions = listOf(GuiMenuEntryAction(
+                actions = listOf(chanponGestureAction(
                     ACTION_ROLE,
-                    MenuAcceptedClicks.LEFT_RIGHT,
+                    MenuGesture.ANY,
                     i18n("role.action"),
+                    safety = MenuActionSafety.REVERSIBLE,
+                    reversibleContract = ChanponReversibleContracts.toolPermission(
+                        worldData.uuid,
+                        targetUuid,
+                        "role",
+                    ),
+                    classification = ChanponReversibleActionClassification.Operation.MEMBER_ROLE_TOGGLE,
                 )),
             ),
         )
@@ -226,18 +229,25 @@ class ToolPermissionMenu(
             GuiMenuEntrySpec(
                 slot = slot,
                 material = definition.material,
-                name = GuiNameSpec.Text(definition.displayName, GuiNameStyle.DEFAULT),
+                name = fixedName(definition.displayName, GuiNameStyle.DEFAULT),
                 role = GuiElementRole.ACTION,
                 data = listOf(GuiMenuEntryData(
                     i18n("state_label"),
                     i18n(if (enabled) "enabled" else "disabled"),
                     if (enabled) GuiValueTone.SUCCESS else GuiValueTone.DANGER,
                 )),
-                actions = listOf(GuiMenuEntryAction(
+                actions = listOf(chanponGestureAction(
                     ACTION_TOGGLE,
-                    MenuAcceptedClicks.LEFT_RIGHT,
+                    MenuGesture.ANY,
                     i18n("toggle_action"),
                     mapOf(TOOL_ID to definition.id),
+                    safety = MenuActionSafety.REVERSIBLE,
+                    reversibleContract = ChanponReversibleContracts.toolPermission(
+                        worldData.uuid,
+                        targetPlayerUuid,
+                        "toggle",
+                    ),
+                    classification = ChanponReversibleActionClassification.Operation.TOOL_ENABLE_TOGGLE,
                 )),
                 glint = enabled,
             ),

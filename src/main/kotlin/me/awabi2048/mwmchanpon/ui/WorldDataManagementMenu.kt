@@ -6,17 +6,18 @@ import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
-import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
 import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
-import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
+import com.awabi2048.ccsystem.api.gui.MenuGesture
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
@@ -97,19 +98,19 @@ class WorldDataManagementMenu(
             elements += simpleActionEntry(
                 player, layout.previousPageSlot, Material.ARROW,
                 i18n(player, "common.prev"), GuiElementRole.NAVIGATION,
-                ACTION_PAGE, mapOf(PAGE to (safePage - 1).toString()),
+                ACTION_PAGE, i18n(player, "common.prev_action"), mapOf(PAGE to (safePage - 1).toString()),
             )
         }
         if (safePage < pages - 1) {
             elements += simpleActionEntry(
                 player, layout.nextPageSlot, Material.ARROW,
                 i18n(player, "common.next"), GuiElementRole.NAVIGATION,
-                ACTION_PAGE, mapOf(PAGE to (safePage + 1).toString()),
+                ACTION_PAGE, i18n(player, "common.next_action"), mapOf(PAGE to (safePage + 1).toString()),
             )
         }
         elements += simpleActionEntry(
             player, layout.backSlot, Material.REDSTONE,
-            i18n(player, "common.back"), GuiElementRole.BACK, ACTION_BACK,
+            i18n(player, "common.back"), GuiElementRole.BACK, ACTION_BACK, i18n(player, "common.back_action"),
         )
         elements += infoEntry(player, layout.infoSlot, worlds.size, safePage + 1, pages)
         worlds.drop(safePage * ITEMS_PER_PAGE).take(ITEMS_PER_PAGE).forEachIndexed { index, world ->
@@ -180,8 +181,8 @@ class WorldDataManagementMenu(
                 displayEntry(
                     layout.previewSlot,
                     previewMaterial,
-                    GuiNameSpec.Component(i18nComponent(player, "$previewKey.display")),
-                    GuiLoreSpec.Rich(
+                    GuiNameSpec.FixedLabel(i18nComponent(player, "$previewKey.display")),
+                    me.awabi2048.mwmchanpon.ui.framedLore(
                         i18nList(player, "$previewKey.lore").map(GuiLoreLine::Text),
                         GuiLoreFrame.BOTH,
                     ),
@@ -189,12 +190,12 @@ class WorldDataManagementMenu(
                 simpleActionEntry(
                     player, layout.confirmSlot, Material.LIME_CONCRETE,
                     i18n(player, "confirm.button.confirm"), GuiElementRole.CONFIRM,
-                    confirmAction,
+                    confirmAction, i18n(player, "confirm.button.confirm_action"),
                 ),
                 simpleActionEntry(
                     player, layout.cancelSlot, Material.RED_CONCRETE,
                     i18n(player, "confirm.button.cancel"), GuiElementRole.CANCEL,
-                    ACTION_CANCEL,
+                    ACTION_CANCEL, i18n(player, "confirm.button.cancel_action"),
                 ),
             ),
         )
@@ -329,12 +330,13 @@ class WorldDataManagementMenu(
         slot: Int,
         world: WorldData,
         payload: Map<String, String>,
-    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+    ): MenuElement {
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
         player,
         GuiMenuEntrySpec(
             slot = slot,
             material = world.icon,
-            name = GuiNameSpec.Component(
+            name = GuiNameSpec.TargetIdentity(
                 i18nComponent(player, "world_data.world.display", mapOf("world" to world.name)),
             ),
             role = GuiElementRole.ACTION,
@@ -353,11 +355,12 @@ class WorldDataManagementMenu(
                 ),
             ),
             actions = listOf(
-                GuiMenuEntryAction(ACTION_WORLD, MenuAcceptedClicks.LEFT, i18n(player, "world_data.world.backup_action"), payload),
-                GuiMenuEntryAction(ACTION_WORLD, MenuAcceptedClicks.RIGHT, i18n(player, "world_data.world.list_action"), payload),
+                chanponGestureAction(ACTION_WORLD, MenuGesture.LEFT, i18n(player, "world_data.world.backup_action"), payload, safety = MenuActionSafety.CONFIRM_ENTRY),
+                chanponGestureAction(ACTION_WORLD, MenuGesture.RIGHT, i18n(player, "world_data.world.list_action"), payload, safety = MenuActionSafety.NAVIGATION_ONLY),
             ),
         ),
     )
+    }
 
     private fun controlEntry(
         player: Player,
@@ -372,15 +375,16 @@ class WorldDataManagementMenu(
         GuiMenuEntrySpec(
             slot = slot,
             material = material,
-            name = GuiNameSpec.Component(i18nComponent(player, "$key.display")),
+            name = GuiNameSpec.FixedLabel(i18nComponent(player, "$key.display")),
             role = GuiElementRole.ACTION,
             description = listOf(i18n(player, "$key.description")),
             warnings = if (warning) listOf(i18n(player, "$key.warning")) else emptyList(),
-            actions = listOf(GuiMenuEntryAction(
+            actions = listOf(chanponGestureAction(
                 actionId,
-                MenuAcceptedClicks.LEFT_RIGHT,
+                MenuGesture.ANY,
                 i18n(player, "$key.action"),
                 payload,
+                safety = worldDataActionSafety(actionId),
             )),
         ),
     )
@@ -392,19 +396,23 @@ class WorldDataManagementMenu(
         text: String,
         role: GuiElementRole,
         actionId: String,
+        actionText: String,
         payload: Map<String, String> = emptyMap(),
-    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+    ): MenuElement {
+        if (role == GuiElementRole.BACK) return CCSystem.getAPI().getGuiElementService().backEntry(player, slot)
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
         player,
         GuiMenuEntrySpec(
             slot = slot,
             material = material,
-            name = GuiNameSpec.Text(text, GuiNameStyle.DEFAULT),
+            name = opaqueName(text, GuiNameStyle.DEFAULT),
             role = role,
             actions = listOf(
-                GuiMenuEntryAction(actionId, MenuAcceptedClicks.LEFT_RIGHT, text, payload),
+                chanponGestureAction(actionId, MenuGesture.ANY, actionText, payload, safety = worldDataActionSafety(actionId)),
             ),
         ),
     )
+    }
 
     private fun displayEntry(
         slot: Int,
@@ -427,8 +435,8 @@ class WorldDataManagementMenu(
     ): MenuElement = displayEntry(
         slot,
         Material.BOOK,
-        GuiNameSpec.Component(i18nComponent(player, "world_data.info.display")),
-        GuiLoreSpec.Rich(
+        GuiNameSpec.FixedLabel(i18nComponent(player, "world_data.info.display")),
+        me.awabi2048.mwmchanpon.ui.framedLore(
             i18nList(
                 player,
                 "world_data.info.lore",
@@ -455,6 +463,14 @@ class WorldDataManagementMenu(
         key: String,
         placeholders: Map<String, Any> = emptyMap(),
     ) = CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
+
+    private fun worldDataActionSafety(actionId: String): MenuActionSafety = when (actionId) {
+        ACTION_BACK, ACTION_PAGE, ACTION_CANCEL -> MenuActionSafety.NAVIGATION_ONLY
+        ACTION_BULK_BACKUP, ACTION_BULK_ROLLBACK, ACTION_CONFIRM_ROLLBACK -> MenuActionSafety.CONFIRM_ENTRY
+        ACTION_ANNUAL_ARCHIVE -> MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE
+        ACTION_CONFIRM_BACKUP -> MenuActionSafety.IRREVERSIBLE
+        else -> error("World-data action must declare a dedicated safety mapping: $actionId")
+    }
 
     companion object {
         private const val OWNER = "mwm-chanpon"

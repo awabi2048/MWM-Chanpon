@@ -1,6 +1,7 @@
 package me.awabi2048.mwmchanpon
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.CCSystemAPI
 import com.awabi2048.ccsystem.api.gui.MenuTargetPolicy
 import com.awabi2048.ccsystem.api.gui.PublicMenuDefinition
 import me.awabi2048.mwmchanpon.backup.BackupService
@@ -108,6 +109,7 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var publishLevelSynchronizer: PublishLevelSynchronizer
 
     override fun onEnable() {
+        if (!verifyGuiRuntimeContract()) return
         CCSystem.getAPI().getConfigSchemaService().register(
             "mwm-chanpon",
             listOf(
@@ -248,9 +250,9 @@ class MWMChanponPlugin : JavaPlugin() {
         chanponAdminWorldListMenu = ChanponAdminWorldListMenu(this, chanponStorage)
         environmentGui = ChanponEnvironmentGui(this, chanponStorage, submittedProtectionService, buildPermissionService)
         chanponWorldSettingsMenu = ChanponWorldSettingsMenu(this, chanponStorage, submittedProtectionService, environmentGui)
-        MyWorldManagerApi.registerWorldSettingsRouteCapability(chanponWorldSettingsMenu)
         worldSettingsCapabilities = ChanponWorldSettingsCapabilities(
             chanponWorldSettingsMenu,
+            chanponStorage,
         )
         easyVoidWorldCreationService = EasyVoidWorldCreationService(this)
         val archiveOperationGuard = ArchiveOperationGuard(globalStorage)
@@ -296,7 +298,7 @@ class MWMChanponPlugin : JavaPlugin() {
         server.pluginManager.registerEvents(SubmittedWorldProtectionListener(submittedProtectionService), this)
         server.pluginManager.registerEvents(SpawnWorldProtectionListener(globalStorage, spawnProtectionService), this)
 
-        val toolMenu = ToolPermissionMenu(this, toolController, toolDefinitions)
+        val toolMenu = ToolPermissionMenu(this, toolController, toolDefinitions, chanponStorage)
         toolPermissionCapability =
             ToolPermissionCapability(toolMenu, toolController, toolDefinitions)
         worldBackupCapability = WorldBackupCapability(
@@ -335,13 +337,35 @@ class MWMChanponPlugin : JavaPlugin() {
         logger.info("MWM-Chanpon addon has been enabled.")
     }
 
-    override fun onDisable() {
-        if (::chanponWorldSettingsMenu.isInitialized) {
-            MyWorldManagerApi.unregisterWorldSettingsRouteCapability(chanponWorldSettingsMenu)
+    private fun verifyGuiRuntimeContract(): Boolean {
+        val ccSystemPlugin = server.pluginManager.getPlugin("CC-System")
+        if (ccSystemPlugin == null || !ccSystemPlugin.isEnabled) {
+            logger.severe("CC-System is missing or disabled; MWM-Chanpon cannot safely register GUI runtime integrations.")
+            server.pluginManager.disablePlugin(this)
+            return false
         }
+        val actualVersion = runCatching { CCSystem.getAPI().guiRuntimeContractVersion }
+            .getOrElse { exception ->
+                logger.severe("Failed to read CC-System GUI runtime contract version: ${exception.message ?: exception.javaClass.simpleName}")
+                server.pluginManager.disablePlugin(this)
+                return false
+            }
+        if (actualVersion != REQUIRED_GUI_RUNTIME_CONTRACT_VERSION) {
+            logger.severe(
+                "CC-System GUI runtime contract version mismatch: " +
+                    "expected=$REQUIRED_GUI_RUNTIME_CONTRACT_VERSION, actual=$actualVersion",
+            )
+            server.pluginManager.disablePlugin(this)
+            return false
+        }
+        return true
+    }
+
+    override fun onDisable() {
         if (::playerWorldCapability.isInitialized) {
             MyWorldManagerApi.unregisterPlayerWorldRouteCapability(playerWorldCapability)
         }
+        runCatching { CCSystem.getAPI().getMenuReversibleStateProviderRegistry().unregisterOwner("mwm-chanpon") }
         runCatching { CCSystem.getAPI().getConfigSchemaService().unregister("mwm-chanpon") }
         runCatching { CCSystem.getAPI().getMenuCommandService().unregisterOwner("mwm-chanpon") }
         runCatching { CCSystem.getAPI().getMenuCapabilityService().unregisterOwner("mwm-chanpon") }
@@ -410,6 +434,7 @@ class MWMChanponPlugin : JavaPlugin() {
 
     private companion object {
         private const val MENU_OWNER = "mwm-chanpon"
+        private const val REQUIRED_GUI_RUNTIME_CONTRACT_VERSION = CCSystemAPI.GUI_RUNTIME_CONTRACT_VERSION
     }
 
 }

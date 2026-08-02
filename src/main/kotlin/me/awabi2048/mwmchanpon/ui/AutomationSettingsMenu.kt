@@ -7,16 +7,17 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
-import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiStructuredMenuEntrySpec
-import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
+import com.awabi2048.ccsystem.api.gui.MenuGesture
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
@@ -25,6 +26,9 @@ import me.awabi2048.mwmchanpon.backup.BackupKind
 import me.awabi2048.mwmchanpon.backup.BackupOperationStatus
 import me.awabi2048.mwmchanpon.backup.BackupService
 import me.awabi2048.mwmchanpon.service.BackupAutomationService
+import me.awabi2048.mwmchanpon.service.ChanponReversibleContracts
+import me.awabi2048.mwmchanpon.service.ChanponReversibleActionClassification
+import me.awabi2048.mwmchanpon.service.ChanponReversibleStateProviders
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
@@ -38,6 +42,13 @@ class AutomationSettingsMenu(
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
     init {
+        ChanponReversibleStateProviders.registerAutomation(
+            CCSystem.getAPI().getMenuReversibleStateProviderRegistry(),
+            plugin,
+        ) {
+            automationService.start()
+            onSettingsChanged()
+        }
         runtime.register(
             InventoryMenuDefinition(
                 owner = OWNER,
@@ -117,6 +128,7 @@ class AutomationSettingsMenu(
                 i18n(player, "common.back"),
                 GuiElementRole.BACK,
                 ACTION_BACK,
+                i18n(player, "common.back_action"),
             ),
         )
         if (plugin.config.getBoolean("backup.auto_rollback.enabled", false)) {
@@ -125,13 +137,14 @@ class AutomationSettingsMenu(
                 GuiMenuEntrySpec(
                     slot = 36,
                     material = Material.END_CRYSTAL,
-                    name = GuiNameSpec.Component(i18nComponent(player, "automation.restore_point.display")),
+                    name = GuiNameSpec.FixedLabel(i18nComponent(player, "automation.restore_point.display")),
                     role = GuiElementRole.ACTION,
                     description = i18nList(player, "automation.restore_point.lore"),
-                    actions = listOf(GuiMenuEntryAction(
+                    actions = listOf(chanponGestureAction(
                         ACTION_RESTORE_POINT,
-                        MenuAcceptedClicks.LEFT_RIGHT,
+                        MenuGesture.ANY,
                         i18n(player, "automation.restore_point.action"),
+                        safety = MenuActionSafety.CONFIRM_ENTRY,
                     )),
                 ),
             )
@@ -165,6 +178,9 @@ class AutomationSettingsMenu(
                     i18n(player, "confirm.button.confirm"),
                     GuiElementRole.CONFIRM,
                     ACTION_CONFIRM_TOGGLE,
+                    i18n(player, "confirm.button.confirm_action"),
+                    reversibleContract = ChanponReversibleContracts.automation(configPath),
+                    classification = ChanponReversibleActionClassification.Operation.AUTOMATION_TOGGLE,
                 ),
                 simpleActionEntry(
                     player,
@@ -173,6 +189,7 @@ class AutomationSettingsMenu(
                     i18n(player, "confirm.button.cancel"),
                     GuiElementRole.CANCEL,
                     ACTION_CANCEL,
+                    i18n(player, "confirm.button.cancel_action"),
                 ),
             ),
         )
@@ -192,6 +209,7 @@ class AutomationSettingsMenu(
                     i18n(player, "confirm.button.confirm"),
                     GuiElementRole.CONFIRM,
                     ACTION_CONFIRM_RESTORE_POINT,
+                    i18n(player, "confirm.button.confirm_action"),
                 ),
                 simpleActionEntry(
                     player,
@@ -200,6 +218,7 @@ class AutomationSettingsMenu(
                     i18n(player, "confirm.button.cancel"),
                     GuiElementRole.CANCEL,
                     ACTION_CANCEL,
+                    i18n(player, "confirm.button.cancel_action"),
                 ),
             ),
         )
@@ -275,17 +294,18 @@ class AutomationSettingsMenu(
         GuiMenuEntrySpec(
             slot = slot,
             material = material,
-            name = GuiNameSpec.Component(i18nComponent(player, "$key.display")),
+            name = GuiNameSpec.FixedLabel(i18nComponent(player, "$key.display")),
             role = GuiElementRole.ACTION,
             description = i18nList(
                 player,
                 "$key.lore",
                 mapOf("state" to i18n(player, if (enabled) "common.on" else "common.off")),
             ),
-            actions = listOf(GuiMenuEntryAction(
+            actions = listOf(chanponGestureAction(
                 actionId,
-                MenuAcceptedClicks.LEFT_RIGHT,
+                MenuGesture.ANY,
                 i18n(player, "$key.action"),
+                safety = automationActionSafety(actionId),
             )),
             glint = enabled,
         ),
@@ -304,8 +324,8 @@ class AutomationSettingsMenu(
                 slot,
                 GuiItemSpec(
                     material,
-                    GuiNameSpec.Component(i18nComponent(player, "$key.display", placeholders)),
-                    GuiLoreSpec.Rich(
+                    GuiNameSpec.FixedLabel(i18nComponent(player, "$key.display", placeholders)),
+                    me.awabi2048.mwmchanpon.ui.framedLore(
                         i18nList(player, "$key.lore", placeholders).map(GuiLoreLine::Text),
                         GuiLoreFrame.BOTH,
                     ),
@@ -322,21 +342,33 @@ class AutomationSettingsMenu(
         text: String,
         role: GuiElementRole,
         actionId: String,
-    ): MenuElement =
-        CCSystem.getAPI().getGuiElementService().menuStructuredEntry(
+        actionText: String,
+        reversibleContract: com.awabi2048.ccsystem.api.gui.MenuReversibleContract? = null,
+        classification: ChanponReversibleActionClassification.Operation? = null,
+    ): MenuElement {
+        if (role == GuiElementRole.BACK) return CCSystem.getAPI().getGuiElementService().backEntry(player, slot)
+        return CCSystem.getAPI().getGuiElementService().menuStructuredEntry(
             player,
             GuiStructuredMenuEntrySpec(
                 slot,
                 GuiItemSpec(
                     material,
-                    GuiNameSpec.Text(text, com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT),
+                    me.awabi2048.mwmchanpon.ui.fixedName(text, com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT),
                     GuiLoreSpec.None,
                     role,
                     1,
                 ),
-                listOf(GuiMenuEntryAction(actionId, MenuAcceptedClicks.LEFT_RIGHT, text)),
+                listOf(chanponGestureAction(
+                    actionId,
+                    MenuGesture.ANY,
+                    actionText,
+                    safety = automationActionSafety(actionId),
+                    reversibleContract = reversibleContract,
+                    classification = classification,
+                )),
             ),
         )
+    }
 
     private fun i18n(player: Player?, key: String) =
         CCSystem.getAPI().getI18nString(player, "chanpon.backup.$key")
@@ -352,6 +384,14 @@ class AutomationSettingsMenu(
         key: String,
         placeholders: Map<String, Any> = emptyMap(),
     ) = CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
+
+    private fun automationActionSafety(actionId: String): MenuActionSafety = when (actionId) {
+        ACTION_BACK, ACTION_CANCEL -> MenuActionSafety.NAVIGATION_ONLY
+        ACTION_AUTO_BACKUP, ACTION_AUTO_ROLLBACK, ACTION_RESTORE_POINT -> MenuActionSafety.CONFIRM_ENTRY
+        ACTION_CONFIRM_TOGGLE -> MenuActionSafety.REVERSIBLE
+        ACTION_CONFIRM_RESTORE_POINT -> MenuActionSafety.IRREVERSIBLE
+        else -> error("Automation action must declare a dedicated safety mapping: $actionId")
+    }
 
     companion object {
         private const val OWNER = "mwm-chanpon"

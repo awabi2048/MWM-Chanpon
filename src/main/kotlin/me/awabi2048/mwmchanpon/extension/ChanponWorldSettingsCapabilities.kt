@@ -2,6 +2,7 @@ package me.awabi2048.mwmchanpon.extension
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
+import com.awabi2048.ccsystem.api.gui.MenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionTextProvider
@@ -13,32 +14,46 @@ import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentationProvider
 import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import me.awabi2048.mwmchanpon.ui.ChanponWorldSettingsMenu
 import me.awabi2048.mwmchanpon.ui.WorldSettingsFeature
+import me.awabi2048.mwmchanpon.ui.chanponCapabilityAction
+import me.awabi2048.mwmchanpon.service.ChanponReversibleContracts
+import me.awabi2048.mwmchanpon.service.ChanponReversibleActionClassification
+import me.awabi2048.mwmchanpon.service.ChanponReversibleStateProviders
+import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
+import me.awabi2048.myworldmanager.api.extension.WorldSettingsCapabilityPlacements
 import me.awabi2048.myworldmanager.model.WorldData
 
 internal class ChanponWorldSettingsCapabilities(
     private val menu: ChanponWorldSettingsMenu,
+    storage: ChanponWorldStorage,
 ) {
     init {
+        ChanponReversibleStateProviders.registerPublication(
+            CCSystem.getAPI().getMenuReversibleStateProviderRegistry(),
+            storage,
+        )
+        ChanponReversibleStateProviders.registerNotification(
+            CCSystem.getAPI().getMenuReversibleStateProviderRegistry(),
+        )
         register(
             WorldSettingsFeature.EXPANSION,
-            ChanponWorldSettingsPlacements.EXPANSION,
+            WorldSettingsCapabilityPlacements.EXPANSION_ACTION,
         )
         register(
             WorldSettingsFeature.PUBLISH,
-            ChanponWorldSettingsPlacements.PUBLISH,
+            WorldSettingsCapabilityPlacements.PUBLISH_ACTION,
         )
         register(
             WorldSettingsFeature.NOTIFICATION,
-            ChanponWorldSettingsPlacements.NOTIFICATION,
+            WorldSettingsCapabilityPlacements.NOTIFICATION_ACTION,
         )
         register(
             WorldSettingsFeature.ENVIRONMENT,
-            ChanponWorldSettingsPlacements.ENVIRONMENT,
+            WorldSettingsCapabilityPlacements.ENVIRONMENT_ACTION,
         )
         register(
             WorldSettingsFeature.CRITICAL,
-            ChanponWorldSettingsPlacements.CRITICAL,
+            WorldSettingsCapabilityPlacements.CRITICAL_ACTION,
         )
     }
 
@@ -48,7 +63,7 @@ internal class ChanponWorldSettingsCapabilities(
                 owner = OWNER,
                 id = "world-settings-${feature.name.lowercase()}",
                 placement = placement,
-                availability = MenuCapabilityAvailability { context ->
+                availability = me.awabi2048.mwmchanpon.ui.optionalAvailability { context ->
                     worldData(context)?.let {
                         menu.isFeatureVisible(context.player, it, feature)
                     } == true
@@ -61,13 +76,21 @@ internal class ChanponWorldSettingsCapabilities(
                     )
                 },
                 actions = listOf(
-                    MenuCapabilityAction(
+                    chanponCapabilityAction(
                         id = feature.name.lowercase(),
                         trigger = menu.actionTrigger(feature),
                         textProvider = MenuCapabilityActionTextProvider { context ->
                             menu.featureActionText(context.player, feature)
                         },
-                        availability = MenuCapabilityAvailability { context ->
+                        availability = me.awabi2048.mwmchanpon.ui.reasonedAvailability(
+                            reason = { context ->
+                                menu.featureUnavailableReason(
+                                    context.player,
+                                    requireNotNull(worldData(context)),
+                                    feature,
+                                )
+                            },
+                        ) { context ->
                             worldData(context)?.let {
                                 menu.isFeatureActionable(context.player, it, feature)
                             } == true
@@ -80,6 +103,9 @@ internal class ChanponWorldSettingsCapabilities(
                                 context.click,
                             )
                         },
+                        safety = featureActionSafety(feature),
+                        reversibleContract = featureReversibleContract(feature),
+                        classification = featureClassification(feature),
                     ),
                 ),
             ),
@@ -95,6 +121,24 @@ internal class ChanponWorldSettingsCapabilities(
         context.arguments[WORLD_UUID]
             ?.let { runCatching { java.util.UUID.fromString(it) }.getOrNull() }
             ?.let { MyWorldManagerApi.getWorldRepository()?.findByUuid(it) }
+
+    private fun featureActionSafety(feature: WorldSettingsFeature): MenuActionSafety = when (feature) {
+        WorldSettingsFeature.EXPANSION -> MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE
+        WorldSettingsFeature.PUBLISH, WorldSettingsFeature.NOTIFICATION -> MenuActionSafety.REVERSIBLE
+        WorldSettingsFeature.ENVIRONMENT, WorldSettingsFeature.CRITICAL -> MenuActionSafety.NAVIGATION_ONLY
+    }
+
+    private fun featureReversibleContract(feature: WorldSettingsFeature) = when (feature) {
+        WorldSettingsFeature.PUBLISH -> ChanponReversibleContracts.publication()
+        WorldSettingsFeature.NOTIFICATION -> ChanponReversibleContracts.notification()
+        else -> null
+    }
+
+    private fun featureClassification(feature: WorldSettingsFeature) = when (feature) {
+        WorldSettingsFeature.PUBLISH -> ChanponReversibleActionClassification.Operation.PUBLICATION_CYCLE
+        WorldSettingsFeature.NOTIFICATION -> ChanponReversibleActionClassification.Operation.WORLD_NOTIFICATION_TOGGLE
+        else -> null
+    }
 
     companion object {
         private const val OWNER = "mwm-chanpon"

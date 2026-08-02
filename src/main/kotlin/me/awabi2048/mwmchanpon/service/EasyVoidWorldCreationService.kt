@@ -9,12 +9,13 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
-import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
 import com.awabi2048.ccsystem.api.gui.GuiStructuredMenuEntrySpec
-import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
+import com.awabi2048.ccsystem.api.gui.MenuGesture
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuDialogButton
 import com.awabi2048.ccsystem.api.gui.MenuDialogHandler
@@ -24,7 +25,10 @@ import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.Collections
+import java.util.LinkedHashMap
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
+import me.awabi2048.mwmchanpon.ui.chanponGestureAction
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.WorldCreationOperation
 import me.awabi2048.myworldmanager.api.extension.WorldCreationRequest
@@ -54,14 +58,63 @@ object EasyPlatformMaterialPolicy {
 /**
  * Chanpon専用の入力とVoid仕様だけを所有し、作成確定はMWM共通パイプラインへ委譲する。
  */
+interface EasyCreationFlowStateStore {
+    fun captureFlowState(playerId: UUID): EasyVoidWorldCreationService.FlowState
+    fun expectedFlowStateAfterStart(returnRoute: MenuRoute): EasyVoidWorldCreationService.FlowState
+    fun restoreFlowState(playerId: UUID, state: EasyVoidWorldCreationService.FlowState)
+}
+
 class EasyVoidWorldCreationService(
     private val plugin: MWMChanponPlugin
-) {
+) : EasyCreationFlowStateStore {
     private data class PendingCreation(val worldName: String)
 
     private val pendingCreations = ConcurrentHashMap<UUID, PendingCreation>()
     private val returnRoutes = ConcurrentHashMap<UUID, MenuRoute>()
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
+
+    /**
+     * 可逆復元用の不変フローsnapshotです。
+     *
+     * MenuRouteはpayloadの防御コピーを保証しないため、Route実体を保存せず
+     * owner/id/payloadを個別に不変化して保持します。
+     */
+    @ConsistentCopyVisibility
+    data class FlowState private constructor(
+        val pendingWorldName: String?,
+        private val returnRouteOwner: String?,
+        private val returnRouteId: String?,
+        private val returnRoutePayload: Map<String, String>,
+    ) {
+        fun returnRoute(): MenuRoute? = returnRouteOwner?.let { owner ->
+            MenuRoute(owner, requireNotNull(returnRouteId), returnRoutePayload)
+        }
+
+        companion object {
+            fun of(pendingWorldName: String?, returnRoute: MenuRoute?): FlowState = FlowState(
+                pendingWorldName,
+                returnRoute?.owner,
+                returnRoute?.id,
+                immutablePayload(returnRoute?.payload.orEmpty()),
+            )
+
+            private fun immutablePayload(payload: Map<String, String>): Map<String, String> =
+                Collections.unmodifiableMap(LinkedHashMap(payload))
+        }
+    }
+
+    override fun captureFlowState(playerId: UUID): FlowState =
+        FlowState.of(pendingCreations[playerId]?.worldName, returnRoutes[playerId])
+
+    override fun expectedFlowStateAfterStart(returnRoute: MenuRoute): FlowState = FlowState.of(null, returnRoute)
+
+    override fun restoreFlowState(playerId: UUID, state: FlowState) {
+        if (state.pendingWorldName == null) pendingCreations.remove(playerId)
+        else pendingCreations[playerId] = PendingCreation(state.pendingWorldName)
+        state.returnRoute()?.let { route ->
+            returnRoutes[playerId] = MenuRoute(route.owner, route.id, route.payload.toMap())
+        } ?: returnRoutes.remove(playerId)
+    }
 
     init {
         runtime.register(
@@ -185,7 +238,7 @@ class EasyVoidWorldCreationService(
         val preview = guiItem(
             Material.PAPER,
             i18n(player, "confirm_title"),
-            GuiLoreSpec.Rich(
+            me.awabi2048.mwmchanpon.ui.framedLore(
                 listOf(
                     GuiLoreLine.Text(i18n(player, "confirm_body", "world" to pending.worldName)),
                     GuiLoreLine.Text(
@@ -218,10 +271,11 @@ class EasyVoidWorldCreationService(
                         GuiElementRole.CONFIRM,
                         ),
                         actions = listOf(
-                            GuiMenuEntryAction(
+                            chanponGestureAction(
                                 ACTION_CREATE,
-                                MenuAcceptedClicks.LEFT_RIGHT,
+                                MenuGesture.ANY,
                                 i18n(player, "create"),
+                                safety = MenuActionSafety.IRREVERSIBLE,
                             ),
                         ),
                     ),
@@ -237,10 +291,11 @@ class EasyVoidWorldCreationService(
                         GuiElementRole.CANCEL,
                         ),
                         actions = listOf(
-                            GuiMenuEntryAction(
+                            chanponGestureAction(
                                 ACTION_BACK,
-                                MenuAcceptedClicks.LEFT_RIGHT,
+                                MenuGesture.ANY,
                                 i18n(player, "back"),
+                                safety = MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE,
                             ),
                         ),
                     ),
@@ -333,7 +388,7 @@ class EasyVoidWorldCreationService(
         role: GuiElementRole,
     ) = GuiItemSpec(
             material = material,
-            name = GuiNameSpec.Text(name, GuiNameStyle.DEFAULT),
+            name = me.awabi2048.mwmchanpon.ui.fixedName(name, GuiNameStyle.DEFAULT),
             lore = lore,
             role = role,
             amount = 1,

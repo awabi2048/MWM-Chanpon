@@ -7,7 +7,7 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
-import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
 import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
@@ -19,7 +19,8 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
-import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
+import com.awabi2048.ccsystem.api.gui.MenuActionSafety
+import com.awabi2048.ccsystem.api.gui.MenuGesture
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
@@ -43,9 +44,12 @@ import me.awabi2048.mwmchanpon.backup.BackupService
 import me.awabi2048.mwmchanpon.backup.RestoreOperationResult
 import me.awabi2048.mwmchanpon.service.BackupAutomationService
 import me.awabi2048.mwmchanpon.service.ManualRollbackService
+import me.awabi2048.mwmchanpon.ui.chanponCapabilityAction
+import me.awabi2048.mwmchanpon.ui.chanponGestureAction
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
+import me.awabi2048.myworldmanager.api.extension.WorldSettingsCapabilityPlacements
 import me.awabi2048.myworldmanager.model.WorldData
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
@@ -106,24 +110,26 @@ class WorldBackupCapability(
             MenuCapabilityDefinition(
                 owner = RUNTIME_OWNER,
                 id = CAPABILITY_ID,
-                placement = ChanponWorldSettingsPlacements.FOOTER_RIGHT,
-                availability = MenuCapabilityAvailability { context ->
+                placement = WorldSettingsCapabilityPlacements.FOOTER_RIGHT_ACTIONS,
+                // TODO: 非本番・非owner等でも項目を消さず、BARRIERと理由Loreを返すdecisionを導入する。
+                availability = me.awabi2048.mwmchanpon.ui.optionalAvailability { context ->
                     val world = worldUuid(context.arguments)
                         ?.let { ownedProductionWorld(context.player, it) }
-                        ?: return@MenuCapabilityAvailability false
+                        ?: return@optionalAvailability false
                     !protectionService.isProtected(world)
                 },
                 presentationProvider = MenuCapabilityPresentationProvider { context ->
                     entryPresentation(context.player)
                 },
                 actions = listOf(
-                    MenuCapabilityAction(
+                    chanponCapabilityAction(
                         id = "open",
-                        trigger = MenuCapabilityTrigger.LEFT,
+                        trigger = MenuCapabilityTrigger.ANY,
                         textProvider = MenuCapabilityActionTextProvider {
                             i18n(it.player, "owner_backup.action")
                         },
                         handler = MenuCapabilityActionHandler(::openFromCapability),
+                        safety = MenuActionSafety.NAVIGATION_ONLY,
                     ),
                 ),
             ),
@@ -155,20 +161,20 @@ class WorldBackupCapability(
             elements += simpleActionEntry(
                 player, layout.previousPageSlot, Material.ARROW,
                 i18n(player, "common.prev"), GuiElementRole.NAVIGATION,
-                ACTION_RUNTIME_PAGE, payload(source.copy(page = safePage - 1)),
+                ACTION_RUNTIME_PAGE, i18n(player, "common.prev_action"), payload(source.copy(page = safePage - 1)),
             )
         }
         if (safePage < pages - 1) {
             elements += simpleActionEntry(
                 player, layout.nextPageSlot, Material.ARROW,
                 i18n(player, "common.next"), GuiElementRole.NAVIGATION,
-                ACTION_RUNTIME_PAGE, payload(source.copy(page = safePage + 1)),
+                ACTION_RUNTIME_PAGE, i18n(player, "common.next_action"), payload(source.copy(page = safePage + 1)),
             )
         }
         elements += simpleActionEntry(
             player, layout.backSlot, Material.REDSTONE,
             i18n(player, "common.back"), GuiElementRole.BACK,
-            ACTION_RUNTIME_BACK, payload(source),
+            ACTION_RUNTIME_BACK, i18n(player, "common.back_action"), payload(source),
         )
         elements += infoEntry(player, layout.infoSlot, world, backups.size, safePage + 1, pages)
         backups.drop(safePage * ITEMS_PER_PAGE).take(ITEMS_PER_PAGE).forEachIndexed { index, backup ->
@@ -415,18 +421,18 @@ class WorldBackupCapability(
                 simpleActionEntry(
                     player, layout.confirmSlot, Material.LIME_CONCRETE,
                     i18n(player, "confirm.button.confirm"), GuiElementRole.CONFIRM,
-                    ACTION_RUNTIME_CONFIRM,
+                    ACTION_RUNTIME_CONFIRM, i18n(player, "confirm.button.confirm_action"),
                 ),
                 displayEntry(
                     layout.previewSlot,
                     Material.PAPER,
-                    GuiNameSpec.Component(title),
-                    GuiLoreSpec.Rich(body.map(GuiLoreLine::Text), GuiLoreFrame.NONE),
+                    GuiNameSpec.FixedLabel(title),
+                    me.awabi2048.mwmchanpon.ui.framedLore(body.map(GuiLoreLine::Text), GuiLoreFrame.NONE),
                 ),
                 simpleActionEntry(
                     player, layout.cancelSlot, Material.RED_CONCRETE,
                     i18n(player, "confirm.button.cancel"), GuiElementRole.CANCEL,
-                    ACTION_RUNTIME_CANCEL,
+                    ACTION_RUNTIME_CANCEL, i18n(player, "confirm.button.cancel_action"),
                 ),
             ),
         )
@@ -456,7 +462,7 @@ class WorldBackupCapability(
     private fun entryPresentation(player: Player) = MenuCapabilityPresentation(
         GuiItemSpec(
             material = Material.CHEST,
-            name = GuiNameSpec.Component(i18nComponent(player, "owner_backup.display")),
+            name = GuiNameSpec.FixedLabel(i18nComponent(player, "owner_backup.display")),
             lore = GuiLoreSpec.Blocks(
                 listOf(
                     GuiLoreBlock(
@@ -474,12 +480,13 @@ class WorldBackupCapability(
         slot: Int,
         backup: BackupEntry,
         payload: Map<String, String>,
-    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+    ): MenuElement {
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
         player,
         GuiMenuEntrySpec(
             slot = slot,
             material = materialFor(backup),
-            name = GuiNameSpec.Component(
+            name = GuiNameSpec.TargetIdentity(
                 i18nComponent(player, "owner_backup.item.display", mapOf("name" to BackupDisplay.displayName(backup))),
             ),
             role = GuiElementRole.ACTION,
@@ -493,14 +500,16 @@ class WorldBackupCapability(
                     BackupDisplay.actorName(backup),
                 ),
             ),
-            actions = listOf(GuiMenuEntryAction(
+            actions = listOf(chanponGestureAction(
                 ACTION_RUNTIME_RESTORE,
-                MenuAcceptedClicks.LEFT_RIGHT,
+                MenuGesture.LEFT,
                 i18n(player, "owner_backup.item.rollback_action"),
                 payload,
+                safety = MenuActionSafety.CONFIRM_ENTRY,
             )),
         ),
     )
+    }
 
     private fun backupControlEntry(
         player: Player,
@@ -515,7 +524,7 @@ class WorldBackupCapability(
             GuiMenuEntrySpec(
                 slot = slot,
                 material = if (remaining > 0) Material.CLOCK else Material.CHEST,
-                name = GuiNameSpec.Component(i18nComponent(
+                name = GuiNameSpec.FixedLabel(i18nComponent(
                     player,
                     "$key.display",
                     mapOf("remaining" to BackupDisplay.formatDuration(remaining)),
@@ -526,11 +535,12 @@ class WorldBackupCapability(
                     "$key.description",
                     mapOf("remaining" to BackupDisplay.formatDuration(remaining)),
                 )),
-                actions = if (remaining > 0) emptyList() else listOf(GuiMenuEntryAction(
+                actions = if (remaining > 0) emptyList() else listOf(chanponGestureAction(
                     ACTION_RUNTIME_CREATE,
-                    MenuAcceptedClicks.LEFT_RIGHT,
+                    MenuGesture.ANY,
                     i18n(player, "$key.action"),
                     payload,
+                    safety = MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE,
                 )),
             ),
         )
@@ -543,19 +553,23 @@ class WorldBackupCapability(
         text: String,
         role: GuiElementRole,
         actionId: String,
+        actionText: String,
         payload: Map<String, String> = emptyMap(),
-    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+    ): MenuElement {
+        if (role == GuiElementRole.BACK) return CCSystem.getAPI().getGuiElementService().backEntry(player, slot)
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
         player,
         GuiMenuEntrySpec(
             slot = slot,
             material = material,
-            name = GuiNameSpec.Text(text, GuiNameStyle.DEFAULT),
+            name = me.awabi2048.mwmchanpon.ui.fixedName(text, GuiNameStyle.DEFAULT),
             role = role,
             actions = listOf(
-                GuiMenuEntryAction(actionId, MenuAcceptedClicks.LEFT_RIGHT, text, payload),
+                chanponGestureAction(actionId, MenuGesture.ANY, actionText, payload, safety = ownerBackupActionSafety(actionId)),
             ),
         ),
     )
+    }
 
     private fun displayEntry(
         slot: Int,
@@ -579,10 +593,10 @@ class WorldBackupCapability(
     ): MenuElement = displayEntry(
         slot,
         world.icon,
-        GuiNameSpec.Component(
+        GuiNameSpec.TargetIdentity(
             i18nComponent(player, "owner_backup.info.display", mapOf("world" to world.name)),
         ),
-        GuiLoreSpec.Rich(
+        me.awabi2048.mwmchanpon.ui.framedLore(
             i18nList(
                 player,
                 "owner_backup.info.lore",
@@ -658,8 +672,15 @@ class WorldBackupCapability(
         CCSystem.getAPI().getI18nString(player, "chanpon.backup.$key", placeholders)
     private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
         CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
-    private fun structuredBlocks(blocks: List<GuiLoreBlock>): List<Component> =
-        CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(blocks))
+
+    private fun ownerBackupActionSafety(actionId: String): MenuActionSafety = when (actionId) {
+        ACTION_RUNTIME_BACK, ACTION_RUNTIME_PAGE, ACTION_RUNTIME_CANCEL -> MenuActionSafety.NAVIGATION_ONLY
+        ACTION_RUNTIME_RESTORE -> MenuActionSafety.CONFIRM_ENTRY
+        ACTION_RUNTIME_CREATE -> MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE
+        ACTION_RUNTIME_CONFIRM -> MenuActionSafety.IRREVERSIBLE
+        else -> error("Owner-backup action must declare a dedicated safety mapping: $actionId")
+    }
+
     data class Holder(val worldUuid: UUID, val page: Int)
 
     companion object {

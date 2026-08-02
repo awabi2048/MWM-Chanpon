@@ -81,6 +81,36 @@ class ChanponGlobalStorage(dataFolder: File) {
         config.save(settingsFile)
     }
 
+    /** 管理ワールド制御の可逆操作で比較・復元する不変スナップショットです。 */
+    data class AdminWorldControlsSnapshot(
+        val buildingAllowed: Boolean,
+        val creationAvailability: WorldCreationAvailability,
+        val spawnWorldUuid: UUID?,
+        val spawnPolicyInitializedUuid: UUID?,
+    )
+
+    @Synchronized
+    fun captureAdminWorldControls(): AdminWorldControlsSnapshot {
+        migrateLegacyPhase()
+        val config = settings()
+        return AdminWorldControlsSnapshot(
+            buildingAllowed = config.getBoolean("building_allowed", true),
+            creationAvailability = getWorldCreationAvailability(),
+            spawnWorldUuid = config.getString("spawn_world.uuid")?.let(::parseUuid),
+            spawnPolicyInitializedUuid = config.getString("spawn_world.policy_initialized_uuid")?.let(::parseUuid),
+        )
+    }
+
+    @Synchronized
+    fun restoreAdminWorldControls(snapshot: AdminWorldControlsSnapshot) {
+        val config = settings()
+        config.set("building_allowed", snapshot.buildingAllowed)
+        config.set("world_creation_availability", snapshot.creationAvailability.name)
+        config.set("spawn_world.uuid", snapshot.spawnWorldUuid?.toString())
+        config.set("spawn_world.policy_initialized_uuid", snapshot.spawnPolicyInitializedUuid?.toString())
+        config.save(settingsFile)
+    }
+
     private fun migrateLegacyPhase() {
         val config = settings()
         if (config.contains("building_allowed") && config.contains("world_creation_availability")) return
@@ -114,4 +144,6 @@ class ChanponGlobalStorage(dataFolder: File) {
         if (!file.exists()) file.createNewFile()
         return YamlConfiguration.loadConfiguration(file)
     }
+
+    private fun parseUuid(value: String): UUID? = runCatching { UUID.fromString(value) }.getOrNull()
 }

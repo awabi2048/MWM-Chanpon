@@ -6,15 +6,16 @@ import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
-import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
-import com.awabi2048.ccsystem.api.gui.GuiMenuCapabilitySpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
+import com.awabi2048.ccsystem.api.gui.GuiMenuCapabilityInvocationSpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiValueTone
-import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
+import com.awabi2048.ccsystem.api.gui.MenuGesture
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
@@ -27,13 +28,13 @@ import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentationProvider
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
-import java.util.UUID
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
+import me.awabi2048.mwmchanpon.service.ChanponReversibleActionClassification
 import me.awabi2048.mwmchanpon.service.EasyVoidWorldCreationService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
@@ -46,6 +47,7 @@ import me.awabi2048.myworldmanager.api.extension.WorldCreationOperation
 import me.awabi2048.myworldmanager.api.extension.WorldCreationRequest
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsNavigationRequest
 import me.awabi2048.myworldmanager.api.service.WorldPointBillingMode
+import me.awabi2048.myworldmanager.service.MwmReversibleContracts
 import me.awabi2048.myworldmanager.model.WorldData
 import net.kyori.adventure.text.format.TextDecoration
 import org.bukkit.Bukkit
@@ -73,50 +75,106 @@ class ChanponPlayerWorldCapability(
         service.register(
             MenuCapabilityDefinition(
                 owner = CAPABILITY_OWNER,
-                id = WORLD_CAPABILITY_ID,
+                id = CURRENT_WORLD_CAPABILITY_ID,
                 placement = PlayerWorldCapabilityContract.WORLD_ITEM_PLACEMENT,
-                availability = MenuCapabilityAvailability {
-                    subject(it) != null && world(it) != null
+                availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
+                    subject(it) != null && world(it)?.let { world -> isCurrentWorld(it.player, world) } == true
                 },
                 presentationProvider = MenuCapabilityPresentationProvider {
                     createWorldPresentation(it.player, requireNotNull(world(it)))
                 },
                 actions = listOf(
-                    MenuCapabilityAction(
+                    chanponCapabilityAction(
                         id = "primary",
                         trigger = MenuCapabilityTrigger.LEFT,
                         textProvider = MenuCapabilityActionTextProvider(::primaryWorldActionText),
-                        availability = MenuCapabilityAvailability {
+                        availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
                             world(it)?.let { world ->
                                 !world.isArchived &&
                                     (!isCurrentWorld(it.player, world) || canOpenSettings(it.player, world))
                             } == true
                         },
                         handler = MenuCapabilityActionHandler(::handleWorld),
+                        safety = MenuActionSafety.NAVIGATION_ONLY,
                     ),
-                    MenuCapabilityAction(
+                    chanponCapabilityAction(
                         id = "settings",
                         trigger = MenuCapabilityTrigger.RIGHT,
                         textProvider = MenuCapabilityActionTextProvider {
                             text(it.player, "gui.player_world.world_item.settings")
                         },
-                        availability = MenuCapabilityAvailability {
+                        availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
                             world(it)?.let { world ->
                                 canOpenSettings(it.player, world)
                             } == true
                         },
                         handler = MenuCapabilityActionHandler(::handleWorld),
+                        safety = MenuActionSafety.NAVIGATION_ONLY,
                     ),
-                    MenuCapabilityAction(
+                    chanponCapabilityAction(
                         id = "prioritize",
                         trigger = MenuCapabilityTrigger.SHIFT_LEFT,
                         textProvider = MenuCapabilityActionTextProvider {
                             text(it.player, "gui.player_world.world_item.move_to_top")
                         },
-                        availability = MenuCapabilityAvailability {
+                        availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
                             subject(it)?.targetPlayerUuid == it.player.uniqueId
                         },
                         handler = MenuCapabilityActionHandler(::handleWorld),
+                        safety = MenuActionSafety.REVERSIBLE,
+                        reversibleContract = MwmReversibleContracts.displayOrder(),
+                        classification = ChanponReversibleActionClassification.Operation.CURRENT_PLAYER_WORLD_DISPLAY_ORDER,
+                    ),
+                ),
+            ),
+        )
+        service.register(
+            MenuCapabilityDefinition(
+                owner = CAPABILITY_OWNER,
+                id = AWAY_WORLD_CAPABILITY_ID,
+                placement = PlayerWorldCapabilityContract.WORLD_ITEM_PLACEMENT,
+                availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
+                    subject(it) != null && world(it)?.let { world -> !isCurrentWorld(it.player, world) } == true
+                },
+                presentationProvider = MenuCapabilityPresentationProvider {
+                    createWorldPresentation(it.player, requireNotNull(world(it)))
+                },
+                actions = listOf(
+                    chanponCapabilityAction(
+                        id = "primary",
+                        trigger = MenuCapabilityTrigger.LEFT,
+                        textProvider = MenuCapabilityActionTextProvider(::primaryWorldActionText),
+                        availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
+                            world(it)?.isArchived == false
+                        },
+                        handler = MenuCapabilityActionHandler(::handleWorld),
+                        safety = MenuActionSafety.EXTERNAL_SIDE_EFFECT,
+                    ),
+                    chanponCapabilityAction(
+                        id = "settings",
+                        trigger = MenuCapabilityTrigger.RIGHT,
+                        textProvider = MenuCapabilityActionTextProvider {
+                            text(it.player, "gui.player_world.world_item.settings")
+                        },
+                        availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
+                            world(it)?.let { world -> canOpenSettings(it.player, world) } == true
+                        },
+                        handler = MenuCapabilityActionHandler(::handleWorld),
+                        safety = MenuActionSafety.NAVIGATION_ONLY,
+                    ),
+                    chanponCapabilityAction(
+                        id = "prioritize",
+                        trigger = MenuCapabilityTrigger.SHIFT_LEFT,
+                        textProvider = MenuCapabilityActionTextProvider {
+                            text(it.player, "gui.player_world.world_item.move_to_top")
+                        },
+                        availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
+                            canPrioritizeWorld(it)
+                        },
+                        handler = MenuCapabilityActionHandler(::handleWorld),
+                        safety = MenuActionSafety.REVERSIBLE,
+                        reversibleContract = MwmReversibleContracts.displayOrder(),
+                        classification = ChanponReversibleActionClassification.Operation.AWAY_PLAYER_WORLD_DISPLAY_ORDER,
                     ),
                 ),
             ),
@@ -126,7 +184,7 @@ class ChanponPlayerWorldCapability(
                 owner = CAPABILITY_OWNER,
                 id = SUMMARY_CAPABILITY_ID,
                 placement = PlayerWorldCapabilityContract.SUMMARY_PLACEMENT,
-                availability = MenuCapabilityAvailability { subject(it) != null },
+                availability = me.awabi2048.mwmchanpon.ui.optionalAvailability { subject(it) != null },
                 presentationProvider = MenuCapabilityPresentationProvider {
                     val subject = requireNotNull(subject(it))
                     createPlayerInfoPresentation(
@@ -143,25 +201,26 @@ class ChanponPlayerWorldCapability(
                 owner = CAPABILITY_OWNER,
                 id = CREATION_CAPABILITY_ID,
                 placement = PlayerWorldCapabilityContract.CREATION_PLACEMENT,
-                availability = MenuCapabilityAvailability {
-                    subject(it)?.targetPlayerUuid == it.player.uniqueId
+                        availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
+                            canPrioritizeWorld(it)
                 },
                 presentationProvider = MenuCapabilityPresentationProvider {
                     creationPresentation(it)
                 },
                 actions = listOf(
-                    MenuCapabilityAction(
+                    chanponCapabilityAction(
                         id = "standard-create",
                         trigger = MenuCapabilityTrigger.LEFT,
                         textProvider = MenuCapabilityActionTextProvider {
                             text(it.player, "gui.player_world.creation_button.action")
                         },
-                        availability = MenuCapabilityAvailability {
+                        availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
                             creationBlockReason(it) == null && hasCreatePermission(it.player)
                         },
                         handler = MenuCapabilityActionHandler(::handleCreate),
+                        safety = MenuActionSafety.NAVIGATION_ONLY,
                     ),
-                    MenuCapabilityAction(
+                    chanponCapabilityAction(
                         id = "easy-create",
                         trigger = MenuCapabilityTrigger.RIGHT,
                         textProvider = MenuCapabilityActionTextProvider {
@@ -170,10 +229,11 @@ class ChanponPlayerWorldCapability(
                                 "chanpon.player_world.easy_creation.action",
                             )
                         },
-                        availability = MenuCapabilityAvailability {
+                        availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
                             creationBlockReason(it) == null && hasCreatePermission(it.player)
                         },
                         handler = MenuCapabilityActionHandler(::handleCreate),
+                        safety = MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE,
                     ),
                 ),
             ),
@@ -187,7 +247,6 @@ class ChanponPlayerWorldCapability(
                     ACTION_PAGE to MenuActionHandler(::changePage),
                     ACTION_SETTINGS to MenuActionHandler(::openUserSettings),
                     ACTION_PENDING to MenuActionHandler(::openPending),
-                    ACTION_CAPABILITY to MenuActionHandler(::executeCapability),
                     ACTION_BACK to MenuActionHandler {
                         MenuActionResult.Success(MenuUpdate.Back)
                     },
@@ -223,54 +282,50 @@ class ChanponPlayerWorldCapability(
             .forEachIndexed { index, worldData ->
                 val attributes = attributes(subject, worldData)
                 val capability = service.resolve(
-                    "$CAPABILITY_OWNER:$WORLD_CAPABILITY_ID",
+                    "$CAPABILITY_OWNER:${worldCapabilityId(player, worldData)}",
                     player,
                     attributes = attributes,
-                ) ?: return@forEachIndexed
+                )?.requireExplicitActionSafety() ?: return@forEachIndexed
                 elements += CCSystem.getAPI().getGuiElementService().menuCapabilityEntry(
                     player,
-                    GuiMenuCapabilitySpec(
+                    playerWorldCapabilityInvocation(
                         slot = layout.layout.itemSlots[index],
-                        capability = capability,
-                        actionId = ACTION_CAPABILITY,
-                        actionPayload = mapOf(
-                            PAYLOAD_CAPABILITY to capability.capabilityId,
-                            PAYLOAD_WORLD_UUID to worldData.uuid.toString(),
-                        ),
+                        capability = capability.requireExplicitActionSafety(),
+                        attributes = attributes,
+                        worldUuid = worldData.uuid,
                     ),
                 )
             }
 
         if (request.targetPlayerUuid == player.uniqueId) {
+            val capabilityAttributes = attributes(subject)
             service.resolve(
                 "$CAPABILITY_OWNER:$CREATION_CAPABILITY_ID",
                 player,
-                attributes = attributes(subject),
-            )?.let { capability ->
-                val capabilityAttributes = attributes(subject)
+                attributes = capabilityAttributes,
+            )?.requireExplicitActionSafety()?.let { capability ->
                 elements += CCSystem.getAPI().getGuiElementService().menuCapabilityEntry(
                     player,
-                    GuiMenuCapabilitySpec(
+                    playerWorldCapabilityInvocation(
                         slot = layout.layout.actionSlot - 2,
-                        capability = capability,
-                        actionId = ACTION_CAPABILITY,
-                        actionPayload = mapOf(PAYLOAD_CAPABILITY to capability.capabilityId),
+                        capability = capability.requireExplicitActionSafety(),
+                        attributes = capabilityAttributes,
                     ),
                 )
             }
         }
+        val summaryAttributes = attributes(subject)
         service.resolve(
             "$CAPABILITY_OWNER:$SUMMARY_CAPABILITY_ID",
             player,
-            attributes = attributes(subject),
-        )?.let { capability ->
+            attributes = summaryAttributes,
+        )?.requireExplicitActionSafety()?.let { capability ->
             elements += CCSystem.getAPI().getGuiElementService().menuCapabilityEntry(
                 player,
-                GuiMenuCapabilitySpec(
+                playerWorldCapabilityInvocation(
                     slot = layout.layout.actionSlot,
-                    capability = capability,
-                    actionId = ACTION_CAPABILITY,
-                    actionPayload = mapOf(PAYLOAD_CAPABILITY to capability.capabilityId),
+                    capability = capability.requireExplicitActionSafety(),
+                    attributes = summaryAttributes,
                 ),
             )
         }
@@ -294,25 +349,7 @@ class ChanponPlayerWorldCapability(
             )
         }
         if (CCSystem.getAPI().getMenuNavigationService().canGoBack(player)) {
-            elements += CCSystem.getAPI().getGuiElementService().menuEntry(
-                player,
-                GuiMenuEntrySpec(
-                    slot = layout.layout.backSlot,
-                    material = Material.REDSTONE,
-                    name = GuiNameSpec.Text(
-                        text(player, "gui.common.return"),
-                        com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT,
-                    ),
-                    role = GuiElementRole.BACK,
-                    actions = listOf(
-                        GuiMenuEntryAction(
-                            ACTION_BACK,
-                            MenuAcceptedClicks.LEFT_RIGHT,
-                            text(player, "gui.common.return"),
-                        ),
-                    ),
-                ),
-            )
+            elements += CCSystem.getAPI().getGuiElementService().backEntry(player, layout.layout.backSlot)
         }
         if (layout.page + 1 < layout.totalPages) {
             elements += navigationElement(
@@ -374,10 +411,10 @@ class ChanponPlayerWorldCapability(
         val worldData = world(context) ?: return MenuActionResult.Ignored
         val player = context.player
         if (
-            subject.targetPlayerUuid == player.uniqueId &&
             context.click.isShiftClick &&
             context.click.isLeftClick
         ) {
+            if (!canPrioritizeWorld(context)) return MenuActionResult.Ignored
             MyWorldManagerApi.prioritizePlayerWorld(player.uniqueId, worldData.uuid)
             return MenuActionResult.Success(MenuUpdate.Refresh)
         }
@@ -409,6 +446,31 @@ class ChanponPlayerWorldCapability(
         } else {
             text(context.player, "gui.player_world.world_item.warp")
         }
+    }
+
+    private fun worldCapabilityId(player: Player, worldData: WorldData): String =
+        if (isCurrentWorld(player, worldData)) CURRENT_WORLD_CAPABILITY_ID else AWAY_WORLD_CAPABILITY_ID
+
+    private fun canPrioritizeWorld(context: MenuCapabilityContext): Boolean {
+        val subject = subject(context) ?: return false
+        val world = world(context) ?: return false
+        return isMoveToTopAvailable(
+            context.player.uniqueId,
+            subject.targetPlayerUuid,
+            subject.worlds.map(WorldData::uuid),
+            world.uuid,
+        )
+    }
+
+    private fun canPrioritizeWorld(context: MenuCapabilityActionContext): Boolean {
+        val subject = subject(context) ?: return false
+        val world = world(context) ?: return false
+        return isMoveToTopAvailable(
+            context.player.uniqueId,
+            subject.targetPlayerUuid,
+            subject.worlds.map(WorldData::uuid),
+            world.uuid,
+        )
     }
 
     private fun createWorldPresentation(
@@ -455,7 +517,7 @@ class ChanponPlayerWorldCapability(
         return MenuCapabilityPresentation(
             item = GuiItemSpec(
                 material = world.icon,
-                name = GuiNameSpec.Component(
+                name = GuiNameSpec.TargetIdentity(
                     component(
                         player,
                         "gui.common.world_item_name",
@@ -474,7 +536,7 @@ class ChanponPlayerWorldCapability(
         MenuCapabilityPresentation(
             GuiItemSpec(
                 material = Material.NETHER_STAR,
-                name = GuiNameSpec.Component(
+                name = GuiNameSpec.FixedLabel(
                     component(player, "gui.player_world.creation_button.display"),
                 ),
                 lore = GuiLoreSpec.Blocks(
@@ -497,8 +559,8 @@ class ChanponPlayerWorldCapability(
         MenuCapabilityPresentation(
             GuiItemSpec(
                 material = Material.BARRIER,
-                name = GuiNameSpec.Component(component(player, reason.displayKey)),
-                lore = GuiLoreSpec.Rich(
+                name = GuiNameSpec.FixedLabel(component(player, reason.displayKey)),
+                lore = me.awabi2048.mwmchanpon.ui.framedLore(
                     textList(player, reason.loreKey).map(GuiLoreLine::Text),
                     com.awabi2048.ccsystem.api.gui.GuiLoreFrame.BOTH,
                 ),
@@ -515,7 +577,7 @@ class ChanponPlayerWorldCapability(
         MenuCapabilityPresentation(
             item = GuiItemSpec(
                 material = Material.PLAYER_HEAD,
-                name = GuiNameSpec.Component(
+                name = GuiNameSpec.TargetIdentity(
                     CCSystem.getAPI().getGuiElementService()
                         .name(targetPlayerName ?: targetPlayerUuid.toString()),
                 ),
@@ -659,6 +721,11 @@ class ChanponPlayerWorldCapability(
         )
     }
 
+    private fun playerWorldRuntimeActionSafety(actionId: String): MenuActionSafety = when (actionId) {
+        ACTION_PAGE, ACTION_SETTINGS, ACTION_PENDING, ACTION_BACK -> MenuActionSafety.NAVIGATION_ONLY
+        else -> error("Chanpon player-world action must declare a dedicated safety mapping: $actionId")
+    }
+
     private fun simpleActionElement(
         slot: Int,
         player: Player,
@@ -672,28 +739,15 @@ class ChanponPlayerWorldCapability(
             GuiMenuEntrySpec(
                 slot = slot,
                 material = material,
-                name = GuiNameSpec.Text(name, com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT),
+                name = me.awabi2048.mwmchanpon.ui.fixedName(name, com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT),
                 role = GuiElementRole.ACTION,
-                actions = listOf(GuiMenuEntryAction(
+                actions = listOf(chanponGestureAction(
                     actionId,
-                    MenuAcceptedClicks.LEFT_RIGHT,
+                    MenuGesture.ANY,
                     actionText,
+                    safety = playerWorldRuntimeActionSafety(actionId),
                 )),
             ),
-        )
-    }
-
-    private fun executeCapability(context: MenuActionContext): MenuActionResult {
-        val capabilityId = context.payload[PAYLOAD_CAPABILITY]
-            ?: return MenuActionResult.Ignored
-        val worldData = context.payload[PAYLOAD_WORLD_UUID]
-            ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-            ?.let { MyWorldManagerApi.getWorldRepository()?.findByUuid(it) }
-        return CCSystem.getAPI().getMenuCapabilityService().execute(
-            capabilityId,
-            context.player,
-            context.click,
-            attributes = attributes(subject(context.player, context.route), worldData),
         )
     }
 
@@ -709,17 +763,18 @@ class ChanponPlayerWorldCapability(
             GuiMenuEntrySpec(
                 slot = slot,
                 material = Material.ARROW,
-                name = GuiNameSpec.Text(
+                name = me.awabi2048.mwmchanpon.ui.fixedName(
                     label,
                     com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT,
                 ),
                 role = GuiElementRole.NAVIGATION,
                 actions = listOf(
-                    GuiMenuEntryAction(
+                    chanponGestureAction(
                         ACTION_PAGE,
-                        MenuAcceptedClicks.LEFT_RIGHT,
+                        MenuGesture.LEFT_RIGHT,
                         label,
                         mapOf(PAYLOAD_PAGE to request.page.toString()),
+                        safety = MenuActionSafety.NAVIGATION_ONLY,
                     ),
                 ),
             ),
@@ -734,7 +789,7 @@ class ChanponPlayerWorldCapability(
                     slot,
                     GuiItemSpec(
                         material = Material.BARRIER,
-                        name = GuiNameSpec.Component(
+                        name = GuiNameSpec.FixedLabel(
                             component(player, "gui.player_world.pending_button.display"),
                         ),
                         lore = GuiLoreSpec.Blocks(
@@ -764,7 +819,7 @@ class ChanponPlayerWorldCapability(
             GuiMenuEntrySpec(
                 slot = slot,
                 material = Material.WRITABLE_BOOK,
-                name = GuiNameSpec.Component(component(player, "gui.player_world.pending_button.display")),
+                name = GuiNameSpec.FixedLabel(component(player, "gui.player_world.pending_button.display")),
                 role = GuiElementRole.ACTION,
                 description = textList(player, "gui.player_world.pending_button.description"),
                 data = listOf(
@@ -779,10 +834,11 @@ class ChanponPlayerWorldCapability(
                         GuiValueTone.INFO,
                     ),
                 ),
-                actions = listOf(GuiMenuEntryAction(
+                actions = listOf(chanponGestureAction(
                     ACTION_PENDING,
-                    MenuAcceptedClicks.LEFT_RIGHT,
+                    MenuGesture.ANY,
                     text(player, "gui.player_world.pending_button.action"),
+                    safety = MenuActionSafety.NAVIGATION_ONLY,
                 )),
                 glint = true,
             ),
@@ -855,7 +911,8 @@ class ChanponPlayerWorldCapability(
 
     private companion object {
         const val CAPABILITY_OWNER = "mwm-chanpon"
-        const val WORLD_CAPABILITY_ID = "player-world-item"
+        const val CURRENT_WORLD_CAPABILITY_ID = "player-world-item-current"
+        const val AWAY_WORLD_CAPABILITY_ID = "player-world-item-away"
         const val SUMMARY_CAPABILITY_ID = "player-world-summary"
         const val CREATION_CAPABILITY_ID = "player-world-creation"
         const val ROUTE_OWNER = "mwm-chanpon"
@@ -863,13 +920,34 @@ class ChanponPlayerWorldCapability(
         const val ACTION_PAGE = "page"
         const val ACTION_SETTINGS = "settings"
         const val ACTION_PENDING = "pending"
-        const val ACTION_CAPABILITY = "capability"
         const val ACTION_BACK = "back"
-        const val PAYLOAD_CAPABILITY = "capability_id"
-        const val PAYLOAD_WORLD_UUID = "capability_world_uuid"
         const val PAYLOAD_PAGE = "page"
         const val PAYLOAD_SHOW_BACK = "show_back"
         const val PAYLOAD_TARGET_UUID = "target_uuid"
         const val PAYLOAD_TARGET_NAME = "target_name"
     }
 }
+
+internal fun isMoveToTopAvailable(
+    viewerUuid: java.util.UUID,
+    targetPlayerUuid: java.util.UUID,
+    orderedWorldUuids: List<java.util.UUID>,
+    targetWorldUuid: java.util.UUID,
+): Boolean = viewerUuid == targetPlayerUuid && orderedWorldUuids.indexOf(targetWorldUuid) > 0
+
+internal fun playerWorldCapabilityInvocation(
+    slot: Int,
+    capability: com.awabi2048.ccsystem.api.gui.ResolvedMenuCapability,
+    attributes: Map<String, Any>,
+    worldUuid: java.util.UUID? = null,
+): GuiMenuCapabilityInvocationSpec = GuiMenuCapabilityInvocationSpec(
+    slot = slot,
+    capability = capability.requireExplicitActionSafety(),
+    arguments = worldUuid?.let(::playerWorldCapabilityArguments).orEmpty(),
+    attributes = attributes,
+)
+
+internal fun playerWorldCapabilityArguments(worldUuid: java.util.UUID): Map<String, String> =
+    mapOf(PLAYER_WORLD_UUID_ARGUMENT to worldUuid.toString())
+
+internal const val PLAYER_WORLD_UUID_ARGUMENT = "capability_world_uuid"

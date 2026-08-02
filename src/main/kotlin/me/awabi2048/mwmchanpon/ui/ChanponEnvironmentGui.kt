@@ -7,7 +7,7 @@ import com.awabi2048.ccsystem.api.gui.GuiCycleDirection
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
-import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryOption
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
@@ -18,7 +18,8 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionContext
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
-import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
+import com.awabi2048.ccsystem.api.gui.MenuActionSafety
+import com.awabi2048.ccsystem.api.gui.MenuGesture
 import com.awabi2048.ccsystem.api.gui.MenuDialogButton
 import com.awabi2048.ccsystem.api.gui.MenuDialogHandler
 import com.awabi2048.ccsystem.api.gui.MenuDialogInput
@@ -37,6 +38,9 @@ import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponWorldProtectionMode
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.protection.WorldBuildPermissionService
+import me.awabi2048.mwmchanpon.service.ChanponReversibleContracts
+import me.awabi2048.mwmchanpon.service.ChanponReversibleActionClassification
+import me.awabi2048.mwmchanpon.service.ChanponReversibleStateProviders
 
 class ChanponEnvironmentGui(
     private val plugin: MWMChanponPlugin,
@@ -48,6 +52,11 @@ class ChanponEnvironmentGui(
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
     init {
+        ChanponReversibleStateProviders.registerEnvironment(
+            CCSystem.getAPI().getMenuReversibleStateProviderRegistry(),
+            storage,
+            buildPermissionService,
+        )
         runtime.register(
             InventoryMenuDefinition(
                 owner = RUNTIME_OWNER,
@@ -95,25 +104,7 @@ class ChanponEnvironmentGui(
                 directSettingEntry(player, 23, worldData.uuid, ACTION_SCALE, Material.PLAYER_HEAD, scaleDisplay(player, scale), scaleOptions(player), scale?.toString(), outsideTargetWorld),
                 directSettingEntry(player, 24, worldData.uuid, ACTION_FLIGHT, Material.ELYTRA, flightDisplay(player, allowFlight), flightOptions(player), allowFlight.toString(), outsideTargetWorld),
                 protectionSettingEntry(player, 25, worldData),
-                CCSystem.getAPI().getGuiElementService().menuEntry(
-                    player,
-                    GuiMenuEntrySpec(
-                        slot = 40,
-                        material = Material.REDSTONE,
-                        name = GuiNameSpec.Text(
-                            i18n(player, "common.back_to_settings"),
-                            com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT,
-                        ),
-                        role = GuiElementRole.BACK,
-                        actions = listOf(
-                            GuiMenuEntryAction(
-                                ACTION_BACK,
-                                MenuAcceptedClicks.LEFT_RIGHT,
-                                i18n(player, "common.back_to_settings"),
-                            ),
-                        ),
-                    ),
-                ),
+                CCSystem.getAPI().getGuiElementService().backEntry(player, 40),
             ),
         )
     }
@@ -345,18 +336,22 @@ class ChanponEnvironmentGui(
             PAYLOAD_SETTING to key,
         )
         val actions = buildList {
-            add(GuiMenuEntryAction(
+            add(chanponGestureAction(
                 ACTION_SETTING,
-                MenuAcceptedClicks.PLAIN_LEFT_RIGHT,
+                MenuGesture.PLAIN_LEFT_RIGHT,
                 i18n(player, "common.action_next"),
                 payload,
+                safety = MenuActionSafety.REVERSIBLE,
+                reversibleContract = ChanponReversibleContracts.environment(worldUuid),
+                classification = ChanponReversibleActionClassification.Operation.ENVIRONMENT_DIRECT_SETTING_CYCLE,
             ))
             if (customTimeAction) {
-                add(GuiMenuEntryAction(
+                add(chanponGestureAction(
                     ACTION_SETTING,
-                    MenuAcceptedClicks.SHIFT_LEFT,
+                    MenuGesture.SHIFT_LEFT,
                     i18n(player, "time.custom.action"),
                     payload,
+                    safety = MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE,
                 ))
             }
         }
@@ -365,7 +360,7 @@ class ChanponEnvironmentGui(
             GuiMenuEntrySpec(
                 slot = slot,
                 material = material,
-                name = GuiNameSpec.Component(i18nComponent(player, "$key.display")),
+                name = GuiNameSpec.FixedLabel(i18nComponent(player, "$key.display")),
                 role = GuiElementRole.ACTION,
                 description = listOf(i18n(player, "$key.description")),
                 data = listOf(GuiMenuEntryData(
@@ -400,18 +395,22 @@ class ChanponEnvironmentGui(
             PAYLOAD_SETTING to ACTION_PROTECTION,
         )
         val actions = buildList {
-            add(GuiMenuEntryAction(
+            add(chanponGestureAction(
                 ACTION_SETTING,
-                MenuAcceptedClicks.PLAIN_LEFT_RIGHT,
+                MenuGesture.PLAIN_LEFT_RIGHT,
                 i18n(player, "common.action_next"),
                 payload,
+                safety = MenuActionSafety.REVERSIBLE,
+                reversibleContract = ChanponReversibleContracts.environment(worldData.uuid),
+                classification = ChanponReversibleActionClassification.Operation.ENVIRONMENT_PROTECTION_CYCLE,
             ))
             if (mode == ChanponWorldProtectionMode.PASSWORD) {
-                add(GuiMenuEntryAction(
+                add(chanponGestureAction(
                     ACTION_SETTING,
-                    MenuAcceptedClicks.SHIFT_LEFT,
+                    MenuGesture.SHIFT_LEFT,
                     i18n(player, "protection.password_change_action"),
                     payload,
+                    safety = MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE,
                 ))
             }
         }
@@ -420,7 +419,7 @@ class ChanponEnvironmentGui(
             GuiMenuEntrySpec(
                 slot = slot,
                 material = Material.IRON_DOOR,
-                name = GuiNameSpec.Component(i18nComponent(player, "protection.display")),
+                name = GuiNameSpec.FixedLabel(i18nComponent(player, "protection.display")),
                 role = GuiElementRole.ACTION,
                 description = listOf(i18n(player, "protection.description")),
                 data = buildList {

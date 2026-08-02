@@ -108,6 +108,31 @@ class MenuRuntimeNavigationContractTest {
     }
 
     @Test
+    fun `tool permission menu uses shared back entry and any-click toggles`() {
+        val source = uiRoot.resolve("ToolPermissionMenu.kt").readText()
+        assertTrue("getGuiElementService().backEntry(player, 40)" in source)
+        assertTrue("MenuGesture.ANY" in source)
+        assertFalse("MenuGesture.LEFT_RIGHT" in source)
+    }
+
+    @Test
+    fun `runtime action helpers do not use the item name as an implicit click label`() {
+        listOf(
+            "BackupListMenu.kt",
+            "ChanponAdminWorldListMenu.kt",
+            "SubmissionAdminMenu.kt",
+            "WorldDataExportMenu.kt",
+            "WorldDataManagementMenu.kt",
+        ).forEach { fileName ->
+            val source = uiRoot.resolve(fileName).readText()
+            assertFalse(
+                "GestureAction(actionId, MenuGesture.ANY, text" in source,
+                "$fileName の操作ラベルがName引数から暗黙生成されています",
+            )
+        }
+    }
+
+    @Test
     fun `公開メニュープロバイダーはRuntimeの表示結果と親経路を保持する`() {
         val environment = uiRoot.resolve("ChanponEnvironmentGui.kt").readText()
         assertTrue("runtime.navigate(player, route(worldData.uuid))" in environment)
