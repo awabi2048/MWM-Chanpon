@@ -339,7 +339,6 @@ class ChanponEnvironmentGui(
             add(chanponCycleAction(
                 ACTION_SETTING,
                 i18n(player, "common.action_next"),
-                i18n(player, "common.action_previous"),
                 payload,
                 safety = MenuActionSafety.REVERSIBLE,
                 reversibleContract = ChanponReversibleContracts.environment(worldUuid),
@@ -398,7 +397,6 @@ class ChanponEnvironmentGui(
             add(chanponCycleAction(
                 ACTION_SETTING,
                 i18n(player, "common.action_next"),
-                i18n(player, "common.action_previous"),
                 payload,
                 safety = MenuActionSafety.REVERSIBLE,
                 reversibleContract = ChanponReversibleContracts.environment(worldData.uuid),

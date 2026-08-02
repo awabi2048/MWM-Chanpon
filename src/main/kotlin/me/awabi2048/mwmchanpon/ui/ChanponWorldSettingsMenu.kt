@@ -1056,7 +1056,7 @@ class ChanponWorldSettingsMenu(
         player: Player,
         feature: WorldSettingsFeature,
     ): String = when (feature) {
-        WorldSettingsFeature.PUBLISH -> i18n(player, "publish.cycle_next_action")
+        WorldSettingsFeature.PUBLISH -> i18n(player, "publish.cycle_action")
         WorldSettingsFeature.EXPANSION ->
             text(player, "gui.settings.expand.action.open_menu")
         WorldSettingsFeature.NOTIFICATION ->
@@ -1065,11 +1065,6 @@ class ChanponWorldSettingsMenu(
             i18n(player, "mwm_action.action")
         WorldSettingsFeature.CRITICAL ->
             i18n(player, "critical.action")
-    }
-
-    internal fun publishCycleActionText(player: Player, direction: GuiCycleDirection): String = when (direction) {
-        GuiCycleDirection.NEXT -> i18n(player, "publish.cycle_next_action")
-        GuiCycleDirection.PREVIOUS -> i18n(player, "publish.cycle_previous_action")
     }
 
     internal fun handleFeature(

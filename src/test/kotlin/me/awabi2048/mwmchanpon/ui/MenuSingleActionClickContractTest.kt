@@ -31,12 +31,10 @@ class MenuSingleActionClickContractTest {
         val cycleWorldCreation = functionBody(source, "cycleWorldCreation")
 
         assertTrue("MenuGesture.ANY" in buildingPermissionItem)
-        assertTrue("MenuGesture.ANY" in worldCreationAvailabilityItem)
+        assertTrue("chanponCycleAction(" in worldCreationAvailabilityItem)
         assertFalse("context.click" in toggleBuilding)
         assertTrue("setBuildingAllowed" in toggleBuilding)
-        assertFalse("context.click" in cycleWorldCreation)
-        assertFalse("GuiCycle.direction" in cycleWorldCreation)
-        assertTrue("GuiCycleDirection.NEXT" in cycleWorldCreation)
+        assertTrue("GuiCycle.direction(context.click)" in cycleWorldCreation)
     }
 
     @Test

@@ -400,7 +400,6 @@ class ChanponAdminWorldListMenu(
             actions = listOf(chanponCycleAction(
                 actionId,
                 i18n(player, "common.action_next"),
-                i18n(player, "common.action_previous"),
                 // Route payloadだけを置換する一覧表示の操作で、ワールド状態は変更しません。
                 safety = MenuActionSafety.NAVIGATION_ONLY,
                 classification = adminListRouteClassification(actionId),

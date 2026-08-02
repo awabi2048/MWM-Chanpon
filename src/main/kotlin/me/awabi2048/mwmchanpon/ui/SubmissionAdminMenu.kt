@@ -665,7 +665,6 @@ class SubmissionAdminMenu(
             actions = listOf(chanponCycleAction(
                 actionId,
                 i18n(player, "common.action_next"),
-                i18n(player, "common.action_previous"),
                 // フィルタ／並び順は次Routeの表示状態のみを変更します。
                 safety = MenuActionSafety.NAVIGATION_ONLY,
                 classification = submissionRouteClassification(actionId),

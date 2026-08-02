@@ -12,7 +12,6 @@ import com.awabi2048.ccsystem.api.gui.MenuCapabilityContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentationProvider
 import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
-import com.awabi2048.ccsystem.api.gui.GuiCycleDirection
 import me.awabi2048.mwmchanpon.ui.ChanponWorldSettingsMenu
 import me.awabi2048.mwmchanpon.ui.WorldSettingsFeature
 import me.awabi2048.mwmchanpon.ui.chanponCapabilityAction
@@ -77,10 +76,7 @@ internal class ChanponWorldSettingsCapabilities(
                     )
                 },
                 actions = if (feature == WorldSettingsFeature.PUBLISH) {
-                    listOf(
-                        publishCycleAction(MenuCapabilityTrigger.LEFT, GuiCycleDirection.NEXT),
-                        publishCycleAction(MenuCapabilityTrigger.RIGHT, GuiCycleDirection.PREVIOUS),
-                    )
+                    listOf(publishCycleAction())
                 } else {
                     listOf(chanponCapabilityAction(
                         id = feature.name.lowercase(),
@@ -118,14 +114,11 @@ internal class ChanponWorldSettingsCapabilities(
         )
     }
 
-    private fun publishCycleAction(
-        trigger: MenuCapabilityTrigger,
-        direction: GuiCycleDirection,
-    ) = chanponCapabilityAction(
-        id = "publish-${direction.name.lowercase()}",
-        trigger = trigger,
+    private fun publishCycleAction() = chanponCapabilityAction(
+        id = "publish-cycle",
+        trigger = MenuCapabilityTrigger.LEFT_RIGHT,
         textProvider = MenuCapabilityActionTextProvider { context ->
-            menu.publishCycleActionText(context.player, direction)
+            menu.featureActionText(context.player, WorldSettingsFeature.PUBLISH)
         },
         availability = me.awabi2048.mwmchanpon.ui.reasonedAvailability(
             reason = { context ->

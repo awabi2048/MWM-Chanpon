@@ -12,8 +12,8 @@ class CycleDirectionContractTest {
         val capabilities = source("extension/ChanponWorldSettingsCapabilities.kt")
 
         assertTrue("val direction = GuiCycle.direction(click)" in menu)
-        assertTrue("publishCycleAction(MenuCapabilityTrigger.LEFT, GuiCycleDirection.NEXT)" in capabilities)
-        assertTrue("publishCycleAction(MenuCapabilityTrigger.RIGHT, GuiCycleDirection.PREVIOUS)" in capabilities)
+        assertTrue("trigger = MenuCapabilityTrigger.LEFT_RIGHT" in capabilities)
+        assertTrue("id = \"publish-cycle\"" in capabilities)
     }
 
     @Test
@@ -25,6 +25,7 @@ class CycleDirectionContractTest {
         ).forEach { path ->
             assertTrue("chanponCycleAction(" in source(path), path)
         }
+        assertTrue("GuiMenuActionIntent.PlainLeftRight" in source("ui/ChanponMenuActionSafety.kt"))
     }
 
     private fun source(relativePath: String): String = Path.of(
