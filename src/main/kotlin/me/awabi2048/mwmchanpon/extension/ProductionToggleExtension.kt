@@ -257,6 +257,7 @@ class ProductionToggleExtension(
     )
 
     private fun isCapabilityAvailable(context: com.awabi2048.ccsystem.api.gui.MenuCapabilityContext): Boolean {
+        // TODO: 本番設定を変更できない場合も項目を消さず、BARRIERと理由Loreを返す。
         val worldData = worldData(context.arguments) ?: return false
         if (globalStorage.getWorldCreationAvailability() != WorldCreationAvailability.PRODUCTION) return false
         if (protectionService.isProtected(worldData)) return false
@@ -282,6 +283,7 @@ class ProductionToggleExtension(
     private fun resolveCapabilityPresentation(
         context: com.awabi2048.ccsystem.api.gui.MenuCapabilityContext,
     ): MenuCapabilityPresentation {
+        // TODO: availability・presentation・actionを単一のdecisionから生成し、表示と実行可否の判定を一致させる。
         val worldData = requireNotNull(worldData(context.arguments))
         if (plugin.isSubmissionClosed()) {
             return capabilityPresentation(
@@ -515,6 +517,7 @@ class ProductionToggleExtension(
     }
 
     private fun applyForcedTags(worldUuid: UUID) {
+        // TODO: タグ保存は維持し、Chanpon仕様のメインメニューでは表示しないpresentation policyをMWMへ提供する。
         val tags = plugin.config.getStringList("production.forced_tags")
             .mapNotNull { raw ->
                 MyWorldManagerApi.getWorldTagService()?.normalizeTagId(raw)

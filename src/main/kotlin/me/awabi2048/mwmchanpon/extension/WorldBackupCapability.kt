@@ -111,6 +111,7 @@ class WorldBackupCapability(
                 owner = RUNTIME_OWNER,
                 id = CAPABILITY_ID,
                 placement = WorldSettingsCapabilityPlacements.FOOTER_RIGHT_ACTIONS,
+                // TODO: 非本番・非owner等でも項目を消さず、BARRIERと理由Loreを返すdecisionを導入する。
                 availability = me.awabi2048.mwmchanpon.ui.optionalAvailability { context ->
                     val world = worldUuid(context.arguments)
                         ?.let { ownedProductionWorld(context.player, it) }
