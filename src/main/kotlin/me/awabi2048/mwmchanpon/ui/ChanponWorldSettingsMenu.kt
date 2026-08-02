@@ -230,11 +230,32 @@ class ChanponWorldSettingsMenu(
                 listOf(i18n(player, "mwm_action.action")), "gui.tour.worldmenu")
         }
         if (owner && !protected) {
-            addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.EXPANSION_ACTION, 23)
+            addCapability(
+                elements,
+                player,
+                worldData,
+                WorldSettingsCapabilityPlacements.EXPANSION_ACTION,
+                23,
+                displayOnlyWhenUnavailable = !isCurrentWorld(player, worldData),
+            )
             addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.PUBLISH_ACTION, 24)
             elements += mwmActionEntry(player, 25, worldData, WorldSettingsAction.MANAGE_MEMBERS, "member", Material.PLAYER_HEAD, OPERATION_MEMBERS, listOf(i18n(player, "mwm_action.action")))
-            addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.ENVIRONMENT_ACTION, 32)
-            addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.CRITICAL_ACTION, 33)
+            addCapability(
+                elements,
+                player,
+                worldData,
+                WorldSettingsCapabilityPlacements.ENVIRONMENT_ACTION,
+                32,
+                displayOnlyWhenUnavailable = !isCurrentWorld(player, worldData),
+            )
+            addCapability(
+                elements,
+                player,
+                worldData,
+                WorldSettingsCapabilityPlacements.CRITICAL_ACTION,
+                33,
+                displayOnlyWhenUnavailable = !isCurrentWorld(player, worldData),
+            )
             if (MyWorldManagerApi.hasWorldPortals(worldData.uuid)) {
                 elements += mwmActionEntry(player, ChanponWorldSettingsLayout.PORTAL_MANAGEMENT_SLOT, worldData, WorldSettingsAction.MANAGE_PORTALS, "portals", Material.END_PORTAL_FRAME, OPERATION_PORTALS, listOf(i18n(player, "mwm_action.action")))
             }
@@ -293,7 +314,8 @@ class ChanponWorldSettingsMenu(
     ): MenuElement {
         val contract = requireNotNull(MyWorldManagerApi.getWorldSettingsActionContract(player, worldData.uuid, action))
         require(contract.options.size == actionTexts.size)
-        val actionable = contract.actionable && (!requireTargetWorld || isCurrentWorld(player, worldData))
+        val outsideTargetWorld = requireTargetWorld && !isCurrentWorld(player, worldData)
+        val actionable = contract.actionable && !outsideTargetWorld
         return CCSystem.getAPI().getGuiElementService().menuEntry(player, GuiMenuEntrySpec(
             slot = slot,
             material = MyWorldManagerApi.getConfiguredMenuIcon("world_settings", iconKey, material),
@@ -301,8 +323,12 @@ class ChanponWorldSettingsMenu(
             role = if (actionable) GuiElementRole.ACTION else GuiElementRole.CONTENT,
             description = mwmDescription(player, iconKey),
             warnings = if (requireTargetWorld && !isCurrentWorld(player, worldData)) listOf(i18n(player, "common.must_be_in_world_warning")) else emptyList(),
-            actions = contract.options.zip(actionTexts).map { (option, actionText) ->
-                chanponGestureAction(ACTION_SELECT, option.gesture, actionText, mapOf(OPERATION to operation), enabled = actionable, safety = mwmActionSafety(action))
+            actions = if (outsideTargetWorld) {
+                emptyList()
+            } else {
+                contract.options.zip(actionTexts).map { (option, actionText) ->
+                    chanponGestureAction(ACTION_SELECT, option.gesture, actionText, mapOf(OPERATION to operation), enabled = actionable, safety = mwmActionSafety(action))
+                }
             },
             sounds = contract.sounds,
         ))
