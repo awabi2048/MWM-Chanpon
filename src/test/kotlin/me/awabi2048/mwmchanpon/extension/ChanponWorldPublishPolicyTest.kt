@@ -10,7 +10,9 @@ import me.awabi2048.myworldmanager.model.WorldData
 import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertInstanceOf
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class ChanponWorldPublishPolicyTest {
@@ -24,6 +26,8 @@ class ChanponWorldPublishPolicyTest {
             val world = WorldData(
                 UUID.randomUUID(), "test", "", Material.STONE, "test", "", UUID.randomUUID(),
             )
+            val original = "# preserve formatting\nvisibility: private\ncustom:\n  untouched: 'yes'\n"
+            storage.worldFile(world.uuid).writeText(original)
             val before = policy.capturePublishCycleState(player, world)
             assertEquals(true, policy.cyclePublishLevel(player, world))
             val actualAfter = policy.capturePublishCycleState(player, world)
@@ -32,6 +36,7 @@ class ChanponWorldPublishPolicyTest {
                 policy.restorePublishCycleState(player, world, before, actualAfter),
             )
             assertEquals(ChanponWorldVisibility.PRIVATE, storage.getVisibility(world.uuid))
+            assertEquals(original, storage.worldFile(world.uuid).readText())
 
             val staleBefore = policy.capturePublishCycleState(player, world)
             assertEquals(true, policy.cyclePublishLevel(player, world))
@@ -42,6 +47,36 @@ class ChanponWorldPublishPolicyTest {
                 policy.restorePublishCycleState(player, world, staleBefore, staleActualAfter),
             )
             assertEquals(ChanponWorldVisibility.DEVELOPMENT, storage.getVisibility(world.uuid))
+        } finally {
+            folder.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `publish restore removes world file created by the operation when it was absent before`() {
+        val folder = Files.createTempDirectory("chanpon-publish-policy-absent").toFile()
+        try {
+            val storage = ChanponWorldStorage(folder)
+            var callbackVisibility: ChanponWorldVisibility? = null
+            val policy = ChanponWorldPublishPolicy(storage) { _, visibility -> callbackVisibility = visibility }
+            val player = player()
+            val world = WorldData(
+                UUID.randomUUID(), "test", "", Material.STONE, "test", "", UUID.randomUUID(),
+            )
+            assertFalse(storage.worldFile(world.uuid).exists())
+
+            val before = policy.capturePublishCycleState(player, world)
+            assertTrue(policy.cyclePublishLevel(player, world))
+            assertEquals(ChanponWorldVisibility.PUBLIC, callbackVisibility)
+            assertTrue(storage.worldFile(world.uuid).exists())
+            val actualAfter = policy.capturePublishCycleState(player, world)
+
+            assertEquals(
+                WorldPublishReversibleRestoreResult.Restored,
+                policy.restorePublishCycleState(player, world, before, actualAfter),
+            )
+            assertFalse(storage.worldFile(world.uuid).exists())
+            assertEquals(ChanponWorldVisibility.PRIVATE, storage.getVisibility(world.uuid))
         } finally {
             folder.deleteRecursively()
         }

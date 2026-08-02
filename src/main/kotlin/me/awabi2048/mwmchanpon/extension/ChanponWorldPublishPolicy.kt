@@ -41,7 +41,11 @@ class ChanponWorldPublishPolicy(
     }
 
     override fun capturePublishCycleState(player: Player, worldData: WorldData): WorldPublishReversibleState =
-        VisibilityState(worldData.uuid, storage.getVisibility(worldData.uuid))
+        VisibilityState(
+            worldData.uuid,
+            storage.getVisibility(worldData.uuid),
+            storage.captureWorldFileSnapshot(worldData.uuid),
+        )
 
     override fun restorePublishCycleState(
         player: Player,
@@ -56,10 +60,13 @@ class ChanponWorldPublishPolicy(
         if (beforeState.worldUuid != worldData.uuid || expectedState.worldUuid != worldData.uuid) {
             return WorldPublishReversibleRestoreResult.Rejected("Chanpon publish target changed")
         }
-        if (storage.getVisibility(worldData.uuid) != expectedState.visibility) {
+        val restored = storage.restoreWorldFileSnapshot(worldData.uuid, beforeState.worldFileBefore) {
+            storage.getVisibility(worldData.uuid) == expectedState.visibility
+        }
+        if (restored == ChanponWorldStorage.WorldFileRestoreResult.CONCURRENT_CHANGE) {
             return WorldPublishReversibleRestoreResult.Rejected("Chanpon publish state changed concurrently")
         }
-        storage.setVisibility(worldData.uuid, beforeState.visibility)
+        storage.syncVisibility(worldData.uuid)
         return WorldPublishReversibleRestoreResult.Restored
     }
 
@@ -72,6 +79,7 @@ class ChanponWorldPublishPolicy(
     private data class VisibilityState(
         val worldUuid: java.util.UUID,
         val visibility: ChanponWorldVisibility,
+        val worldFileBefore: ChanponWorldStorage.WorldFileSnapshot,
     ) : WorldPublishReversibleState
 
     private fun displayName(player: Player?, visibility: ChanponWorldVisibility): String {
