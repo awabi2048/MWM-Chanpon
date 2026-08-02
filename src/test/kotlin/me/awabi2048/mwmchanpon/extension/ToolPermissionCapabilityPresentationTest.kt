@@ -25,18 +25,23 @@ class ToolPermissionCapabilityPresentationTest {
 
             assertEquals(GuiLoreLine.Data("ツール権限", null, ""), block.lines.first())
             assertEquals(4, block.lines.size)
-            val rendered = block.lines.drop(1).map { (it as GuiLoreLine.Text).text }
-            assertEquals(
-                definitions.map(ToolPermissionDefinition::displayName),
-                rendered.map { it.replace(Regex("§[0-9a-fk-or]", RegexOption.IGNORE_CASE), "").substringAfterLast(' ') },
-            )
+            val options = block.lines.drop(1).map { it as GuiLoreLine.Option }
+            assertEquals(definitions.map(ToolPermissionDefinition::displayName), options.map { it.label })
             definitions.forEach { definition ->
-                assertEquals(1, rendered.count { it.contains(definition.displayName) })
-                val line = rendered.single { it.contains(definition.displayName) }
-                if (states[definition.id] == true) assertTrue(line.startsWith("§6●"))
-                else assertTrue(line.startsWith("§8● §7"))
+                val option = options.single { it.label == definition.displayName }
+                assertEquals(states[definition.id] == true, option.selected)
+                assertEquals("§6", option.selectedColor)
+                assertEquals("§7", option.inactiveColor)
             }
         }
+    }
+
+    @Test
+    fun `tool block uses data then choice semantics`() {
+        val block = toolPermissionLoreBlock("ツール権限", definitions, emptyMap())
+
+        assertTrue(block.lines.first() is GuiLoreLine.Data)
+        assertTrue(block.lines.drop(1).all { it is GuiLoreLine.Option })
     }
 
     @Test

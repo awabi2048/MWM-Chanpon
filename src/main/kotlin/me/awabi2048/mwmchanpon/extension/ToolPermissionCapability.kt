@@ -18,9 +18,10 @@ import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.mwmchanpon.tool.ToolPermissionDefinition
 import me.awabi2048.mwmchanpon.ui.ToolPermissionMenu
 import me.awabi2048.mwmchanpon.ui.chanponCapabilityAction
+import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.MemberManagementCapabilityContract
-import me.awabi2048.myworldmanager.api.extension.MemberManagementCapabilitySubject
 import me.awabi2048.myworldmanager.model.WorldData
+import java.util.UUID
 import org.bukkit.entity.Player
 
 class ToolPermissionCapability(
@@ -73,13 +74,17 @@ class ToolPermissionCapability(
     private fun canManage(player: Player, worldData: WorldData): Boolean =
         player.uniqueId == worldData.owner || player.hasPermission("myworldmanager.admin")
 
-    private fun subject(context: MenuCapabilityContext): MemberManagementCapabilitySubject? =
-        context.attributes[MemberManagementCapabilityContract.SUBJECT_ATTRIBUTE]
-            as? MemberManagementCapabilitySubject
+    private fun subject(context: MenuCapabilityContext): ToolPermissionSubject? =
+        subject(context.arguments)
 
-    private fun subject(context: MenuCapabilityActionContext): MemberManagementCapabilitySubject? =
-        context.attributes[MemberManagementCapabilityContract.SUBJECT_ATTRIBUTE]
-            as? MemberManagementCapabilitySubject
+    private fun subject(context: MenuCapabilityActionContext): ToolPermissionSubject? =
+        subject(context.arguments)
+
+    private fun subject(arguments: Map<String, String>): ToolPermissionSubject? {
+        val target = MemberManagementCapabilityContract.resolveTarget(arguments) ?: return null
+        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(target.worldUuid) ?: return null
+        return ToolPermissionSubject(worldData, target.targetPlayerUuid)
+    }
 
     private fun i18n(player: Player, key: String): String =
         CCSystem.getAPI().getI18nString(player, "chanpon.member_lore.$key")
@@ -90,6 +95,11 @@ class ToolPermissionCapability(
     }
 }
 
+private data class ToolPermissionSubject(
+    val worldData: WorldData,
+    val memberUuid: UUID,
+)
+
 internal fun toolPermissionLoreBlock(
     title: String,
     definitions: List<ToolPermissionDefinition>,
@@ -98,12 +108,11 @@ internal fun toolPermissionLoreBlock(
     add(GuiLoreLine.Data(title, null, ""))
     definitions.forEach { definition ->
         add(
-            GuiLoreLine.Text(
-                if (states[definition.id] == true) {
-                    "§6● ${definition.displayName}"
-                } else {
-                    "§8● §7${definition.displayName}"
-                },
+            GuiLoreLine.Option(
+                label = definition.displayName,
+                selected = states[definition.id] == true,
+                selectedColor = "§6",
+                inactiveColor = "§7",
             ),
         )
     }
