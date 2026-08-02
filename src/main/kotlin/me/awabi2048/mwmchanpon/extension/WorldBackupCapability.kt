@@ -46,6 +46,7 @@ import me.awabi2048.mwmchanpon.service.BackupAutomationService
 import me.awabi2048.mwmchanpon.service.ManualRollbackService
 import me.awabi2048.mwmchanpon.ui.chanponCapabilityAction
 import me.awabi2048.mwmchanpon.ui.chanponGestureAction
+import me.awabi2048.mwmchanpon.ui.reasonedAvailability
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
@@ -113,13 +114,14 @@ class WorldBackupCapability(
                 placement = WorldSettingsCapabilityPlacements.FOOTER_RIGHT_ACTIONS,
                 // TODO: 非本番・非owner等でも項目を消さず、BARRIERと理由Loreを返すdecisionを導入する。
                 availability = me.awabi2048.mwmchanpon.ui.optionalAvailability { context ->
-                    val world = worldUuid(context.arguments)
-                        ?.let { ownedProductionWorld(context.player, it) }
-                        ?: return@optionalAvailability false
-                    !protectionService.isProtected(world)
+                    worldUuid(context.arguments)?.let {
+                        MyWorldManagerApi.getWorldRepository()?.findByUuid(it)
+                    } != null
                 },
                 presentationProvider = MenuCapabilityPresentationProvider { context ->
-                    entryPresentation(context.player)
+                    val decision = backupDecision(context.player, worldUuid(context.arguments))
+                    if (decision.available) entryPresentation(context.player)
+                    else unavailableEntryPresentation(context.player, decision)
                 },
                 actions = listOf(
                     chanponCapabilityAction(
@@ -128,6 +130,12 @@ class WorldBackupCapability(
                         textProvider = MenuCapabilityActionTextProvider {
                             i18n(it.player, "owner_backup.action")
                         },
+                        availability = reasonedAvailability(
+                            reason = { context ->
+                                i18nComponent(context.player, backupDecision(context.player, worldUuid(context.arguments)).messageKey)
+                            },
+                            predicate = { context -> backupDecision(context.player, worldUuid(context.arguments)).available },
+                        ),
                         handler = MenuCapabilityActionHandler(::openFromCapability),
                         safety = MenuActionSafety.NAVIGATION_ONLY,
                     ),
@@ -474,6 +482,36 @@ class WorldBackupCapability(
             amount = 1,
         ),
     )
+
+    private fun unavailableEntryPresentation(player: Player, decision: BackupDecision) =
+        MenuCapabilityPresentation(
+            GuiItemSpec(
+                material = Material.BARRIER,
+                name = GuiNameSpec.FixedLabel(i18nComponent(player, "owner_backup.unavailable.display")),
+                lore = GuiLoreSpec.Blocks(
+                    listOf(GuiLoreBlock(listOf(GuiLoreLine.Warning(i18n(player, decision.messageKey))))),
+                ),
+                role = GuiElementRole.CONTENT,
+                amount = 1,
+            ),
+        )
+
+    private fun backupDecision(player: Player, worldUuid: UUID?): BackupDecision {
+        val world = worldUuid?.let { MyWorldManagerApi.getWorldRepository()?.findByUuid(it) }
+            ?: return BackupDecision(false, "owner_backup.unavailable.world_missing")
+        if (world.owner != player.uniqueId) {
+            return BackupDecision(false, "owner_backup.unavailable.owner_only")
+        }
+        if (!storage.isProductionWorld(world.uuid)) {
+            return BackupDecision(false, "owner_backup.unavailable.not_production")
+        }
+        if (protectionService.isProtected(world)) {
+            return BackupDecision(false, "owner_backup.unavailable.protected")
+        }
+        return BackupDecision(true, "owner_backup.unavailable.world_missing")
+    }
+
+    private data class BackupDecision(val available: Boolean, val messageKey: String)
 
     private fun backupEntry(
         player: Player,

@@ -92,7 +92,8 @@ class MenuCapabilityInspectionReadOnlyContractTest {
                 "worldData",
             ),
             Path.of("src/main/kotlin/me/awabi2048/mwmchanpon/extension/ProductionToggleExtension.kt") to listOf(
-                "isCapabilityAvailable",
+                "isCapabilityInScope",
+                "productionDecision",
                 "creationDraft",
                 "resolveCapabilityPresentation",
                 "resolveCapabilityRoute",

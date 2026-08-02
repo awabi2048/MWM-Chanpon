@@ -201,8 +201,8 @@ class ChanponPlayerWorldCapability(
                 owner = CAPABILITY_OWNER,
                 id = CREATION_CAPABILITY_ID,
                 placement = PlayerWorldCapabilityContract.CREATION_PLACEMENT,
-                        availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
-                            canPrioritizeWorld(it)
+                availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
+                    subject(it)?.targetPlayerUuid == it.player.uniqueId
                 },
                 presentationProvider = MenuCapabilityPresentationProvider {
                     creationPresentation(it)

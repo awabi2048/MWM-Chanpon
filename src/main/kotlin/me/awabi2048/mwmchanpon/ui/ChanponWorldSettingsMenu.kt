@@ -242,9 +242,13 @@ class ChanponWorldSettingsMenu(
         if (CCSystem.getAPI().getMenuNavigationService().canGoBack(player)) {
             elements += actionElement(player, ChanponGuiElements.backSlot(size), null, i18n(player, "common.back"), OPERATION_BACK, GuiElementRole.BACK)
         }
-        addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.FOOTER_ACTIONS, 51)
+        if (owner) {
+            addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.FOOTER_ACTIONS, 6)
+        }
         addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.FOOTER_LEFT_ACTIONS, ChanponWorldSettingsLayout.linkedPortalSlot(size, owner, protected))
-        addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.FOOTER_RIGHT_ACTIONS, size - 4)
+        if (owner) {
+            addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.FOOTER_RIGHT_ACTIONS, size - 3)
+        }
         return InventoryMenuView(
             size,
             CCSystem.getAPI().getI18nComponent(player, "gui.settings.title", mapOf("world" to worldData.name)),

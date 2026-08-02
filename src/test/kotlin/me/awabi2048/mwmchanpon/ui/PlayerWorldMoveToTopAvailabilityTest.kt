@@ -39,7 +39,7 @@ class PlayerWorldMoveToTopAvailabilityTest {
             Path.of("src/main/kotlin/me/awabi2048/mwmchanpon/ui/ChanponPlayerWorldCapability.kt"),
         )
 
-        assertEquals(3, Regex("canPrioritizeWorld\\(it\\)|canPrioritizeWorld\\(context\\)").findAll(source).count())
+        assertEquals(2, Regex("canPrioritizeWorld\\(it\\)|canPrioritizeWorld\\(context\\)").findAll(source).count())
         assertTrue(source.contains("if (!canPrioritizeWorld(context)) return MenuActionResult.Ignored"))
         assertTrue(source.contains("MyWorldManagerApi.prioritizePlayerWorld(player.uniqueId, worldData.uuid)"))
         assertEquals(2, source.split("reversibleContract = MwmReversibleContracts.displayOrder()").size - 1)
