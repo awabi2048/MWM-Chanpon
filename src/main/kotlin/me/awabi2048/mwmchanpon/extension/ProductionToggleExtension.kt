@@ -50,6 +50,7 @@ import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.mwmchanpon.ui.ChanponGuiElements
 import me.awabi2048.mwmchanpon.ui.chanponCapabilityAction
 import me.awabi2048.mwmchanpon.ui.chanponGestureAction
+import me.awabi2048.mwmchanpon.ui.reasonedAvailability
 import me.awabi2048.mwmchanpon.service.ChanponReversibleContracts
 import me.awabi2048.mwmchanpon.service.ChanponReversibleActionClassification
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
@@ -143,7 +144,7 @@ class ProductionToggleExtension(
                 owner = RUNTIME_OWNER,
                 id = CAPABILITY_ID,
                 placement = WorldSettingsCapabilityPlacements.FOOTER_ACTIONS,
-                availability = me.awabi2048.mwmchanpon.ui.optionalAvailability(::isCapabilityAvailable),
+                availability = me.awabi2048.mwmchanpon.ui.optionalAvailability(::isCapabilityInScope),
                 presentationProvider =
                     MenuCapabilityPresentationProvider(::resolveCapabilityPresentation),
                 actions = listOf(
@@ -152,8 +153,12 @@ class ProductionToggleExtension(
                         trigger = MenuCapabilityTrigger.ANY,
                         textProvider =
                             MenuCapabilityActionTextProvider(::capabilityActionText),
-                        availability =
-                            me.awabi2048.mwmchanpon.ui.optionalAvailability { resolveCapabilityRoute(it) != null },
+                        availability = reasonedAvailability(
+                            reason = { context ->
+                                i18nComponent(context.player, productionDecision(context).messageKey)
+                            },
+                            predicate = { context -> productionDecision(context).available },
+                        ),
                         handler = MenuCapabilityActionHandler(::handleCapabilityAction),
                         safety = MenuActionSafety.CONFIRM_ENTRY,
                     ),
@@ -256,16 +261,11 @@ class ProductionToggleExtension(
         val expectedPending: Boolean?,
     )
 
-    private fun isCapabilityAvailable(context: com.awabi2048.ccsystem.api.gui.MenuCapabilityContext): Boolean {
+    private fun isCapabilityInScope(context: com.awabi2048.ccsystem.api.gui.MenuCapabilityContext): Boolean {
         // TODO: 本番設定を変更できない場合も項目を消さず、BARRIERと理由Loreを返す。
         val worldData = worldData(context.arguments) ?: return false
-        if (globalStorage.getWorldCreationAvailability() != WorldCreationAvailability.PRODUCTION) return false
-        if (protectionService.isProtected(worldData)) return false
-        if (worldData.owner != context.player.uniqueId &&
-            !context.player.hasPermission("myworldmanager.admin")
-        ) return false
-        return storage.isProductionWorld(worldData.uuid) ||
-            !ownerHasProductionWorld(worldData.owner, worldData.uuid)
+        return worldData.owner == context.player.uniqueId ||
+            context.player.hasPermission("myworldmanager.admin")
     }
 
     private fun creationDraft(
@@ -285,13 +285,9 @@ class ProductionToggleExtension(
     ): MenuCapabilityPresentation {
         // TODO: availability・presentation・actionを単一のdecisionから生成し、表示と実行可否の判定を一致させる。
         val worldData = requireNotNull(worldData(context.arguments))
-        if (plugin.isSubmissionClosed()) {
-            return capabilityPresentation(
-                Material.GRAY_STAINED_GLASS_PANE,
-                Component.empty(),
-                GuiLoreSpec.None,
-                GuiElementRole.DECORATION,
-            )
+        val decision = productionDecision(context)
+        if (!decision.available) {
+            return productionUnavailablePresentation(context.player, decision.messageKey)
         }
         return if (storage.isProductionWorld(worldData.uuid)) {
             submissionPresentation(context.player, worldData.uuid)
@@ -299,6 +295,42 @@ class ProductionToggleExtension(
             productionPresentation(context.player)
         }
     }
+
+    private fun productionDecision(
+        context: com.awabi2048.ccsystem.api.gui.MenuCapabilityContext,
+    ): ProductionDecision {
+        val worldData = worldData(context.arguments)
+            ?: return ProductionDecision(false, "production.unavailable.world_missing")
+        if (plugin.isSubmissionClosed()) {
+            return ProductionDecision(false, "production.unavailable.submission_closed")
+        }
+        if (globalStorage.getWorldCreationAvailability() != WorldCreationAvailability.PRODUCTION) {
+            return ProductionDecision(false, "production.unavailable.phase")
+        }
+        if (protectionService.isProtected(worldData)) {
+            return ProductionDecision(false, "production.unavailable.protected")
+        }
+        if (worldData.owner != context.player.uniqueId && !context.player.hasPermission("myworldmanager.admin")) {
+            return ProductionDecision(false, "production.unavailable.owner_only")
+        }
+        if (!storage.isProductionWorld(worldData.uuid) && ownerHasProductionWorld(worldData.owner, worldData.uuid)) {
+            return ProductionDecision(false, "production.unavailable.limit")
+        }
+        if (resolveCapabilityRoute(context) == null) {
+            return ProductionDecision(false, "production.unavailable.state")
+        }
+        return ProductionDecision(true, "production.unavailable.world_missing")
+    }
+
+    private fun productionUnavailablePresentation(player: Player, messageKey: String) =
+        capabilityPresentation(
+            Material.BARRIER,
+            i18nComponent(player, "production.unavailable.display"),
+            structuredLore(listOf(GuiLoreLine.Warning(i18n(player, messageKey)))),
+            GuiElementRole.CONTENT,
+        )
+
+    private data class ProductionDecision(val available: Boolean, val messageKey: String)
 
     private fun resolveCapabilityRoute(
         context: com.awabi2048.ccsystem.api.gui.MenuCapabilityContext,

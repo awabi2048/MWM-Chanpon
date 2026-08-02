@@ -85,27 +85,15 @@ class ChanponPlayerWorldCapability(
                 },
                 actions = listOf(
                     chanponCapabilityAction(
-                        id = "primary",
-                        trigger = MenuCapabilityTrigger.LEFT,
-                        textProvider = MenuCapabilityActionTextProvider(::primaryWorldActionText),
-                        availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
-                            world(it)?.let { world ->
-                                !world.isArchived &&
-                                    (!isCurrentWorld(it.player, world) || canOpenSettings(it.player, world))
-                            } == true
-                        },
-                        handler = MenuCapabilityActionHandler(::handleWorld),
-                        safety = MenuActionSafety.NAVIGATION_ONLY,
-                    ),
-                    chanponCapabilityAction(
                         id = "settings",
-                        trigger = MenuCapabilityTrigger.RIGHT,
+                        trigger = MenuCapabilityTrigger.LEFT_RIGHT,
                         textProvider = MenuCapabilityActionTextProvider {
                             text(it.player, "gui.player_world.world_item.settings")
                         },
                         availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
                             world(it)?.let { world ->
-                                canOpenSettings(it.player, world)
+                                !world.isArchived &&
+                                    canOpenSettings(it.player, world)
                             } == true
                         },
                         handler = MenuCapabilityActionHandler(::handleWorld),
@@ -201,8 +189,8 @@ class ChanponPlayerWorldCapability(
                 owner = CAPABILITY_OWNER,
                 id = CREATION_CAPABILITY_ID,
                 placement = PlayerWorldCapabilityContract.CREATION_PLACEMENT,
-                        availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
-                            canPrioritizeWorld(it)
+                availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
+                    subject(it)?.targetPlayerUuid == it.player.uniqueId
                 },
                 presentationProvider = MenuCapabilityPresentationProvider {
                     creationPresentation(it)
