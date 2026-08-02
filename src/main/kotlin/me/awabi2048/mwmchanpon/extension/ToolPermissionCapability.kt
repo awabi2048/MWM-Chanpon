@@ -108,11 +108,11 @@ internal fun toolPermissionLoreBlock(
     add(GuiLoreLine.Data(title, null, ""))
     definitions.forEach { definition ->
         add(
-            GuiLoreLine.Option(
+            GuiLoreLine.Checkbox(
                 label = definition.displayName,
-                selected = states[definition.id] == true,
-                selectedColor = "§6",
-                inactiveColor = "§7",
+                checked = states[definition.id] == true,
+                checkedColor = "§6",
+                uncheckedColor = "§8",
             ),
         )
     }

@@ -25,13 +25,14 @@ class ToolPermissionCapabilityPresentationTest {
 
             assertEquals(GuiLoreLine.Data("ツール権限", null, ""), block.lines.first())
             assertEquals(4, block.lines.size)
-            val options = block.lines.drop(1).map { it as GuiLoreLine.Option }
-            assertEquals(definitions.map(ToolPermissionDefinition::displayName), options.map { it.label })
+            val checkboxes = block.lines.drop(1).map { it as GuiLoreLine.Checkbox }
+            assertEquals(definitions.map(ToolPermissionDefinition::displayName), checkboxes.map { it.label })
             definitions.forEach { definition ->
-                val option = options.single { it.label == definition.displayName }
-                assertEquals(states[definition.id] == true, option.selected)
-                assertEquals("§6", option.selectedColor)
-                assertEquals("§7", option.inactiveColor)
+                val checkbox = checkboxes.single { it.label == definition.displayName }
+                assertEquals(states[definition.id] == true, checkbox.checked)
+                assertEquals("§6", checkbox.checkedColor)
+                assertEquals("§8", checkbox.uncheckedColor)
+                assertEquals("◆", checkbox.marker)
             }
         }
     }
@@ -41,7 +42,7 @@ class ToolPermissionCapabilityPresentationTest {
         val block = toolPermissionLoreBlock("ツール権限", definitions, emptyMap())
 
         assertTrue(block.lines.first() is GuiLoreLine.Data)
-        assertTrue(block.lines.drop(1).all { it is GuiLoreLine.Option })
+        assertTrue(block.lines.drop(1).all { it is GuiLoreLine.Checkbox })
     }
 
     @Test

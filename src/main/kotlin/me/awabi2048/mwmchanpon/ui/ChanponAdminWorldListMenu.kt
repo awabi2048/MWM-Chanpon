@@ -397,9 +397,8 @@ class ChanponAdminWorldListMenu(
             name = GuiNameSpec.FixedLabel(i18nComponent(player, "$key.display")),
             role = GuiElementRole.ACTION,
             options = optionKeys.map { GuiMenuEntryOption(i18n(player, it), it == selectedKey) },
-            actions = listOf(chanponGestureAction(
+            actions = listOf(chanponCycleAction(
                 actionId,
-                MenuGesture.ANY,
                 i18n(player, "common.action_next"),
                 // Route payloadだけを置換する一覧表示の操作で、ワールド状態は変更しません。
                 safety = MenuActionSafety.NAVIGATION_ONLY,

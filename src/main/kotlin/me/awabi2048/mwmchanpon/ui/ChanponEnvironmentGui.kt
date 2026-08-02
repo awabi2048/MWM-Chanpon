@@ -336,9 +336,8 @@ class ChanponEnvironmentGui(
             PAYLOAD_SETTING to key,
         )
         val actions = buildList {
-            add(chanponGestureAction(
+            add(chanponCycleAction(
                 ACTION_SETTING,
-                MenuGesture.PLAIN_LEFT_RIGHT,
                 i18n(player, "common.action_next"),
                 payload,
                 safety = MenuActionSafety.REVERSIBLE,
@@ -395,9 +394,8 @@ class ChanponEnvironmentGui(
             PAYLOAD_SETTING to ACTION_PROTECTION,
         )
         val actions = buildList {
-            add(chanponGestureAction(
+            add(chanponCycleAction(
                 ACTION_SETTING,
-                MenuGesture.PLAIN_LEFT_RIGHT,
                 i18n(player, "common.action_next"),
                 payload,
                 safety = MenuActionSafety.REVERSIBLE,

@@ -11,6 +11,7 @@ import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionTextProvider
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionGuidance
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
@@ -82,7 +83,9 @@ class LinkedPortalCapability {
             role = GuiElementRole.ACTION,
             amount = 1,
         ),
-    )
+    ).also {
+        it.actionGuidance = MenuCapabilityActionGuidance.HIDDEN
+    }
 
     private fun worldData(arguments: Map<String, String>): WorldData? =
         arguments[WORLD_UUID]

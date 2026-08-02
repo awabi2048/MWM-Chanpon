@@ -75,8 +75,10 @@ internal class ChanponWorldSettingsCapabilities(
                         feature,
                     )
                 },
-                actions = listOf(
-                    chanponCapabilityAction(
+                actions = if (feature == WorldSettingsFeature.PUBLISH) {
+                    listOf(publishCycleAction())
+                } else {
+                    listOf(chanponCapabilityAction(
                         id = feature.name.lowercase(),
                         trigger = menu.actionTrigger(feature),
                         textProvider = MenuCapabilityActionTextProvider { context ->
@@ -106,11 +108,43 @@ internal class ChanponWorldSettingsCapabilities(
                         safety = featureActionSafety(feature),
                         reversibleContract = featureReversibleContract(feature),
                         classification = featureClassification(feature),
-                    ),
-                ),
+                    ))
+                },
             ),
         )
     }
+
+    private fun publishCycleAction() = chanponCapabilityAction(
+        id = "publish-cycle",
+        trigger = MenuCapabilityTrigger.LEFT_RIGHT,
+        textProvider = MenuCapabilityActionTextProvider { context ->
+            menu.featureActionText(context.player, WorldSettingsFeature.PUBLISH)
+        },
+        availability = me.awabi2048.mwmchanpon.ui.reasonedAvailability(
+            reason = { context ->
+                menu.featureUnavailableReason(
+                    context.player,
+                    requireNotNull(worldData(context)),
+                    WorldSettingsFeature.PUBLISH,
+                )
+            },
+        ) { context ->
+            worldData(context)?.let {
+                menu.isFeatureActionable(context.player, it, WorldSettingsFeature.PUBLISH)
+            } == true
+        },
+        handler = MenuCapabilityActionHandler { context ->
+            menu.handleFeature(
+                context.player,
+                requireNotNull(worldData(context)),
+                WorldSettingsFeature.PUBLISH,
+                context.click,
+            )
+        },
+        safety = MenuActionSafety.REVERSIBLE,
+        reversibleContract = ChanponReversibleContracts.publication(),
+        classification = ChanponReversibleActionClassification.Operation.PUBLICATION_CYCLE,
+    )
 
     private fun worldData(context: MenuCapabilityContext): WorldData? =
         context.arguments[WORLD_UUID]

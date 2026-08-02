@@ -662,9 +662,8 @@ class SubmissionAdminMenu(
             name = GuiNameSpec.FixedLabel(i18nComponent(player, displayKey)),
             role = GuiElementRole.ACTION,
             options = optionKeys.map { GuiMenuEntryOption(i18n(player, it), it == selectedKey) },
-            actions = listOf(chanponGestureAction(
+            actions = listOf(chanponCycleAction(
                 actionId,
-                MenuGesture.ANY,
                 i18n(player, "common.action_next"),
                 // フィルタ／並び順は次Routeの表示状態のみを変更します。
                 safety = MenuActionSafety.NAVIGATION_ONLY,

@@ -5,7 +5,6 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiCycle
-import com.awabi2048.ccsystem.api.gui.GuiCycleDirection
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
@@ -179,11 +178,12 @@ class ChanponAdminMenu(
     }
 
     private fun cycleWorldCreation(context: MenuActionContext): MenuActionResult {
+        val direction = GuiCycle.direction(context.click) ?: return MenuActionResult.Ignored
         globalStorage.setWorldCreationAvailability(
             GuiCycle.select(
                 globalStorage.getWorldCreationAvailability(),
                 WorldCreationAvailability.entries.toList(),
-                GuiCycleDirection.NEXT,
+                direction,
             ),
         )
         return MenuActionResult.Success(MenuUpdate.Refresh)
@@ -350,9 +350,8 @@ class ChanponAdminMenu(
                 },
                 warnings = emptyList(),
                 dangers = emptyList(),
-                actions = listOf(chanponGestureAction(
+                actions = listOf(chanponCycleAction(
                     ACTION_WORLD_CREATION,
-                    MenuGesture.ANY,
                     controlsI18n(player, "creation.cycle_action"),
                     safety = MenuActionSafety.REVERSIBLE,
                     reversibleContract = ChanponReversibleContracts.adminWorldControls("creation"),
