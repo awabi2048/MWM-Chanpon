@@ -6,7 +6,11 @@ import org.junit.jupiter.api.Test
 class ChanponWorldSettingsLayoutTest {
     @Test
     fun `ポータル管理は設定画面の固定スロットを使用する`() {
-        assertEquals(52, ChanponWorldSettingsLayout.PORTAL_MANAGEMENT_SLOT)
+        assertEquals(6, ChanponWorldSettingsLayout.PORTAL_MANAGEMENT_SLOT)
+        assertEquals(51, ChanponWorldSettingsLayout.backupSlot(54))
+        assertEquals(52, ChanponWorldSettingsLayout.productionSubmissionSlot(54))
+        assertEquals(42, ChanponWorldSettingsLayout.backupSlot(45))
+        assertEquals(43, ChanponWorldSettingsLayout.productionSubmissionSlot(45))
     }
 
     @Test

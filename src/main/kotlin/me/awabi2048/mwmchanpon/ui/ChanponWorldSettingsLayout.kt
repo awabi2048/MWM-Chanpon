@@ -1,7 +1,11 @@
 package me.awabi2048.mwmchanpon.ui
 
 internal object ChanponWorldSettingsLayout {
-    const val PORTAL_MANAGEMENT_SLOT = 52
+    const val PORTAL_MANAGEMENT_SLOT = 6
+
+    fun backupSlot(inventorySize: Int): Int = inventorySize - 3
+
+    fun productionSubmissionSlot(inventorySize: Int): Int = inventorySize - 2
 
     fun linkedPortalSlot(
         inventorySize: Int,

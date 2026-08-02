@@ -24,8 +24,20 @@ class WorldSettingsAvailabilityContractTest {
     fun `設定画面の固定配置を維持する`() {
         val menu = source("ui/ChanponWorldSettingsMenu.kt")
 
-        assertTrue("WorldSettingsCapabilityPlacements.FOOTER_ACTIONS, 6" in menu)
-        assertTrue("WorldSettingsCapabilityPlacements.FOOTER_RIGHT_ACTIONS, size - 3" in menu)
+        assertTrue("WorldSettingsCapabilityPlacements.FOOTER_ACTIONS, ChanponWorldSettingsLayout.productionSubmissionSlot(size)" in menu)
+        assertTrue("WorldSettingsCapabilityPlacements.FOOTER_RIGHT_ACTIONS, ChanponWorldSettingsLayout.backupSlot(size)" in menu)
+        assertTrue("displayOnlyWhenUnavailable = true" in menu)
+    }
+
+    @Test
+    fun `現在ワールドの設定操作は左右クリックを一つの操作として宣言する`() {
+        val source = source("ui/ChanponPlayerWorldCapability.kt")
+        val currentWorld = source.substringAfter("id = CURRENT_WORLD_CAPABILITY_ID")
+            .substringBefore("id = AWAY_WORLD_CAPABILITY_ID")
+
+        assertTrue("trigger = MenuCapabilityTrigger.LEFT_RIGHT" in currentWorld)
+        assertFalse("trigger = MenuCapabilityTrigger.LEFT," in currentWorld)
+        assertFalse("trigger = MenuCapabilityTrigger.RIGHT," in currentWorld)
     }
 
     @Test

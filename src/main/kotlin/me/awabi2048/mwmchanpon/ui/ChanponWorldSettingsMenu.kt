@@ -10,6 +10,7 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
 import com.awabi2048.ccsystem.api.gui.GuiMenuCapabilityInvocationSpec
+import com.awabi2048.ccsystem.api.gui.GuiUnavailableInteraction
 import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
@@ -243,11 +244,11 @@ class ChanponWorldSettingsMenu(
             elements += actionElement(player, ChanponGuiElements.backSlot(size), null, i18n(player, "common.back"), OPERATION_BACK, GuiElementRole.BACK)
         }
         if (owner) {
-            addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.FOOTER_ACTIONS, 6)
+            addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.FOOTER_ACTIONS, ChanponWorldSettingsLayout.productionSubmissionSlot(size), displayOnlyWhenUnavailable = true)
         }
         addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.FOOTER_LEFT_ACTIONS, ChanponWorldSettingsLayout.linkedPortalSlot(size, owner, protected))
         if (owner) {
-            addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.FOOTER_RIGHT_ACTIONS, size - 3)
+            addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.FOOTER_RIGHT_ACTIONS, ChanponWorldSettingsLayout.backupSlot(size), displayOnlyWhenUnavailable = true)
         }
         return InventoryMenuView(
             size,
@@ -257,7 +258,14 @@ class ChanponWorldSettingsMenu(
         )
     }
 
-    private fun addCapability(elements: MutableList<MenuElement>, player: Player, worldData: WorldData, placement: String, slot: Int) {
+    private fun addCapability(
+        elements: MutableList<MenuElement>,
+        player: Player,
+        worldData: WorldData,
+        placement: String,
+        slot: Int,
+        displayOnlyWhenUnavailable: Boolean = false,
+    ) {
         val service = CCSystem.getAPI().getMenuCapabilityService()
         val arguments = mapOf(WORLD_UUID to worldData.uuid.toString())
         val capability = service.definitions(placement).firstNotNullOfOrNull {
@@ -269,6 +277,11 @@ class ChanponWorldSettingsMenu(
                 slot,
                 capability.requireExplicitActionSafety(),
                 arguments = arguments,
+                unavailableInteraction = if (displayOnlyWhenUnavailable) {
+                    GuiUnavailableInteraction.DISPLAY_ONLY
+                } else {
+                    GuiUnavailableInteraction.REJECT_WITH_REASON
+                },
             ),
         )
     }
