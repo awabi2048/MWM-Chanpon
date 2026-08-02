@@ -51,6 +51,42 @@ internal fun chanponGestureAction(
     )
 }
 
+internal fun chanponCycleAction(
+    actionId: String,
+    nextLabel: String,
+    previousLabel: String,
+    payload: Map<String, String> = emptyMap(),
+    enabled: Boolean = true,
+    safety: MenuActionSafety,
+    reversibleContract: MenuReversibleContract? = null,
+    classification: ChanponReversibleActionClassification.Operation? = null,
+): GuiMenuActionIntent.LeftRight {
+    fun directional(gesture: MenuGesture, label: String): GuiMenuActionIntent.AnyClick {
+        val action = chanponGestureAction(
+            actionId,
+            gesture,
+            label,
+            payload,
+            enabled,
+            safety,
+            reversibleContract,
+            classification,
+        )
+        return GuiMenuActionIntent.AnyClick(
+            action.actionId,
+            action.label,
+            action.payload,
+            action.enabled,
+            action.safety,
+            action.reversibleContract,
+        )
+    }
+    return GuiMenuActionIntent.LeftRight(
+        left = directional(MenuGesture.LEFT, nextLabel),
+        right = directional(MenuGesture.RIGHT, previousLabel),
+    )
+}
+
 /** Chanpon公開Capabilityの操作にも安全区分を必須化します。 */
 internal fun chanponCapabilityAction(
     id: String,

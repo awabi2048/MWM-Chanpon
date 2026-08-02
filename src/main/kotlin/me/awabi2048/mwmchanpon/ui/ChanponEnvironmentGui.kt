@@ -336,10 +336,10 @@ class ChanponEnvironmentGui(
             PAYLOAD_SETTING to key,
         )
         val actions = buildList {
-            add(chanponGestureAction(
+            add(chanponCycleAction(
                 ACTION_SETTING,
-                MenuGesture.PLAIN_LEFT_RIGHT,
                 i18n(player, "common.action_next"),
+                i18n(player, "common.action_previous"),
                 payload,
                 safety = MenuActionSafety.REVERSIBLE,
                 reversibleContract = ChanponReversibleContracts.environment(worldUuid),
@@ -395,10 +395,10 @@ class ChanponEnvironmentGui(
             PAYLOAD_SETTING to ACTION_PROTECTION,
         )
         val actions = buildList {
-            add(chanponGestureAction(
+            add(chanponCycleAction(
                 ACTION_SETTING,
-                MenuGesture.PLAIN_LEFT_RIGHT,
                 i18n(player, "common.action_next"),
+                i18n(player, "common.action_previous"),
                 payload,
                 safety = MenuActionSafety.REVERSIBLE,
                 reversibleContract = ChanponReversibleContracts.environment(worldData.uuid),

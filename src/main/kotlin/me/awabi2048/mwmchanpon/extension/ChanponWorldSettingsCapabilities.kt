@@ -12,6 +12,7 @@ import com.awabi2048.ccsystem.api.gui.MenuCapabilityContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentationProvider
 import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
+import com.awabi2048.ccsystem.api.gui.GuiCycleDirection
 import me.awabi2048.mwmchanpon.ui.ChanponWorldSettingsMenu
 import me.awabi2048.mwmchanpon.ui.WorldSettingsFeature
 import me.awabi2048.mwmchanpon.ui.chanponCapabilityAction
@@ -75,8 +76,13 @@ internal class ChanponWorldSettingsCapabilities(
                         feature,
                     )
                 },
-                actions = listOf(
-                    chanponCapabilityAction(
+                actions = if (feature == WorldSettingsFeature.PUBLISH) {
+                    listOf(
+                        publishCycleAction(MenuCapabilityTrigger.LEFT, GuiCycleDirection.NEXT),
+                        publishCycleAction(MenuCapabilityTrigger.RIGHT, GuiCycleDirection.PREVIOUS),
+                    )
+                } else {
+                    listOf(chanponCapabilityAction(
                         id = feature.name.lowercase(),
                         trigger = menu.actionTrigger(feature),
                         textProvider = MenuCapabilityActionTextProvider { context ->
@@ -106,11 +112,46 @@ internal class ChanponWorldSettingsCapabilities(
                         safety = featureActionSafety(feature),
                         reversibleContract = featureReversibleContract(feature),
                         classification = featureClassification(feature),
-                    ),
-                ),
+                    ))
+                },
             ),
         )
     }
+
+    private fun publishCycleAction(
+        trigger: MenuCapabilityTrigger,
+        direction: GuiCycleDirection,
+    ) = chanponCapabilityAction(
+        id = "publish-${direction.name.lowercase()}",
+        trigger = trigger,
+        textProvider = MenuCapabilityActionTextProvider { context ->
+            menu.publishCycleActionText(context.player, direction)
+        },
+        availability = me.awabi2048.mwmchanpon.ui.reasonedAvailability(
+            reason = { context ->
+                menu.featureUnavailableReason(
+                    context.player,
+                    requireNotNull(worldData(context)),
+                    WorldSettingsFeature.PUBLISH,
+                )
+            },
+        ) { context ->
+            worldData(context)?.let {
+                menu.isFeatureActionable(context.player, it, WorldSettingsFeature.PUBLISH)
+            } == true
+        },
+        handler = MenuCapabilityActionHandler { context ->
+            menu.handleFeature(
+                context.player,
+                requireNotNull(worldData(context)),
+                WorldSettingsFeature.PUBLISH,
+                context.click,
+            )
+        },
+        safety = MenuActionSafety.REVERSIBLE,
+        reversibleContract = ChanponReversibleContracts.publication(),
+        classification = ChanponReversibleActionClassification.Operation.PUBLICATION_CYCLE,
+    )
 
     private fun worldData(context: MenuCapabilityContext): WorldData? =
         context.arguments[WORLD_UUID]

@@ -957,7 +957,10 @@ class ChanponWorldSettingsMenu(
         return i18n(player, "visibility.${visibility.storageValue}")
     }
 
-    private fun cycleVisibility(current: ChanponWorldVisibility): ChanponWorldVisibility {
+    private fun cycleVisibility(
+        current: ChanponWorldVisibility,
+        direction: GuiCycleDirection,
+    ): ChanponWorldVisibility {
         return GuiCycle.select(
             current,
             listOf(
@@ -965,7 +968,7 @@ class ChanponWorldSettingsMenu(
                 ChanponWorldVisibility.DEVELOPMENT,
                 ChanponWorldVisibility.PRIVATE,
             ),
-            GuiCycleDirection.NEXT,
+            direction,
         )
     }
 
@@ -1053,7 +1056,7 @@ class ChanponWorldSettingsMenu(
         player: Player,
         feature: WorldSettingsFeature,
     ): String = when (feature) {
-        WorldSettingsFeature.PUBLISH -> text(player, "gui.common.action.cycle")
+        WorldSettingsFeature.PUBLISH -> i18n(player, "publish.cycle_next_action")
         WorldSettingsFeature.EXPANSION ->
             text(player, "gui.settings.expand.action.open_menu")
         WorldSettingsFeature.NOTIFICATION ->
@@ -1062,6 +1065,11 @@ class ChanponWorldSettingsMenu(
             i18n(player, "mwm_action.action")
         WorldSettingsFeature.CRITICAL ->
             i18n(player, "critical.action")
+    }
+
+    internal fun publishCycleActionText(player: Player, direction: GuiCycleDirection): String = when (direction) {
+        GuiCycleDirection.NEXT -> i18n(player, "publish.cycle_next_action")
+        GuiCycleDirection.PREVIOUS -> i18n(player, "publish.cycle_previous_action")
     }
 
     internal fun handleFeature(
@@ -1080,7 +1088,8 @@ class ChanponWorldSettingsMenu(
                 }
             }
             WorldSettingsFeature.PUBLISH -> {
-                val next = cycleVisibility(storage.getVisibility(worldData.uuid))
+                val direction = GuiCycle.direction(click) ?: return MenuActionResult.Ignored
+                val next = cycleVisibility(storage.getVisibility(worldData.uuid), direction)
                 storage.setVisibility(worldData.uuid, next)
                 MenuActionResult.Success(MenuUpdate.Refresh)
             }
