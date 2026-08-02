@@ -433,7 +433,7 @@ class MWMChanponPlugin : JavaPlugin() {
 
     private companion object {
         private const val MENU_OWNER = "mwm-chanpon"
-        private const val REQUIRED_GUI_RUNTIME_CONTRACT_VERSION = 5
+        private const val REQUIRED_GUI_RUNTIME_CONTRACT_VERSION = 6
     }
 
 }

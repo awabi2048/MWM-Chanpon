@@ -1,28 +1,19 @@
 package me.awabi2048.mwmchanpon.extension
 
 import com.awabi2048.ccsystem.CCSystem
-import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
-import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
-import com.awabi2048.ccsystem.api.gui.GuiItemSpec
-import com.awabi2048.ccsystem.api.gui.GuiNameSpec
-import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
 import com.awabi2048.ccsystem.api.gui.MenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionContext
-import com.awabi2048.ccsystem.api.gui.MenuCapabilityAction
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityActionTextProvider
-import com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger
-import com.awabi2048.ccsystem.api.gui.MenuCapabilityAvailability
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityContext
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentationProvider
+import com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.mwmchanpon.tool.ToolPermissionDefinition
 import me.awabi2048.mwmchanpon.ui.ToolPermissionMenu
@@ -30,12 +21,7 @@ import me.awabi2048.mwmchanpon.ui.chanponCapabilityAction
 import me.awabi2048.myworldmanager.api.extension.MemberManagementCapabilityContract
 import me.awabi2048.myworldmanager.api.extension.MemberManagementCapabilitySubject
 import me.awabi2048.myworldmanager.model.WorldData
-import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.format.TextDecoration
-import org.bukkit.Bukkit
-import org.bukkit.Material
 import org.bukkit.entity.Player
-import org.bukkit.event.inventory.ClickType
 
 class ToolPermissionCapability(
     private val menu: ToolPermissionMenu,
@@ -49,29 +35,26 @@ class ToolPermissionCapability(
                 id = CAPABILITY_ID,
                 placement = MemberManagementCapabilityContract.PLACEMENT,
                 availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
-                    subject(it)?.let { subject ->
-                        canManage(it.player, subject.worldData)
-                    } == true
+                    subject(it)?.let { subject -> canManage(it.player, subject.worldData) } == true
                 },
                 presentationProvider = MenuCapabilityPresentationProvider {
                     val subject = requireNotNull(subject(it))
-                    buildPresentation(
-                        it.player,
-                        subject.worldData,
-                        subject.memberUuid,
-                        controller.getMemberToolStates(
-                            subject.worldData,
-                            subject.memberUuid,
+                    MenuCapabilityPresentation.hostAugmentation(
+                        listOf(
+                            toolPermissionLoreBlock(
+                                i18n(it.player, "tool_permission_title"),
+                                definitions,
+                                controller.getMemberToolStates(subject.worldData, subject.memberUuid),
+                            ),
                         ),
                     )
                 },
                 actions = listOf(
                     chanponCapabilityAction(
                         id = "edit",
-                        // メンバー一覧ではShift操作を別枝として併設するため、通常左右クリックを使用する。
                         trigger = MenuCapabilityTrigger.LEFT_RIGHT,
                         textProvider = MenuCapabilityActionTextProvider {
-                            i18n(it.player, "click_edit_action")
+                            i18n(it.player, "tool_permission_operation")
                         },
                         handler = MenuCapabilityActionHandler(::handlePrimaryAction),
                         safety = MenuActionSafety.NAVIGATION_ONLY,
@@ -81,76 +64,14 @@ class ToolPermissionCapability(
         )
     }
 
-    private fun handlePrimaryAction(
-        context: MenuCapabilityActionContext,
-    ): MenuActionResult {
+    private fun handlePrimaryAction(context: MenuCapabilityActionContext): MenuActionResult {
         val subject = subject(context) ?: return MenuActionResult.Ignored
         if (!canManage(context.player, subject.worldData)) return MenuActionResult.Ignored
-        return MenuActionResult.Success(
-            MenuUpdate.Navigate(
-                menu.route(subject.worldData.uuid, subject.memberUuid),
-            ),
-        )
+        return MenuActionResult.Success(MenuUpdate.Navigate(menu.route(subject.worldData.uuid, subject.memberUuid)))
     }
 
     private fun canManage(player: Player, worldData: WorldData): Boolean =
-        player.uniqueId == worldData.owner ||
-            player.hasPermission("myworldmanager.admin")
-
-    private fun buildPresentation(
-        player: Player,
-        worldData: WorldData,
-        memberUuid: java.util.UUID,
-        states: Map<String, Boolean>,
-    ): MenuCapabilityPresentation {
-        val offlinePlayer = Bukkit.getOfflinePlayer(memberUuid)
-        val identity = offlinePlayer.name ?: memberUuid.toString()
-        val identityColor = if (offlinePlayer.isOnline) "§a" else "§c"
-        val statusLines = mutableListOf<GuiLoreLine>()
-        if (offlinePlayer.isOnline) {
-            statusLines += GuiLoreLine.Text(i18n(player, "online"))
-        } else {
-            val date = if (offlinePlayer.lastSeen > 0) {
-                Instant.ofEpochMilli(offlinePlayer.lastSeen)
-                    .atZone(ZoneId.systemDefault())
-                    .format(DateTimeFormatter.ofPattern("yyyy年M月d日 HH:mm"))
-            } else {
-                i18n(player, "unknown")
-            }
-            statusLines += GuiLoreLine.Data(i18n(player, "last_online_label"), date, "§f")
-        }
-
-        val toolLines = mutableListOf<GuiLoreLine>()
-        toolLines += GuiLoreLine.Data(
-            i18n(player, "tool_permission_title"),
-            null,
-            "",
-        )
-        definitions.forEach { definition ->
-            toolLines += GuiLoreLine.Text(
-                if (states[definition.id] == true) {
-                    "§6◆ ${definition.displayName}"
-                } else {
-                    "§8◆ §7${definition.displayName}"
-                },
-            )
-        }
-
-        return MenuCapabilityPresentation(
-            item = GuiItemSpec(
-                material = Material.PLAYER_HEAD,
-                name = GuiNameSpec.TargetIdentity(
-                    Component.text("$identityColor$identity").decoration(TextDecoration.ITALIC, false),
-                ),
-                lore = GuiLoreSpec.Blocks(
-                    listOf(GuiLoreBlock(statusLines), GuiLoreBlock(toolLines)),
-                ),
-                role = GuiElementRole.ACTION,
-                amount = 1,
-            ),
-            playerHeadOwner = memberUuid,
-        )
-    }
+        player.uniqueId == worldData.owner || player.hasPermission("myworldmanager.admin")
 
     private fun subject(context: MenuCapabilityContext): MemberManagementCapabilitySubject? =
         context.attributes[MemberManagementCapabilityContract.SUBJECT_ATTRIBUTE]
@@ -168,3 +89,22 @@ class ToolPermissionCapability(
         const val CAPABILITY_ID = "member-tool-permissions"
     }
 }
+
+internal fun toolPermissionLoreBlock(
+    title: String,
+    definitions: List<ToolPermissionDefinition>,
+    states: Map<String, Boolean>,
+): GuiLoreBlock = GuiLoreBlock(buildList {
+    add(GuiLoreLine.Data(title, null, ""))
+    definitions.forEach { definition ->
+        add(
+            GuiLoreLine.Text(
+                if (states[definition.id] == true) {
+                    "§6● ${definition.displayName}"
+                } else {
+                    "§8● §7${definition.displayName}"
+                },
+            ),
+        )
+    }
+})

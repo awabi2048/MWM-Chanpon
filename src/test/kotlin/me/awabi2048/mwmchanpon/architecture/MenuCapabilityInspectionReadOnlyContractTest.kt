@@ -101,7 +101,7 @@ class MenuCapabilityInspectionReadOnlyContractTest {
             ),
             Path.of("src/main/kotlin/me/awabi2048/mwmchanpon/extension/ToolPermissionCapability.kt") to listOf(
                 "canManage",
-                "buildPresentation",
+                "toolPermissionLoreBlock",
                 "subject",
             ),
             Path.of("src/main/kotlin/me/awabi2048/mwmchanpon/tool/ToolPermissionController.kt") to listOf(
