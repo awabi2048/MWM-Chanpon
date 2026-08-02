@@ -2,10 +2,12 @@ package me.awabi2048.mwmchanpon.storage
 
 import java.io.File
 import java.nio.channels.FileChannel
+import java.nio.file.Files
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
 import java.time.LocalDateTime
+import java.security.MessageDigest
 import java.util.UUID
 import org.bukkit.configuration.file.YamlConfiguration
 
@@ -53,8 +55,48 @@ class ChanponWorldStorage(dataFolder: File) {
 
     fun worldFile(worldUuid: UUID): File = File(worldsDir, "${worldUuid}.yml")
 
+    data class WorldFileSnapshot(val exists: Boolean, val bytes: ByteArray, val sha256: String)
+
+    enum class WorldFileRestoreResult { RESTORED, CONCURRENT_CHANGE }
+
+    @Synchronized
+    fun captureWorldFileSnapshot(worldUuid: UUID): WorldFileSnapshot {
+        val target = worldFile(worldUuid)
+        if (!target.exists()) return WorldFileSnapshot(false, byteArrayOf(), sha256(byteArrayOf()))
+        val bytes = target.readBytes()
+        return WorldFileSnapshot(true, bytes, sha256(bytes))
+    }
+
+    @Synchronized
+    fun matchesWorldFileSnapshot(worldUuid: UUID, snapshot: WorldFileSnapshot): Boolean {
+        val target = worldFile(worldUuid)
+        if (target.exists() != snapshot.exists) return false
+        return !snapshot.exists || sha256(target.readBytes()) == snapshot.sha256
+    }
+
+    @Synchronized
+    fun restoreWorldFileSnapshot(
+        worldUuid: UUID,
+        snapshot: WorldFileSnapshot,
+        expectedCurrentState: () -> Boolean,
+    ): WorldFileRestoreResult {
+        if (!expectedCurrentState()) return WorldFileRestoreResult.CONCURRENT_CHANGE
+        val target = worldFile(worldUuid)
+        if (!snapshot.exists) {
+            Files.deleteIfExists(target.toPath())
+            return WorldFileRestoreResult.RESTORED
+        }
+        check(sha256(snapshot.bytes) == snapshot.sha256) { "Chanpon world snapshot hash mismatch: $worldUuid" }
+        writeAtomicBytes(target, snapshot.bytes, snapshot.sha256)
+        return WorldFileRestoreResult.RESTORED
+    }
+
     fun setVisibilitySyncHandler(handler: (UUID) -> Unit) {
         visibilitySyncHandler = handler
+    }
+
+    fun syncVisibility(worldUuid: UUID) {
+        visibilitySyncHandler?.invoke(worldUuid)
     }
 
     fun isProductionWorld(worldUuid: UUID): Boolean {
@@ -374,5 +416,35 @@ class ChanponWorldStorage(dataFolder: File) {
             )
         }
     }
+
+    private fun writeAtomicBytes(target: File, bytes: ByteArray, expectedSha256: String) {
+        target.parentFile?.mkdirs()
+        val temporary = File(target.parentFile, "${target.name}.restore.tmp")
+        try {
+            FileChannel.open(
+                temporary.toPath(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE,
+            ).use { channel ->
+                val buffer = java.nio.ByteBuffer.wrap(bytes)
+                while (buffer.hasRemaining()) channel.write(buffer)
+                channel.force(true)
+            }
+            check(sha256(temporary.readBytes()) == expectedSha256) {
+                "Temporary Chanpon world snapshot verification failed: ${target.name}"
+            }
+            try {
+                Files.move(
+                    temporary.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING,
+                )
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(temporary.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
+        } finally {
+            Files.deleteIfExists(temporary.toPath())
+        }
+    }
+
+    private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")
+        .digest(bytes)
+        .joinToString("") { "%02x".format(it) }
 
 }

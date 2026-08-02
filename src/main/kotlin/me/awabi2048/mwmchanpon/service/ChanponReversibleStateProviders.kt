@@ -24,6 +24,7 @@ import me.awabi2048.myworldmanager.model.WorldData
 import com.sk89q.worldguard.protection.flags.RegionGroup
 import com.sk89q.worldguard.protection.flags.StateFlag
 import java.util.UUID
+import java.util.Base64
 
 /** Chanponの実状態を扱う可逆provider群です。各providerは一つのaggregateだけを復元します。 */
 internal object ChanponReversibleStateProviders {
@@ -295,6 +296,7 @@ private data class EnvironmentState(
     val worldUuid: UUID,
     val before: EnvironmentSnapshot,
     val expectedAfter: EnvironmentSnapshot,
+    val worldFileBefore: ChanponWorldStorage.WorldFileSnapshot,
 ) : MenuReversibleOpaqueState {
     override fun snapshot(): Any = ChanponReversibleOpaqueState.of(
         ENVIRONMENT_PROVIDER_ID,
@@ -303,6 +305,7 @@ private data class EnvironmentState(
             "worldUuid" to worldUuid,
             "before" to before.toOpaqueMap(),
             "expectedAfter" to expectedAfter.toOpaqueMap(),
+            "worldFileBefore" to worldFileBefore.toOpaqueMap(),
         ),
     ).snapshot()
 
@@ -310,12 +313,13 @@ private data class EnvironmentState(
         private const val TYPE = "world-environment"
         fun decode(value: Any?): EnvironmentState? {
             val payload = decodeChanponOpaqueState(
-                value, ENVIRONMENT_PROVIDER_ID, TYPE, setOf("worldUuid", "before", "expectedAfter"),
+                value, ENVIRONMENT_PROVIDER_ID, TYPE, setOf("worldUuid", "before", "expectedAfter", "worldFileBefore"),
             )?.payload ?: return null
             return EnvironmentState(
                 payload.strictUuid("worldUuid") ?: return null,
                 decodeEnvironmentSnapshot(payload["before"]) ?: return null,
                 decodeEnvironmentSnapshot(payload["expectedAfter"]) ?: return null,
+                decodeWorldFileSnapshot(payload["worldFileBefore"]) ?: return null,
             )
         }
     }
@@ -336,16 +340,22 @@ internal class EnvironmentProvider(
         val expectedAfter = nextSnapshot(before, setting, context) ?: return rejectCapture(
             "unsupported environment interaction: setting=$setting click=${context.interaction.click}",
         )
-        return MenuReversibleProviderCaptureResult.Captured(EnvironmentState(worldUuid, before, expectedAfter))
+        return MenuReversibleProviderCaptureResult.Captured(
+            EnvironmentState(worldUuid, before, expectedAfter, storage.captureWorldFileSnapshot(worldUuid)),
+        )
     }
 
     override fun restore(context: MenuReversibleStateRestoreContext): MenuReversibleProviderRestoreResult {
         val state = EnvironmentState.decode(context.stateSnapshot.value)
             ?: return rejectRestore("invalid environment state type")
         val worldData = world(state.worldUuid) ?: return rejectRestore("environment world no longer exists: ${state.worldUuid}")
-        val current = snapshot(worldData)
-        if (current != state.expectedAfter) return concurrent("environment ${state.worldUuid}", state.expectedAfter, current)
-        apply(worldData, state.before)
+        val restored = storage.restoreWorldFileSnapshot(state.worldUuid, state.worldFileBefore) {
+            snapshot(worldData) == state.expectedAfter
+        }
+        if (restored == ChanponWorldStorage.WorldFileRestoreResult.CONCURRENT_CHANGE) {
+            return concurrent("environment ${state.worldUuid}", state.expectedAfter, snapshot(worldData))
+        }
+        applyRuntimeState(worldData, state.before)
         return MenuReversibleProviderRestoreResult.Restored
     }
 
@@ -377,15 +387,13 @@ internal class EnvironmentProvider(
         }
     }
 
-    private fun apply(worldData: WorldData, state: EnvironmentSnapshot) {
+    private fun applyRuntimeState(worldData: WorldData, state: EnvironmentSnapshot) {
         worldData.fixedWeather = state.fixedWeather
         worldData.fixedTime = state.fixedTime
         worldData.gravityValue = state.gravity
         worldData.fixedScale = state.scale
         worldData.allowFlight = state.allowFlight
         MyWorldManagerApi.getWorldRepository()?.save(worldData)
-        storage.setFreecamAllowed(worldData.uuid, state.freecamAllowed)
-        storage.setProtectionMode(worldData.uuid, state.protectionMode)
         onApplied(worldData)
     }
 
@@ -428,23 +436,30 @@ private data class PublicationState(
     val worldUuid: UUID,
     val before: ChanponWorldVisibility,
     val expectedAfter: ChanponWorldVisibility,
+    val worldFileBefore: ChanponWorldStorage.WorldFileSnapshot,
 ) : MenuReversibleOpaqueState {
     override fun snapshot(): Any = ChanponReversibleOpaqueState.of(
         PUBLICATION_PROVIDER_ID,
         TYPE,
-        mapOf("worldUuid" to worldUuid, "before" to before.name, "expectedAfter" to expectedAfter.name),
+        mapOf(
+            "worldUuid" to worldUuid,
+            "before" to before.name,
+            "expectedAfter" to expectedAfter.name,
+            "worldFileBefore" to worldFileBefore.toOpaqueMap(),
+        ),
     ).snapshot()
 
     companion object {
         private const val TYPE = "world-publication"
         fun decode(value: Any?): PublicationState? {
             val payload = decodeChanponOpaqueState(
-                value, PUBLICATION_PROVIDER_ID, TYPE, setOf("worldUuid", "before", "expectedAfter"),
+                value, PUBLICATION_PROVIDER_ID, TYPE, setOf("worldUuid", "before", "expectedAfter", "worldFileBefore"),
             )?.payload ?: return null
             return PublicationState(
                 payload.strictUuid("worldUuid") ?: return null,
                 payload.strictString("before")?.let(::visibilityOrNull) ?: return null,
                 payload.strictString("expectedAfter")?.let(::visibilityOrNull) ?: return null,
+                decodeWorldFileSnapshot(payload["worldFileBefore"]) ?: return null,
             )
         }
     }
@@ -456,7 +471,9 @@ internal class PublicationProvider(private val storage: ChanponWorldStorage) : M
         val before = storage.getVisibility(worldUuid)
         val values = listOf(ChanponWorldVisibility.PUBLIC, ChanponWorldVisibility.DEVELOPMENT, ChanponWorldVisibility.PRIVATE)
         val expectedAfter = values[(values.indexOf(before) + 1) % values.size]
-        return MenuReversibleProviderCaptureResult.Captured(PublicationState(worldUuid, before, expectedAfter))
+        return MenuReversibleProviderCaptureResult.Captured(
+            PublicationState(worldUuid, before, expectedAfter, storage.captureWorldFileSnapshot(worldUuid)),
+        )
     }
 
     override fun restore(context: MenuReversibleStateRestoreContext): MenuReversibleProviderRestoreResult {
@@ -464,9 +481,13 @@ internal class PublicationProvider(private val storage: ChanponWorldStorage) : M
         if (MyWorldManagerApi.getWorldRepository()?.findByUuid(state.worldUuid) == null) {
             return rejectRestore("TARGET_MISSING: publication world no longer exists: ${state.worldUuid}")
         }
-        val current = storage.getVisibility(state.worldUuid)
-        if (current != state.expectedAfter) return concurrent("publication ${state.worldUuid}", state.expectedAfter, current)
-        storage.setVisibility(state.worldUuid, state.before)
+        val restored = storage.restoreWorldFileSnapshot(state.worldUuid, state.worldFileBefore) {
+            storage.getVisibility(state.worldUuid) == state.expectedAfter
+        }
+        if (restored == ChanponWorldStorage.WorldFileRestoreResult.CONCURRENT_CHANGE) {
+            return concurrent("publication ${state.worldUuid}", state.expectedAfter, storage.getVisibility(state.worldUuid))
+        }
+        storage.syncVisibility(state.worldUuid)
         return MenuReversibleProviderRestoreResult.Restored
     }
 }
@@ -706,6 +727,7 @@ private sealed interface ToolPermissionState : MenuReversibleOpaqueState {
         val toolId: String,
         val before: Boolean?,
         val expectedAfter: Boolean,
+        val worldFileBefore: ChanponWorldStorage.WorldFileSnapshot,
     ) : ToolPermissionState {
         override fun snapshot(): Any = ChanponReversibleOpaqueState.of(
             TOOL_PROVIDER_ID,
@@ -716,6 +738,7 @@ private sealed interface ToolPermissionState : MenuReversibleOpaqueState {
                 "toolId" to toolId,
                 "before" to before,
                 "expectedAfter" to expectedAfter,
+                "worldFileBefore" to worldFileBefore.toOpaqueMap(),
             ),
         ).snapshot()
 
@@ -726,7 +749,7 @@ private sealed interface ToolPermissionState : MenuReversibleOpaqueState {
                     value,
                     TOOL_PROVIDER_ID,
                     TYPE,
-                    setOf("worldUuid", "targetPlayerUuid", "toolId", "before", "expectedAfter"),
+                    setOf("worldUuid", "targetPlayerUuid", "toolId", "before", "expectedAfter", "worldFileBefore"),
                 )?.payload ?: return null
                 val before = decodeNullableBoolean(payload["before"]) ?: return null
                 return Toggle(
@@ -735,6 +758,7 @@ private sealed interface ToolPermissionState : MenuReversibleOpaqueState {
                     payload.strictString("toolId") ?: return null,
                     before.value,
                     payload.strictBoolean("expectedAfter") ?: return null,
+                    decodeWorldFileSnapshot(payload["worldFileBefore"]) ?: return null,
                 )
             }
         }
@@ -747,6 +771,7 @@ private sealed interface ToolPermissionState : MenuReversibleOpaqueState {
         val moderators: List<UUID>,
         val expectedMembers: List<UUID>,
         val expectedModerators: List<UUID>,
+        val worldFileBefore: ChanponWorldStorage.WorldFileSnapshot,
     ) : ToolPermissionState {
         override fun snapshot(): Any = ChanponReversibleOpaqueState.of(
             TOOL_PROVIDER_ID,
@@ -758,6 +783,7 @@ private sealed interface ToolPermissionState : MenuReversibleOpaqueState {
                 "moderators" to moderators,
                 "expectedMembers" to expectedMembers,
                 "expectedModerators" to expectedModerators,
+                "worldFileBefore" to worldFileBefore.toOpaqueMap(),
             ),
         ).snapshot()
 
@@ -771,6 +797,7 @@ private sealed interface ToolPermissionState : MenuReversibleOpaqueState {
                     setOf(
                         "worldUuid", "targetPlayerUuid", "members", "moderators",
                         "expectedMembers", "expectedModerators",
+                        "worldFileBefore",
                     ),
                 )?.payload ?: return null
                 return Role(
@@ -780,6 +807,7 @@ private sealed interface ToolPermissionState : MenuReversibleOpaqueState {
                     payload.strictUuidList("moderators") ?: return null,
                     payload.strictUuidList("expectedMembers") ?: return null,
                     payload.strictUuidList("expectedModerators") ?: return null,
+                    decodeWorldFileSnapshot(payload["worldFileBefore"]) ?: return null,
                 )
             }
         }
@@ -826,6 +854,7 @@ internal class ToolPermissionProvider(
                         toolId,
                         before,
                         gateway.storedEnabledAfterSet(worldData, requested),
+                        storage.captureWorldFileSnapshot(worldUuid),
                     ),
                 )
             }
@@ -848,6 +877,7 @@ internal class ToolPermissionProvider(
                         moderators,
                         expectedMembers,
                         expectedModerators,
+                        storage.captureWorldFileSnapshot(worldUuid),
                     ),
                 )
             }
@@ -862,10 +892,16 @@ internal class ToolPermissionProvider(
     }
 
     private fun restoreToggle(state: ToolPermissionState.Toggle): MenuReversibleProviderRestoreResult {
-        val current = storage.getToolEnabledState(state.worldUuid, state.targetPlayerUuid, state.toolId)
-        if (current != state.expectedAfter) return concurrent("tool permission ${state.worldUuid}/${state.toolId}", state.expectedAfter, current)
         return try {
-            storage.restoreToolEnabledState(state.worldUuid, state.targetPlayerUuid, state.toolId, state.before)
+            val restored = storage.restoreWorldFileSnapshot(state.worldUuid, state.worldFileBefore) {
+                storage.getToolEnabledState(state.worldUuid, state.targetPlayerUuid, state.toolId) == state.expectedAfter
+            }
+            if (restored == ChanponWorldStorage.WorldFileRestoreResult.CONCURRENT_CHANGE) {
+                return concurrent(
+                    "tool permission ${state.worldUuid}/${state.toolId}", state.expectedAfter,
+                    storage.getToolEnabledState(state.worldUuid, state.targetPlayerUuid, state.toolId),
+                )
+            }
             MyWorldManagerApi.getWorldRepository()?.findByUuid(state.worldUuid)?.let(gateway::syncWorld)
             MenuReversibleProviderRestoreResult.Restored
         } catch (exception: RuntimeException) {
@@ -878,6 +914,12 @@ internal class ToolPermissionProvider(
             ?: return rejectRestore("tool permission world no longer exists: ${state.worldUuid}")
         if (worldData.members != state.expectedMembers || worldData.moderators != state.expectedModerators) {
             return concurrent("tool role ${state.worldUuid}/${state.targetPlayerUuid}", "expected member role", "changed")
+        }
+        val restored = storage.restoreWorldFileSnapshot(state.worldUuid, state.worldFileBefore) {
+            storage.matchesWorldFileSnapshot(state.worldUuid, state.worldFileBefore)
+        }
+        if (restored == ChanponWorldStorage.WorldFileRestoreResult.CONCURRENT_CHANGE) {
+            return concurrent("tool role file ${state.worldUuid}/${state.targetPlayerUuid}", state.worldFileBefore.sha256, "changed")
         }
         worldData.members.clear()
         worldData.members.addAll(state.members)
@@ -1024,6 +1066,22 @@ private fun ChanponWorldStorage.SubmissionSnapshot.toOpaqueMap(): Map<String, An
     "state" to state.name,
     "history" to history.map { entry -> entry.toSortedMap() },
 )
+
+private fun ChanponWorldStorage.WorldFileSnapshot.toOpaqueMap(): Map<String, Any?> = mapOf(
+    "exists" to exists,
+    "bytesBase64" to Base64.getEncoder().encodeToString(bytes),
+    "sha256" to sha256,
+)
+
+private fun decodeWorldFileSnapshot(value: Any?): ChanponWorldStorage.WorldFileSnapshot? {
+    val map = strictMap(value, setOf("exists", "bytesBase64", "sha256")) ?: return null
+    val exists = map.strictBoolean("exists") ?: return null
+    val bytes = runCatching {
+        Base64.getDecoder().decode(map.strictString("bytesBase64") ?: return null)
+    }.getOrNull() ?: return null
+    val sha256 = map.strictString("sha256") ?: return null
+    return ChanponWorldStorage.WorldFileSnapshot(exists, bytes, sha256)
+}
 
 private fun decodeSubmissionSnapshot(value: Any?): ChanponWorldStorage.SubmissionSnapshot? {
     val map = strictMap(value, setOf("state", "history")) ?: return null

@@ -147,6 +147,57 @@ class ChanponReversibleStateProviderTest {
     }
 
     @Test
+    fun `world file providers restore exact preimage bytes`() = withWorldStorage { storage, _ ->
+        val world = world()
+        val target = UUID.randomUUID()
+        registerRepository(world)
+        val player = player()
+        val original = """
+            submission:
+              state: unsubmitted
+            visibility: private
+            visibility_set_at: 'original-visibility-time'
+            protection:
+              mode: members
+              updated_at: 'original-protection-time'
+            tool_permissions:
+              preserved-player:
+                worldedit: false
+        """.trimIndent() + "\n"
+        storage.worldFile(world.uuid).apply { parentFile.mkdirs(); writeText(original) }
+
+        val publication = PublicationProvider(storage)
+        val publicationContext = captureContext(
+            player, ChanponReversibleContracts.publication(),
+            arguments = mapOf("world_uuid" to world.uuid.toString()),
+        )
+        val publicationState = captured(publication, publicationContext)
+        storage.setVisibility(world.uuid, ChanponWorldVisibility.PUBLIC)
+        assertRestored(publication, player, publicationContext, publicationState)
+        assertEquals(original, storage.worldFile(world.uuid).readText())
+
+        val environment = EnvironmentProvider(storage) { }
+        val environmentContext = captureContext(
+            player, ChanponReversibleContracts.environment(world.uuid),
+            arguments = mapOf("setting" to "protection"),
+        )
+        val environmentState = captured(environment, environmentContext)
+        storage.setProtectionMode(world.uuid, me.awabi2048.mwmchanpon.storage.ChanponWorldProtectionMode.PASSWORD)
+        assertRestored(environment, player, environmentContext, environmentState)
+        assertEquals(original, storage.worldFile(world.uuid).readText())
+
+        val tool = ToolPermissionProvider(storage, RecordingToolGateway())
+        val toolContext = captureContext(
+            player, ChanponReversibleContracts.toolPermission(world.uuid, target, "toggle"),
+            arguments = mapOf("tool_id" to "worldedit"),
+        )
+        val toolState = captured(tool, toolContext)
+        storage.setToolEnabled(world.uuid, target, "worldedit", true)
+        assertRestored(tool, player, toolContext, toolState)
+        assertEquals(original, storage.worldFile(world.uuid).readText())
+    }
+
+    @Test
     fun `submission and tool providers restore domain state and synchronize exactly after CAS`() = withWorldStorage { storage, _ ->
         val world = world()
         val actor = UUID(0L, 1L)
