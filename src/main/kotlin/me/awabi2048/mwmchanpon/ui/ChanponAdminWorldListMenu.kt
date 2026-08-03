@@ -3,6 +3,7 @@ package me.awabi2048.mwmchanpon.ui
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiCycle
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiInteractionGuidance
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
@@ -404,6 +405,7 @@ class ChanponAdminWorldListMenu(
                 safety = MenuActionSafety.NAVIGATION_ONLY,
                 classification = adminListRouteClassification(actionId),
             )),
+            interactionGuidance = GuiInteractionGuidance.LIST_SETTING,
         ),
     )
     }

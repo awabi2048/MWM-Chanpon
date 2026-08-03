@@ -6,6 +6,7 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiCycle
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiInteractionGuidance
 import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryOption
@@ -357,6 +358,7 @@ class ChanponAdminMenu(
                     reversibleContract = ChanponReversibleContracts.adminWorldControls("creation"),
                     classification = ChanponReversibleActionClassification.Operation.CREATION_AVAILABILITY_CYCLE,
                 )),
+                interactionGuidance = GuiInteractionGuidance.LIST_SETTING,
                 glint = null
             ),
         )

@@ -2,6 +2,7 @@ package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiInteractionGuidance
 import com.awabi2048.ccsystem.api.gui.GuiCycle
 import com.awabi2048.ccsystem.api.gui.GuiCycleDirection
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
@@ -374,6 +375,7 @@ class ChanponEnvironmentGui(
                     emptyList()
                 },
                 actions = actions,
+                interactionGuidance = GuiInteractionGuidance.LIST_SETTING,
             ),
         )
     }
@@ -439,6 +441,7 @@ class ChanponEnvironmentGui(
                     emptyList()
                 },
                 actions = actions,
+                interactionGuidance = GuiInteractionGuidance.LIST_SETTING,
             ),
         )
     }
