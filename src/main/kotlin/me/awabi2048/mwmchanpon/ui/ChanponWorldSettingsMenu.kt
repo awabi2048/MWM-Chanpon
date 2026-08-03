@@ -113,7 +113,8 @@ class ChanponWorldSettingsMenu(
             OPERATION_PORTALS -> executeMwmAction(player, worldData, WorldSettingsAction.MANAGE_PORTALS, context.click)
             OPERATION_WARP -> executeMwmAction(player, worldData, WorldSettingsAction.WARP, context.click)
             OPERATION_BACK -> if (source.screen == Screen.DELETE_CONFIRM) {
-                // 2段階削除確認のキャンセルは前段階へ戻さず、確認フロー全体を破棄します。
+                // 2段階削除確認のキャンセルは前段階を再表示せず、確認開始前の設定メニューへ戻します。
+                // 確認画面群だけの履歴切り戻しはRuntimeが行います。
                 MenuActionResult.Success(MenuUpdate.Cancel)
             } else {
                 MenuActionResult.Success(MenuUpdate.Back)

@@ -85,8 +85,8 @@ class BackupListMenu(
                 id = ROUTE_DELETE_CONFIRM,
                 renderer = { context -> renderDeleteConfirmation(context.player, context.route) },
                 actions = mapOf(
-                    // 削除確認は2段階の確認フローです。途中のキャンセルで前段階へ戻すと、
-                    // 確認を再表示してさらに戻る操作が必要になるため、履歴ごと破棄します。
+                    // 削除確認は2段階の確認フローです。途中のキャンセルでは前段階を再表示せず、
+                    // 確認開始前の一覧へ戻します。確認画面群だけの履歴切り戻しはRuntimeが行います。
                     ACTION_CANCEL to MenuActionHandler { MenuActionResult.Success(MenuUpdate.Cancel) },
                     ACTION_CONFIRM_DELETE to MenuActionHandler(::confirmDelete),
                 ),

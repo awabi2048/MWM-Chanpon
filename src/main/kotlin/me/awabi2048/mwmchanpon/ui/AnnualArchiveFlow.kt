@@ -227,7 +227,8 @@ class AnnualArchiveFlow(
 
     private fun cancelFromMenu(context: MenuActionContext): MenuActionResult {
         cancel(context.player, closeMenu = false)
-        // 最終確認からのキャンセルは、入力・確認を含むフロー全体の履歴を破棄します。
+        // 最終確認からのキャンセルは、確認画面群だけを履歴から取り除きます。
+        // 開始前メニューがあればRuntimeがそこへ戻し、チャット起点でなければ画面を閉じます。
         return MenuActionResult.Success(MenuUpdate.Cancel)
     }
 

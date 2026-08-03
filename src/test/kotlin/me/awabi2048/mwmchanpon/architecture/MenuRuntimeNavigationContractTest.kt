@@ -94,7 +94,7 @@ class MenuRuntimeNavigationContractTest {
 
 
     @Test
-    fun `confirmation views declare their category and cancel whole multi-stage flows`() {
+    fun `confirmation views declare their category and delegate multi-stage cancellation`() {
         listOf(
             "AnnualArchiveFlow.kt",
             "AutomationSettingsMenu.kt",
