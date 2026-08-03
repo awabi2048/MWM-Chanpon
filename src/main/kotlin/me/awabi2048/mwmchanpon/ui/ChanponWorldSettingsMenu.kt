@@ -4,6 +4,7 @@ import com.awabi2048.ccsystem.api.gui.GuiCycle
 import com.awabi2048.ccsystem.api.gui.GuiCycleDirection
 import com.awabi2048.ccsystem.api.gui.GuiConfirmationLayout
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiInteractionGuidance
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
@@ -233,7 +234,9 @@ class ChanponWorldSettingsMenu(
             elements += mwmActionEntry(player, 20, worldData, WorldSettingsAction.SELECT_ICON, "icon", Material.ANVIL, OPERATION_SELECT_ICON, listOf(i18n(player, "mwm_action.action")))
             elements += mwmActionEntry(player, 21, worldData, WorldSettingsAction.SET_SPAWN, "spawn", Material.COMPASS, OPERATION_SET_SPAWN,
                 if (MyWorldManagerApi.getBedrockFormService()?.isBedrock(player) == true) listOf(text(player, "gui.settings.spawn.action.select_type")) else listOf(text(player, "gui.settings.spawn.action.set_guest"), text(player, "gui.settings.spawn.action.set_member")),
-                requireTargetWorld = true)
+                requireTargetWorld = true,
+                interactionGuidance = GuiInteractionGuidance.SINGLE_ACTION_CLICK,
+            )
             elements += mwmActionEntry(player, 28, worldData, WorldSettingsAction.EDIT_ANNOUNCEMENT, "announcement", Material.OAK_SIGN, OPERATION_ANNOUNCEMENT,
                 listOf(text(player, "gui.settings.announcement.action.set_message"), text(player, "gui.settings.announcement.action.reset_message")))
             addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.NOTIFICATION_ACTION, 29)
@@ -322,6 +325,7 @@ class ChanponWorldSettingsMenu(
         player: Player, slot: Int, worldData: WorldData, action: WorldSettingsAction,
         iconKey: String, material: Material, operation: String, actionTexts: List<String>,
         langPrefix: String = "gui.settings.$iconKey", requireTargetWorld: Boolean = false,
+        interactionGuidance: GuiInteractionGuidance = GuiInteractionGuidance.DEFAULT,
     ): MenuElement {
         val contract = requireNotNull(MyWorldManagerApi.getWorldSettingsActionContract(player, worldData.uuid, action))
         require(contract.options.size == actionTexts.size)
@@ -342,6 +346,7 @@ class ChanponWorldSettingsMenu(
                 }
             },
             sounds = contract.sounds,
+            interactionGuidance = interactionGuidance,
         ))
     }
 
