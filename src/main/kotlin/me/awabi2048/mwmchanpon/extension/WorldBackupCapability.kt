@@ -47,6 +47,7 @@ import me.awabi2048.mwmchanpon.service.ManualRollbackService
 import me.awabi2048.mwmchanpon.ui.chanponCapabilityAction
 import me.awabi2048.mwmchanpon.ui.chanponGestureAction
 import me.awabi2048.mwmchanpon.ui.reasonedAvailability
+import me.awabi2048.mwmchanpon.ui.asConfirmation
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
@@ -443,7 +444,7 @@ class WorldBackupCapability(
                     ACTION_RUNTIME_CANCEL, i18n(player, "confirm.button.cancel_action"),
                 ),
             ),
-        )
+        ).asConfirmation()
     }
 
     private fun confirmOwnerBackup(context: MenuActionContext): MenuActionResult {

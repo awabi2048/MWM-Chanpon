@@ -466,7 +466,7 @@ class SubmissionAdminMenu(
                 confirmationEntry(player, layout.confirmSlot, true, confirmAction, reversibleContract, classification),
                 confirmationEntry(player, layout.cancelSlot, false, ACTION_CANCEL),
             ),
-        )
+        ).asConfirmation()
     }
 
     private fun confirmationActions(

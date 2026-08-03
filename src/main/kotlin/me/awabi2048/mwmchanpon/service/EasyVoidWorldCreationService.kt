@@ -29,6 +29,7 @@ import java.util.Collections
 import java.util.LinkedHashMap
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.ui.chanponGestureAction
+import me.awabi2048.mwmchanpon.ui.asConfirmation
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.WorldCreationOperation
 import me.awabi2048.myworldmanager.api.extension.WorldCreationRequest
@@ -233,7 +234,7 @@ class EasyVoidWorldCreationService(
         val pending = pendingCreations[player.uniqueId]
         val layout = CCSystem.getAPI().getGuiLayoutService().confirmation45()
         if (pending == null) {
-            return InventoryMenuView(layout.size, component(player, "confirm_title"), emptyList())
+            return InventoryMenuView(layout.size, component(player, "confirm_title"), emptyList()).asConfirmation()
         }
         val preview = guiItem(
             Material.PAPER,
@@ -301,7 +302,7 @@ class EasyVoidWorldCreationService(
                     ),
                 ),
             ),
-        )
+        ).asConfirmation()
     }
 
     private fun confirmCreation(player: Player): MenuActionResult {

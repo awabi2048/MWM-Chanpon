@@ -198,7 +198,7 @@ class WorldDataManagementMenu(
                     ACTION_CANCEL, i18n(player, "confirm.button.cancel_action"),
                 ),
             ),
-        )
+        ).asConfirmation()
     }
 
     private fun back(context: MenuActionContext): MenuActionResult {

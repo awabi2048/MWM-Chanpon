@@ -93,6 +93,38 @@ class MenuRuntimeNavigationContractTest {
     }
 
 
+    @Test
+    fun `confirmation views declare their category and cancel whole multi-stage flows`() {
+        listOf(
+            "AnnualArchiveFlow.kt",
+            "AutomationSettingsMenu.kt",
+            "BackupListMenu.kt",
+            "ChanponAdminMenu.kt",
+            "ChanponWorldSettingsMenu.kt",
+            "SubmissionAdminMenu.kt",
+            "WorldDataExportMenu.kt",
+            "WorldDataManagementMenu.kt",
+        ).forEach { fileName ->
+            val source = uiRoot.resolve(fileName).readText()
+            assertTrue(
+                "asConfirmation()" in source,
+                "$fileName must mark confirmation views explicitly",
+            )
+        }
+
+        val backup = uiRoot.resolve("BackupListMenu.kt").readText()
+        assertTrue("ROUTE_DELETE_CONFIRM" in backup)
+        assertTrue("MenuUpdate.Cancel" in backup)
+
+        val settings = uiRoot.resolve("ChanponWorldSettingsMenu.kt").readText()
+        assertTrue("Screen.DELETE_CONFIRM" in settings)
+        assertTrue("MenuUpdate.Cancel" in settings)
+
+        val archive = uiRoot.resolve("AnnualArchiveFlow.kt").readText()
+        assertTrue("MenuUpdate.Cancel" in functionBody(archive, "cancelFromMenu"))
+    }
+
+
 
     @Test
     fun `dialog cancellation replaces its source menu without adding history`() {

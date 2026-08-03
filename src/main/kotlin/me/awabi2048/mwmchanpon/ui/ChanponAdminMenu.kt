@@ -244,7 +244,7 @@ class ChanponAdminMenu(
                 ),
                 confirmationEntry(player, layout.cancelSlot, false, ACTION_CANCEL_SPAWN),
             ),
-        )
+        ).asConfirmation()
     }
 
     private fun confirmSpawn(context: MenuActionContext): MenuActionResult {

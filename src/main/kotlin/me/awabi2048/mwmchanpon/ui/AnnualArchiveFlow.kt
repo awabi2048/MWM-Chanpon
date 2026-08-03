@@ -183,7 +183,7 @@ class AnnualArchiveFlow(
                 ACTION_CANCEL,
             ),
         ),
-    )
+    ).asConfirmation()
 
     private fun confirmationEntry(
         player: Player,
@@ -227,7 +227,8 @@ class AnnualArchiveFlow(
 
     private fun cancelFromMenu(context: MenuActionContext): MenuActionResult {
         cancel(context.player, closeMenu = false)
-        return MenuActionResult.Success(MenuUpdate.Close)
+        // 最終確認からのキャンセルは、入力・確認を含むフロー全体の履歴を破棄します。
+        return MenuActionResult.Success(MenuUpdate.Cancel)
     }
 
     private fun executeArchive(player: Player) {

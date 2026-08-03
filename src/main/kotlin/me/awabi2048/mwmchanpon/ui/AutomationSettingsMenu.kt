@@ -192,7 +192,7 @@ class AutomationSettingsMenu(
                     i18n(player, "confirm.button.cancel_action"),
                 ),
             ),
-        )
+        ).asConfirmation()
     }
 
     private fun renderRestorePointConfirmation(player: Player): InventoryMenuView {
@@ -221,7 +221,7 @@ class AutomationSettingsMenu(
                     i18n(player, "confirm.button.cancel_action"),
                 ),
             ),
-        )
+        ).asConfirmation()
     }
 
     private fun back(context: MenuActionContext): MenuActionResult {

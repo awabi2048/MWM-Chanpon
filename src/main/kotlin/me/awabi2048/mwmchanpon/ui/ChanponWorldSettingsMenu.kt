@@ -82,13 +82,18 @@ class ChanponWorldSettingsMenu(
     private fun render(player: Player, source: Source): InventoryMenuView {
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(source.worldUuid)
             ?: return InventoryMenuView(9, Component.text("World settings"), emptyList())
-        return when (source.screen) {
+        val view = when (source.screen) {
             Screen.MAIN -> renderMain(player, worldData)
             Screen.EXPANSION -> renderExpansion(player, worldData)
             Screen.MODIFIED_WARNING -> renderModifiedWarning(player)
             Screen.CONFIRM -> renderConfirmation(player, worldData, source)
             Screen.CRITICAL -> renderCritical(player, worldData)
             Screen.DELETE_CONFIRM -> renderDeleteConfirmation(player, worldData, source.finalStep)
+        }
+        return if (source.screen == Screen.CONFIRM || source.screen == Screen.DELETE_CONFIRM) {
+            view.asConfirmation()
+        } else {
+            view
         }
     }
 
@@ -107,7 +112,12 @@ class ChanponWorldSettingsMenu(
             OPERATION_TOUR -> executeMwmAction(player, worldData, WorldSettingsAction.MANAGE_TOUR, context.click)
             OPERATION_PORTALS -> executeMwmAction(player, worldData, WorldSettingsAction.MANAGE_PORTALS, context.click)
             OPERATION_WARP -> executeMwmAction(player, worldData, WorldSettingsAction.WARP, context.click)
-            OPERATION_BACK -> MenuActionResult.Success(MenuUpdate.Back)
+            OPERATION_BACK -> if (source.screen == Screen.DELETE_CONFIRM) {
+                // 2段階削除確認のキャンセルは前段階へ戻さず、確認フロー全体を破棄します。
+                MenuActionResult.Success(MenuUpdate.Cancel)
+            } else {
+                MenuActionResult.Success(MenuUpdate.Back)
+            }
             OPERATION_EXPAND_CENTER -> {
                 if (!accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)) {
                     return MenuActionResult.Rejected()

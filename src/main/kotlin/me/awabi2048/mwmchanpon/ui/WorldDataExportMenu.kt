@@ -145,6 +145,7 @@ class WorldDataExportMenu(
             ),
         )
         return InventoryMenuView(layout.size, i18nComponent(player, "export_menu.confirm.title"), elements)
+            .asConfirmation()
     }
 
     private fun back(context: MenuActionContext): MenuActionResult {

@@ -85,7 +85,9 @@ class BackupListMenu(
                 id = ROUTE_DELETE_CONFIRM,
                 renderer = { context -> renderDeleteConfirmation(context.player, context.route) },
                 actions = mapOf(
-                    ACTION_CANCEL to MenuActionHandler { MenuActionResult.Success(MenuUpdate.Back) },
+                    // 削除確認は2段階の確認フローです。途中のキャンセルで前段階へ戻すと、
+                    // 確認を再表示してさらに戻る操作が必要になるため、履歴ごと破棄します。
+                    ACTION_CANCEL to MenuActionHandler { MenuActionResult.Success(MenuUpdate.Cancel) },
                     ACTION_CONFIRM_DELETE to MenuActionHandler(::confirmDelete),
                 ),
             ),
@@ -202,7 +204,7 @@ class BackupListMenu(
                 confirmationEntry(player, layout.confirmSlot, true, confirmAction),
                 confirmationEntry(player, layout.cancelSlot, false, ACTION_CANCEL),
             ),
-        )
+        ).asConfirmation()
     }
 
     private fun back(context: MenuActionContext): MenuActionResult {

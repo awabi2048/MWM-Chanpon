@@ -51,6 +51,7 @@ import me.awabi2048.mwmchanpon.ui.ChanponGuiElements
 import me.awabi2048.mwmchanpon.ui.chanponCapabilityAction
 import me.awabi2048.mwmchanpon.ui.chanponGestureAction
 import me.awabi2048.mwmchanpon.ui.reasonedAvailability
+import me.awabi2048.mwmchanpon.ui.asConfirmation
 import me.awabi2048.mwmchanpon.service.ChanponReversibleContracts
 import me.awabi2048.mwmchanpon.service.ChanponReversibleActionClassification
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
@@ -422,7 +423,7 @@ class ProductionToggleExtension(
                     ACTION_CANCEL,
                 ),
             ),
-        )
+        ).asConfirmation()
     }
 
     private fun confirmationEntry(
