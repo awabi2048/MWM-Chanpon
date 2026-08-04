@@ -241,7 +241,7 @@ class ChanponWorldSettingsMenu(
                 listOf(text(player, "gui.settings.announcement.action.set_message"), text(player, "gui.settings.announcement.action.reset_message")))
             addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.NOTIFICATION_ACTION, 29)
             elements += mwmActionEntry(player, 47, worldData, WorldSettingsAction.MANAGE_TOUR, "tour", Material.PALE_OAK_BOAT, OPERATION_TOUR,
-                listOf(i18n(player, "mwm_action.action")), "gui.tour.worldmenu")
+                listOf(i18n(player, "mwm_action.action")), "gui.tour.worldmenu", requireTargetWorld = true)
         }
         if (owner && !protected) {
             addCapability(
