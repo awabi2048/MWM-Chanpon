@@ -45,7 +45,7 @@
         <dependency>
             <groupId>me.awabi2048</groupId>
             <artifactId>chanpon-utilities</artifactId>
-            <version>0.3.0</version>
+            <version>26.809.1</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
