@@ -57,3 +57,7 @@ data class RestoreOperationResult(
     val preRollbackBackup: BackupEntry?,
     val message: String
 )
+
+/** 対象ワールド専用画面に表示できるのは、単一ワールドとして保存されたバックアップだけです。 */
+internal fun BackupEntry.isDedicatedWorldBackupFor(worldUuid: UUID): Boolean =
+    scope == BackupScope.WORLD && worldUuid in worldUuids

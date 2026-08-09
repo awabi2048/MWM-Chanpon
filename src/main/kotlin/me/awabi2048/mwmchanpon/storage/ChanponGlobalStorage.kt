@@ -46,6 +46,57 @@ class ChanponGlobalStorage(dataFolder: File) {
         config.save(playerFile(playerUuid))
     }
 
+    /**
+     * プレイヤーごとに、ログイン時のオフラインメンバー招待通知を送信済みか記録します。
+     * 招待自体の状態はMWMが管理するため、ここには通知済みIDだけを保持します。
+     */
+    @Synchronized
+    fun getSentOfflineMemberInviteIds(playerUuid: UUID): Set<UUID> =
+        playerConfig(playerUuid)
+            .getStringList(OFFLINE_MEMBER_INVITE_SENT_IDS_PATH)
+            .mapNotNull(::parseUuid)
+            .toSet()
+
+    /**
+     * MWMが現在返した保留招待に存在しない通知済みIDを整理します。
+     * 保留招待の取得に成功した後だけ呼び出すことで、API障害時に履歴を誤って消しません。
+     */
+    @Synchronized
+    fun retainOfflineMemberInviteIds(playerUuid: UUID, pendingInviteIds: Set<UUID>): Set<UUID> {
+        val config = playerConfig(playerUuid)
+        val current = config.getStringList(OFFLINE_MEMBER_INVITE_SENT_IDS_PATH)
+            .mapNotNull(::parseUuid)
+            .toSet()
+        val retained = current.intersect(pendingInviteIds)
+        if (retained != current) {
+            config.set(
+                OFFLINE_MEMBER_INVITE_SENT_IDS_PATH,
+                retained.map(UUID::toString).sorted()
+            )
+            config.save(playerFile(playerUuid))
+        }
+        return retained
+    }
+
+    /**
+     * 通知送信後にIDを保存します。UUID文字列はソートして保存し、ファイル差分を安定させます。
+     * 戻り値は今回新しく追加されたかどうかです。
+     */
+    @Synchronized
+    fun markOfflineMemberInviteNotified(playerUuid: UUID, inviteId: UUID): Boolean {
+        val config = playerConfig(playerUuid)
+        val notified = config.getStringList(OFFLINE_MEMBER_INVITE_SENT_IDS_PATH)
+            .mapNotNull(::parseUuid)
+            .toMutableSet()
+        if (!notified.add(inviteId)) return false
+        config.set(
+            OFFLINE_MEMBER_INVITE_SENT_IDS_PATH,
+            notified.map(UUID::toString).sorted()
+        )
+        config.save(playerFile(playerUuid))
+        return true
+    }
+
     fun isArchiveLocked(): Boolean =
         settings().getBoolean("archive_locked", false)
 
@@ -146,4 +197,8 @@ class ChanponGlobalStorage(dataFolder: File) {
     }
 
     private fun parseUuid(value: String): UUID? = runCatching { UUID.fromString(value) }.getOrNull()
+
+    private companion object {
+        const val OFFLINE_MEMBER_INVITE_SENT_IDS_PATH = "offline_member_invite_notifications.sent_ids"
+    }
 }

@@ -221,15 +221,18 @@ class ChanponWorldSettingsMenu(
         val member = player.uniqueId in worldData.members
         val imported = storage.isImportedArchive(worldData.uuid)
         val owner = actualOwner && !imported
-        val manager = (owner || moderator) && !imported
+        val viewerRole = worldSettingsViewerRole(owner, moderator, member)
+        val canInspectSettings = !imported && viewerRole != WorldSettingsViewerRole.NONE
         val protected = protectionService.isProtected(worldData)
-        val size = if (protected || member && !manager) PROTECTED_SETTINGS_SIZE else 54
+        // メンバーも設定の全体像を確認できるよう、表示専用項目を含む通常画面は54枠を使います。
+        // 保護ワールドのオーナー向け短縮画面だけは、既存の配置契約を維持します。
+        val size = if (protected && owner) PROTECTED_SETTINGS_SIZE else 54
         val elements = mutableListOf<MenuElement>()
 
         if (protected && owner) {
             addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.PUBLISH_ACTION, 21)
             addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.NOTIFICATION_ACTION, 22)
-        } else if (manager) {
+        } else if (canInspectSettings) {
             elements += mwmActionEntry(player, 19, worldData, WorldSettingsAction.EDIT_INFO, "info", Material.NAME_TAG, OPERATION_EDIT_INFO, listOf(i18n(player, "mwm_action.action")))
             elements += mwmActionEntry(player, 20, worldData, WorldSettingsAction.SELECT_ICON, "icon", Material.ANVIL, OPERATION_SELECT_ICON, listOf(i18n(player, "mwm_action.action")))
             elements += mwmActionEntry(player, 21, worldData, WorldSettingsAction.SET_SPAWN, "spawn", Material.COMPASS, OPERATION_SET_SPAWN,
@@ -239,20 +242,35 @@ class ChanponWorldSettingsMenu(
             )
             elements += mwmActionEntry(player, 28, worldData, WorldSettingsAction.EDIT_ANNOUNCEMENT, "announcement", Material.OAK_SIGN, OPERATION_ANNOUNCEMENT,
                 listOf(text(player, "gui.settings.announcement.action.set_message"), text(player, "gui.settings.announcement.action.reset_message")))
-            addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.NOTIFICATION_ACTION, 29)
+            addCapability(
+                elements,
+                player,
+                worldData,
+                WorldSettingsCapabilityPlacements.NOTIFICATION_ACTION,
+                29,
+                displayOnlyWhenUnavailable = !isFeatureRoleActionable(player, worldData, WorldSettingsFeature.NOTIFICATION),
+            )
             elements += mwmActionEntry(player, 47, worldData, WorldSettingsAction.MANAGE_TOUR, "tour", Material.PALE_OAK_BOAT, OPERATION_TOUR,
                 listOf(i18n(player, "mwm_action.action")), "gui.tour.worldmenu", requireTargetWorld = true)
         }
-        if (owner && !protected) {
+        if (canInspectSettings && !protected) {
             addCapability(
                 elements,
                 player,
                 worldData,
                 WorldSettingsCapabilityPlacements.EXPANSION_ACTION,
                 23,
-                displayOnlyWhenUnavailable = !isCurrentWorld(player, worldData),
+                displayOnlyWhenUnavailable = !isCurrentWorld(player, worldData) ||
+                    !isFeatureRoleActionable(player, worldData, WorldSettingsFeature.EXPANSION),
             )
-            addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.PUBLISH_ACTION, 24)
+            addCapability(
+                elements,
+                player,
+                worldData,
+                WorldSettingsCapabilityPlacements.PUBLISH_ACTION,
+                24,
+                displayOnlyWhenUnavailable = !isFeatureRoleActionable(player, worldData, WorldSettingsFeature.PUBLISH),
+            )
             elements += mwmActionEntry(player, 25, worldData, WorldSettingsAction.MANAGE_MEMBERS, "member", Material.PLAYER_HEAD, OPERATION_MEMBERS, listOf(i18n(player, "mwm_action.action")))
             addCapability(
                 elements,
@@ -260,7 +278,8 @@ class ChanponWorldSettingsMenu(
                 worldData,
                 WorldSettingsCapabilityPlacements.ENVIRONMENT_ACTION,
                 32,
-                displayOnlyWhenUnavailable = !isCurrentWorld(player, worldData),
+                displayOnlyWhenUnavailable = !isCurrentWorld(player, worldData) ||
+                    !isFeatureRoleActionable(player, worldData, WorldSettingsFeature.ENVIRONMENT),
             )
             addCapability(
                 elements,
@@ -268,7 +287,8 @@ class ChanponWorldSettingsMenu(
                 worldData,
                 WorldSettingsCapabilityPlacements.CRITICAL_ACTION,
                 33,
-                displayOnlyWhenUnavailable = !isCurrentWorld(player, worldData),
+                displayOnlyWhenUnavailable = !isCurrentWorld(player, worldData) ||
+                    !isFeatureRoleActionable(player, worldData, WorldSettingsFeature.CRITICAL),
             )
             if (MyWorldManagerApi.hasWorldPortals(worldData.uuid)) {
                 elements += mwmActionEntry(player, ChanponWorldSettingsLayout.PORTAL_MANAGEMENT_SLOT, worldData, WorldSettingsAction.MANAGE_PORTALS, "portals", Material.END_PORTAL_FRAME, OPERATION_PORTALS, listOf(i18n(player, "mwm_action.action")))
@@ -331,14 +351,23 @@ class ChanponWorldSettingsMenu(
         require(contract.options.size == actionTexts.size)
         val outsideTargetWorld = requireTargetWorld && !isCurrentWorld(player, worldData)
         val actionable = contract.actionable && !outsideTargetWorld
+        val warningKey = worldSettingsRestrictionWarningKey(
+            worldSettingsViewerRole(
+                owner = worldData.owner == player.uniqueId || MyWorldManagerApi.hasWorldSettingsAdminAccess(player),
+                moderator = player.uniqueId in worldData.moderators,
+                member = player.uniqueId in worldData.members,
+            ),
+            outsideTargetWorld,
+        )?.takeUnless { actionable }
         return CCSystem.getAPI().getGuiElementService().menuEntry(player, GuiMenuEntrySpec(
             slot = slot,
             material = MyWorldManagerApi.getConfiguredMenuIcon("world_settings", iconKey, material),
             name = fixedName(text(player, "$langPrefix.display"), GuiNameStyle.DEFAULT),
             role = if (actionable) GuiElementRole.ACTION else GuiElementRole.CONTENT,
             description = mwmDescription(player, iconKey),
-            warnings = if (requireTargetWorld && !isCurrentWorld(player, worldData)) listOf(i18n(player, "common.must_be_in_world_warning")) else emptyList(),
-            actions = if (outsideTargetWorld) {
+            warnings = warningKey?.let { listOf(i18n(player, it)) } ?: emptyList(),
+            // メンバー／モデレーターは同じ配置で項目を確認できますが、非操作時は操作案内を生成しません。
+            actions = if (outsideTargetWorld || !contract.actionable) {
                 emptyList()
             } else {
                 contract.options.zip(actionTexts).map { (option, actionText) ->
@@ -667,23 +696,33 @@ class ChanponWorldSettingsMenu(
         }
         val loreBlocks = buildList {
             add(GuiLoreBlock(listOf(GuiLoreLine.Text(description))))
-            add(GuiLoreBlock(listOf(
-                GuiLoreLine.Data(
-                    i18n(player, "publish.current_label"),
-                    display,
-                    options.first { it.first == visibility }.third,
-                ),
-            )))
-            add(GuiLoreBlock(options.map { (option, displayName, selectedColor) ->
-                GuiLoreLine.Option(
-                    displayName,
-                    option == visibility,
-                    selectedColor,
-                    "\u00A77",
-                )
-            }))
+            if (isFeatureRoleActionable(player, worldData, WorldSettingsFeature.PUBLISH)) {
+                add(GuiLoreBlock(listOf(
+                    GuiLoreLine.Data(
+                        i18n(player, "publish.current_label"),
+                        display,
+                        options.first { it.first == visibility }.third,
+                    ),
+                )))
+                add(GuiLoreBlock(options.map { (option, displayName, selectedColor) ->
+                    GuiLoreLine.Option(
+                        displayName,
+                        option == visibility,
+                        selectedColor,
+                        "\u00A77",
+                    )
+                }))
+            }
+            featureRestrictionWarning(player, worldData, WorldSettingsFeature.PUBLISH)?.let {
+                add(GuiLoreBlock(listOf(it)))
+            }
         }
-        return capabilityPresentation(Material.OAK_SIGN, i18n(player, "publish.title"), loreBlocks)
+        return capabilityPresentation(
+            Material.OAK_SIGN,
+            i18n(player, "publish.title"),
+            loreBlocks,
+            role = if (isFeatureActionable(player, worldData, WorldSettingsFeature.PUBLISH)) GuiElementRole.ACTION else GuiElementRole.CONTENT,
+        )
     }
 
     private fun expansionPresentation(
@@ -705,8 +744,10 @@ class ChanponWorldSettingsMenu(
                 textList(player, "gui.settings.expand.blocks.description").map(GuiLoreLine::Text),
                 lines,
                 requireTargetWorld = true,
-                worldData = worldData
+                worldData = worldData,
+                restrictionWarning = featureRestrictionWarning(player, worldData, WorldSettingsFeature.EXPANSION),
             ),
+            role = if (isFeatureRoleActionable(player, worldData, WorldSettingsFeature.EXPANSION)) GuiElementRole.ACTION else GuiElementRole.CONTENT,
         )
     }
 
@@ -715,6 +756,23 @@ class ChanponWorldSettingsMenu(
         worldData: WorldData,
     ): MenuCapabilityPresentation {
         val status = i18n(player, if (worldData.notificationEnabled) "common.on" else "common.off")
+        val restrictionWarning = featureRestrictionWarning(player, worldData, WorldSettingsFeature.NOTIFICATION)
+        val loreBlocks = buildList {
+            add(GuiLoreBlock(
+                textList(player, "gui.settings.notification.blocks.description")
+                    .map(GuiLoreLine::Text),
+            ))
+            if (isFeatureRoleActionable(player, worldData, WorldSettingsFeature.NOTIFICATION)) {
+                add(GuiLoreBlock(listOf(
+                    GuiLoreLine.Data(
+                        i18n(player, "notification.current_label"),
+                        status,
+                        "\u00A7e",
+                    ),
+                )))
+            }
+            restrictionWarning?.let { add(GuiLoreBlock(listOf(it))) }
+        }
         return MenuCapabilityPresentation(
             GuiItemSpec(
                 material = Material.BELL,
@@ -722,24 +780,8 @@ class ChanponWorldSettingsMenu(
                     text(player, "gui.settings.notification.display"),
                     GuiNameStyle.DEFAULT,
                 ),
-                lore = GuiLoreSpec.Blocks(
-                    listOf(
-                        GuiLoreBlock(
-                            textList(player, "gui.settings.notification.blocks.description")
-                                .map(GuiLoreLine::Text),
-                        ),
-                        GuiLoreBlock(
-                            listOf(
-                                GuiLoreLine.Data(
-                                    i18n(player, "notification.current_label"),
-                                    status,
-                                    "§e",
-                                ),
-                            ),
-                        ),
-                    ),
-                ),
-                role = GuiElementRole.ACTION,
+                lore = GuiLoreSpec.Blocks(loreBlocks),
+                role = if (isFeatureActionable(player, worldData, WorldSettingsFeature.NOTIFICATION)) GuiElementRole.ACTION else GuiElementRole.CONTENT,
                 amount = 1,
             ),
             glint = worldData.notificationEnabled,
@@ -750,8 +792,23 @@ class ChanponWorldSettingsMenu(
         player: Player,
         worldData: WorldData,
     ): MenuCapabilityPresentation {
+        featureRestrictionWarning(player, worldData, WorldSettingsFeature.CRITICAL)?.let { warning ->
+            return capabilityPresentation(
+                Material.BARRIER,
+                i18n(player, "critical.unavailable_display"),
+                describedStructuredLore(
+                    player,
+                    textList(player, "gui.settings.critical.blocks.summary").map(GuiLoreLine::Text),
+                    emptyList(),
+                    requireTargetWorld = true,
+                    worldData = worldData,
+                    restrictionWarning = warning,
+                ),
+                role = GuiElementRole.CONTENT,
+            )
+        }
         criticalUnavailableLoreKey(player, worldData)?.let { loreKey ->
-            return criticalUnavailablePresentation(player, loreKey)
+            return criticalUnavailablePresentation(player, worldData, loreKey)
         }
         return capabilityPresentation(
             Material.TNT,
@@ -762,6 +819,7 @@ class ChanponWorldSettingsMenu(
                 emptyList(),
                 requireTargetWorld = true,
                 worldData = worldData,
+                restrictionWarning = featureRestrictionWarning(player, worldData, WorldSettingsFeature.CRITICAL),
             ),
         )
     }
@@ -777,6 +835,7 @@ class ChanponWorldSettingsMenu(
 
     private fun criticalUnavailablePresentation(
         player: Player,
+        worldData: WorldData,
         loreKey: String,
     ): MenuCapabilityPresentation {
         return capabilityPresentation(
@@ -786,6 +845,8 @@ class ChanponWorldSettingsMenu(
                 player,
                 textList(player, "gui.settings.critical.blocks.summary").map(GuiLoreLine::Text),
                 listOf(GuiLoreLine.Warning(i18n(player, loreKey))),
+                requireTargetWorld = true,
+                worldData = worldData,
             ),
             role = GuiElementRole.CONTENT,
         )
@@ -802,13 +863,19 @@ class ChanponWorldSettingsMenu(
             emptyList(),
             requireTargetWorld = true,
             worldData = worldData,
+            restrictionWarning = featureRestrictionWarning(player, worldData, WorldSettingsFeature.ENVIRONMENT),
         )
         val icon = MyWorldManagerApi.getConfiguredMenuIcon(
             "world_settings",
             "environment",
             Material.GRASS_BLOCK,
         )
-        return capabilityPresentation(icon, display, lore)
+        return capabilityPresentation(
+            icon,
+            display,
+            lore,
+            role = if (isFeatureRoleActionable(player, worldData, WorldSettingsFeature.ENVIRONMENT)) GuiElementRole.ACTION else GuiElementRole.CONTENT,
+        )
     }
 
     private fun capabilityPresentation(
@@ -827,20 +894,43 @@ class ChanponWorldSettingsMenu(
         embeddedLoreBlocks = loreBlocks,
     )
 
+    private fun featureRestrictionWarning(
+        player: Player,
+        worldData: WorldData,
+        feature: WorldSettingsFeature,
+    ): GuiLoreLine.Warning? {
+        if (isFeatureActionable(player, worldData, feature)) return null
+        return worldSettingsRestrictionWarningKey(
+            worldSettingsViewerRole(
+                owner = worldData.owner == player.uniqueId || MyWorldManagerApi.hasWorldSettingsAdminAccess(player),
+                moderator = player.uniqueId in worldData.moderators,
+                member = player.uniqueId in worldData.members,
+            ),
+            outsideTargetWorld = !isCurrentWorld(player, worldData),
+        )?.let { GuiLoreLine.Warning(i18n(player, it)) }
+    }
+
     private fun describedStructuredLore(
         player: Player,
         description: List<GuiLoreLine>,
         existing: List<GuiLoreLine>,
         requireTargetWorld: Boolean = false,
-        worldData: WorldData? = null
+        worldData: WorldData? = null,
+        restrictionWarning: GuiLoreLine.Warning? = null,
     ): List<GuiLoreBlock> {
         val outsideTargetWorld = requireTargetWorld && worldData != null && !isCurrentWorld(player, worldData)
         return buildList {
             if (description.isNotEmpty()) add(GuiLoreBlock(description))
-            if (!outsideTargetWorld && existing.isNotEmpty()) add(GuiLoreBlock(existing))
-            if (outsideTargetWorld) {
-                add(GuiLoreBlock(listOf(GuiLoreLine.Warning(i18n(player, "common.must_be_in_world_warning")))))
+            // ワールド外では、この項目固有の警告／危険文を重ねず、既存のData/Textだけを残します。
+            // 共通のワールド外警告を、既存画面と同じ警告ブロック位置へ集約します。
+            val visibleExisting = if (outsideTargetWorld) {
+                existing.filter { it is GuiLoreLine.Data || it is GuiLoreLine.Text }
+            } else {
+                existing
             }
+            if (visibleExisting.isNotEmpty()) add(GuiLoreBlock(visibleExisting))
+            if (outsideTargetWorld) add(GuiLoreBlock(listOf(GuiLoreLine.Warning(i18n(player, "common.must_be_in_world_warning")))))
+            else if (restrictionWarning != null) add(GuiLoreBlock(listOf(restrictionWarning)))
         }
     }
 
@@ -1027,6 +1117,19 @@ class ChanponWorldSettingsMenu(
                 WorldSettingsFeature.NOTIFICATION,
             )
         }
+        // capability自体はメンバー／モデレーターにも解決し、actionable=falseの
+        // 表示専用アイコンとして項目説明と変更不可理由を表示します。実行権限は下の
+        // isFeatureRoleActionableと既存handlerが引き続き担当します。
+        return owner || moderator || player.uniqueId in worldData.members
+    }
+
+    internal fun isFeatureRoleActionable(
+        player: Player,
+        worldData: WorldData,
+        feature: WorldSettingsFeature,
+    ): Boolean {
+        val owner = worldData.owner == player.uniqueId || MyWorldManagerApi.hasWorldSettingsAdminAccess(player)
+        val moderator = player.uniqueId in worldData.moderators
         return when (feature) {
             WorldSettingsFeature.NOTIFICATION -> owner || moderator
             else -> owner
@@ -1039,6 +1142,7 @@ class ChanponWorldSettingsMenu(
         feature: WorldSettingsFeature,
     ): Boolean {
         if (!isFeatureVisible(player, worldData, feature)) return false
+        if (!isFeatureRoleActionable(player, worldData, feature)) return false
         val inWorld = isCurrentWorld(player, worldData)
         return when (feature) {
             WorldSettingsFeature.EXPANSION ->
@@ -1191,6 +1295,19 @@ class ChanponWorldSettingsMenu(
     ): Component {
         if (!isCurrentWorld(player, worldData)) {
             return i18nComponent(player, "common.must_be_in_world_warning")
+        }
+        if (!isFeatureRoleActionable(player, worldData, feature)) {
+            return i18nComponent(
+                player,
+                worldSettingsRestrictionWarningKey(
+                    worldSettingsViewerRole(
+                        owner = worldData.owner == player.uniqueId || MyWorldManagerApi.hasWorldSettingsAdminAccess(player),
+                        moderator = player.uniqueId in worldData.moderators,
+                        member = player.uniqueId in worldData.members,
+                    ),
+                    outsideTargetWorld = false,
+                ) ?: "common.member_cannot_change_warning",
+            )
         }
         return when (feature) {
             WorldSettingsFeature.EXPANSION -> i18nComponent(player, "message.expand_max")

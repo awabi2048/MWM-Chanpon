@@ -46,7 +46,8 @@ class BackupService(
     }
 
     fun listBackupsForWorld(worldUuid: UUID): List<BackupEntry> {
-        return listBackups().filter { worldUuid in it.worldUuids }
+        // 一括バックアップにも対象UUIDが含まれるため、対象ワールド画面ではscopeを必ず限定します。
+        return listBackups().filter { it.isDedicatedWorldBackupFor(worldUuid) }
     }
 
     fun latestRestorePoint(): BackupEntry? {

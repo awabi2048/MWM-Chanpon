@@ -37,6 +37,7 @@ import me.awabi2048.mwmchanpon.service.ChanponSpawnWorldService
 import me.awabi2048.mwmchanpon.service.EasyVoidWorldCreationService
 import me.awabi2048.mwmchanpon.service.ArchiveOperationGuard
 import me.awabi2048.mwmchanpon.service.ManualRollbackService
+import me.awabi2048.mwmchanpon.service.OfflineMemberInviteNotifier
 import me.awabi2048.mwmchanpon.service.PublishLevelSynchronizer
 import me.awabi2048.mwmchanpon.service.WorldDataExportService
 import me.awabi2048.mwmchanpon.service.ArchiveService
@@ -103,6 +104,7 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var adminCommand: ChanponAdminCommand
     private lateinit var spawnWorldService: ChanponSpawnWorldService
     private lateinit var toolController: ToolPermissionController
+    private lateinit var offlineMemberInviteNotifier: OfflineMemberInviteNotifier
     private lateinit var spawnProtectionService: SpawnWorldProtectionService
     private lateinit var buildPermissionService: WorldBuildPermissionService
     private lateinit var easyVoidWorldCreationService: EasyVoidWorldCreationService
@@ -170,6 +172,7 @@ class MWMChanponPlugin : JavaPlugin() {
         publishLevelSynchronizer = PublishLevelSynchronizer()
         chanponStorage.setVisibilitySyncHandler(publishLevelSynchronizer::sync)
         globalStorage = ChanponGlobalStorage(dataFolder)
+        offlineMemberInviteNotifier = OfflineMemberInviteNotifier(globalStorage, logger)
         spawnWorldService = ChanponSpawnWorldService(this, globalStorage)
         val luckPerms = LuckPermsProvider.get()
         spawnProtectionService = SpawnWorldProtectionService()
@@ -313,7 +316,10 @@ class MWMChanponPlugin : JavaPlugin() {
         linkedPortalCapability = LinkedPortalCapability()
         productionToggleExtension.syncForcedTagsForProductionWorlds()
         server.pluginManager.registerEvents(MemberPermissionSyncListener(toolController, chanponStorage), this)
-        server.pluginManager.registerEvents(PlayerJoinListener(toolController, spawnWorldService), this)
+        server.pluginManager.registerEvents(
+            PlayerJoinListener(toolController, spawnWorldService, offlineMemberInviteNotifier),
+            this,
+        )
         server.pluginManager.registerEvents(ToolPermissionWorldListener(toolController), this)
         server.pluginManager.registerEvents(WorldCleanupListener(chanponStorage, toolController), this)
 

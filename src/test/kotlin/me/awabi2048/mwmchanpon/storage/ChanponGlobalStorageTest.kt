@@ -72,4 +72,29 @@ class ChanponGlobalStorageTest {
             folder.deleteRecursively()
         }
     }
+
+    @Test
+    fun `offline invite notification ids are retained only while invites remain pending`() {
+        val folder = Files.createTempDirectory("chanpon-global-storage-offline-invite").toFile()
+        try {
+            val storage = ChanponGlobalStorage(folder)
+            val playerUuid = UUID.randomUUID()
+            val retainedId = UUID.randomUUID()
+            val removedId = UUID.randomUUID()
+
+            assertTrue(storage.markOfflineMemberInviteNotified(playerUuid, retainedId))
+            assertTrue(storage.markOfflineMemberInviteNotified(playerUuid, removedId))
+            assertEquals(
+                setOf(retainedId),
+                storage.retainOfflineMemberInviteIds(playerUuid, setOf(retainedId)),
+            )
+            assertEquals(setOf(retainedId), storage.getSentOfflineMemberInviteIds(playerUuid))
+            assertEquals(
+                setOf(retainedId),
+                ChanponGlobalStorage(folder).getSentOfflineMemberInviteIds(playerUuid),
+            )
+        } finally {
+            folder.deleteRecursively()
+        }
+    }
 }

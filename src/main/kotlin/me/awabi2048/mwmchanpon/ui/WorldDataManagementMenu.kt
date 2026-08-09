@@ -50,7 +50,8 @@ class WorldDataManagementMenu(
                 actions = mapOf(
                     ACTION_BACK to MenuActionHandler(::back),
                     ACTION_PAGE to MenuActionHandler(::changePage),
-                    ACTION_WORLD to MenuActionHandler(::selectWorld),
+                    ACTION_WORLD_BACKUP to MenuActionHandler(::selectWorldBackup),
+                    ACTION_WORLD_LIST to MenuActionHandler(::navigateWorldBackupList),
                     ACTION_BULK_BACKUP to MenuActionHandler(::showBulkBackupConfirmation),
                     ACTION_BULK_ROLLBACK to MenuActionHandler(::showBulkRollbackConfirmation),
                     ACTION_ANNUAL_ARCHIVE to MenuActionHandler(::startAnnualArchive),
@@ -114,9 +115,20 @@ class WorldDataManagementMenu(
         )
         elements += infoEntry(player, layout.infoSlot, worlds.size, safePage + 1, pages)
         worlds.drop(safePage * ITEMS_PER_PAGE).take(ITEMS_PER_PAGE).forEachIndexed { index, world ->
+            // 一覧アイコンとバックアップ操作を同じ項目へ詰め込まず、対象ごとに専用項目を隣接配置します。
+            val worldSlot = index * ITEMS_PER_WORLD_STRIDE
             elements += worldEntry(
                 player,
-                layout.itemSlots[index],
+                layout.itemSlots[worldSlot],
+                world,
+                mapOf(
+                    WORLD_UUID to world.uuid.toString(),
+                    PAGE to safePage.toString(),
+                ),
+            )
+            elements += worldBackupEntry(
+                player,
+                layout.itemSlots[worldSlot + 1],
                 world,
                 mapOf(
                     WORLD_UUID to world.uuid.toString(),
@@ -210,31 +222,30 @@ class WorldDataManagementMenu(
             MenuUpdate.Replace(listRoute(context.payload[PAGE]?.toIntOrNull() ?: 0)),
         )
 
-    private fun selectWorld(context: MenuActionContext): MenuActionResult {
+    private fun selectWorldBackup(context: MenuActionContext): MenuActionResult {
         val worldUuid = context.payload[WORLD_UUID]?.let {
             runCatching { UUID.fromString(it) }.getOrNull()
         } ?: return MenuActionResult.Rejected()
         val currentPage = context.payload[PAGE]?.toIntOrNull() ?: page(context.route)
-        if (context.click.isLeftClick) {
-            return MenuActionResult.Success(
-                MenuUpdate.Navigate(
-                    MenuRoute(
-                        OWNER,
-                        ROUTE_BACKUP_CONFIRM,
-                        mapOf(
-                            WORLD_UUID to worldUuid.toString(),
-                            PAGE to currentPage.toString(),
-                        ),
+        return MenuActionResult.Success(
+            MenuUpdate.Navigate(
+                MenuRoute(
+                    OWNER,
+                    ROUTE_BACKUP_CONFIRM,
+                    mapOf(
+                        WORLD_UUID to worldUuid.toString(),
+                        PAGE to currentPage.toString(),
                     ),
                 ),
-            )
-        }
-        if (context.click.isRightClick) {
-            return MenuActionResult.Success(
-                MenuUpdate.Navigate(backupListMenu.routeForWorld(worldUuid)),
-            )
-        }
-        return MenuActionResult.Ignored
+            ),
+        )
+    }
+
+    private fun navigateWorldBackupList(context: MenuActionContext): MenuActionResult {
+        val worldUuid = context.payload[WORLD_UUID]?.let {
+            runCatching { UUID.fromString(it) }.getOrNull()
+        } ?: return MenuActionResult.Rejected()
+        return MenuActionResult.Success(MenuUpdate.Navigate(backupListMenu.routeForWorld(worldUuid)))
     }
 
     private fun showBulkBackupConfirmation(context: MenuActionContext): MenuActionResult =
@@ -355,12 +366,38 @@ class WorldDataManagementMenu(
                 ),
             ),
             actions = listOf(
-                chanponGestureAction(ACTION_WORLD, MenuGesture.LEFT, i18n(player, "world_data.world.backup_action"), payload, safety = MenuActionSafety.CONFIRM_ENTRY),
-                chanponGestureAction(ACTION_WORLD, MenuGesture.RIGHT, i18n(player, "world_data.world.list_action"), payload, safety = MenuActionSafety.NAVIGATION_ONLY),
+                chanponGestureAction(ACTION_WORLD_LIST, MenuGesture.ANY, i18n(player, "world_data.world.list_action"), payload, safety = MenuActionSafety.NAVIGATION_ONLY),
             ),
         ),
     )
     }
+
+    private fun worldBackupEntry(
+        player: Player,
+        slot: Int,
+        world: WorldData,
+        payload: Map<String, String>,
+    ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
+        player,
+        GuiMenuEntrySpec(
+            slot = slot,
+            material = Material.CHEST,
+            name = GuiNameSpec.TargetIdentity(
+                i18nComponent(player, "world_data.world_backup.display", mapOf("world" to world.name)),
+            ),
+            role = GuiElementRole.ACTION,
+            description = listOf(i18n(player, "world_data.world_backup.description")),
+            actions = listOf(
+                chanponGestureAction(
+                    ACTION_WORLD_BACKUP,
+                    MenuGesture.ANY,
+                    i18n(player, "world_data.world_backup.action"),
+                    payload,
+                    safety = MenuActionSafety.CONFIRM_ENTRY,
+                ),
+            ),
+        ),
+    )
 
     private fun controlEntry(
         player: Player,
@@ -466,7 +503,8 @@ class WorldDataManagementMenu(
 
     private fun worldDataActionSafety(actionId: String): MenuActionSafety = when (actionId) {
         ACTION_BACK, ACTION_PAGE, ACTION_CANCEL -> MenuActionSafety.NAVIGATION_ONLY
-        ACTION_BULK_BACKUP, ACTION_BULK_ROLLBACK, ACTION_CONFIRM_ROLLBACK -> MenuActionSafety.CONFIRM_ENTRY
+        ACTION_WORLD_BACKUP, ACTION_BULK_BACKUP, ACTION_BULK_ROLLBACK, ACTION_CONFIRM_ROLLBACK -> MenuActionSafety.CONFIRM_ENTRY
+        ACTION_WORLD_LIST -> MenuActionSafety.NAVIGATION_ONLY
         ACTION_ANNUAL_ARCHIVE -> MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE
         ACTION_CONFIRM_BACKUP -> MenuActionSafety.IRREVERSIBLE
         else -> error("World-data action must declare a dedicated safety mapping: $actionId")
@@ -479,7 +517,8 @@ class WorldDataManagementMenu(
         private const val ROUTE_ROLLBACK_CONFIRM = "world-data-rollback-confirm"
         private const val ACTION_BACK = "back"
         private const val ACTION_PAGE = "page"
-        private const val ACTION_WORLD = "world"
+        private const val ACTION_WORLD_BACKUP = "world-backup"
+        private const val ACTION_WORLD_LIST = "world-list"
         private const val ACTION_BULK_BACKUP = "bulk-backup"
         private const val ACTION_BULK_ROLLBACK = "bulk-rollback"
         private const val ACTION_ANNUAL_ARCHIVE = "annual-archive"
@@ -488,6 +527,7 @@ class WorldDataManagementMenu(
         private const val ACTION_CANCEL = "cancel"
         private const val PAGE = "page"
         private const val WORLD_UUID = "world-uuid"
-        private const val ITEMS_PER_PAGE = 36
+        private const val ITEMS_PER_PAGE = 18
+        private const val ITEMS_PER_WORLD_STRIDE = 2
     }
 }

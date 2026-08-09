@@ -131,8 +131,18 @@ class BackupListMenu(
         val inventorySize = variableLayout?.size ?: fixedLayout!!.size
         val previousPageSlot = variableLayout?.previousPageSlot ?: fixedLayout!!.previousPageSlot
         val nextPageSlot = variableLayout?.nextPageSlot ?: fixedLayout!!.nextPageSlot
-        val backSlot = variableLayout?.backSlot ?: fixedLayout!!.backSlot
-        val infoSlot = variableLayout?.actionSlot ?: fixedLayout!!.infoSlot
+        val defaultBackSlot = variableLayout?.backSlot ?: fixedLayout!!.backSlot
+        val defaultInfoSlot = variableLayout?.actionSlot ?: fixedLayout!!.infoSlot
+        val slots = resolveBackupListSlots(
+            source.mode,
+            defaultBackSlot,
+            defaultInfoSlot,
+            centeredBackSlot = if (source.mode == BackupListMode.WORLD) {
+                ChanponGuiElements.backSlot(inventorySize)
+            } else {
+                defaultBackSlot
+            },
+        )
         val itemSlots = variableLayout?.itemSlots ?: fixedLayout!!.itemSlots
         val startIndex = variablePage?.startIndex ?: safePage * ITEMS_PER_PAGE
         val itemCount = variablePage?.itemCount ?: ITEMS_PER_PAGE
@@ -152,10 +162,10 @@ class BackupListMenu(
             )
         }
         elements += simpleActionEntry(
-            player, backSlot, Material.REDSTONE, i18n(player, "common.back"),
+            player, slots.backSlot, Material.REDSTONE, i18n(player, "common.back"),
             GuiElementRole.BACK, ACTION_BACK, i18n(player, "common.back_action"),
         )
-        elements += infoEntry(player, infoSlot, backups.size, safePage + 1, pages)
+        elements += infoEntry(player, slots.infoSlot, backups.size, safePage + 1, pages)
         backups.drop(startIndex).take(itemCount).forEachIndexed { index, backup ->
             elements += backupEntry(
                 player,
@@ -373,7 +383,8 @@ class BackupListMenu(
 
     private fun findBackup(route: MenuRoute): BackupEntry? {
         val backupId = route.payload[BACKUP_ID] ?: return null
-        return backupService.listBackups().firstOrNull { it.id == backupId }
+        // 確認画面へ持ち込まれたIDも、開始元の一覧契約に属するものだけを許可します。
+        return backups(source(route)).firstOrNull { it.id == backupId }
     }
 
     private fun backups(source: BackupListSource): List<BackupEntry> = when (source.mode) {
@@ -590,4 +601,27 @@ class BackupListMenu(
         private const val STAGE = "stage"
         private const val ITEMS_PER_PAGE = 36
     }
+}
+
+internal data class BackupListSlots(
+    val backSlot: Int,
+    val infoSlot: Int,
+)
+
+internal fun resolveBackupListSlots(
+    mode: BackupListMenu.BackupListMode,
+    defaultBackSlot: Int,
+    defaultInfoSlot: Int,
+    centeredBackSlot: Int,
+): BackupListSlots {
+    if (mode != BackupListMenu.BackupListMode.WORLD) {
+        // ALLモードは既存の共通ページ一覧レイアウトを維持し、今回の対象外とします。
+        return BackupListSlots(defaultBackSlot, defaultInfoSlot)
+    }
+
+    // 対象ワールド一覧では、件数・ページ情報をヘッダー中央へ移し、戻るをフッター中央に統一します。
+    return BackupListSlots(
+        backSlot = centeredBackSlot,
+        infoSlot = 4,
+    )
 }

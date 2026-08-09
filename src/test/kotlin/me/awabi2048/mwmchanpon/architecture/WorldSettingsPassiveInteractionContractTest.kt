@@ -10,7 +10,7 @@ class WorldSettingsPassiveInteractionContractTest {
     fun `ワールド外の必須設定は操作を持たない`() {
         val source = source("ui/ChanponWorldSettingsMenu.kt")
 
-        assertTrue("actions = if (outsideTargetWorld)" in source)
+        assertTrue("actions = if (outsideTargetWorld || !contract.actionable)" in source)
         assertTrue("displayOnlyWhenUnavailable = !isCurrentWorld(player, worldData)" in source)
     }
 
