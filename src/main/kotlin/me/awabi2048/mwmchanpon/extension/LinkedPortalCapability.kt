@@ -37,7 +37,7 @@ class LinkedPortalCapability {
                     val world = worldData(context.arguments) ?: return@optionalAvailability false
                     context.player.uniqueId == world.owner ||
                         world.members.contains(context.player.uniqueId) ||
-                        context.player.hasPermission("myworldmanager.admin")
+                        context.player.hasPermission("mwmchanpon.admin")
                 },
                 presentationProvider = MenuCapabilityPresentationProvider { context ->
                     portalPresentation(context.player)

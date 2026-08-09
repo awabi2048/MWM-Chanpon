@@ -351,8 +351,7 @@ class EasyVoidWorldCreationService(
     private fun canCreate(player: Player): Boolean {
         if (!player.hasPermission("myworldmanager.world.create") &&
             !player.hasPermission("myworldmanager.admin") &&
-            !player.hasPermission("mwmchanpon.admin") &&
-            !player.hasPermission("craftercrossing.test")
+            !player.hasPermission("mwmchanpon.admin")
         ) {
             player.sendMessage(CCSystem.getAPI().getI18nString(player, "no_permission"))
             return false

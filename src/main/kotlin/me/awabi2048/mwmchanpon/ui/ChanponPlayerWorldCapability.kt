@@ -616,14 +616,12 @@ class ChanponPlayerWorldCapability(
 
     private fun canBypassWorldLimits(player: Player): Boolean =
         player.hasPermission("myworldmanager.admin.bypass_world_limits") ||
-            player.hasPermission("myworldmanager.admin") ||
-            player.hasPermission("craftercrossing.test")
+            player.hasPermission("myworldmanager.admin")
 
     private fun hasCreatePermission(player: Player): Boolean =
         player.hasPermission("myworldmanager.world.create") ||
             player.hasPermission("myworldmanager.admin") ||
-            player.hasPermission("mwmchanpon.admin") ||
-            player.hasPermission("craftercrossing.test")
+            player.hasPermission("mwmchanpon.admin")
 
     private fun creationBlockReason(
         context: MenuCapabilityContext,

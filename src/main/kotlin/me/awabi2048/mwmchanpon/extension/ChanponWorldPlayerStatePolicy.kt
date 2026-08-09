@@ -30,8 +30,7 @@ class ChanponWorldPlayerStatePolicy(
 
     private fun isAdmin(player: Player): Boolean =
         player.hasPermission("myworldmanager.admin") ||
-            player.hasPermission("mwmchanpon.admin") ||
-            player.hasPermission("chanponutilities.admin")
+            player.hasPermission("mwmchanpon.admin")
 
     companion object {
         const val POLICY_ID = "mwmchanpon.player_state"

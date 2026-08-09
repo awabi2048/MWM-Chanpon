@@ -266,7 +266,7 @@ class ProductionToggleExtension(
         // TODO: 本番設定を変更できない場合も項目を消さず、BARRIERと理由Loreを返す。
         val worldData = worldData(context.arguments) ?: return false
         return worldData.owner == context.player.uniqueId ||
-            context.player.hasPermission("myworldmanager.admin")
+            context.player.hasPermission("mwmchanpon.admin")
     }
 
     private fun creationDraft(
@@ -311,7 +311,7 @@ class ProductionToggleExtension(
         if (protectionService.isProtected(worldData)) {
             return ProductionDecision(false, "production.unavailable.protected")
         }
-        if (worldData.owner != context.player.uniqueId && !context.player.hasPermission("myworldmanager.admin")) {
+        if (worldData.owner != context.player.uniqueId && !context.player.hasPermission("mwmchanpon.admin")) {
             return ProductionDecision(false, "production.unavailable.owner_only")
         }
         if (!storage.isProductionWorld(worldData.uuid) && ownerHasProductionWorld(worldData.owner, worldData.uuid)) {

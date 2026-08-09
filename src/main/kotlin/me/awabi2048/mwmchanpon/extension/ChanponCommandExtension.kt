@@ -18,7 +18,6 @@ class ChanponCommandExtension(
         if (!archiveOperationGuard.canPerform(sender, operationFor(subCommand, args))) return false
         return when (subCommand.lowercase()) {
             "stats" -> false
-            "give" -> !isWorldSeedGive(args)
             else -> true
         }
     }
@@ -33,14 +32,6 @@ class ChanponCommandExtension(
             "stats" -> false
             else -> true
         }
-    }
-
-    override fun canSuggestMwmGiveItem(sender: CommandSender, itemId: String): Boolean {
-        return !itemId.equals("world_seed", ignoreCase = true)
-    }
-
-    private fun isWorldSeedGive(args: List<String>): Boolean {
-        return args.size >= 3 && args[2].equals("world_seed", ignoreCase = true)
     }
 
     private fun operationFor(subCommand: String, args: List<String>): ChanponOperation =

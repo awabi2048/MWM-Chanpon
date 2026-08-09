@@ -59,8 +59,7 @@ class ChanponWorldCreationGuard(
 
     private fun canBypassWorldLimits(player: org.bukkit.entity.Player): Boolean =
         player.hasPermission("myworldmanager.admin.bypass_world_limits") ||
-            player.hasPermission("myworldmanager.admin") ||
-            player.hasPermission("craftercrossing.test")
+            player.hasPermission("myworldmanager.admin")
 
     companion object {
         const val POLICY_ID = "mwmchanpon.world_creation"

@@ -113,7 +113,7 @@ class SubmissionAdminMenu(
         progressFilter: ProgressFilter = ProgressFilter.ALL,
         sortType: SortType = SortType.CREATED_DESC
     ) {
-        if (!player.hasPermission("myworldmanager.admin")) {
+        if (!player.hasPermission("mwmchanpon.admin")) {
             player.sendMessage(i18nComponent(player, "admin_menu.no_permission"))
             return
         }

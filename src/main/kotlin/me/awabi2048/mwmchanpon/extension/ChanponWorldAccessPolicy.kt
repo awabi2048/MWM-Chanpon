@@ -107,6 +107,5 @@ class ChanponWorldAccessPolicy(
     private fun canCreateWorld(player: Player): Boolean =
         player.hasPermission("myworldmanager.world.create") ||
             player.hasPermission("myworldmanager.admin") ||
-            player.hasPermission("mwmchanpon.admin") ||
-            player.hasPermission("craftercrossing.test")
+            player.hasPermission("mwmchanpon.admin")
 }
