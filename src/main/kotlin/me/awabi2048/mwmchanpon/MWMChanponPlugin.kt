@@ -24,6 +24,7 @@ import me.awabi2048.mwmchanpon.extension.ToolPermissionCapability
 import me.awabi2048.mwmchanpon.extension.WorldBackupCapability
 import me.awabi2048.mwmchanpon.listener.MemberPermissionSyncListener
 import me.awabi2048.mwmchanpon.listener.FreecamWorldPolicyListener
+import me.awabi2048.mwmchanpon.listener.MyWorldSafetyDefaultsListener
 import me.awabi2048.mwmchanpon.listener.PlayerJoinListener
 import me.awabi2048.mwmchanpon.listener.SubmittedWorldProtectionListener
 import me.awabi2048.mwmchanpon.listener.SpawnWorldProtectionListener
@@ -32,6 +33,7 @@ import me.awabi2048.mwmchanpon.listener.WorldCleanupListener
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
 import me.awabi2048.mwmchanpon.protection.SpawnWorldProtectionService
 import me.awabi2048.mwmchanpon.protection.WorldBuildPermissionService
+import me.awabi2048.mwmchanpon.protection.MyWorldSafetyDefaultsService
 import me.awabi2048.mwmchanpon.service.BackupAutomationService
 import me.awabi2048.mwmchanpon.service.ChanponSpawnWorldService
 import me.awabi2048.mwmchanpon.service.EasyVoidWorldCreationService
@@ -107,6 +109,7 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var offlineMemberInviteNotifier: OfflineMemberInviteNotifier
     private lateinit var spawnProtectionService: SpawnWorldProtectionService
     private lateinit var buildPermissionService: WorldBuildPermissionService
+    private lateinit var worldSafetyDefaultsService: MyWorldSafetyDefaultsService
     private lateinit var easyVoidWorldCreationService: EasyVoidWorldCreationService
     private lateinit var publishLevelSynchronizer: PublishLevelSynchronizer
 
@@ -176,6 +179,7 @@ class MWMChanponPlugin : JavaPlugin() {
         spawnWorldService = ChanponSpawnWorldService(this, globalStorage)
         val luckPerms = LuckPermsProvider.get()
         spawnProtectionService = SpawnWorldProtectionService()
+        worldSafetyDefaultsService = MyWorldSafetyDefaultsService(logger)
         val toolDefinitions = ToolPermissionConfig(this).load()
         val isAutoRollbackEnabled = { config.getBoolean("backup.auto_rollback.enabled", false) }
         worldWorkPermissionPolicy = ChanponWorldWorkPermissionPolicy(chanponStorage, isAutoRollbackEnabled)
@@ -216,6 +220,7 @@ class MWMChanponPlugin : JavaPlugin() {
         backupService.setPostRestoreHandler { restoredWorlds ->
             val repository = MyWorldManagerApi.getWorldRepository() ?: return@setPostRestoreHandler
             restoredWorlds.mapNotNull(repository::findByUuid).forEach { worldData ->
+                worldSafetyDefaultsService.sync(worldData)
                 publishLevelSynchronizer.sync(worldData.uuid)
                 submittedProtectionService.sync(worldData)
                 toolController.syncWorld(worldData)
@@ -301,6 +306,7 @@ class MWMChanponPlugin : JavaPlugin() {
         server.pluginManager.registerEvents(publishLevelSynchronizer, this)
         server.pluginManager.registerEvents(SubmittedWorldProtectionListener(submittedProtectionService), this)
         server.pluginManager.registerEvents(SpawnWorldProtectionListener(globalStorage, spawnProtectionService), this)
+        server.pluginManager.registerEvents(MyWorldSafetyDefaultsListener(this, worldSafetyDefaultsService), this)
 
         val toolMenu = ToolPermissionMenu(this, toolController, toolDefinitions, chanponStorage)
         toolPermissionCapability =
@@ -325,6 +331,7 @@ class MWMChanponPlugin : JavaPlugin() {
 
         server.scheduler.runTask(this, Runnable {
             MyWorldManagerApi.getWorldRepository()?.findAll()?.let {
+                worldSafetyDefaultsService.syncAll(it)
                 publishLevelSynchronizer.syncAll()
                 submittedProtectionService.syncAll(it)
                 it.forEach(toolController::syncWorld)
