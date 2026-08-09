@@ -24,7 +24,9 @@ class MyWorldSafetyDefaultsService(
         val worldName = worldName(worldData)
         val world = Bukkit.getWorld(worldName)
         if (world == null) {
-            logger.warning("マイワールドの安全既定値を適用できません。ワールドが未ロードです: $worldName")
+            // MWMは未使用ワールドをアンロードするため、起動時の未ロードは異常ではありません。
+            // 実際のロード時にはリスナーが再度同期します。
+            logger.fine("マイワールドは未ロードのため安全既定値を保留します: $worldName")
             return false
         }
 
