@@ -9,6 +9,9 @@ import java.nio.file.StandardOpenOption
 import java.time.LocalDateTime
 import java.security.MessageDigest
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import java.util.logging.Level
+import java.util.logging.Logger
 import org.bukkit.configuration.file.YamlConfiguration
 
 enum class SubmissionState(val storageValue: String, val i18nKey: String) {
@@ -45,9 +48,13 @@ enum class ChanponWorldProtectionMode(val storageValue: String, val i18nKey: Str
     }
 }
 
-class ChanponWorldStorage(dataFolder: File) {
+class ChanponWorldStorage(
+    dataFolder: File,
+    private val logger: Logger = Logger.getLogger("MWM-Chanpon"),
+) {
     private val worldsDir = File(dataFolder, "my_worlds")
     private var visibilitySyncHandler: ((UUID) -> Unit)? = null
+    private val warnedLoadFailures = ConcurrentHashMap.newKeySet<UUID>()
 
     init {
         worldsDir.mkdirs()
@@ -379,7 +386,22 @@ class ChanponWorldStorage(dataFolder: File) {
     private fun load(worldUuid: UUID): YamlConfiguration? {
         val file = worldFile(worldUuid)
         if (!file.exists()) return null
-        return YamlConfiguration.loadConfiguration(file)
+        return try {
+            YamlConfiguration.loadConfiguration(file).also {
+                warnedLoadFailures.remove(worldUuid)
+            }
+        } catch (failure: RuntimeException) {
+            // 破損したワールド別データは読み取り系呼出しから例外を広げず、既定値へフォールバックします。
+            // 同じファイルが描画のたびに読まれるため、ログはファイル単位で一度だけ出します。
+            if (warnedLoadFailures.add(worldUuid)) {
+                logger.log(
+                    Level.WARNING,
+                    "MWM-Chanpon world data could not be loaded; using defaults: $file",
+                    failure,
+                )
+            }
+            null
+        }
     }
 
     private fun loadOrCreate(worldUuid: UUID): YamlConfiguration {
