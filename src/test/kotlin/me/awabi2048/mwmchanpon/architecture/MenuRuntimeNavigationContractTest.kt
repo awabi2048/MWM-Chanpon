@@ -43,6 +43,18 @@ class MenuRuntimeNavigationContractTest {
     }
 
     @Test
+    fun `player world route keeps summary in the header and current world in the footer center`() {
+        val source = uiRoot.resolve("ChanponPlayerWorldCapability.kt").readText()
+        val body = functionBody(source, "render")
+
+        assertTrue("slot = PlayerWorldCapabilityContract.HEADER_CENTER_SLOT" in body)
+        assertTrue("MyWorldManagerApi.createCurrentWorldMenuElement(player, layout.layout.actionSlot)" in body)
+        assertTrue("pendingElement(layout.layout.size - 1, player)" in body)
+        assertFalse("pendingElement(layout.layout.size - 2, player)" in body)
+        assertFalse("slot = layout.layout.actionSlot,\n                    capability" in body)
+    }
+
+    @Test
     fun `environment dialogs do not request inventory close`() {
         val source = uiRoot.resolve("ChanponEnvironmentGui.kt").readText()
         val body = functionBody(source, "setting")

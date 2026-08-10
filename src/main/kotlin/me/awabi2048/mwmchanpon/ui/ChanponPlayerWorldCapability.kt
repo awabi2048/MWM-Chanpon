@@ -312,12 +312,14 @@ class ChanponPlayerWorldCapability(
             elements += CCSystem.getAPI().getGuiElementService().menuCapabilityEntry(
                 player,
                 playerWorldCapabilityInvocation(
-                    slot = layout.layout.actionSlot,
+                    slot = PlayerWorldCapabilityContract.HEADER_CENTER_SLOT,
                     capability = capability.requireExplicitActionSafety(),
                     attributes = summaryAttributes,
                 ),
             )
         }
+        // ルート差し替え時もMWM標準画面と同じ生成元で、フッター中央へ操作プレイヤーの現在地を表示します。
+        elements += MyWorldManagerApi.createCurrentWorldMenuElement(player, layout.layout.actionSlot)
         if (request.targetPlayerUuid == player.uniqueId) {
             elements += simpleActionElement(
                 layout.layout.actionSlot + 2,
@@ -327,7 +329,8 @@ class ChanponPlayerWorldCapability(
                 text(player, "gui.user_settings.button.action"),
                 ACTION_SETTINGS,
             )
-            elements += pendingElement(layout.layout.size - 2, player)
+            // 次ページのfooter+7と重ならないよう、保留通知は右端へ固定します。
+            elements += pendingElement(layout.layout.size - 1, player)
         }
         if (layout.page > 0) {
             elements += navigationElement(
