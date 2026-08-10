@@ -41,6 +41,15 @@ class ChanponWorldAccessPolicy(
             (target !is Player || canCreateWorld(target))
     }
 
+    override fun canInviteFavoriteGroup(sender: Player, worldData: WorldData, isMember: Boolean): Boolean =
+        canDirectWorldWarp(sender, worldData, isMember)
+
+    override fun canReceiveFavoriteGroupInvite(sender: Player, worldData: WorldData, target: Player): Boolean =
+        archiveOperationGuard.canPerform(sender, ChanponOperation.EDIT)
+
+    override fun canAcceptWorldInvite(target: Player, worldData: WorldData): Boolean =
+        !worldData.isArchived && archiveOperationGuard.canPerform(target, ChanponOperation.WARP)
+
     override fun inviteToWorldDeniedMessageKey(sender: Player, worldData: WorldData): String? =
         if (!archiveOperationGuard.canPerform(sender, ChanponOperation.EDIT)) "messages.world_operation_locked" else null
 
