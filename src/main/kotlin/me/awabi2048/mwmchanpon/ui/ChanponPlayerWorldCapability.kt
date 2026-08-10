@@ -328,9 +328,9 @@ class ChanponPlayerWorldCapability(
                 text(player, "gui.user_settings.button.display"),
                 text(player, "gui.user_settings.button.action"),
                 ACTION_SETTINGS,
+                description = textList(player, "gui.user_settings.button.description"),
             )
-            // 次ページのfooter+7と重ならないよう、保留通知は右端へ固定します。
-            elements += pendingElement(layout.layout.size - 1, player)
+            elements += pendingElement(layout.layout.size - 2, player)
         }
         if (layout.page > 0) {
             elements += navigationElement(
@@ -345,7 +345,8 @@ class ChanponPlayerWorldCapability(
         }
         if (layout.page + 1 < layout.totalPages) {
             elements += navigationElement(
-                layout.layout.nextPageSlot,
+                // 個人設定・保留通知の旧配置を保ち、ページ操作だけを右端へ分離します。
+                layout.layout.size - 1,
                 player,
                 true,
                 current.copy(page = layout.page + 1),
@@ -723,6 +724,7 @@ class ChanponPlayerWorldCapability(
         name: String,
         actionText: String,
         actionId: String,
+        description: List<String> = emptyList(),
     ): MenuElement {
         return CCSystem.getAPI().getGuiElementService().menuEntry(
             player,
@@ -731,6 +733,7 @@ class ChanponPlayerWorldCapability(
                 material = material,
                 name = me.awabi2048.mwmchanpon.ui.fixedName(name, com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT),
                 role = GuiElementRole.ACTION,
+                description = description,
                 actions = listOf(chanponGestureAction(
                     actionId,
                     MenuGesture.ANY,
