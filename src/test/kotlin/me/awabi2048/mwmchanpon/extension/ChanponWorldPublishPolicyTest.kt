@@ -6,6 +6,7 @@ import java.util.UUID
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.myworldmanager.api.extension.WorldPublishReversibleRestoreResult
+import me.awabi2048.myworldmanager.model.ManagedDimension
 import me.awabi2048.myworldmanager.model.WorldData
 import org.bukkit.Material
 import org.bukkit.entity.Player
@@ -24,7 +25,7 @@ class ChanponWorldPublishPolicyTest {
             val policy = ChanponWorldPublishPolicy(storage) { _, _ -> }
             val player = player()
             val world = WorldData(
-                UUID.randomUUID(), "test", "", Material.STONE, "test", "", UUID.randomUUID(),
+                UUID.randomUUID(), ManagedDimension.OVERWORLD, "test", "", Material.STONE, "test", "", UUID.randomUUID(),
             )
             val original = "# preserve formatting\nvisibility: private\ncustom:\n  untouched: 'yes'\n"
             storage.worldFile(world.uuid).writeText(original)
@@ -61,7 +62,7 @@ class ChanponWorldPublishPolicyTest {
             val policy = ChanponWorldPublishPolicy(storage) { _, visibility -> callbackVisibility = visibility }
             val player = player()
             val world = WorldData(
-                UUID.randomUUID(), "test", "", Material.STONE, "test", "", UUID.randomUUID(),
+                UUID.randomUUID(), ManagedDimension.OVERWORLD, "test", "", Material.STONE, "test", "", UUID.randomUUID(),
             )
             assertFalse(storage.worldFile(world.uuid).exists())
 

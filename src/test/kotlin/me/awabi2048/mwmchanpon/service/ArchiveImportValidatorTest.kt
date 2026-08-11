@@ -2,6 +2,7 @@ package me.awabi2048.mwmchanpon.service
 
 import java.util.UUID
 import me.awabi2048.myworldmanager.model.WorldData
+import me.awabi2048.myworldmanager.model.ManagedDimension
 import org.bukkit.Material
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
@@ -55,6 +56,7 @@ class ArchiveImportValidatorTest {
 
     private fun worldData(worldKey: String, uuid: UUID = UUID.randomUUID()) = WorldData(
         uuid = uuid,
+        dimension = ManagedDimension.OVERWORLD,
         name = "Test",
         description = "",
         icon = Material.GRASS_BLOCK,

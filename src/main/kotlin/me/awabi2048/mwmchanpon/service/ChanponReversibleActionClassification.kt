@@ -36,6 +36,8 @@ internal object ChanponReversibleActionClassification {
         CREATION_PRODUCTION_SELECTION("creation-production-selection", Kind.STATE_AGGREGATE, "creation-production-selection", "mwm-chanpon:creation-production-selection"),
         CURRENT_PLAYER_WORLD_DISPLAY_ORDER("current-player-world-display-order", Kind.STATE_AGGREGATE, "world-display-order", "myworldmanager:world-display-order"),
         AWAY_PLAYER_WORLD_DISPLAY_ORDER("away-player-world-display-order", Kind.STATE_AGGREGATE, "world-display-order", "myworldmanager:world-display-order"),
+        /** MWMのFavorite永続状態を、Chanpon差し替え画面からも同じ可逆契約で扱います。 */
+        FAVORITE_TOGGLE("favorite-toggle", Kind.STATE_AGGREGATE, "player-state", "myworldmanager:player-state"),
         ADMIN_WORLD_LIST_FILTER("admin-world-list-filter", Kind.ROUTE_ONLY, "route-payload"),
         ADMIN_WORLD_LIST_SORT("admin-world-list-sort", Kind.ROUTE_ONLY, "route-payload"),
         SUBMISSION_LIST_FILTER("submission-list-filter", Kind.ROUTE_ONLY, "route-payload"),

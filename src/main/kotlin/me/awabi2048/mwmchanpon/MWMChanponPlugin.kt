@@ -55,6 +55,8 @@ import me.awabi2048.mwmchanpon.ui.BackupListMenu
 import me.awabi2048.mwmchanpon.ui.ChanponAdminMenu
 import me.awabi2048.mwmchanpon.ui.ChanponAdminWorldListMenu
 import me.awabi2048.mwmchanpon.ui.ChanponEnvironmentGui
+import me.awabi2048.mwmchanpon.ui.ChanponDiscoveryMenu
+import me.awabi2048.mwmchanpon.ui.ChanponFavoriteListMenu
 import me.awabi2048.mwmchanpon.ui.ChanponPlayerWorldCapability
 import me.awabi2048.mwmchanpon.ui.ChanponWorldSettingsMenu
 import me.awabi2048.mwmchanpon.ui.SubmissionAdminMenu
@@ -73,6 +75,8 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var productionWorldGuard: ProductionWorldGuard
     private lateinit var submittedProtectionService: SubmittedWorldProtectionService
     private lateinit var chanponWorldSettingsMenu: ChanponWorldSettingsMenu
+    private lateinit var chanponDiscoveryMenu: ChanponDiscoveryMenu
+    private lateinit var chanponFavoriteListMenu: ChanponFavoriteListMenu
     private lateinit var playerWorldCapability: ChanponPlayerWorldCapability
     private lateinit var chanponAdminWorldListMenu: ChanponAdminWorldListMenu
     private lateinit var submissionAdminMenu: SubmissionAdminMenu
@@ -267,6 +271,10 @@ class MWMChanponPlugin : JavaPlugin() {
         val archiveOperationGuard = ArchiveOperationGuard(globalStorage)
         playerWorldCapability = ChanponPlayerWorldCapability(this, chanponStorage, easyVoidWorldCreationService)
         MyWorldManagerApi.registerPlayerWorldRouteCapability(playerWorldCapability)
+        chanponDiscoveryMenu = ChanponDiscoveryMenu(this, chanponStorage)
+        MyWorldManagerApi.registerDiscoveryRouteCapability(chanponDiscoveryMenu)
+        chanponFavoriteListMenu = ChanponFavoriteListMenu(this)
+        MyWorldManagerApi.registerFavoriteListRouteCapability(chanponFavoriteListMenu)
         worldAccessPolicy = ChanponWorldAccessPolicy(archiveOperationGuard, chanponStorage)
         worldMenuAccessPolicy = ChanponWorldMenuAccessPolicy(chanponStorage)
         worldPortalPolicy = ChanponWorldPortalPolicy(chanponStorage)
@@ -281,7 +289,7 @@ class MWMChanponPlugin : JavaPlugin() {
         MyWorldManagerApi.registerWorldPlayerStatePolicy(worldPlayerStatePolicy)
         MyWorldManagerApi.registerWorldSettingsStatePolicy(worldSettingsStatePolicy)
         MyWorldManagerApi.registerWorldDeleteGuard(productionWorldGuard)
-        // Discovery / favorite / visit menus stay on MWM standard providers; Chanpon only supplies policies.
+        // Discovery / Favoriteは既存Route CapabilityでChanpon画面へ差し替え、MWMの標準画面はフォールバックとして残す。
         MyWorldManagerApi.registerWorldEvacuationProvider(spawnWorldService)
         MyWorldManagerApi.registerWorldAccessPolicy(worldAccessPolicy)
         MyWorldManagerApi.registerWorldMenuAccessPolicy(worldMenuAccessPolicy)
@@ -381,6 +389,12 @@ class MWMChanponPlugin : JavaPlugin() {
         }
         if (::playerWorldCapability.isInitialized) {
             MyWorldManagerApi.unregisterPlayerWorldRouteCapability(playerWorldCapability)
+        }
+        if (::chanponDiscoveryMenu.isInitialized) {
+            MyWorldManagerApi.unregisterDiscoveryRouteCapability(chanponDiscoveryMenu)
+        }
+        if (::chanponFavoriteListMenu.isInitialized) {
+            MyWorldManagerApi.unregisterFavoriteListRouteCapability(chanponFavoriteListMenu)
         }
         runCatching { CCSystem.getAPI().getMenuReversibleStateProviderRegistry().unregisterOwner("mwm-chanpon") }
         runCatching { CCSystem.getAPI().getConfigSchemaService().unregister("mwm-chanpon") }

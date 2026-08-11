@@ -371,16 +371,21 @@ class ChanponWorldStorage(
 
     fun getCompletedAt(worldUuid: UUID): java.time.LocalDateTime? {
         val config = load(worldUuid) ?: return null
-        if (getSubmissionState(worldUuid) != SubmissionState.COMPLETED) return null
+        // 既に読み込んだ設定から状態も判定し、一覧描画時に同じYAMLを再読込しないようにします。
+        if (SubmissionState.fromStorageValue(config.getString("submission.state")) != SubmissionState.COMPLETED) {
+            return null
+        }
         val history = config.getMapList("submission.history")
-        val completedEntries = history.filter {
-            (it["action"] as? String) == "mark_completed"
-        }
-        val lastCompleted = completedEntries.maxByOrNull {
-            (it["at"] as? String) ?: ""
-        }
-        val raw = lastCompleted?.get("at") as? String ?: return null
-        return runCatching { java.time.LocalDateTime.parse(raw) }.getOrNull()
+        // 不正な履歴1件が混ざっていても、有効な再完成日時まで隠さないよう、
+        // 文字列比較ではなく各履歴を先にLocalDateTimeへ変換してから最新値を選びます。
+        return history.asSequence()
+            .filter { (it["action"] as? String) == "mark_completed" }
+            .mapNotNull { entry ->
+                (entry["at"] as? String)?.let { raw ->
+                    runCatching { java.time.LocalDateTime.parse(raw) }.getOrNull()
+                }
+            }
+            .maxOrNull()
     }
 
     private fun load(worldUuid: UUID): YamlConfiguration? {

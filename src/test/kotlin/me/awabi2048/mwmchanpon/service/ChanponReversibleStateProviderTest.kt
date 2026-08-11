@@ -22,6 +22,7 @@ import me.awabi2048.mwmchanpon.storage.WorldCreationAvailability
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.service.ApiWorldRepository
 import me.awabi2048.myworldmanager.model.WorldData
+import me.awabi2048.myworldmanager.model.ManagedDimension
 import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.bukkit.event.inventory.ClickType
@@ -315,7 +316,7 @@ class ChanponReversibleStateProviderTest {
     ) = restoreContextForTest(player, capture, state)
 
     private fun world(): WorldData = WorldData(
-        UUID.randomUUID(), "test", "", Material.STONE, "test", "", UUID.randomUUID(),
+        UUID.randomUUID(), ManagedDimension.OVERWORLD, "test", "", Material.STONE, "test", "", UUID.randomUUID(),
     )
 
     private fun registerRepository(vararg worlds: WorldData) {
