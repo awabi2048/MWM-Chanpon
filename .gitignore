@@ -2,3 +2,9 @@ target/
 .idea/
 *.iml
 .docs/
+
+# Documentation policy: keep README files, leave other documents untracked.
+*.md
+!README.md
+docs/
+src/test/resources/architecture/runtime-ui-legacy-allowlist.txt
