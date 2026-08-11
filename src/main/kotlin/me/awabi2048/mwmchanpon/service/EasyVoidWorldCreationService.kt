@@ -179,7 +179,7 @@ class EasyVoidWorldCreationService(
         }
 
         if (MyWorldManagerApi.getWorldRepository()
-                ?.findByOwnerAndDisplayName(player.uniqueId, name) != null
+                ?.hasDisplayNameConflict(player.uniqueId, name) == true
         ) {
             showNameDialog(
                 player,

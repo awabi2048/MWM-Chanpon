@@ -13,6 +13,7 @@ import java.util.zip.ZipOutputStream
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
+import me.awabi2048.myworldmanager.api.service.ApiWorldDataState
 import me.awabi2048.mwmchanpon.storage.SubmissionState
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.service.ApiPortalSnapshot
@@ -198,7 +199,7 @@ class ArchiveService(
                 }
                 ArchiveImportValidator.validateConflicts(
                     imports,
-                    uuidExists = { repository.findByUuid(it) != null },
+                    uuidExists = { repository.stateOf(it) != ApiWorldDataState.NOT_FOUND },
                     folder = { worldData ->
                         val folderName = worldService.getWorldFolderName(worldData)
                         ImportFolder(
