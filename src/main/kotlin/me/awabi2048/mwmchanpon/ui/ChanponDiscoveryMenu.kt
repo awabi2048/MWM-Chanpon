@@ -115,7 +115,8 @@ class ChanponDiscoveryMenu(
             }
         }
 
-        elements += infoEntry(player, 4)
+        // Discoveryではソート等の機能枠を廃止し、説明だけをフッター中央へ固定します。
+        elements += infoEntry(player, layout.actionSlot)
         if (GuiHelper.canGoBack(player)) elements += backEntry(player, layout.backSlot)
         if (page.page > 0) elements += navigationEntry(player, layout.previousPageSlot, false, page.page - 1)
         if (page.page < page.totalPages - 1) elements += navigationEntry(player, layout.nextPageSlot, true, page.page + 1)
