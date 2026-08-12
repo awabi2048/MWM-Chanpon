@@ -174,12 +174,14 @@ class ChanponAdminMenu(
     }
 
     private fun toggleBuilding(context: MenuActionContext): MenuActionResult {
+        if (!plugin.isConfigurationMigrationCurrent()) return MenuActionResult.Rejected()
         plugin.setBuildingAllowed(!globalStorage.isBuildingAllowed())
         return MenuActionResult.Success(MenuUpdate.Refresh)
     }
 
     private fun cycleWorldCreation(context: MenuActionContext): MenuActionResult {
         val direction = GuiCycle.direction(context.click) ?: return MenuActionResult.Ignored
+        if (!plugin.isConfigurationMigrationCurrent()) return MenuActionResult.Rejected()
         globalStorage.setWorldCreationAvailability(
             GuiCycle.select(
                 globalStorage.getWorldCreationAvailability(),
@@ -249,6 +251,7 @@ class ChanponAdminMenu(
     }
 
     private fun confirmSpawn(context: MenuActionContext): MenuActionResult {
+        if (!plugin.isConfigurationMigrationCurrent()) return MenuActionResult.Rejected()
         val worldUuid = context.route.payload[WORLD_UUID]
             ?.let { runCatching { java.util.UUID.fromString(it) }.getOrNull() }
             ?: return MenuActionResult.Rejected()

@@ -248,8 +248,9 @@ class AutomationSettingsMenu(
     private fun confirmToggle(context: MenuActionContext): MenuActionResult {
         val configPath = context.route.payload[CONFIG_PATH]
             ?: return MenuActionResult.Rejected()
+        if (!plugin.isConfigurationMigrationCurrent()) return MenuActionResult.Rejected()
         plugin.config.set(configPath, !plugin.config.getBoolean(configPath, false))
-        plugin.saveConfig()
+        plugin.saveConfigIfCurrent()
         automationService.start()
         onSettingsChanged()
         return MenuActionResult.Success(MenuUpdate.Back)

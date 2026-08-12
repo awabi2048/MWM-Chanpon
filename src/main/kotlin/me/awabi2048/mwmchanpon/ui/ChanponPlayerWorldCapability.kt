@@ -363,9 +363,11 @@ class ChanponPlayerWorldCapability(
         context: MenuCapabilityContext,
     ): MenuCapabilityPresentation {
         val subject = requireNotNull(subject(context))
+        val ownerCount = MyWorldManagerApi.getWorldRepository()?.ownerCountIncludingQuarantine(subject.targetPlayerUuid)
+            ?: subject.worlds.count { it.owner == subject.targetPlayerUuid }
         val reason = creationBlockReason(
             context.player,
-            subject.worlds.count { it.owner == subject.targetPlayerUuid },
+            ownerCount,
             plugin.config.getInt("creation.max_worlds_per_player", 50),
         )
         return if (reason == null && hasCreatePermission(context.player)) {
@@ -631,9 +633,11 @@ class ChanponPlayerWorldCapability(
         context: MenuCapabilityContext,
     ): CreationBlockReason? {
         val subject = subject(context) ?: return CreationBlockReason.POLICY_DENIED
+        val ownerCount = MyWorldManagerApi.getWorldRepository()?.ownerCountIncludingQuarantine(subject.targetPlayerUuid)
+            ?: subject.worlds.count { it.owner == subject.targetPlayerUuid }
         return creationBlockReason(
             context.player,
-            subject.worlds.count { it.owner == subject.targetPlayerUuid },
+            ownerCount,
             plugin.config.getInt("creation.max_worlds_per_player", 50),
         )
     }

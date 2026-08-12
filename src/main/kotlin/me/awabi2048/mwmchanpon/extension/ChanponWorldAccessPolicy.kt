@@ -17,27 +17,32 @@ class ChanponWorldAccessPolicy(
     override fun getId(): String = "mwmchanpon.world_access"
 
     override fun canShowInDiscovery(viewer: Player, worldData: WorldData): Boolean =
-        !worldData.isArchived &&
+        storage.hasCurrentWorldData(worldData.uuid) &&
+            !worldData.isArchived &&
             worldData.sourceWorld != "CONVERT" &&
             storage.isSubmissionCompleted(worldData.uuid) &&
             visibility(worldData) == ChanponWorldVisibility.PUBLIC
 
     override fun canShowInVisitWorldList(viewer: Player, worldData: WorldData): Boolean =
-        !worldData.isArchived &&
+        storage.hasCurrentWorldData(worldData.uuid) &&
+            !worldData.isArchived &&
             visibility(worldData) == ChanponWorldVisibility.PUBLIC
 
     override fun canUseVisitEntry(viewer: Player, worldData: WorldData, isMember: Boolean): Boolean =
-        archiveOperationGuard.canPerform(viewer, ChanponOperation.WARP) &&
+        storage.hasCurrentWorldData(worldData.uuid) &&
+            archiveOperationGuard.canPerform(viewer, ChanponOperation.WARP) &&
             (isMember || visibility(worldData) == ChanponWorldVisibility.PUBLIC)
 
     override fun canUseSharedEntry(viewer: Player, worldData: WorldData, isMember: Boolean): Boolean =
         canUseVisitEntry(viewer, worldData, isMember)
 
     override fun canInviteToWorld(sender: Player, worldData: WorldData): Boolean =
-        archiveOperationGuard.canPerform(sender, ChanponOperation.EDIT)
+        storage.hasCurrentWorldData(worldData.uuid) &&
+            archiveOperationGuard.canPerform(sender, ChanponOperation.EDIT)
 
     override fun canInviteTarget(sender: Player, worldData: WorldData, target: OfflinePlayer): Boolean {
-        return archiveOperationGuard.canPerform(sender, ChanponOperation.EDIT) &&
+        return storage.hasCurrentWorldData(worldData.uuid) &&
+            archiveOperationGuard.canPerform(sender, ChanponOperation.EDIT) &&
             (target !is Player || canCreateWorld(target))
     }
 
@@ -45,10 +50,12 @@ class ChanponWorldAccessPolicy(
         canDirectWorldWarp(sender, worldData, isMember)
 
     override fun canReceiveFavoriteGroupInvite(sender: Player, worldData: WorldData, target: Player): Boolean =
-        archiveOperationGuard.canPerform(sender, ChanponOperation.EDIT)
+        storage.hasCurrentWorldData(worldData.uuid) &&
+            archiveOperationGuard.canPerform(sender, ChanponOperation.EDIT)
 
     override fun canAcceptWorldInvite(target: Player, worldData: WorldData): Boolean =
-        !worldData.isArchived && archiveOperationGuard.canPerform(target, ChanponOperation.WARP)
+        storage.hasCurrentWorldData(worldData.uuid) &&
+            !worldData.isArchived && archiveOperationGuard.canPerform(target, ChanponOperation.WARP)
 
     override fun inviteToWorldDeniedMessageKey(sender: Player, worldData: WorldData): String? =
         if (!archiveOperationGuard.canPerform(sender, ChanponOperation.EDIT)) "messages.world_operation_locked" else null
@@ -78,6 +85,7 @@ class ChanponWorldAccessPolicy(
         if (!archiveOperationGuard.canPerform(viewer, ChanponOperation.WARP)) "messages.world_operation_locked" else null
 
     override fun canEnterWorld(player: Player, worldData: WorldData, isMember: Boolean): Boolean {
+        if (!storage.hasCurrentWorldData(worldData.uuid)) return false
         if (!archiveOperationGuard.canPerform(player, ChanponOperation.WARP)) return false
         if (worldData.isArchived) return false
         if (player.hasPermission("myworldmanager.admin") || isMember) return true
@@ -85,11 +93,13 @@ class ChanponWorldAccessPolicy(
     }
 
     override fun canShowMeetTarget(viewer: Player, target: Player, worldData: WorldData, isMember: Boolean): Boolean {
+        if (!storage.hasCurrentWorldData(worldData.uuid)) return false
         if (target.world.uid == viewer.world.uid) return true
         return isMember || visibility(worldData) != ChanponWorldVisibility.PRIVATE
     }
 
     override fun getMeetTargetAction(viewer: Player, target: Player, worldData: WorldData, isMember: Boolean): MeetTargetAction {
+        if (!storage.hasCurrentWorldData(worldData.uuid)) return MeetTargetAction.DENY
         if (!archiveOperationGuard.canPerform(viewer, ChanponOperation.WARP)) return MeetTargetAction.DENY
         if (target.world.uid == viewer.world.uid || isMember) return MeetTargetAction.DIRECT
         return when (visibility(worldData)) {
@@ -100,12 +110,14 @@ class ChanponWorldAccessPolicy(
     }
 
     override fun canDirectWorldWarp(player: Player, worldData: WorldData, isMember: Boolean): Boolean =
-        archiveOperationGuard.canPerform(player, ChanponOperation.WARP) &&
+        storage.hasCurrentWorldData(worldData.uuid) &&
+            archiveOperationGuard.canPerform(player, ChanponOperation.WARP) &&
             !worldData.isArchived &&
             (isMember || visibility(worldData) == ChanponWorldVisibility.PUBLIC)
 
     override fun canRequestWorldWarp(player: Player, worldData: WorldData, isMember: Boolean): Boolean =
-        archiveOperationGuard.canPerform(player, ChanponOperation.WARP) &&
+        storage.hasCurrentWorldData(worldData.uuid) &&
+            archiveOperationGuard.canPerform(player, ChanponOperation.WARP) &&
             !worldData.isArchived &&
             !isMember &&
             visibility(worldData) != ChanponWorldVisibility.PUBLIC

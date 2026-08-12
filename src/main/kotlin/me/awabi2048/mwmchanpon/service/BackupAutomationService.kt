@@ -56,6 +56,10 @@ class BackupAutomationService(
     }
 
     private fun tick() {
+        // 旧形式の設定を読み込んだまま自動処理を進めると、実行日時などの書き込みだけが
+        // 先に発生し、移行前の設定と処理状態が食い違います。/mwm migration 完了まで
+        // タスク自体は保持しますが、判定と書き込みを含む自動処理は停止します。
+        if (!plugin.isConfigurationMigrationCurrent()) return
         handleAutoBackup()
         handleAutoRollback()
     }
@@ -86,7 +90,7 @@ class BackupAutomationService(
         if (restorePoint == null) {
             if (isDue(LocalTime.now(), targetTime)) {
                 plugin.config.set("backup.auto_rollback.last_run_date", today)
-                plugin.saveConfig()
+                plugin.saveConfigIfCurrent()
                 plugin.logger.warning("Auto rollback skipped because restore point is missing.")
             }
             return
@@ -126,7 +130,7 @@ class BackupAutomationService(
         run.started = true
         val configPath = if (run.type == AutomationType.BACKUP) "backup.auto_backup.last_run_date" else "backup.auto_rollback.last_run_date"
         plugin.config.set(configPath, run.date)
-        plugin.saveConfig()
+        plugin.saveConfigIfCurrent()
 
         run.evacuatedPlayers = evacuatePlayers(run.worldUuids) ?: emptyList()
         run.bossBar?.setTitle(i18n("${run.type.key}_running"))

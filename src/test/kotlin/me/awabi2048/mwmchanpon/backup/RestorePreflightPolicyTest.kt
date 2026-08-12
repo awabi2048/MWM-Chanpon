@@ -11,7 +11,9 @@ class RestorePreflightPolicyTest {
             productionWorld = true,
             worldDataAvailable = true,
             archiveReadable = true,
-            targetDirectoryWritable = true
+            targetDirectoryWritable = true,
+            worldMigrationCurrent = true,
+            chanponDataCurrent = true,
         )
 
     @Test
@@ -21,6 +23,7 @@ class RestorePreflightPolicyTest {
             RestorePreflightPolicy.failureReason(
                 backupLocked = false,
                 coreAvailable = true,
+                globalMigrationPending = false,
                 targets = listOf(validTarget.copy(archiveReadable = false)),
                 evacuationRequired = false,
                 evacuationAvailable = false
@@ -31,6 +34,7 @@ class RestorePreflightPolicyTest {
             RestorePreflightPolicy.failureReason(
                 backupLocked = false,
                 coreAvailable = true,
+                globalMigrationPending = false,
                 targets = listOf(validTarget),
                 evacuationRequired = true,
                 evacuationAvailable = false
@@ -44,9 +48,36 @@ class RestorePreflightPolicyTest {
             RestorePreflightPolicy.failureReason(
                 backupLocked = false,
                 coreAvailable = true,
+                globalMigrationPending = false,
                 targets = listOf(validTarget),
                 evacuationRequired = false,
                 evacuationAvailable = false
+            )
+        )
+    }
+
+    @Test
+    fun `移行保留中は復元を開始しない`() {
+        assertEquals(
+            "global migration is pending",
+            RestorePreflightPolicy.failureReason(
+                backupLocked = false,
+                coreAvailable = true,
+                globalMigrationPending = true,
+                targets = listOf(validTarget),
+                evacuationRequired = false,
+                evacuationAvailable = false,
+            )
+        )
+        assertEquals(
+            "world migration is pending",
+            RestorePreflightPolicy.failureReason(
+                backupLocked = false,
+                coreAvailable = true,
+                globalMigrationPending = false,
+                targets = listOf(validTarget.copy(worldMigrationCurrent = false)),
+                evacuationRequired = false,
+                evacuationAvailable = false,
             )
         )
     }

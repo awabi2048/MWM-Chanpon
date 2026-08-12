@@ -14,7 +14,8 @@ class ChanponWorldPortalPolicy(
     override fun getId(): String = "mwmchanpon.world_portal"
 
     override fun isPortalOpen(destination: WorldData): Boolean {
-        return storage.getVisibility(destination.uuid) == ChanponWorldVisibility.PUBLIC
+        return storage.hasCurrentWorldData(destination.uuid) &&
+            storage.getVisibility(destination.uuid) == ChanponWorldVisibility.PUBLIC
     }
 
     override fun canUsePortal(player: Player, destination: WorldData): Boolean {

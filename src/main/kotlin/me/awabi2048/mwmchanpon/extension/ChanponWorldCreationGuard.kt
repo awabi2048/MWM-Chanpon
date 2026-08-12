@@ -17,6 +17,16 @@ class ChanponWorldCreationGuard(
     override fun getId(): String = POLICY_ID
 
     override fun evaluate(request: WorldCreationRequest): WorldCreationDecision {
+        if (!plugin.isConfigurationMigrationCurrent()) {
+            return WorldCreationDecision.deny(
+                request.actor?.let {
+                    CCSystem.getAPI().getI18nComponent(
+                        it as? org.bukkit.entity.Player,
+                        "chanpon.controls.creation_denied",
+                    )
+                },
+            )
+        }
         val availability = globalStorage.getWorldCreationAvailability()
         val creationAllowed = when (request.operation) {
             WorldCreationOperation.NORMAL -> availability != WorldCreationAvailability.DENIED
@@ -40,7 +50,7 @@ class ChanponWorldCreationGuard(
             (player == null || !canBypassWorldLimits(player))
         ) {
             val repository = MyWorldManagerApi.getWorldRepository()
-            val ownerCount = repository?.findByOwner(targetUuid)?.size ?: 0
+            val ownerCount = repository?.ownerCountIncludingQuarantine(targetUuid) ?: 0
             val maxWorlds = plugin.config.getInt("creation.max_worlds_per_player", 50)
             if (ownerCount >= maxWorlds) {
                 return WorldCreationDecision.deny(

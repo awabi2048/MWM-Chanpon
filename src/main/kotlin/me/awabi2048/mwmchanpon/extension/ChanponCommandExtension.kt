@@ -15,6 +15,9 @@ class ChanponCommandExtension(
         subCommand: String,
         args: List<String>
     ): Boolean {
+        // 移行は旧設定・残留ロックを解消する復旧経路そのものです。通常操作のゲートで
+        // 遮断すると、管理者が自力で復旧できなくなります。
+        if (subCommand.equals("migration", ignoreCase = true)) return true
         if (!archiveOperationGuard.canPerform(sender, operationFor(subCommand, args))) return false
         return when (subCommand.lowercase()) {
             "stats" -> false
@@ -27,6 +30,7 @@ class ChanponCommandExtension(
         subCommand: String,
         args: List<String>
     ): Boolean {
+        if (subCommand.equals("migration", ignoreCase = true)) return true
         if (!archiveOperationGuard.canPerform(sender, operationFor(subCommand, args))) return false
         return when (subCommand.lowercase()) {
             "stats" -> false

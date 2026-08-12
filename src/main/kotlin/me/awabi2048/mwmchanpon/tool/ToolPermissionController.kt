@@ -15,6 +15,7 @@ class ToolPermissionController(
     private val autoRollbackLocked: () -> Boolean = { false }
 ) {
     fun isEnabled(worldData: WorldData, playerUuid: UUID, toolId: String): Boolean {
+        if (!storage.hasCurrentWorldData(worldData.uuid)) return false
         if (isSubmissionLocked(worldData.uuid)) return false
         return storage.getToolEnabledState(worldData.uuid, playerUuid, toolId)
             ?: (playerUuid == worldData.owner)
@@ -104,6 +105,7 @@ class ToolPermissionController(
     }
 
     private fun isSubmissionLocked(worldUuid: UUID): Boolean {
+        if (!storage.hasCurrentWorldData(worldUuid)) return true
         if (storage.isProductionWorld(worldUuid) && autoRollbackLocked()) return true
         return try {
             when (storage.getSubmissionState(worldUuid)) {
@@ -111,7 +113,8 @@ class ToolPermissionController(
                 SubmissionState.UNSUBMITTED -> false
             }
         } catch (ex: IllegalStateException) {
-            false
+            // 読み取り不能をロックなしとして扱うと、破損データから権限を付与できます。
+            true
         }
     }
 

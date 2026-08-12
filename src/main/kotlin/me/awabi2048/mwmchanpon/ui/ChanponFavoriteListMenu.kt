@@ -224,7 +224,7 @@ class ChanponFavoriteListMenu(
                     CCSystem.getAPI().getI18nComponent(
                         player,
                         "gui.favorite.player_icon.name",
-                        mapOf("player" to (player.name ?: plugin.getMessage(player, "general.unknown"))),
+                        mapOf("player" to player.name),
                     ),
                 ),
                 role = GuiElementRole.CONTENT,

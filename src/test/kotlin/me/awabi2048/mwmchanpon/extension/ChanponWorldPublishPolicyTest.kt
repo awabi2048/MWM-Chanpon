@@ -27,7 +27,7 @@ class ChanponWorldPublishPolicyTest {
             val world = WorldData(
                 UUID.randomUUID(), ManagedDimension.OVERWORLD, "test", "", Material.STONE, "test", "", UUID.randomUUID(),
             )
-            val original = "# preserve formatting\nvisibility: private\ncustom:\n  untouched: 'yes'\n"
+            val original = "# preserve formatting\nschema_version: 1\nvisibility: private\ncustom:\n  untouched: 'yes'\n"
             storage.worldFile(world.uuid).writeText(original)
             val before = policy.capturePublishCycleState(player, world)
             assertEquals(true, policy.cyclePublishLevel(player, world))
@@ -67,6 +67,7 @@ class ChanponWorldPublishPolicyTest {
             assertFalse(storage.worldFile(world.uuid).exists())
 
             val before = policy.capturePublishCycleState(player, world)
+            assertTrue(policy.handlesPublishCycle(world))
             assertTrue(policy.cyclePublishLevel(player, world))
             assertEquals(ChanponWorldVisibility.PUBLIC, callbackVisibility)
             assertTrue(storage.worldFile(world.uuid).exists())

@@ -9,6 +9,9 @@ class ProductionWorldGuard(private val storage: ChanponWorldStorage) : WorldDele
     override fun getId(): String = "chanpon.production_guard"
 
     override fun canDelete(worldData: WorldData, caller: CommandSender?): String? {
+        if (!storage.hasCurrentWorldData(worldData.uuid)) {
+            return "このワールドのChanponデータが未移行または利用不能のため変更できません"
+        }
         if (storage.isImportedArchive(worldData.uuid)) {
             return "このワールドはアーカイブから復元されたワールドのため変更できません"
         }

@@ -201,6 +201,7 @@ class ProductionToggleExtension(
 
     @EventHandler
     fun onWorldCreated(event: MwmWorldCreatedEvent) {
+        if (!plugin.isConfigurationMigrationCurrent()) return
         storage.initializeSubmissionState(event.worldUuid)
         val enabled = creationSelectionState.takePending(event.ownerUuid, event.worldName) ?: return
         if (enabled) {
@@ -213,6 +214,7 @@ class ProductionToggleExtension(
     }
 
     fun syncForcedTagsForProductionWorlds() {
+        if (!plugin.isConfigurationMigrationCurrent()) return
         val repository = MyWorldManagerApi.getWorldRepository() ?: return
         repository.findAll()
             .filter { storage.isProductionWorld(it.uuid) }
@@ -300,6 +302,9 @@ class ProductionToggleExtension(
     private fun productionDecision(
         context: com.awabi2048.ccsystem.api.gui.MenuCapabilityContext,
     ): ProductionDecision {
+        if (!plugin.isConfigurationMigrationCurrent()) {
+            return ProductionDecision(false, "production.unavailable.phase")
+        }
         val worldData = worldData(context.arguments)
             ?: return ProductionDecision(false, "production.unavailable.world_missing")
         if (plugin.isSubmissionClosed()) {
@@ -491,6 +496,7 @@ class ProductionToggleExtension(
             ?: error("確認操作が見つかりません")
 
     private fun executeConfirmedAction(player: Player, worldUuid: UUID, action: ConfirmationAction) {
+        if (!plugin.isConfigurationMigrationCurrent()) return
         when (action) {
             ConfirmationAction.SET_PRODUCTION -> {
                 if (!canUseProduction(player)) return

@@ -28,7 +28,7 @@ class ChanponGlobalStorageTest {
     }
 
     @Test
-    fun `legacy phase is migrated to independent controls`() {
+    fun `legacy phase is read without being migrated implicitly`() {
         val folder = Files.createTempDirectory("chanpon-global-storage-legacy").toFile()
         try {
             val settings = folder.resolve("settings.yml")
@@ -41,8 +41,10 @@ class ChanponGlobalStorageTest {
             val storage = ChanponGlobalStorage(folder)
             assertFalse(storage.isBuildingAllowed())
             assertEquals(WorldCreationAvailability.DENIED, storage.getWorldCreationAvailability())
-            val migrated = YamlConfiguration.loadConfiguration(settings)
-            assertFalse(migrated.contains("phase"))
+            val unchanged = YamlConfiguration.loadConfiguration(settings)
+            assertTrue(unchanged.contains("phase"))
+            assertFalse(unchanged.contains("building_allowed"))
+            assertFalse(unchanged.contains("world_creation_availability"))
         } finally {
             folder.deleteRecursively()
         }

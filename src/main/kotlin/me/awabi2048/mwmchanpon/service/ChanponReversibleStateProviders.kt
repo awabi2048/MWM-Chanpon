@@ -147,8 +147,9 @@ private class PluginAutomationSettingsGateway(
     override fun getBoolean(path: String): Boolean = plugin.config.getBoolean(path, false)
 
     override fun restoreBoolean(path: String, value: Boolean) {
+        check(plugin.isConfigurationMigrationCurrent()) { "configuration migration is required before restoring automation settings" }
         plugin.config.set(path, value)
-        plugin.saveConfig()
+        plugin.saveConfigIfCurrent()
         onRestored()
     }
 }
@@ -257,6 +258,9 @@ internal class AdminWorldControlsProvider(
     override fun restore(context: MenuReversibleStateRestoreContext): MenuReversibleProviderRestoreResult {
         val state = AdminWorldControlsState.decode(context.stateSnapshot.value)
             ?: return rejectRestore("invalid admin world controls state type")
+        if (!storage.canWriteSettings()) {
+            return rejectRestore("configuration migration is required before restoring admin world controls")
+        }
         val current = storage.captureAdminWorldControls()
         if (current != state.expectedAfter) return concurrent("admin world controls", state.expectedAfter, current)
         if (state.spawnDefaultsExpectedAfter != null) {
@@ -623,11 +627,13 @@ private class PluginSubmissionGateway(
     private val protectionService: SubmittedWorldProtectionService,
     private val toolPermissionController: ToolPermissionController,
 ) : SubmissionGateway {
+    fun isConfigurationMigrationCurrent(): Boolean = plugin.isConfigurationMigrationCurrent()
     override fun isClosed(): Boolean = plugin.isSubmissionClosed()
 
     override fun restoreClosed(value: Boolean) {
+        check(plugin.isConfigurationMigrationCurrent()) { "configuration migration is required before restoring submission settings" }
         plugin.config.set("submission.closed", value)
-        plugin.saveConfig()
+        plugin.saveConfigIfCurrent()
     }
 
     override fun syncWorld(worldData: WorldData) {

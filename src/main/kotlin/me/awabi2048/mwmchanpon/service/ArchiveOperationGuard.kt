@@ -20,7 +20,19 @@ enum class ChanponOperation {
 class ArchiveOperationGuard(
     private val globalStorage: ChanponGlobalStorage
 ) {
+    private var configurationAvailable: () -> Boolean = { true }
+
+    fun setConfigurationAvailability(gate: () -> Boolean) {
+        configurationAvailable = gate
+    }
+
     fun canPerform(sender: CommandSender, operation: ChanponOperation): Boolean {
+        if (!configurationAvailable() &&
+            operation != ChanponOperation.READ &&
+            operation != ChanponOperation.DIAGNOSE
+        ) {
+            return false
+        }
         return ArchiveOperationPolicy.canPerform(
             globalStorage.isArchiveLocked(),
             operation,

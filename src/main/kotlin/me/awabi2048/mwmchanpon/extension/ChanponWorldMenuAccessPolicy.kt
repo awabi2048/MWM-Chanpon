@@ -47,6 +47,7 @@ class ChanponWorldMenuAccessPolicy(
 
     override fun challenge(context: WorldMenuAccessContext): WorldMenuAccessChallenge? {
         val worldData = context.worldData
+        if (!storage.hasCurrentWorldData(worldData.uuid)) return null
         if (storage.getProtectionMode(worldData.uuid) != ChanponWorldProtectionMode.PASSWORD) {
             return null
         }
@@ -61,6 +62,7 @@ class ChanponWorldMenuAccessPolicy(
             ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
             ?.let { MyWorldManagerApi.getWorldRepository()?.findByUuid(it) }
             ?: return false
+        if (!storage.hasCurrentWorldData(worldData.uuid)) return false
         if (!storage.hasProtectionPassword(worldData.uuid)) {
             player.sendMessage(i18n(player, "protection.password_not_configured"))
             return true

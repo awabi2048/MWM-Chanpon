@@ -234,8 +234,9 @@ class SubmissionAdminMenu(
 
     private fun toggleSubmissionClosure(context: MenuActionContext): MenuActionResult {
         if (plugin.isSubmissionClosed()) {
+            if (!plugin.isConfigurationMigrationCurrent()) return MenuActionResult.Rejected()
             plugin.config.set("submission.closed", false)
-            plugin.saveConfig()
+            plugin.saveConfigIfCurrent()
             context.player.sendMessage(i18nComponent(context.player, "admin_menu.reopened_message"))
             return MenuActionResult.Success(MenuUpdate.Refresh)
         }
@@ -479,8 +480,9 @@ class SubmissionAdminMenu(
     )
 
     private fun confirmCloseSubmissions(context: MenuActionContext): MenuActionResult {
+        if (!plugin.isConfigurationMigrationCurrent()) return MenuActionResult.Rejected()
         plugin.config.set("submission.closed", true)
-        plugin.saveConfig()
+        plugin.saveConfigIfCurrent()
         context.player.sendMessage(i18nComponent(context.player, "admin_menu.closed_message"))
         return MenuActionResult.Success(MenuUpdate.Back)
     }

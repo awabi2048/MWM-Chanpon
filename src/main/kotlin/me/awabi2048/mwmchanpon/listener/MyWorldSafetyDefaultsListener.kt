@@ -30,6 +30,7 @@ class MyWorldSafetyDefaultsListener(
     }
 
     private fun syncWithRetry(worldData: me.awabi2048.myworldmanager.model.WorldData) {
+        if (!plugin.isConfigurationMigrationCurrent()) return
         if (service.sync(worldData)) return
 
         // WorldGuardのRegionManagerがロード途中だった場合だけ、作成トランザクションを止めずに再試行します。

@@ -13,6 +13,12 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.logging.Level
 import java.util.logging.Logger
 import org.bukkit.configuration.file.YamlConfiguration
+import me.awabi2048.myworldmanager.api.MyWorldManagerApi
+import me.awabi2048.myworldmanager.api.service.ApiMigrationParticipant
+import me.awabi2048.myworldmanager.api.service.ApiMigrationParticipantResult
+import me.awabi2048.myworldmanager.api.service.ApiMigrationParticipantResultState
+import me.awabi2048.myworldmanager.api.service.ApiMigrationParticipantState
+import me.awabi2048.myworldmanager.api.service.ApiMigrationParticipantStatus
 
 enum class SubmissionState(val storageValue: String, val i18nKey: String) {
     UNSUBMITTED("unsubmitted", "unsubmitted"),
@@ -54,10 +60,15 @@ class ChanponWorldStorage(
 ) {
     private val worldsDir = File(dataFolder, "my_worlds")
     private var visibilitySyncHandler: ((UUID) -> Unit)? = null
+    private var worldWriteGate: ((UUID) -> Boolean)? = null
     private val warnedLoadFailures = ConcurrentHashMap.newKeySet<UUID>()
+
+    private val migrationExecutor = ChanponWorldDataMigrationParticipant(this, logger)
+    val migrationParticipant: ApiMigrationParticipant = migrationExecutor
 
     init {
         worldsDir.mkdirs()
+        MyWorldManagerApi.registerMigrationParticipant(migrationParticipant, migrationExecutor::executeMigration)
     }
 
     fun worldFile(worldUuid: UUID): File = File(worldsDir, "${worldUuid}.yml")
@@ -87,6 +98,7 @@ class ChanponWorldStorage(
         snapshot: WorldFileSnapshot,
         expectedCurrentState: () -> Boolean,
     ): WorldFileRestoreResult {
+        ensureWritable(worldUuid)
         if (!expectedCurrentState()) return WorldFileRestoreResult.CONCURRENT_CHANGE
         val target = worldFile(worldUuid)
         if (!snapshot.exists) {
@@ -98,9 +110,104 @@ class ChanponWorldStorage(
         return WorldFileRestoreResult.RESTORED
     }
 
+    /**
+     * バックアップ／アーカイブからのワールド別データ復元を一つの入口へ集約します。
+     * 外部ファイルは現行形式であることを検証してから、通常保存と同じatomic置換を行います。
+     * 旧形式をここで変換することは許可せず、変換は /mwm migration に限定します。
+     */
+    @Synchronized
+    fun restoreExternalWorldFile(source: File, worldUuid: UUID) {
+        validateExternalWorldFile(source, worldUuid)
+        val restored = YamlConfiguration().also { it.load(source) }
+        val current = worldFile(worldUuid).takeIf(File::isFile)?.let { YamlConfiguration().also { config -> config.load(it) } }
+        restored.set("backup.last_hash", null)
+        restored.set(
+            "backup.owner_manual.last_created_at",
+            current?.getLong("backup.owner_manual.last_created_at", 0L)
+                ?.takeIf { it > 0L },
+        )
+        saveAtomic(worldUuid, restored)
+    }
+
+    /**
+     * バックアップに対象ファイルが存在しない状態を、そのまま復元するための削除入口です。
+     * 通常の削除とは異なり、移行状態と書込みゲートを必ず確認してから一時名へ移動します。
+     * 復元元にないデータを現在のファイルに残したまま成功扱いにしないために使用します。
+     */
+    @Synchronized
+    fun removeWorldFileForRestore(worldUuid: UUID) {
+        ensureWritable(worldUuid)
+        val target = worldFile(worldUuid)
+        if (!target.isFile) {
+            require(!target.exists()) { "Chanpon world data target is not a regular file: ${target.name}" }
+            return
+        }
+        val tombstone = File(target.parentFile, "${target.name}.restore-delete-${UUID.randomUUID()}.tmp")
+        try {
+            try {
+                Files.move(
+                    target.toPath(),
+                    tombstone.toPath(),
+                    java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+                )
+            } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+                Files.move(target.toPath(), tombstone.toPath())
+            }
+        } finally {
+            Files.deleteIfExists(tombstone.toPath())
+        }
+    }
+
+    /**
+     * 外部復元の書き込み前検証です。バックアップ処理はワールドディレクトリを移動する前に
+     * この検証だけを実行し、旧形式を復元経路で暗黙変換しないようにします。
+     */
+    @Synchronized
+    fun validateExternalWorldFile(source: File, worldUuid: UUID) {
+        require(source.isFile) { "Chanpon world data source is missing: ${source.name}" }
+        ensureWritable(worldUuid)
+        ChanponWorldDataMigrationParticipant.validateCurrentExternalFile(source, worldUuid)
+    }
+
     fun setVisibilitySyncHandler(handler: (UUID) -> Unit) {
         visibilitySyncHandler = handler
     }
+
+    /** ワールド単位で、旧形式・破損ファイルへの通常書込みを止めます。 */
+    fun setWorldWriteGate(gate: (UUID) -> Boolean) {
+        worldWriteGate = gate
+    }
+
+    internal fun worldFiles(): List<File> = worldsDir.listFiles { file -> file.extension == "yml" }.orEmpty().toList()
+
+    internal fun migrateWorldFile(file: File) = ChanponWorldDataMigrationParticipant.migrateFile(file, logger)
+
+    internal fun inspectWorldFile(file: File): ChanponWorldFileInspection =
+        ChanponWorldDataMigrationParticipant.inspectFile(file)
+
+    fun isWorldDataCurrent(worldUuid: UUID): Boolean {
+        val file = worldFile(worldUuid)
+        return !file.exists() || runCatching { inspectWorldFile(file).state == ChanponWorldFileState.CURRENT }.getOrDefault(false)
+    }
+
+    /** 既存ワールドの運用判定では、ファイル不存在も利用不能として扱います。 */
+    fun hasCurrentWorldData(worldUuid: UUID): Boolean {
+        val file = worldFile(worldUuid)
+        // 既存ワールドにChanponファイルがまだない状態は「未初期化」であり、
+        // 旧形式・破損ファイルとは異なります。読み取りは安全な既定値を使い、
+        // 最初の設定変更時にsaveAtomic()が現行形式を生成します。
+        return !file.exists() || runCatching {
+            inspectWorldFile(file).state == ChanponWorldFileState.CURRENT
+        }.getOrDefault(false)
+    }
+
+    /** バックアップ復元など、storage外からの上書き前にも同じゲートを適用します。 */
+    fun ensureWritableForExternalWrite(worldUuid: UUID) {
+        ensureWritable(worldUuid)
+    }
+
+    fun isWorldDataFileCurrent(file: File): Boolean =
+        !file.exists() || runCatching { inspectWorldFile(file).state == ChanponWorldFileState.CURRENT }.getOrDefault(false)
 
     fun syncVisibility(worldUuid: UUID) {
         visibilitySyncHandler?.invoke(worldUuid)
@@ -113,6 +220,7 @@ class ChanponWorldStorage(
 
     @Synchronized
     fun setProductionWorld(worldUuid: UUID, production: Boolean) {
+        ensureWritable(worldUuid)
         val config = loadOrCreate(worldUuid)
         val wasProduction = config.getBoolean("production", false)
         if (production) {
@@ -145,6 +253,7 @@ class ChanponWorldStorage(
 
     @Synchronized
     fun setVisibility(worldUuid: UUID, visibility: ChanponWorldVisibility) {
+        ensureWritable(worldUuid)
         val config = loadOrCreate(worldUuid)
         config.set("visibility", visibility.storageValue)
         config.set("development", null)
@@ -163,6 +272,7 @@ class ChanponWorldStorage(
 
     @Synchronized
     fun setProtectionMode(worldUuid: UUID, mode: ChanponWorldProtectionMode) {
+        ensureWritable(worldUuid)
         val config = loadOrCreate(worldUuid)
         config.set("protection.mode", mode.storageValue)
         config.set("protection.updated_at", LocalDateTime.now().toString())
@@ -179,6 +289,7 @@ class ChanponWorldStorage(
 
     @Synchronized
     fun setProtectionPassword(worldUuid: UUID, password: String) {
+        ensureWritable(worldUuid)
         val config = loadOrCreate(worldUuid)
         config.set("protection.password", password)
         config.set("protection.password_hash", null)
@@ -192,6 +303,7 @@ class ChanponWorldStorage(
 
     @Synchronized
     fun initializeSubmissionState(worldUuid: UUID) {
+        ensureWritable(worldUuid)
         val config = loadOrCreate(worldUuid)
         config.set("submission.state", SubmissionState.UNSUBMITTED.storageValue)
         saveAtomic(worldUuid, config)
@@ -211,6 +323,7 @@ class ChanponWorldStorage(
 
     @Synchronized
     fun setFreecamAllowed(worldUuid: UUID, allowed: Boolean) {
+        ensureWritable(worldUuid)
         val config = loadOrCreate(worldUuid)
         config.set("environment.freecam_allowed", allowed)
         saveAtomic(worldUuid, config)
@@ -229,6 +342,7 @@ class ChanponWorldStorage(
         actorName: String,
         action: String
     ) {
+        ensureWritable(worldUuid)
         val config = load(worldUuid)
             ?: error("MWM-Chanpon world data is missing: $worldUuid")
         if (!config.contains("submission.state")) {
@@ -274,6 +388,7 @@ class ChanponWorldStorage(
 
     @Synchronized
     fun restoreSubmissionSnapshot(worldUuid: UUID, snapshot: SubmissionSnapshot) {
+        ensureWritable(worldUuid)
         val config = load(worldUuid)
             ?: error("MWM-Chanpon world data is missing: $worldUuid")
         config.set("submission.state", snapshot.state.storageValue)
@@ -294,6 +409,7 @@ class ChanponWorldStorage(
 
     @Synchronized
     fun setToolEnabled(worldUuid: UUID, playerUuid: UUID, toolId: String, enabled: Boolean) {
+        ensureWritable(worldUuid)
         val config = loadOrCreate(worldUuid)
         config.set("tool_permissions.${playerUuid}.${toolId}", enabled)
         saveAtomic(worldUuid, config)
@@ -301,6 +417,7 @@ class ChanponWorldStorage(
 
     @Synchronized
     fun restoreToolEnabledState(worldUuid: UUID, playerUuid: UUID, toolId: String, enabled: Boolean?) {
+        ensureWritable(worldUuid)
         val config = loadOrCreate(worldUuid)
         config.set("tool_permissions.${playerUuid}.${toolId}", enabled)
         saveAtomic(worldUuid, config)
@@ -314,6 +431,7 @@ class ChanponWorldStorage(
 
     @Synchronized
     fun removeMember(worldUuid: UUID, playerUuid: UUID) {
+        ensureWritable(worldUuid)
         val config = load(worldUuid) ?: return
         config.set("tool_permissions.${playerUuid}", null)
         saveAtomic(worldUuid, config)
@@ -325,6 +443,7 @@ class ChanponWorldStorage(
 
     @Synchronized
     fun setLastBackupHash(worldUuid: UUID, hash: String) {
+        ensureWritable(worldUuid)
         val config = loadOrCreate(worldUuid)
         config.set("backup.last_hash", hash)
         saveAtomic(worldUuid, config)
@@ -336,6 +455,7 @@ class ChanponWorldStorage(
 
     @Synchronized
     fun setOwnerManualBackupLastCreatedAt(worldUuid: UUID, value: Long) {
+        ensureWritable(worldUuid)
         val config = loadOrCreate(worldUuid)
         config.set("backup.owner_manual.last_created_at", value)
         saveAtomic(worldUuid, config)
@@ -347,6 +467,7 @@ class ChanponWorldStorage(
 
     @Synchronized
     fun setManualRollbackLastExecutedAt(worldUuid: UUID, value: Long) {
+        ensureWritable(worldUuid)
         val config = loadOrCreate(worldUuid)
         config.set("backup.manual_rollback.last_executed_at", value)
         saveAtomic(worldUuid, config)
@@ -364,6 +485,7 @@ class ChanponWorldStorage(
 
     @Synchronized
     fun setImportedArchive(worldUuid: UUID, value: Boolean) {
+        ensureWritable(worldUuid)
         val config = loadOrCreate(worldUuid)
         config.set("imported_archive", value)
         saveAtomic(worldUuid, config)
@@ -419,6 +541,10 @@ class ChanponWorldStorage(
     }
 
     private fun saveAtomic(worldUuid: UUID, config: YamlConfiguration) {
+        config.set(
+            "schema_version",
+            ChanponWorldDataMigrationParticipant.CURRENT_SCHEMA_VERSION,
+        )
         val target = worldFile(worldUuid)
         target.parentFile?.mkdirs()
         val temporary = File(target.parentFile, "${target.name}.tmp")
@@ -441,6 +567,14 @@ class ChanponWorldStorage(
                 target.toPath(),
                 StandardCopyOption.REPLACE_EXISTING
             )
+        }
+    }
+
+    private fun ensureWritable(worldUuid: UUID) {
+        worldWriteGate?.let { gate ->
+            check(gate(worldUuid)) {
+                "Chanpon world data requires /mwm migration before it can be modified: $worldUuid"
+            }
         }
     }
 
