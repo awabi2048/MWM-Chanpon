@@ -1,5 +1,7 @@
 package me.awabi2048.mwmchanpon.service
 
+import com.awabi2048.ccsystem.api.localization.generated.CommonKeys
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
@@ -327,7 +329,7 @@ class EasyVoidWorldCreationService(
         val platformMaterial = configuredPlatformMaterial()
         val worldService = MyWorldManagerApi.getWorldService()
         if (worldService == null) {
-            player.sendMessage(CCSystem.getAPI().getI18nString(player, "error.internal_error"))
+            player.sendMessage(CCSystem.getAPI().getLocalized(player, CommonKeys.ERROR_INTERNAL_ERROR))
             return
         }
         worldService.createManagedWorld(

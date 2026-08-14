@@ -1,4 +1,6 @@
 package me.awabi2048.mwmchanpon.ui
+
+import com.awabi2048.ccsystem.api.localization.generated.MyworldGuiAdminKeys
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
@@ -121,9 +123,9 @@ class ChanponAdminMenu(
                         id = "open",
                         trigger = MenuCapabilityTrigger.ANY,
                         textProvider = MenuCapabilityActionTextProvider {
-                            CCSystem.getAPI().getI18nString(
+                            CCSystem.getAPI().getLocalized(
                                 it.player,
-                                "gui.admin_menu.menu_switch.action",
+                                MyworldGuiAdminKeys.GUI_ADMIN_MENU_MENU_SWITCH_ACTION,
                             )
                         },
                         handler = MenuCapabilityActionHandler {
@@ -450,18 +452,18 @@ class ChanponAdminMenu(
             GuiItemSpec(
                 material = Material.NETHER_STAR,
                 name = me.awabi2048.mwmchanpon.ui.fixedName(
-                    CCSystem.getAPI().getI18nString(
+                    CCSystem.getAPI().getLocalized(
                         player,
-                        "gui.admin_menu.menu_switch.display",
+                        MyworldGuiAdminKeys.GUI_ADMIN_MENU_MENU_SWITCH_DISPLAY,
                     ),
                     GuiNameStyle.DEFAULT,
                 ),
                 lore = GuiLoreSpec.Blocks(
                     listOf(
                         GuiLoreBlock(
-                            CCSystem.getAPI().getI18nStringList(
+                            CCSystem.getAPI().getLocalized(
                                 player,
-                                "gui.admin_menu.menu_switch.lore",
+                                MyworldGuiAdminKeys.GUI_ADMIN_MENU_MENU_SWITCH_LORE,
                                 mapOf("next" to i18n(player, "admin.provider_display")),
                             ).map(GuiLoreLine::Text),
                         ),

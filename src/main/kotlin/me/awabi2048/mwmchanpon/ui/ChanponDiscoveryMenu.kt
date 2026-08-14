@@ -1,5 +1,9 @@
 package me.awabi2048.mwmchanpon.ui
 
+import com.awabi2048.ccsystem.api.localization.generated.CommonKeys
+import com.awabi2048.ccsystem.api.localization.generated.MyworldGuiCommonKeys
+import com.awabi2048.ccsystem.api.localization.generated.MyworldGuiDiscoveryKeys
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiInteractionGuidance
@@ -165,7 +169,7 @@ class ChanponDiscoveryMenu(
                     action(
                         DiscoveryWorldAction.VISIT,
                         MenuGesture.PLAIN_LEFT,
-                        plugin.getMessage(player, "gui.discovery.world_item.warp_hint"),
+                        plugin.getMessage(player, MyworldGuiDiscoveryKeys.GUI_DISCOVERY_WORLD_ITEM_WARP_HINT),
                         payload,
                         MenuActionSafety.EXTERNAL_SIDE_EFFECT,
                     ),
@@ -176,7 +180,7 @@ class ChanponDiscoveryMenu(
                     action(
                         DiscoveryWorldAction.PREVIEW,
                         MenuGesture.PLAIN_RIGHT,
-                        plugin.getMessage(player, "gui.discovery.world_item.preview_hint"),
+                        plugin.getMessage(player, MyworldGuiDiscoveryKeys.GUI_DISCOVERY_WORLD_ITEM_PREVIEW_HINT),
                         payload,
                         MenuActionSafety.EXTERNAL_SIDE_EFFECT,
                     ),
@@ -187,7 +191,7 @@ class ChanponDiscoveryMenu(
                     action(
                         DiscoveryWorldAction.REQUEST_MEMBERSHIP,
                         MenuGesture.SHIFT_LEFT,
-                        plugin.getMessage(player, "gui.discovery.world_item.member_request_hint"),
+                        plugin.getMessage(player, MyworldGuiDiscoveryKeys.GUI_DISCOVERY_WORLD_ITEM_MEMBER_REQUEST_HINT),
                         payload,
                         MenuActionSafety.CONFIRM_ENTRY,
                     ),
@@ -216,23 +220,23 @@ class ChanponDiscoveryMenu(
             MyWorldManagerApi.getWorldTagService()?.getDisplayName(player, tagId) ?: tagId
         }
         val ownerName = Bukkit.getOfflinePlayer(data.owner).name
-            ?: plugin.getMessage(player, "general.unknown")
+            ?: plugin.getMessage(player, CommonKeys.GENERAL_UNKNOWN)
         val dataLines = buildList {
-            add(GuiMenuEntryData(plugin.getMessage(player, "gui.common.world_item.owner"), ownerName))
-            add(GuiMenuEntryData(plugin.getMessage(player, "gui.common.world_item.favorite"), data.favorite, GuiValueTone.DANGER))
+            add(GuiMenuEntryData(plugin.getMessage(player, MyworldGuiCommonKeys.GUI_COMMON_WORLD_ITEM_OWNER), ownerName))
+            add(GuiMenuEntryData(plugin.getMessage(player, MyworldGuiCommonKeys.GUI_COMMON_WORLD_ITEM_FAVORITE), data.favorite, GuiValueTone.DANGER))
             add(
                 GuiMenuEntryData(
-                    plugin.getMessage(player, "gui.common.world_item.recent_visitors"),
+                    plugin.getMessage(player, MyworldGuiCommonKeys.GUI_COMMON_WORLD_ITEM_RECENT_VISITORS),
                     plugin.getMessage(
                         player,
-                        "gui.common.world_item.recent_visitors_value",
+                        MyworldGuiCommonKeys.GUI_COMMON_WORLD_ITEM_RECENT_VISITORS_VALUE,
                         "count" to data.recentVisitors.sum(),
                     ),
                     GuiValueTone.SUCCESS,
                 ),
             )
             tagNames?.let {
-                add(GuiMenuEntryData(plugin.getMessage(player, "gui.common.world_item.tags"), it, GuiValueTone.PRIMARY))
+                add(GuiMenuEntryData(plugin.getMessage(player, MyworldGuiCommonKeys.GUI_COMMON_WORLD_ITEM_TAGS), it, GuiValueTone.PRIMARY))
             }
         }
         return CCSystem.getAPI().getGuiElementService().menuEntry(

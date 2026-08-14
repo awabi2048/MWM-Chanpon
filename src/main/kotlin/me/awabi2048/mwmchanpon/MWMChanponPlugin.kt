@@ -2,6 +2,7 @@ package me.awabi2048.mwmchanpon
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.CCSystemAPI
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
 import com.awabi2048.ccsystem.api.gui.MenuTargetPolicy
 import com.awabi2048.ccsystem.api.gui.PublicMenuDefinition
 import me.awabi2048.mwmchanpon.backup.BackupService
@@ -490,6 +491,12 @@ class MWMChanponPlugin : JavaPlugin() {
         for ((k, v) in placeholders) raw = raw.replace("{$k}", v.toString())
         return raw
     }
+
+    fun getMessage(
+        player: Player?,
+        key: LocalizationKey<String>,
+        vararg placeholders: Pair<String, Any>,
+    ): String = CCSystem.getAPI().getLocalized(player, key, placeholders.toMap())
 
     fun getCoreApiBridge(): CoreApiBridge = coreApiBridge
 

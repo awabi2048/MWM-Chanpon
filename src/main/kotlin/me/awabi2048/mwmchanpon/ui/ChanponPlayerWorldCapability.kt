@@ -1,5 +1,9 @@
 package me.awabi2048.mwmchanpon.ui
 
+import com.awabi2048.ccsystem.api.localization.generated.ChanponSystemKeys
+
+import com.awabi2048.ccsystem.api.localization.generated.CommonKeys
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiInteractionGuidance
@@ -215,7 +219,7 @@ class ChanponPlayerWorldCapability(
                         textProvider = MenuCapabilityActionTextProvider {
                             plugin.getMessage(
                                 it.player,
-                                "chanpon.player_world.easy_creation.action",
+                                ChanponSystemKeys.CHANPON_PLAYER_WORLD_EASY_CREATION_ACTION,
                             )
                         },
                         availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
@@ -478,14 +482,14 @@ class ChanponPlayerWorldCapability(
         val information = buildList {
             add(
                 GuiLoreLine.Data(
-                    CCSystem.getAPI().getI18nString(player, "gui_data.owner"),
+                    CCSystem.getAPI().getLocalized(player, CommonKeys.GUI_DATA_OWNER),
                     ownerName,
                     "§f",
                 ),
             )
             add(
                 GuiLoreLine.Data(
-                    CCSystem.getAPI().getI18nString(player, "gui_data.visibility"),
+                    CCSystem.getAPI().getLocalized(player, CommonKeys.GUI_DATA_VISIBILITY),
                     visibilityName(player, storage.getVisibility(world.uuid)),
                     "§e",
                 ),

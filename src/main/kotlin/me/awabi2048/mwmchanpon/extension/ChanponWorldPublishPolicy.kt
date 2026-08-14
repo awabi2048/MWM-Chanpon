@@ -1,5 +1,7 @@
 package me.awabi2048.mwmchanpon.extension
 
+import com.awabi2048.ccsystem.api.localization.generated.ChanponSystemKeys
+
 import com.awabi2048.ccsystem.CCSystem
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
@@ -11,9 +13,9 @@ import org.bukkit.entity.Player
 
 private fun defaultPublishUpdated(player: Player, visibility: ChanponWorldVisibility) {
     player.sendMessage(
-        CCSystem.getAPI().getI18nString(
+        CCSystem.getAPI().getLocalized(
             player,
-            "chanpon.publish.updated",
+            ChanponSystemKeys.CHANPON_PUBLISH_UPDATED,
             mapOf("level" to CCSystem.getAPI().getI18nString(player, "chanpon.publish.${visibility.name.lowercase()}")),
         ),
     )

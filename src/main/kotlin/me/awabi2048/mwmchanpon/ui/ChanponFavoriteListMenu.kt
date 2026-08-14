@@ -1,5 +1,10 @@
 package me.awabi2048.mwmchanpon.ui
 
+import com.awabi2048.ccsystem.api.localization.generated.CommonKeys
+import com.awabi2048.ccsystem.api.localization.generated.MyworldGuiCommonKeys
+
+import com.awabi2048.ccsystem.api.localization.generated.MyworldGuiFavoriteKeys
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiInteractionGuidance
@@ -112,7 +117,7 @@ class ChanponFavoriteListMenu(
         return InventoryMenuView(
             size = layout.size,
             title = GuiHelper.inventoryTitle(
-                CCSystem.getAPI().getI18nString(player, "gui.favorite.title"),
+                CCSystem.getAPI().getLocalized(player, MyworldGuiFavoriteKeys.GUI_FAVORITE_TITLE),
             ),
             elements = elements,
         )
@@ -158,7 +163,7 @@ class ChanponFavoriteListMenu(
 
     private fun worldEntry(player: Player, data: WorldData, slot: Int): MenuElement {
         val ownerName = Bukkit.getOfflinePlayer(data.owner).name
-            ?: plugin.getMessage(player, "general.unknown")
+            ?: plugin.getMessage(player, CommonKeys.GENERAL_UNKNOWN)
         val isMember = data.owner == player.uniqueId ||
             player.uniqueId in data.moderators ||
             player.uniqueId in data.members
@@ -167,20 +172,20 @@ class ChanponFavoriteListMenu(
             MyWorldManagerApi.getWorldTagService()?.getDisplayName(player, tagId) ?: tagId
         }
         val dataLines = buildList {
-            add(GuiMenuEntryData(plugin.getMessage(player, "gui.common.world_item.owner"), ownerName, GuiValueTone.INFO))
-            add(GuiMenuEntryData(plugin.getMessage(player, "gui.common.world_item.favorite"), data.favorite, GuiValueTone.DANGER))
+            add(GuiMenuEntryData(plugin.getMessage(player, MyworldGuiCommonKeys.GUI_COMMON_WORLD_ITEM_OWNER), ownerName, GuiValueTone.INFO))
+            add(GuiMenuEntryData(plugin.getMessage(player, MyworldGuiCommonKeys.GUI_COMMON_WORLD_ITEM_FAVORITE), data.favorite, GuiValueTone.DANGER))
             add(
                 GuiMenuEntryData(
-                    plugin.getMessage(player, "gui.common.world_item.recent_visitors"),
+                    plugin.getMessage(player, MyworldGuiCommonKeys.GUI_COMMON_WORLD_ITEM_RECENT_VISITORS),
                     plugin.getMessage(
                         player,
-                        "gui.common.world_item.recent_visitors_value",
+                        MyworldGuiCommonKeys.GUI_COMMON_WORLD_ITEM_RECENT_VISITORS_VALUE,
                         "count" to data.recentVisitors.sum(),
                     ),
                     GuiValueTone.SUCCESS,
                 ),
             )
-            tagNames?.let { add(GuiMenuEntryData(plugin.getMessage(player, "gui.common.world_item.tags"), it, GuiValueTone.PRIMARY)) }
+            tagNames?.let { add(GuiMenuEntryData(plugin.getMessage(player, MyworldGuiCommonKeys.GUI_COMMON_WORLD_ITEM_TAGS), it, GuiValueTone.PRIMARY)) }
         }
         return CCSystem.getAPI().getGuiElementService().menuEntry(
             player,
@@ -198,14 +203,14 @@ class ChanponFavoriteListMenu(
                 description = listOfNotNull(data.description.takeIf(String::isNotBlank)),
                 data = dataLines,
                 warnings = buildList {
-                    if (data.isArchived) add(plugin.getMessage(player, "gui.favorite.world_item.archived_label"))
-                    else if (!canWarp) add(plugin.getMessage(player, "gui.favorite.world_item.direct_warp_unavailable"))
+                    if (data.isArchived) add(plugin.getMessage(player, MyworldGuiFavoriteKeys.GUI_FAVORITE_WORLD_ITEM_ARCHIVED_LABEL))
+                    else if (!canWarp) add(plugin.getMessage(player, MyworldGuiFavoriteKeys.GUI_FAVORITE_WORLD_ITEM_DIRECT_WARP_UNAVAILABLE))
                 },
                 actions = listOf(
                     chanponGestureAction(
                         ACTION_WORLD,
                         MenuGesture.ANY,
-                        plugin.getMessage(player, "gui.favorite.world_item.open_actions"),
+                        plugin.getMessage(player, MyworldGuiFavoriteKeys.GUI_FAVORITE_WORLD_ITEM_OPEN_ACTIONS),
                         mapOf(WORLD_UUID to data.uuid.toString()),
                         safety = MenuActionSafety.NAVIGATION_ONLY,
                     ),
@@ -230,7 +235,7 @@ class ChanponFavoriteListMenu(
                 role = GuiElementRole.CONTENT,
                 data = listOf(
                     GuiMenuEntryData(
-                        plugin.getMessage(player, "gui.favorite.player_icon.lore_count"),
+                        plugin.getMessage(player, MyworldGuiFavoriteKeys.GUI_FAVORITE_PLAYER_ICON_LORE_COUNT),
                         totalCount,
                         GuiValueTone.SUCCESS,
                     ),
@@ -249,12 +254,12 @@ class ChanponFavoriteListMenu(
                     CCSystem.getAPI().getI18nComponent(player, "gui.favorite.favorite_menu.other_worlds.name"),
                 ),
                 role = GuiElementRole.ACTION,
-                description = CCSystem.getAPI().getI18nStringList(player, "gui.favorite.favorite_menu.other_worlds.lore"),
+                description = CCSystem.getAPI().getLocalized(player, MyworldGuiFavoriteKeys.GUI_FAVORITE_FAVORITE_MENU_OTHER_WORLDS_LORE),
                 actions = listOf(
                     chanponGestureAction(
                         ACTION_OTHER_WORLDS,
                         MenuGesture.ANY,
-                        plugin.getMessage(player, "gui.favorite.favorite_menu.other_worlds.action"),
+                        plugin.getMessage(player, MyworldGuiFavoriteKeys.GUI_FAVORITE_FAVORITE_MENU_OTHER_WORLDS_ACTION),
                         mapOf(EXPECTED_CURRENT_WORLD_UUID to expectedCurrentUuid.toString()),
                         safety = MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE,
                     ),
@@ -306,7 +311,7 @@ class ChanponFavoriteListMenu(
                     chanponGestureAction(
                         ACTION_TOGGLE_CURRENT,
                         MenuGesture.ANY,
-                        plugin.getMessage(player, "gui.favorite.favorite_menu.toggle.action"),
+                        plugin.getMessage(player, MyworldGuiFavoriteKeys.GUI_FAVORITE_FAVORITE_MENU_TOGGLE_ACTION),
                         mapOf(EXPECTED_CURRENT_WORLD_UUID to world.uuid.toString()),
                         safety = safety,
                         reversibleContract = if (safety == MenuActionSafety.REVERSIBLE) {

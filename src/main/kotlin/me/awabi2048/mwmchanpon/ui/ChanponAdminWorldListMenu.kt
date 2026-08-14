@@ -1,5 +1,9 @@
 package me.awabi2048.mwmchanpon.ui
 
+import com.awabi2048.ccsystem.api.localization.generated.CommonKeys
+import com.awabi2048.ccsystem.api.localization.generated.MyworldGuiAdminKeys
+import com.awabi2048.ccsystem.api.localization.generated.MyworldMessagesKeys
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiCycle
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
@@ -92,7 +96,7 @@ class ChanponAdminWorldListMenu(
                         trigger = MenuCapabilityTrigger.ANY,
                         textProvider = MenuCapabilityActionTextProvider {
                             CCSystem.getAPI()
-                                .getI18nString(it.player, "gui.admin_menu.info.action")
+                                .getLocalized(it.player, MyworldGuiAdminKeys.GUI_ADMIN_MENU_INFO_ACTION)
                         },
                         handler = MenuCapabilityActionHandler { context ->
                             val state = ListState(fromAdminMenu = true)
@@ -178,14 +182,14 @@ class ChanponAdminWorldListMenu(
             GuiItemSpec(
                 material = Material.FILLED_MAP,
                 name = me.awabi2048.mwmchanpon.ui.fixedName(
-                    CCSystem.getAPI().getI18nString(player, "gui.admin_menu.info.display"),
+                    CCSystem.getAPI().getLocalized(player, MyworldGuiAdminKeys.GUI_ADMIN_MENU_INFO_DISPLAY),
                     GuiNameStyle.DEFAULT,
                 ),
                 lore = GuiLoreSpec.Blocks(
                     listOf(
                         GuiLoreBlock(
                             CCSystem.getAPI()
-                                .getI18nStringList(player, "gui.admin_menu.info.lore")
+                                .getLocalized(player, MyworldGuiAdminKeys.GUI_ADMIN_MENU_INFO_LORE)
                                 .map(GuiLoreLine::Text),
                         ),
                     ),
@@ -464,7 +468,7 @@ class ChanponAdminWorldListMenu(
     private fun openSettings(player: Player, worldData: WorldData): MenuActionResult {
         val folderName = worldDirectory(worldData)
         if (!worldData.isArchived && Bukkit.getWorld(folderName) == null) {
-            player.sendMessage(CCSystem.getAPI().getI18nString(player, "messages.world_loading"))
+            player.sendMessage(CCSystem.getAPI().getLocalized(player, MyworldMessagesKeys.MESSAGES_WORLD_LOADING))
             runtime.suspendForExternal(player)
             Bukkit.getScheduler().runTask(plugin, Runnable {
                 if (!player.isOnline) {
@@ -472,7 +476,7 @@ class ChanponAdminWorldListMenu(
                     return@Runnable
                 }
                 if (MyWorldManagerApi.getWorldService()?.loadWorld(worldData.uuid) != true) {
-                    player.sendMessage(CCSystem.getAPI().getI18nString(player, "error.load_failed"))
+                    player.sendMessage(CCSystem.getAPI().getLocalized(player, CommonKeys.ERROR_LOAD_FAILED))
                     runtime.finishExternal(player)
                     return@Runnable
                 }

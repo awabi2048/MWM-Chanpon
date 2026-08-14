@@ -1,17 +1,15 @@
 package me.awabi2048.mwmchanpon.architecture
 
-import com.awabi2048.ccsystem.api.localization.LocalizationCatalogContract
-import com.awabi2048.ccsystem.api.localization.LocalizationKey
-import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Test
 import java.nio.file.Files
 import java.nio.file.Path
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
 
 class EmbeddedLocalizationReferenceTest {
     @Test
-    fun `リテラル言語キーは埋込カタログに期待型で存在する`() {
+    fun `fixed localization references use generated typed keys`() {
         val errors = mutableListOf<String>()
-        val call = Regex(
+        val fixedCall = Regex(
             "(?:getI18nStringList|getI18nString|getMessageList|getMessage)" +
                 "\\([^\\\"\\)]*?\\\"([a-z0-9_]+(?:\\.[a-z0-9_]+)+)\\\"",
         )
@@ -19,19 +17,8 @@ class EmbeddedLocalizationReferenceTest {
             files.filter(Files::isRegularFile)
                 .filter { it.toString().endsWith(".kt") }
                 .forEach { file ->
-                    call.findAll(Files.readString(file)).forEach { match ->
-                        val invocation = match.value.substringBefore('(')
-                        val key = match.groupValues[1]
-                        val expected = if (invocation.contains("List")) {
-                            LocalizationKey.ValueType.TEXT_LIST
-                        } else {
-                            LocalizationKey.ValueType.TEXT
-                        }
-                        if (!LocalizationCatalogContract.contains(key)) {
-                            errors += "$file: キーがありません: $key"
-                        } else if (LocalizationCatalogContract.valueType(key) != expected) {
-                            errors += "$file: 値型が一致しません: key=$key expected=$expected actual=${LocalizationCatalogContract.valueType(key)}"
-                        }
+                    fixedCall.findAll(Files.readString(file)).forEach { match ->
+                        errors += "$file: 固定キーは生成済みLocalizationKeyで参照してください: ${match.groupValues[1]}"
                     }
                 }
         }
