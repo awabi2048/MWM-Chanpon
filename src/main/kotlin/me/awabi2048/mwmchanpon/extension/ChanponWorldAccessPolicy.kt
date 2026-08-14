@@ -1,5 +1,7 @@
 package me.awabi2048.mwmchanpon.extension
 
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
+import com.awabi2048.ccsystem.api.localization.generated.MyworldMessagesKeys
 import me.awabi2048.mwmchanpon.service.ArchiveOperationGuard
 import me.awabi2048.mwmchanpon.service.ChanponOperation
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
@@ -57,32 +59,32 @@ class ChanponWorldAccessPolicy(
         storage.hasCurrentWorldData(worldData.uuid) &&
             !worldData.isArchived && archiveOperationGuard.canPerform(target, ChanponOperation.WARP)
 
-    override fun inviteToWorldDeniedMessageKey(sender: Player, worldData: WorldData): String? =
-        if (!archiveOperationGuard.canPerform(sender, ChanponOperation.EDIT)) "messages.world_operation_locked" else null
+    override fun inviteToWorldDeniedMessageKey(sender: Player, worldData: WorldData): LocalizationKey<String>? =
+        if (!archiveOperationGuard.canPerform(sender, ChanponOperation.EDIT)) MyworldMessagesKeys.MESSAGES_WORLD_OPERATION_LOCKED else null
 
-    override fun inviteTargetDeniedMessageKey(sender: Player, worldData: WorldData, target: OfflinePlayer): String? = when {
-        !archiveOperationGuard.canPerform(sender, ChanponOperation.EDIT) -> "messages.world_operation_locked"
-        target is Player && !canCreateWorld(target) -> "messages.member_invite_target_cannot_create"
+    override fun inviteTargetDeniedMessageKey(sender: Player, worldData: WorldData, target: OfflinePlayer): LocalizationKey<String>? = when {
+        !archiveOperationGuard.canPerform(sender, ChanponOperation.EDIT) -> MyworldMessagesKeys.MESSAGES_WORLD_OPERATION_LOCKED
+        target is Player && !canCreateWorld(target) -> MyworldMessagesKeys.MESSAGES_MEMBER_INVITE_TARGET_CANNOT_CREATE
         else -> null
     }
 
-    override fun visitDeniedMessageKey(viewer: Player, worldData: WorldData, isMember: Boolean): String? = when {
-        !archiveOperationGuard.canPerform(viewer, ChanponOperation.WARP) -> "messages.world_operation_locked"
-        worldData.isArchived -> "messages.archive_access_denied"
+    override fun visitDeniedMessageKey(viewer: Player, worldData: WorldData, isMember: Boolean): LocalizationKey<String>? = when {
+        !archiveOperationGuard.canPerform(viewer, ChanponOperation.WARP) -> MyworldMessagesKeys.MESSAGES_WORLD_OPERATION_LOCKED
+        worldData.isArchived -> MyworldMessagesKeys.MESSAGES_ARCHIVE_ACCESS_DENIED
         else -> null
     }
 
-    override fun sharedEntryDeniedMessageKey(player: Player, worldData: WorldData, isMember: Boolean): String? =
+    override fun sharedEntryDeniedMessageKey(player: Player, worldData: WorldData, isMember: Boolean): LocalizationKey<String>? =
         visitDeniedMessageKey(player, worldData, isMember)
 
-    override fun enterDeniedMessageKey(player: Player, worldData: WorldData, isMember: Boolean): String? = when {
-        !archiveOperationGuard.canPerform(player, ChanponOperation.WARP) -> "messages.world_operation_locked"
-        worldData.isArchived -> "messages.archive_access_denied"
+    override fun enterDeniedMessageKey(player: Player, worldData: WorldData, isMember: Boolean): LocalizationKey<String>? = when {
+        !archiveOperationGuard.canPerform(player, ChanponOperation.WARP) -> MyworldMessagesKeys.MESSAGES_WORLD_OPERATION_LOCKED
+        worldData.isArchived -> MyworldMessagesKeys.MESSAGES_ARCHIVE_ACCESS_DENIED
         else -> null
     }
 
-    override fun meetDeniedMessageKey(viewer: Player, target: Player, worldData: WorldData, isMember: Boolean): String? =
-        if (!archiveOperationGuard.canPerform(viewer, ChanponOperation.WARP)) "messages.world_operation_locked" else null
+    override fun meetDeniedMessageKey(viewer: Player, target: Player, worldData: WorldData, isMember: Boolean): LocalizationKey<String>? =
+        if (!archiveOperationGuard.canPerform(viewer, ChanponOperation.WARP)) MyworldMessagesKeys.MESSAGES_WORLD_OPERATION_LOCKED else null
 
     override fun canEnterWorld(player: Player, worldData: WorldData, isMember: Boolean): Boolean {
         if (!storage.hasCurrentWorldData(worldData.uuid)) return false
