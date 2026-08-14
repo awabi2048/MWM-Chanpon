@@ -1,6 +1,7 @@
 package me.awabi2048.mwmchanpon.extension
 
 import com.awabi2048.ccsystem.api.localization.generated.ChanponPhaseKeys
+import com.awabi2048.ccsystem.api.localization.generated.MyworldGuiCreationKeys
 
 import com.awabi2048.ccsystem.CCSystem
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
@@ -59,7 +60,7 @@ class ChanponWorldCreationGuard(
                     request.actor?.let {
                         CCSystem.getAPI().getI18nComponent(
                         it as? org.bukkit.entity.Player,
-                        "myworld.gui.creation.limit_reached",
+                        MyworldGuiCreationKeys.GUI_CREATION_LIMIT_REACHED,
                         mapOf("current" to ownerCount, "max" to maxWorlds)
                         )
                     }

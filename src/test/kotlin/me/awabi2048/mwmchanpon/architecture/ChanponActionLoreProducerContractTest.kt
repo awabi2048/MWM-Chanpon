@@ -8,6 +8,7 @@ import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import com.awabi2048.ccsystem.api.gui.MenuElementPresentationSemantics
 import com.awabi2048.ccsystem.api.gui.MenuPresentationProfile
 import com.awabi2048.ccsystem.api.gui.MenuPresentationSemanticsValidator
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
 import com.awabi2048.ccsystem.core.gui.LoreServiceImpl
 import java.nio.file.Files
 import java.nio.file.Path
@@ -19,14 +20,14 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class ChanponActionLoreProducerContractTest {
-    private val i18n: (org.bukkit.entity.Player?, String, Map<String, Any>) -> String = { _, key, _ ->
-        when (key) {
+    private val i18n: (org.bukkit.entity.Player?, LocalizationKey<String>, Map<String, Any>) -> String = { _, key, _ ->
+        when (key.id) {
             "gui.input.left_click" -> "左クリック"
             "gui.input.right_click" -> "右クリック"
             "gui.input.left_or_right_click" -> "クリック"
             "gui.input.any_click" -> "クリック"
             "lore.click.any" -> "クリック"
-            else -> key
+            else -> key.id
         }
     }
 
