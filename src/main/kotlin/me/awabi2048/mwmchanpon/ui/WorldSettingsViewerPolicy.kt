@@ -1,5 +1,8 @@
 package me.awabi2048.mwmchanpon.ui
 
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
+import com.awabi2048.ccsystem.api.localization.generated.ChanponSystemKeys
+
 /**
  * ワールド設定を閲覧しているプレイヤーの役割です。
  *
@@ -34,9 +37,9 @@ internal fun worldSettingsViewerRole(
 internal fun worldSettingsRestrictionWarningKey(
     role: WorldSettingsViewerRole,
     outsideTargetWorld: Boolean,
-): String? = when {
-    outsideTargetWorld -> "common.must_be_in_world_warning"
-    role == WorldSettingsViewerRole.MEMBER -> "common.member_cannot_change_warning"
-    role == WorldSettingsViewerRole.MODERATOR -> "common.moderator_cannot_change_warning"
+): LocalizationKey<String>? = when {
+    outsideTargetWorld -> ChanponSystemKeys.CHANPON_SETTINGS_COMMON_MUST_BE_IN_WORLD_WARNING
+    role == WorldSettingsViewerRole.MEMBER -> ChanponSystemKeys.CHANPON_SETTINGS_COMMON_MEMBER_CANNOT_CHANGE_WARNING
+    role == WorldSettingsViewerRole.MODERATOR -> ChanponSystemKeys.CHANPON_SETTINGS_COMMON_MODERATOR_CANNOT_CHANGE_WARNING
     else -> null
 }

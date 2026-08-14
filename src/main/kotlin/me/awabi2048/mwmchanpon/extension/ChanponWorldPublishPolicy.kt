@@ -3,6 +3,7 @@ package me.awabi2048.mwmchanpon.extension
 import com.awabi2048.ccsystem.api.localization.generated.ChanponSystemKeys
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.myworldmanager.model.WorldData
@@ -16,9 +17,15 @@ private fun defaultPublishUpdated(player: Player, visibility: ChanponWorldVisibi
         CCSystem.getAPI().getLocalized(
             player,
             ChanponSystemKeys.CHANPON_PUBLISH_UPDATED,
-            mapOf("level" to CCSystem.getAPI().getI18nString(player, "chanpon.publish.${visibility.name.lowercase()}")),
+            mapOf("level" to CCSystem.getAPI().getLocalized(player, publishVisibilityKey(visibility))),
         ),
     )
+}
+
+private fun publishVisibilityKey(visibility: ChanponWorldVisibility): LocalizationKey<String> = when (visibility) {
+    ChanponWorldVisibility.PUBLIC -> ChanponSystemKeys.CHANPON_PUBLISH_PUBLIC
+    ChanponWorldVisibility.DEVELOPMENT -> ChanponSystemKeys.CHANPON_PUBLISH_DEVELOPMENT
+    ChanponWorldVisibility.PRIVATE -> ChanponSystemKeys.CHANPON_PUBLISH_PRIVATE
 }
 
 class ChanponWorldPublishPolicy(
@@ -104,11 +111,16 @@ class ChanponWorldPublishPolicy(
     ) : WorldPublishReversibleState
 
     private fun displayName(player: Player?, visibility: ChanponWorldVisibility): String {
-        return text(player, "chanpon.publish.${visibility.name.lowercase()}")
+        val key = when (visibility) {
+            ChanponWorldVisibility.PUBLIC -> ChanponSystemKeys.CHANPON_PUBLISH_PUBLIC
+            ChanponWorldVisibility.DEVELOPMENT -> ChanponSystemKeys.CHANPON_PUBLISH_DEVELOPMENT
+            ChanponWorldVisibility.PRIVATE -> ChanponSystemKeys.CHANPON_PUBLISH_PRIVATE
+        }
+        return text(player, key)
     }
 
-    private fun text(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): String {
-        return CCSystem.getAPI().getI18nString(player, key, placeholders)
+    private fun text(player: Player?, key: LocalizationKey<String>, placeholders: Map<String, Any> = emptyMap()): String {
+        return CCSystem.getAPI().getLocalized(player, key, placeholders)
     }
 
 }

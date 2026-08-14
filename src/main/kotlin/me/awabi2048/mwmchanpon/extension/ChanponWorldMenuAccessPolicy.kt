@@ -1,5 +1,9 @@
 package me.awabi2048.mwmchanpon.extension
 
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
+
+import com.awabi2048.ccsystem.api.localization.generated.ChanponEnvironmentKeys
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
 import com.awabi2048.ccsystem.api.gui.MenuDialogButton
@@ -64,7 +68,7 @@ class ChanponWorldMenuAccessPolicy(
             ?: return false
         if (!storage.hasCurrentWorldData(worldData.uuid)) return false
         if (!storage.hasProtectionPassword(worldData.uuid)) {
-            player.sendMessage(i18n(player, "protection.password_not_configured"))
+            player.sendMessage(i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_NOT_CONFIGURED))
             return true
         }
 
@@ -81,7 +85,7 @@ class ChanponWorldMenuAccessPolicy(
             ?: return MenuActionResult.Rejected()
 
         if (!storage.matchesProtectionPassword(worldData.uuid, password)) {
-            player.sendMessage(i18n(player, "protection.password_invalid"))
+            player.sendMessage(i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_INVALID))
             pendingPasswordInputs[player.uniqueId] = request
             return MenuActionResult.Success(MenuUpdate.Refresh)
         }
@@ -94,7 +98,7 @@ class ChanponWorldMenuAccessPolicy(
             providerId = "mwm-chanpon",
             detail = "password"
         )
-        player.sendMessage(i18n(player, "protection.password_success"))
+        player.sendMessage(i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_SUCCESS))
         return openWorldSettings(player, worldData)
     }
 
@@ -105,23 +109,23 @@ class ChanponWorldMenuAccessPolicy(
                 MenuDialogRequest(
                 owner = OWNER,
                 id = PASSWORD_DIALOG,
-                title = i18nComponent(player, "protection.password_title"),
-                body = listOf(i18nComponent(player, "protection.password_body")),
+                title = i18nComponent(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_TITLE),
+                body = listOf(i18nComponent(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_BODY)),
                 inputs = listOf(
                     MenuDialogInput.Text(
                         PASSWORD_INPUT,
-                        i18nComponent(player, "protection.password_label"),
+                        i18nComponent(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_LABEL),
                         maxLength = 64,
                     ),
                 ),
                 confirm = MenuDialogButton(
-                    i18nComponent(player, "protection.password_submit"),
+                    i18nComponent(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_SUBMIT),
                     MenuDialogHandler { actor, response ->
                         submitPassword(actor, response.textValue(PASSWORD_INPUT))
                     },
                 ),
                 cancel = MenuDialogButton(
-                    i18nComponent(player, "common.back"),
+                    i18nComponent(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_COMMON_BACK),
                     MenuDialogHandler { actor, _ ->
                         pendingPasswordInputs.remove(actor.uniqueId)
                         MenuActionResult.Success(MenuUpdate.Resume)
@@ -150,11 +154,11 @@ class ChanponWorldMenuAccessPolicy(
         return MenuActionResult.Success(MenuUpdate.Navigate(route))
     }
 
-    private fun i18n(player: Player?, key: String): String =
-        CCSystem.getAPI().getI18nString(player, "chanpon.environment.$key")
+    private fun i18n(player: Player?, key: LocalizationKey<String>): String =
+        CCSystem.getAPI().getLocalized(player, key)
 
-    private fun i18nComponent(player: Player?, key: String): Component =
-        CCSystem.getAPI().getI18nComponent(player, "chanpon.environment.$key")
+    private fun i18nComponent(player: Player?, key: LocalizationKey<String>): Component =
+        CCSystem.getAPI().getI18nComponent(player, key)
 
     private data class PasswordRequest(val worldUuid: UUID)
 

@@ -1,5 +1,9 @@
 package me.awabi2048.mwmchanpon.extension
 
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
+
+import com.awabi2048.ccsystem.api.localization.generated.ChanponMemberLoreKeys
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
@@ -43,7 +47,7 @@ class ToolPermissionCapability(
                     MenuCapabilityPresentation.hostAugmentation(
                         listOf(
                             toolPermissionLoreBlock(
-                                i18n(it.player, "tool_permission_title"),
+                                i18n(it.player, ChanponMemberLoreKeys.CHANPON_MEMBER_LORE_TOOL_PERMISSION_TITLE),
                                 definitions,
                                 controller.getMemberToolStates(subject.worldData, subject.memberUuid),
                             ),
@@ -55,7 +59,7 @@ class ToolPermissionCapability(
                         id = "edit",
                         trigger = MenuCapabilityTrigger.LEFT_RIGHT,
                         textProvider = MenuCapabilityActionTextProvider {
-                            i18n(it.player, "tool_permission_operation")
+                            i18n(it.player, ChanponMemberLoreKeys.CHANPON_MEMBER_LORE_TOOL_PERMISSION_OPERATION)
                         },
                         handler = MenuCapabilityActionHandler(::handlePrimaryAction),
                         safety = MenuActionSafety.NAVIGATION_ONLY,
@@ -86,8 +90,8 @@ class ToolPermissionCapability(
         return ToolPermissionSubject(worldData, target.targetPlayerUuid)
     }
 
-    private fun i18n(player: Player, key: String): String =
-        CCSystem.getAPI().getI18nString(player, "chanpon.member_lore.$key")
+    private fun i18n(player: Player, key: LocalizationKey<String>): String =
+        CCSystem.getAPI().getLocalized(player, key)
 
     private companion object {
         const val CAPABILITY_OWNER = "mwm-chanpon"

@@ -1,5 +1,10 @@
 package me.awabi2048.mwmchanpon.ui
 
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
+
+import com.awabi2048.ccsystem.api.localization.generated.ChanponBackupKeys
+import com.awabi2048.ccsystem.api.localization.generated.ChanponPhaseKeys
+
 import com.awabi2048.ccsystem.api.localization.generated.MyworldGuiAdminKeys
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
@@ -111,7 +116,7 @@ class ChanponAdminMenu(
                 id = MENU_SWITCH_CAPABILITY,
                 placement = AdminMenuCapabilityPlacements.MENU_SWITCH,
                 availability = reasonedAvailability(
-                    reason = { i18nComponent(it.player, "error.no_permission") },
+                    reason = { i18nComponent(it.player, ChanponBackupKeys.CHANPON_BACKUP_ADMIN_NO_PERMISSION) },
                 ) {
                     it.player.hasPermission("mwmchanpon.admin")
                 },
@@ -130,7 +135,7 @@ class ChanponAdminMenu(
                         },
                         handler = MenuCapabilityActionHandler {
                             if (!it.player.hasPermission("mwmchanpon.admin")) {
-                                MenuActionResult.Rejected(i18nComponent(it.player, "admin.no_permission"))
+                                MenuActionResult.Rejected(i18nComponent(it.player, ChanponBackupKeys.CHANPON_BACKUP_ADMIN_NO_PERMISSION))
                             } else {
                                 MenuActionResult.Success(MenuUpdate.Navigate(MenuRoute(OWNER, ROUTE_MAIN)))
                             }
@@ -144,7 +149,7 @@ class ChanponAdminMenu(
 
     fun open(player: Player) {
         if (!player.hasPermission("mwmchanpon.admin")) {
-            player.sendMessage(i18nComponent(player, "admin.no_permission"))
+            player.sendMessage(i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_ADMIN_NO_PERMISSION))
             return
         }
         runtime.navigate(player, MenuRoute(OWNER, ROUTE_MAIN))
@@ -152,17 +157,21 @@ class ChanponAdminMenu(
 
     private fun renderMain(player: Player): InventoryMenuView {
         val elements = mutableListOf(
-            actionEntry(player, 19, Material.LIME_BANNER, "admin.submission", ACTION_SUBMISSION),
-            actionEntry(player, 21, Material.CHEST, "admin.world_data", ACTION_WORLD_DATA),
-            actionEntry(player, 23, Material.CLOCK, "admin.automation", ACTION_AUTOMATION),
-            actionEntry(player, 25, Material.DISPENSER, "admin.export", ACTION_EXPORT),
+            actionEntry(player, 19, Material.LIME_BANNER, adminPresentation(ACTION_SUBMISSION), ACTION_SUBMISSION),
+            actionEntry(player, 21, Material.CHEST, adminPresentation(ACTION_WORLD_DATA), ACTION_WORLD_DATA),
+            actionEntry(player, 23, Material.CLOCK, adminPresentation(ACTION_AUTOMATION), ACTION_AUTOMATION),
+            actionEntry(player, 25, Material.DISPENSER, adminPresentation(ACTION_EXPORT), ACTION_EXPORT),
             buildingPermissionItem(player),
             worldCreationAvailabilityItem(player),
             switchToMwmItem(player),
         )
         currentWorldUuid(player)?.let { worldUuid ->
             val configured = globalStorage.getSpawnWorldUuid()
-            val key = if (configured == null) "spawn_world.set" else "spawn_world.change"
+            val key = if (configured == null) {
+                AdminPresentation(ChanponBackupKeys.CHANPON_BACKUP_SPAWN_WORLD_SET_DISPLAY, ChanponBackupKeys.CHANPON_BACKUP_SPAWN_WORLD_SET_LORE, ChanponBackupKeys.CHANPON_BACKUP_SPAWN_WORLD_SET_ACTION)
+            } else {
+                AdminPresentation(ChanponBackupKeys.CHANPON_BACKUP_SPAWN_WORLD_CHANGE_DISPLAY, ChanponBackupKeys.CHANPON_BACKUP_SPAWN_WORLD_CHANGE_LORE, ChanponBackupKeys.CHANPON_BACKUP_SPAWN_WORLD_CHANGE_ACTION)
+            }
             elements += actionEntry(
                 player,
                 ChanponAdminMenuLayout.FOOTER_SPAWN_WORLD,
@@ -172,7 +181,7 @@ class ChanponAdminMenu(
                 mapOf(WORLD_UUID to worldUuid.toString()),
             )
         }
-        return InventoryMenuView(45, i18nComponent(player, "admin.title"), elements)
+        return InventoryMenuView(45, i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_ADMIN_TITLE), elements)
     }
 
     private fun toggleBuilding(context: MenuActionContext): MenuActionResult {
@@ -212,7 +221,7 @@ class ChanponAdminMenu(
         val layout = ChanponGuiElements.confirmationLayout()
         return InventoryMenuView(
             layout.size,
-            i18nComponent(player, "spawn_world.confirm.title"),
+            i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_SPAWN_WORLD_CONFIRM_TITLE),
             listOf(
                 confirmationEntry(
                     player,
@@ -230,14 +239,14 @@ class ChanponAdminMenu(
                             GuiNameSpec.FixedLabel(
                                 i18nComponent(
                                     player,
-                                    "spawn_world.confirm.center.display",
+                                    ChanponBackupKeys.CHANPON_BACKUP_SPAWN_WORLD_CONFIRM_CENTER_DISPLAY,
                                     mapOf("world" to worldData.name),
                                 ),
                             ),
                             me.awabi2048.mwmchanpon.ui.framedLore(
                                 i18nList(
                                     player,
-                                    "spawn_world.confirm.center.lore",
+                                    ChanponBackupKeys.CHANPON_BACKUP_SPAWN_WORLD_CONFIRM_CENTER_LORE,
                                     mapOf("world" to worldData.name),
                                 ).map(GuiLoreLine::Text),
                                 com.awabi2048.ccsystem.api.gui.GuiLoreFrame.BOTH,
@@ -263,7 +272,7 @@ class ChanponAdminMenu(
                 globalStorage.setSpawnPolicyInitialized(worldUuid)
             }
         }
-        context.player.sendMessage(i18nComponent(context.player, "spawn_world.set_success"))
+        context.player.sendMessage(i18nComponent(context.player, ChanponBackupKeys.CHANPON_BACKUP_SPAWN_WORLD_SET_SUCCESS))
         return MenuActionResult.Success(MenuUpdate.Back)
     }
 
@@ -271,7 +280,7 @@ class ChanponAdminMenu(
         player: Player,
         slot: Int,
         material: Material,
-        key: String,
+        presentation: AdminPresentation,
         actionId: String,
         payload: Map<String, String> = emptyMap(),
     ): MenuElement =
@@ -280,14 +289,14 @@ class ChanponAdminMenu(
             GuiMenuEntrySpec(
                 slot = slot,
                 material = material,
-                name = GuiNameSpec.FixedLabel(i18nComponent(player, "$key.display")),
+                name = GuiNameSpec.FixedLabel(i18nComponent(player, presentation.display)),
                 role = GuiElementRole.ACTION,
-                description = i18nList(player, "$key.lore"),
+                description = i18nList(player, presentation.lore),
                 actions = listOf(
                     chanponGestureAction(
                         actionId,
                         MenuGesture.ANY,
-                        i18n(player, "$key.action"),
+                        i18n(player, presentation.action),
                         payload,
                         safety = adminActionSafety(actionId),
                         reversibleContract = adminReversibleContract(actionId),
@@ -304,19 +313,19 @@ class ChanponAdminMenu(
             GuiMenuEntrySpec(
                 slot = ChanponAdminMenuLayout.FOOTER_BUILDING_PERMISSION,
                 material = if (allowed) Material.BRICKS else Material.BARRIER,
-                name = me.awabi2048.mwmchanpon.ui.fixedName(controlsI18n(player, "build.display"), GuiNameStyle.PRIMARY),
+                name = me.awabi2048.mwmchanpon.ui.fixedName(i18n(player, ChanponPhaseKeys.CHANPON_CONTROLS_BUILD_DISPLAY), GuiNameStyle.PRIMARY),
                 role = GuiElementRole.ACTION,
                 amount = 1,
-                description = listOf(controlsI18n(player, if (allowed) "build.allowed_description" else "build.denied_description")),
+                description = listOf(i18n(player, if (allowed) ChanponPhaseKeys.CHANPON_CONTROLS_BUILD_ALLOWED_DESCRIPTION else ChanponPhaseKeys.CHANPON_CONTROLS_BUILD_DENIED_DESCRIPTION)),
                 data = listOf(GuiMenuEntryData(
-                    controlsI18n(player, "build.current"),
-                    controlsI18n(player, if (allowed) "build.allowed" else "build.denied"),
+                    i18n(player, ChanponPhaseKeys.CHANPON_CONTROLS_BUILD_CURRENT),
+                    i18n(player, if (allowed) ChanponPhaseKeys.CHANPON_CONTROLS_BUILD_ALLOWED else ChanponPhaseKeys.CHANPON_CONTROLS_BUILD_DENIED),
                     GuiValueTone.PRIMARY,
                 )),
                 actions = listOf(chanponGestureAction(
                     ACTION_BUILDING_ALLOWED,
                     MenuGesture.ANY,
-                    controlsI18n(player, if (allowed) "build.deny_action" else "build.allow_action"),
+                    i18n(player, if (allowed) ChanponPhaseKeys.CHANPON_CONTROLS_BUILD_DENY_ACTION else ChanponPhaseKeys.CHANPON_CONTROLS_BUILD_ALLOW_ACTION),
                     safety = MenuActionSafety.REVERSIBLE,
                     reversibleContract = ChanponReversibleContracts.adminWorldControls("building"),
                     classification = ChanponReversibleActionClassification.Operation.BUILDING_TOGGLE,
@@ -328,7 +337,7 @@ class ChanponAdminMenu(
 
     private fun worldCreationAvailabilityItem(player: Player): MenuElement {
         val availability = globalStorage.getWorldCreationAvailability()
-        val key = availability.name.lowercase()
+        val presentation = creationPresentation(availability)
         val material = when (availability) {
             WorldCreationAvailability.DENIED -> Material.BARRIER
             WorldCreationAvailability.NON_PRODUCTION -> Material.CRAFTING_TABLE
@@ -339,18 +348,18 @@ class ChanponAdminMenu(
             GuiMenuEntrySpec(
                 slot = ChanponAdminMenuLayout.FOOTER_WORLD_CREATION,
                 material = material,
-                name = me.awabi2048.mwmchanpon.ui.fixedName(controlsI18n(player, "creation.display"), GuiNameStyle.PRIMARY),
+                name = me.awabi2048.mwmchanpon.ui.fixedName(i18n(player, ChanponPhaseKeys.CHANPON_CONTROLS_CREATION_DISPLAY), GuiNameStyle.PRIMARY),
                 role = GuiElementRole.ACTION,
                 amount = 1,
-                description = listOf(controlsI18n(player, "creation.$key.description")),
+                description = listOf(i18n(player, presentation.description)),
                 data = listOf(GuiMenuEntryData(
-                    controlsI18n(player, "creation.current"),
-                    controlsI18n(player, "creation.$key.display"),
+                    i18n(player, ChanponPhaseKeys.CHANPON_CONTROLS_CREATION_CURRENT),
+                    i18n(player, presentation.display),
                     GuiValueTone.PRIMARY,
                 )),
                 options = WorldCreationAvailability.entries.map { option ->
                     GuiMenuEntryOption(
-                        label = controlsI18n(player, "creation.${option.name.lowercase()}.display"),
+                        label = i18n(player, creationPresentation(option).display),
                         selected = option == availability,
                     )
                 },
@@ -358,7 +367,7 @@ class ChanponAdminMenu(
                 dangers = emptyList(),
                 actions = listOf(chanponCycleAction(
                     ACTION_WORLD_CREATION,
-                    controlsI18n(player, "creation.cycle_action"),
+                    i18n(player, ChanponPhaseKeys.CHANPON_CONTROLS_CREATION_CYCLE_ACTION),
                     safety = MenuActionSafety.REVERSIBLE,
                     reversibleContract = ChanponReversibleContracts.adminWorldControls("creation"),
                     classification = ChanponReversibleActionClassification.Operation.CREATION_AVAILABILITY_CYCLE,
@@ -377,7 +386,8 @@ class ChanponAdminMenu(
         reversibleContract: com.awabi2048.ccsystem.api.gui.MenuReversibleContract? = null,
         classification: ChanponReversibleActionClassification.Operation? = null,
     ): MenuElement {
-        val key = if (confirm) "confirm.button.confirm" else "confirm.button.cancel"
+        val key = if (confirm) ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BUTTON_CONFIRM else ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BUTTON_CANCEL
+        val actionKey = if (confirm) ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BUTTON_CONFIRM_ACTION else ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BUTTON_CANCEL_ACTION
         return CCSystem.getAPI().getGuiElementService().menuEntry(
             player,
             GuiMenuEntrySpec(
@@ -389,7 +399,7 @@ class ChanponAdminMenu(
                     chanponGestureAction(
                         actionId,
                         MenuGesture.ANY,
-                        i18n(player, "$key.action"),
+                        i18n(player, actionKey),
                         safety = adminActionSafety(actionId),
                         reversibleContract = reversibleContract,
                         classification = classification,
@@ -435,13 +445,13 @@ class ChanponAdminMenu(
             GuiMenuEntrySpec(
                 slot = ChanponAdminMenuLayout.FOOTER_MAIN_SWITCH,
                 material = Material.NETHER_STAR,
-                name = GuiNameSpec.FixedLabel(i18nComponent(player, "admin.switch_mwm.display")),
+                name = GuiNameSpec.FixedLabel(i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_ADMIN_SWITCH_MWM_DISPLAY)),
                 role = GuiElementRole.NAVIGATION,
-                description = listOf(i18n(player, "admin.switch_mwm.description")),
+                description = listOf(i18n(player, ChanponBackupKeys.CHANPON_BACKUP_ADMIN_SWITCH_MWM_DESCRIPTION)),
                 actions = listOf(chanponGestureAction(
                     ACTION_SWITCH_MWM,
                     MenuGesture.ANY,
-                    i18n(player, "admin.switch_mwm.action"),
+                    i18n(player, ChanponBackupKeys.CHANPON_BACKUP_ADMIN_SWITCH_MWM_ACTION),
                     safety = MenuActionSafety.NAVIGATION_ONLY,
                 )),
             ),
@@ -464,7 +474,7 @@ class ChanponAdminMenu(
                             CCSystem.getAPI().getLocalized(
                                 player,
                                 MyworldGuiAdminKeys.GUI_ADMIN_MENU_MENU_SWITCH_LORE,
-                                mapOf("next" to i18n(player, "admin.provider_display")),
+                                mapOf("next" to i18n(player, ChanponBackupKeys.CHANPON_BACKUP_ADMIN_PROVIDER_DISPLAY)),
                             ).map(GuiLoreLine::Text),
                         ),
                     ),
@@ -475,17 +485,39 @@ class ChanponAdminMenu(
         )
     }
 
-    private fun i18nComponent(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
-        CCSystem.getAPI().getI18nComponent(player, "chanpon.backup.$key", placeholders)
+    private fun i18nComponent(player: Player?, key: LocalizationKey<String>, placeholders: Map<String, Any> = emptyMap()) =
+        CCSystem.getAPI().getI18nComponent(player, key, placeholders)
 
-    private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
-        CCSystem.getAPI().getI18nString(player, "chanpon.backup.$key", placeholders)
+    private fun i18n(player: Player?, key: LocalizationKey<String>, placeholders: Map<String, Any> = emptyMap()) =
+        CCSystem.getAPI().getLocalized(player, key, placeholders)
 
-    private fun controlsI18n(player: Player?, key: String) =
-        CCSystem.getAPI().getI18nString(player, "chanpon.controls.$key")
+    private fun i18nList(player: Player?, key: LocalizationKey<List<String>>, placeholders: Map<String, Any> = emptyMap()) =
+        CCSystem.getAPI().getLocalized(player, key, placeholders)
 
-    private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
-        CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
+    private fun adminPresentation(actionId: String): AdminPresentation = when (actionId) {
+        ACTION_SUBMISSION -> AdminPresentation(ChanponBackupKeys.CHANPON_BACKUP_ADMIN_SUBMISSION_DISPLAY, ChanponBackupKeys.CHANPON_BACKUP_ADMIN_SUBMISSION_LORE, ChanponBackupKeys.CHANPON_BACKUP_ADMIN_SUBMISSION_ACTION)
+        ACTION_WORLD_DATA -> AdminPresentation(ChanponBackupKeys.CHANPON_BACKUP_ADMIN_WORLD_DATA_DISPLAY, ChanponBackupKeys.CHANPON_BACKUP_ADMIN_WORLD_DATA_LORE, ChanponBackupKeys.CHANPON_BACKUP_ADMIN_WORLD_DATA_ACTION)
+        ACTION_AUTOMATION -> AdminPresentation(ChanponBackupKeys.CHANPON_BACKUP_ADMIN_AUTOMATION_DISPLAY, ChanponBackupKeys.CHANPON_BACKUP_ADMIN_AUTOMATION_LORE, ChanponBackupKeys.CHANPON_BACKUP_ADMIN_AUTOMATION_ACTION)
+        ACTION_EXPORT -> AdminPresentation(ChanponBackupKeys.CHANPON_BACKUP_ADMIN_EXPORT_DISPLAY, ChanponBackupKeys.CHANPON_BACKUP_ADMIN_EXPORT_LORE, ChanponBackupKeys.CHANPON_BACKUP_ADMIN_EXPORT_ACTION)
+        else -> error("未定義の管理操作IDです: $actionId")
+    }
+
+    private fun creationPresentation(availability: WorldCreationAvailability): CreationPresentation = when (availability) {
+        WorldCreationAvailability.DENIED -> CreationPresentation(ChanponPhaseKeys.CHANPON_CONTROLS_CREATION_DENIED_DISPLAY, ChanponPhaseKeys.CHANPON_CONTROLS_CREATION_DENIED_DESCRIPTION)
+        WorldCreationAvailability.NON_PRODUCTION -> CreationPresentation(ChanponPhaseKeys.CHANPON_CONTROLS_CREATION_NON_PRODUCTION_DISPLAY, ChanponPhaseKeys.CHANPON_CONTROLS_CREATION_NON_PRODUCTION_DESCRIPTION)
+        WorldCreationAvailability.PRODUCTION -> CreationPresentation(ChanponPhaseKeys.CHANPON_CONTROLS_CREATION_PRODUCTION_DISPLAY, ChanponPhaseKeys.CHANPON_CONTROLS_CREATION_PRODUCTION_DESCRIPTION)
+    }
+
+    private data class AdminPresentation(
+        val display: LocalizationKey<String>,
+        val lore: LocalizationKey<List<String>>,
+        val action: LocalizationKey<String>,
+    )
+
+    private data class CreationPresentation(
+        val display: LocalizationKey<String>,
+        val description: LocalizationKey<String>,
+    )
 
     companion object {
         private const val OWNER = "mwm-chanpon"

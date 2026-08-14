@@ -1,6 +1,8 @@
 package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
+import com.awabi2048.ccsystem.api.localization.generated.ChanponArchiveKeys
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
@@ -70,7 +72,7 @@ class AnnualArchiveFlow(
 
     fun start(player: Player) {
         if (sessions.containsKey(player.uniqueId)) {
-            player.sendMessage(i18n(player, "already_in_progress"))
+            player.sendMessage(i18n(player, ChanponArchiveKeys.CHANPON_ARCHIVE_ERROR_ALREADY_IN_PROGRESS))
             return
         }
         val shouldRegister = sessions.isEmpty()
@@ -79,11 +81,11 @@ class AnnualArchiveFlow(
             plugin.server.pluginManager.registerEvents(this, plugin)
         }
         player.sendMessage(Component.empty())
-        player.sendMessage(i18nComponent(player, "prompt.name_input"))
+        player.sendMessage(i18nComponent(player, ChanponArchiveKeys.CHANPON_ARCHIVE_PROMPT_NAME_INPUT))
         player.sendMessage(
-            Component.text(i18n(player, "prompt.cancel_hint"), NamedTextColor.GRAY)
+            Component.text(i18n(player, ChanponArchiveKeys.CHANPON_ARCHIVE_PROMPT_CANCEL_HINT), NamedTextColor.GRAY)
                 .clickEvent(ClickEvent.callback { cancel(player, closeMenu = true) })
-                .hoverEvent(HoverEvent.showText(Component.text(i18n(player, "prompt.cancel_hover")))),
+                .hoverEvent(HoverEvent.showText(Component.text(i18n(player, ChanponArchiveKeys.CHANPON_ARCHIVE_PROMPT_CANCEL_HOVER)))),
         )
     }
 
@@ -99,7 +101,7 @@ class AnnualArchiveFlow(
             when (session.step) {
                 ArchiveStep.NAME_INPUT -> acceptArchiveName(player, session, message)
                 ArchiveStep.CONFIRM_NAME, ArchiveStep.CONFIRM_FINAL ->
-                    player.sendMessage(i18nComponent(player, "error.use_button"))
+                    player.sendMessage(i18nComponent(player, ChanponArchiveKeys.CHANPON_ARCHIVE_ERROR_USE_BUTTON))
                 ArchiveStep.PASSWORD_INPUT -> acceptPassword(player, session, message)
             }
         })
@@ -113,7 +115,7 @@ class AnnualArchiveFlow(
 
     private fun acceptArchiveName(player: Player, session: ArchiveSession, message: String) {
         if (message.isBlank()) {
-            player.sendMessage(i18nComponent(player, "error.empty_name"))
+            player.sendMessage(i18nComponent(player, ChanponArchiveKeys.CHANPON_ARCHIVE_ERROR_EMPTY_NAME))
             return
         }
         session.archiveName = message
@@ -124,7 +126,7 @@ class AnnualArchiveFlow(
     private fun acceptPassword(player: Player, session: ArchiveSession, message: String) {
         val expectedPassword = plugin.config.getString("archive.password", "たぬきスープ")
         if (message != expectedPassword) {
-            player.sendMessage(i18nComponent(player, "error.wrong_password"))
+            player.sendMessage(i18nComponent(player, ChanponArchiveKeys.CHANPON_ARCHIVE_ERROR_WRONG_PASSWORD))
             cancel(player, closeMenu = false)
             return
         }
@@ -137,9 +139,9 @@ class AnnualArchiveFlow(
             ?: error("アーカイブ作成セッションがありません")
         return confirmationView(
             player,
-            "confirm.name",
+            ChanponArchiveKeys.CHANPON_ARCHIVE_CONFIRM_NAME,
             mapOf("name" to session.archiveName),
-            "confirm.proceed",
+            ChanponArchiveKeys.CHANPON_ARCHIVE_CONFIRM_PROCEED,
             ACTION_CONFIRM_NAME,
         )
     }
@@ -149,18 +151,18 @@ class AnnualArchiveFlow(
             ?: error("アーカイブ作成セッションがありません")
         return confirmationView(
             player,
-            "confirm.final",
+            ChanponArchiveKeys.CHANPON_ARCHIVE_CONFIRM_FINAL,
             mapOf("name" to session.archiveName),
-            "confirm.execute",
+            ChanponArchiveKeys.CHANPON_ARCHIVE_CONFIRM_EXECUTE,
             ACTION_EXECUTE,
         )
     }
 
     private fun confirmationView(
         player: Player,
-        titleKey: String,
+        titleKey: LocalizationKey<String>,
         titlePlaceholders: Map<String, Any>,
-        confirmKey: String,
+        confirmKey: LocalizationKey<String>,
         confirmAction: String,
     ): InventoryMenuView = InventoryMenuView(
         27,
@@ -178,7 +180,7 @@ class AnnualArchiveFlow(
                 player,
                 CANCEL_SLOT,
                 Material.BARRIER,
-                "message.cancelled",
+                ChanponArchiveKeys.CHANPON_ARCHIVE_MESSAGE_CANCELLED,
                 GuiElementRole.CANCEL,
                 ACTION_CANCEL,
             ),
@@ -189,7 +191,7 @@ class AnnualArchiveFlow(
         player: Player,
         slot: Int,
         material: Material,
-        textKey: String,
+        textKey: LocalizationKey<String>,
         role: GuiElementRole,
         actionId: String,
     ): MenuElement =
@@ -216,7 +218,7 @@ class AnnualArchiveFlow(
             ?: return MenuActionResult.Rejected()
         session.step = ArchiveStep.PASSWORD_INPUT
         context.player.sendMessage(Component.empty())
-        context.player.sendMessage(i18nComponent(context.player, "prompt.password_input"))
+        context.player.sendMessage(i18nComponent(context.player, ChanponArchiveKeys.CHANPON_ARCHIVE_PROMPT_PASSWORD_INPUT))
         return MenuActionResult.Success(MenuUpdate.Close)
     }
 
@@ -235,7 +237,7 @@ class AnnualArchiveFlow(
     private fun executeArchive(player: Player) {
         val session = sessions.remove(player.uniqueId) ?: return
         unregisterWhenIdle()
-        player.sendMessage(i18nComponent(player, "message.executing"))
+        player.sendMessage(i18nComponent(player, ChanponArchiveKeys.CHANPON_ARCHIVE_MESSAGE_EXECUTING))
         archiveService.createAnnualArchive(session.archiveName, player)
             .thenAccept { result ->
                 Bukkit.getScheduler().runTask(plugin, Runnable {
@@ -243,7 +245,7 @@ class AnnualArchiveFlow(
                         player.sendMessage(
                             i18nComponent(
                                 player,
-                                "message.success",
+                                ChanponArchiveKeys.CHANPON_ARCHIVE_MESSAGE_SUCCESS,
                                 mapOf("name" to session.archiveName),
                             ),
                         )
@@ -251,7 +253,7 @@ class AnnualArchiveFlow(
                         player.sendMessage(
                             i18nComponent(
                                 player,
-                                "message.failed",
+                                ChanponArchiveKeys.CHANPON_ARCHIVE_MESSAGE_FAILED,
                                 mapOf("reason" to result.message),
                             ),
                         )
@@ -273,7 +275,7 @@ class AnnualArchiveFlow(
         if (closeMenu) {
             runtime.close(player)
         }
-        player.sendMessage(i18nComponent(player, "message.cancelled"))
+        player.sendMessage(i18nComponent(player, ChanponArchiveKeys.CHANPON_ARCHIVE_MESSAGE_CANCELLED))
     }
 
     private fun unregisterWhenIdle() {
@@ -291,21 +293,21 @@ class AnnualArchiveFlow(
 
     private fun i18n(
         player: Player,
-        key: String,
+        key: LocalizationKey<String>,
         placeholders: Map<String, Any> = emptyMap(),
-    ): String = CCSystem.getAPI().getI18nString(
+    ): String = CCSystem.getAPI().getLocalized(
         player,
-        "chanpon.archive.$key",
+        key,
         placeholders,
     )
 
     private fun i18nComponent(
         player: Player,
-        key: String,
+        key: LocalizationKey<String>,
         placeholders: Map<String, Any> = emptyMap(),
     ): Component = CCSystem.getAPI().getI18nComponent(
         player,
-        "chanpon.archive.$key",
+        key,
         placeholders,
     )
 

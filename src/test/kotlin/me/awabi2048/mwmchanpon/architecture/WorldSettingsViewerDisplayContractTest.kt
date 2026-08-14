@@ -22,7 +22,7 @@ class WorldSettingsViewerDisplayContractTest {
         assertTrue("role = if (actionable) GuiElementRole.ACTION else GuiElementRole.CONTENT" in menu)
         assertTrue("isFeatureRoleActionable" in menu)
         assertTrue("existing.filter { it is GuiLoreLine.Data || it is GuiLoreLine.Text }" in menu)
-        assertTrue("common.must_be_in_world_warning" in menu)
+        assertTrue("CHANPON_SETTINGS_COMMON_MUST_BE_IN_WORLD_WARNING" in menu)
     }
 
     @Test
@@ -43,9 +43,9 @@ class WorldSettingsViewerDisplayContractTest {
 
         assertTrue("worldSettingsRestrictionWarningKey" in menu)
         assertTrue("warnings = warningKey?.let { listOf(i18n(player, it)) } ?: emptyList()" in menu)
-        assertTrue("outsideTargetWorld -> \"common.must_be_in_world_warning\"" in policy)
-        assertTrue("common.member_cannot_change_warning" in policy)
-        assertTrue("common.moderator_cannot_change_warning" in policy)
+        assertTrue("outsideTargetWorld -> ChanponSystemKeys.CHANPON_SETTINGS_COMMON_MUST_BE_IN_WORLD_WARNING" in policy)
+        assertTrue("CHANPON_SETTINGS_COMMON_MEMBER_CANNOT_CHANGE_WARNING" in policy)
+        assertTrue("CHANPON_SETTINGS_COMMON_MODERATOR_CANNOT_CHANGE_WARNING" in policy)
     }
 
     private fun source(relativePath: String): String = Path.of(

@@ -486,12 +486,6 @@ class MWMChanponPlugin : JavaPlugin() {
     fun isConfigurationMigrationCurrent(): Boolean =
         configMigrationParticipant.status().state == ApiMigrationParticipantState.CURRENT
 
-    fun getMessage(player: Player?, key: String, vararg placeholders: Pair<String, Any>): String {
-        var raw = CCSystem.getAPI().getI18nString(player, key)
-        for ((k, v) in placeholders) raw = raw.replace("{$k}", v.toString())
-        return raw
-    }
-
     fun getMessage(
         player: Player?,
         key: LocalizationKey<String>,

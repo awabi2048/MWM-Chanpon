@@ -86,7 +86,7 @@ class ChanponFavoriteListMenu(
                         name = GuiNameSpec.FixedLabel(
                             CCSystem.getAPI().getI18nComponent(
                                 player,
-                                "gui.favorite.empty_message_no_favorites",
+                                MyworldGuiFavoriteKeys.GUI_FAVORITE_EMPTY_MESSAGE_NO_FAVORITES,
                             ),
                         ),
                         lore = GuiLoreSpec.None,
@@ -195,7 +195,7 @@ class ChanponFavoriteListMenu(
                 name = GuiNameSpec.TargetIdentity(
                     CCSystem.getAPI().getI18nComponent(
                         player,
-                        "gui.common.world_item_name",
+                        MyworldGuiCommonKeys.GUI_COMMON_WORLD_ITEM_NAME,
                         mapOf("world" to data.name),
                     ),
                 ),
@@ -228,7 +228,7 @@ class ChanponFavoriteListMenu(
                 name = GuiNameSpec.FixedLabel(
                     CCSystem.getAPI().getI18nComponent(
                         player,
-                        "gui.favorite.player_icon.name",
+                        MyworldGuiFavoriteKeys.GUI_FAVORITE_PLAYER_ICON_NAME,
                         mapOf("player" to player.name),
                     ),
                 ),
@@ -251,7 +251,7 @@ class ChanponFavoriteListMenu(
                 slot = slot,
                 material = Material.COMPASS,
                 name = GuiNameSpec.FixedLabel(
-                    CCSystem.getAPI().getI18nComponent(player, "gui.favorite.favorite_menu.other_worlds.name"),
+                    CCSystem.getAPI().getI18nComponent(player, MyworldGuiFavoriteKeys.GUI_FAVORITE_FAVORITE_MENU_OTHER_WORLDS_NAME),
                 ),
                 role = GuiElementRole.ACTION,
                 description = CCSystem.getAPI().getLocalized(player, MyworldGuiFavoriteKeys.GUI_FAVORITE_FAVORITE_MENU_OTHER_WORLDS_LORE),
@@ -274,8 +274,8 @@ class ChanponFavoriteListMenu(
         snapshot: FavoriteListSnapshot,
     ): MenuElement {
         val restrictedKey = when {
-            currentWorld == null -> "gui.favorite.favorite_menu.toggle.lore_restricted_not_managed"
-            currentWorld.owner == player.uniqueId -> "gui.favorite.favorite_menu.toggle.lore_restricted_owner"
+            currentWorld == null -> MyworldGuiFavoriteKeys.GUI_FAVORITE_FAVORITE_MENU_TOGGLE_LORE_RESTRICTED_NOT_MANAGED
+            currentWorld.owner == player.uniqueId -> MyworldGuiFavoriteKeys.GUI_FAVORITE_FAVORITE_MENU_TOGGLE_LORE_RESTRICTED_OWNER
             else -> null
         }
         if (restrictedKey != null) {
@@ -285,7 +285,7 @@ class ChanponFavoriteListMenu(
                     slot = slot,
                     material = Material.BARRIER,
                     name = GuiNameSpec.FixedLabel(
-                        CCSystem.getAPI().getI18nComponent(player, "gui.favorite.favorite_menu.toggle.name_restricted"),
+                        CCSystem.getAPI().getI18nComponent(player, MyworldGuiFavoriteKeys.GUI_FAVORITE_FAVORITE_MENU_TOGGLE_NAME_RESTRICTED),
                     ),
                     role = GuiElementRole.CONTENT,
                     warnings = listOf(plugin.getMessage(player, restrictedKey)),
@@ -295,9 +295,9 @@ class ChanponFavoriteListMenu(
         val world = requireNotNull(currentWorld)
         val isFavorite = snapshot.currentWorldIsFavorite
         val nameKey = if (isFavorite) {
-            "gui.favorite.favorite_menu.toggle.name_remove"
+            MyworldGuiFavoriteKeys.GUI_FAVORITE_FAVORITE_MENU_TOGGLE_NAME_REMOVE
         } else {
-            "gui.favorite.favorite_menu.toggle.name_add"
+            MyworldGuiFavoriteKeys.GUI_FAVORITE_FAVORITE_MENU_TOGGLE_NAME_ADD
         }
         val safety = if (isFavorite) MenuActionSafety.CONFIRM_ENTRY else MenuActionSafety.REVERSIBLE
         return CCSystem.getAPI().getGuiElementService().menuEntry(
@@ -332,7 +332,7 @@ class ChanponFavoriteListMenu(
     }
 
     private fun navigationEntry(player: Player, slot: Int, next: Boolean, targetPage: Int): MenuElement {
-        val labelKey = if (next) "gui.common.next_page" else "gui.common.prev_page"
+        val labelKey = if (next) CommonKeys.GUI_COMMON_NEXT_PAGE else CommonKeys.GUI_COMMON_PREV_PAGE
         val iconKey = if (next) "next_page" else "prev_page"
         val label = plugin.getMessage(player, labelKey)
         return CCSystem.getAPI().getGuiElementService().menuEntry(

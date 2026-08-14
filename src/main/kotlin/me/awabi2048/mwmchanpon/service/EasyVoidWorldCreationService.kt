@@ -1,8 +1,12 @@
 package me.awabi2048.mwmchanpon.service
 
+import com.awabi2048.ccsystem.api.localization.generated.MyworldMessagesKeys
+
 import com.awabi2048.ccsystem.api.localization.generated.CommonKeys
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
+import com.awabi2048.ccsystem.api.localization.generated.ChanponSystemKeys
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
@@ -146,7 +150,7 @@ class EasyVoidWorldCreationService(
         if (!canCreate(player)) return MenuActionResult.Rejected()
         pendingCreations.remove(player.uniqueId)
         returnRoutes[player.uniqueId] = returnRoute
-        player.sendMessage(i18n(player, "start"))
+        player.sendMessage(i18n(player, ChanponSystemKeys.CHANPON_PLAYER_WORLD_EASY_CREATION_START))
         showNameDialog(player)
         return MenuActionResult.Success(MenuUpdate.None)
     }
@@ -168,7 +172,7 @@ class EasyVoidWorldCreationService(
             showNameDialog(
                 player,
                 name,
-                legacy("§c${i18n(player, "name_required")}")
+                legacy("§c${i18n(player, ChanponSystemKeys.CHANPON_PLAYER_WORLD_EASY_CREATION_NAME_REQUIRED)}")
             )
             return MenuActionResult.Success(MenuUpdate.None)
         }
@@ -186,7 +190,7 @@ class EasyVoidWorldCreationService(
             showNameDialog(
                 player,
                 name,
-                CCSystem.getAPI().getI18nComponent(player, "messages.world_name_duplicate"),
+                CCSystem.getAPI().getI18nComponent(player, MyworldMessagesKeys.MESSAGES_WORLD_NAME_DUPLICATE),
             )
             return MenuActionResult.Success(MenuUpdate.None)
         }
@@ -207,16 +211,16 @@ class EasyVoidWorldCreationService(
             MenuDialogRequest(
                 owner = OWNER,
                 id = NAME_DIALOG,
-                title = component(player, "name_title"),
+                title = component(player, ChanponSystemKeys.CHANPON_PLAYER_WORLD_EASY_CREATION_NAME_TITLE),
                 body = buildList {
-                    add(component(player, "name_body"))
+                    add(component(player, ChanponSystemKeys.CHANPON_PLAYER_WORLD_EASY_CREATION_NAME_BODY))
                     if (error != null) add(error)
                 },
                 inputs = listOf(
-                    MenuDialogInput.Text(NAME_INPUT, component(player, "name_label"), initial, maxLength = 32),
+                    MenuDialogInput.Text(NAME_INPUT, component(player, ChanponSystemKeys.CHANPON_PLAYER_WORLD_EASY_CREATION_NAME_LABEL), initial, maxLength = 32),
                 ),
                 confirm = MenuDialogButton(
-                    component(player, "next"),
+                    component(player, ChanponSystemKeys.CHANPON_PLAYER_WORLD_EASY_CREATION_NEXT),
                     MenuDialogHandler { actor, response ->
                         handleNameSubmit(
                             actor,
@@ -225,7 +229,7 @@ class EasyVoidWorldCreationService(
                     },
                 ),
                 cancel = MenuDialogButton(
-                    component(player, "cancel"),
+                    component(player, ChanponSystemKeys.CHANPON_PLAYER_WORLD_EASY_CREATION_CANCEL),
                     MenuDialogHandler { actor, _ -> cancelFlow(actor) },
                 ),
             ),
@@ -236,18 +240,18 @@ class EasyVoidWorldCreationService(
         val pending = pendingCreations[player.uniqueId]
         val layout = CCSystem.getAPI().getGuiLayoutService().confirmation45()
         if (pending == null) {
-            return InventoryMenuView(layout.size, component(player, "confirm_title"), emptyList()).asConfirmation()
+            return InventoryMenuView(layout.size, component(player, ChanponSystemKeys.CHANPON_PLAYER_WORLD_EASY_CREATION_CONFIRM_TITLE), emptyList()).asConfirmation()
         }
         val preview = guiItem(
             Material.PAPER,
-            i18n(player, "confirm_title"),
+            i18n(player, ChanponSystemKeys.CHANPON_PLAYER_WORLD_EASY_CREATION_CONFIRM_TITLE),
             me.awabi2048.mwmchanpon.ui.framedLore(
                 listOf(
-                    GuiLoreLine.Text(i18n(player, "confirm_body", "world" to pending.worldName)),
+                    GuiLoreLine.Text(i18n(player, ChanponSystemKeys.CHANPON_PLAYER_WORLD_EASY_CREATION_CONFIRM_BODY, "world" to pending.worldName)),
                     GuiLoreLine.Text(
                         i18n(
                             player,
-                            "confirm_template",
+                            ChanponSystemKeys.CHANPON_PLAYER_WORLD_EASY_CREATION_CONFIRM_TEMPLATE,
                             "material" to configuredPlatformMaterial().key.asString(),
                         ),
                     ),
@@ -258,7 +262,7 @@ class EasyVoidWorldCreationService(
         )
         return InventoryMenuView(
             layout.size,
-            component(player, "confirm_title"),
+            component(player, ChanponSystemKeys.CHANPON_PLAYER_WORLD_EASY_CREATION_CONFIRM_TITLE),
             listOf(
                 CCSystem.getAPI().getGuiElementService().menuDisplay(
                     GuiMenuDisplaySpec(layout.previewSlot, preview),
@@ -269,7 +273,7 @@ class EasyVoidWorldCreationService(
                         slot = layout.confirmSlot,
                         item = guiItem(
                         Material.LIME_CONCRETE,
-                        i18n(player, "create"),
+                        i18n(player, ChanponSystemKeys.CHANPON_PLAYER_WORLD_EASY_CREATION_CREATE),
                         GuiLoreSpec.None,
                         GuiElementRole.CONFIRM,
                         ),
@@ -277,7 +281,7 @@ class EasyVoidWorldCreationService(
                             chanponGestureAction(
                                 ACTION_CREATE,
                                 MenuGesture.ANY,
-                                i18n(player, "create"),
+                                i18n(player, ChanponSystemKeys.CHANPON_PLAYER_WORLD_EASY_CREATION_CREATE),
                                 safety = MenuActionSafety.IRREVERSIBLE,
                             ),
                         ),
@@ -289,7 +293,7 @@ class EasyVoidWorldCreationService(
                         slot = layout.cancelSlot,
                         item = guiItem(
                         Material.RED_CONCRETE,
-                        i18n(player, "back"),
+                        i18n(player, ChanponSystemKeys.CHANPON_PLAYER_WORLD_EASY_CREATION_BACK),
                         GuiLoreSpec.None,
                         GuiElementRole.CANCEL,
                         ),
@@ -297,7 +301,7 @@ class EasyVoidWorldCreationService(
                             chanponGestureAction(
                                 ACTION_BACK,
                                 MenuGesture.ANY,
-                                i18n(player, "back"),
+                                i18n(player, ChanponSystemKeys.CHANPON_PLAYER_WORLD_EASY_CREATION_BACK),
                                 safety = MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE,
                             ),
                         ),
@@ -355,7 +359,7 @@ class EasyVoidWorldCreationService(
             !player.hasPermission("myworldmanager.admin") &&
             !player.hasPermission("mwmchanpon.admin")
         ) {
-            player.sendMessage(CCSystem.getAPI().getI18nString(player, "no_permission"))
+            player.sendMessage(CCSystem.getAPI().getLocalized(player, CommonKeys.NO_PERMISSION))
             return false
         }
         val decision = MyWorldManagerApi.checkWorldCreation(
@@ -396,11 +400,11 @@ class EasyVoidWorldCreationService(
             amount = 1,
         )
 
-    private fun i18n(player: Player?, key: String, vararg placeholders: Pair<String, Any>): String =
-        CCSystem.getAPI().getI18nString(player, "chanpon.player_world.easy_creation.$key", placeholders.toMap())
+    private fun i18n(player: Player?, key: LocalizationKey<String>, vararg placeholders: Pair<String, Any>): String =
+        CCSystem.getAPI().getLocalized(player, key, placeholders.toMap())
 
-    private fun component(player: Player?, key: String, vararg placeholders: Pair<String, Any>): Component =
-        CCSystem.getAPI().getI18nComponent(player, "chanpon.player_world.easy_creation.$key", placeholders.toMap())
+    private fun component(player: Player?, key: LocalizationKey<String>, vararg placeholders: Pair<String, Any>): Component =
+        CCSystem.getAPI().getI18nComponent(player, key, placeholders.toMap())
 
     private fun legacy(text: String): Component = LegacyComponentSerializer.legacySection().deserialize(text)
 

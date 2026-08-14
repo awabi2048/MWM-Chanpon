@@ -1,5 +1,7 @@
 package me.awabi2048.mwmchanpon.service
 
+import com.awabi2048.ccsystem.api.localization.generated.ChanponBackupKeys
+
 import com.awabi2048.ccsystem.CCSystem
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.backup.BackupOperationStatus
@@ -42,7 +44,7 @@ class ManualRollbackService(
     private fun broadcastAnnouncement(actorName: String, delaySeconds: Long) {
         val lines = CCSystem.getAPI().getI18nComponentList(
             null,
-            "chanpon.backup.manual_rollback.announcement",
+            ChanponBackupKeys.CHANPON_BACKUP_MANUAL_ROLLBACK_ANNOUNCEMENT,
             mapOf("actor" to actorName, "delay" to delaySeconds)
         )
         lines.forEach(Bukkit::broadcast)

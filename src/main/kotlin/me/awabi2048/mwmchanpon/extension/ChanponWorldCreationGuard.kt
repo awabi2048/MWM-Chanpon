@@ -1,5 +1,7 @@
 package me.awabi2048.mwmchanpon.extension
 
+import com.awabi2048.ccsystem.api.localization.generated.ChanponPhaseKeys
+
 import com.awabi2048.ccsystem.CCSystem
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
@@ -22,7 +24,7 @@ class ChanponWorldCreationGuard(
                 request.actor?.let {
                     CCSystem.getAPI().getI18nComponent(
                         it as? org.bukkit.entity.Player,
-                        "chanpon.controls.creation_denied",
+                        ChanponPhaseKeys.CHANPON_CONTROLS_CREATION_DENIED,
                     )
                 },
             )
@@ -34,9 +36,9 @@ class ChanponWorldCreationGuard(
         }
         if (!creationAllowed) {
             val key = if (request.operation == WorldCreationOperation.PRODUCTION) {
-                "chanpon.controls.production_denied"
+                ChanponPhaseKeys.CHANPON_CONTROLS_PRODUCTION_DENIED
             } else {
-                "chanpon.controls.creation_denied"
+                ChanponPhaseKeys.CHANPON_CONTROLS_CREATION_DENIED
             }
             return WorldCreationDecision.deny(
                 request.player?.let { CCSystem.getAPI().getI18nComponent(it, key) }

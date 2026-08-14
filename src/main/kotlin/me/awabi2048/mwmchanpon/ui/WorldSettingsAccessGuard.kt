@@ -1,5 +1,9 @@
 package me.awabi2048.mwmchanpon.ui
 
+import com.awabi2048.ccsystem.api.localization.generated.ChanponSystemKeys
+import com.awabi2048.ccsystem.api.localization.generated.CommonKeys
+import com.awabi2048.ccsystem.api.localization.generated.MyworldGuiSettingsKeys
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.ManagedMenuInteraction
 import com.awabi2048.ccsystem.api.gui.ManagedMenuInteractionOutcome
@@ -28,7 +32,7 @@ internal class WorldSettingsAccessGuard(
         val authorized = if (ownerOnly) owner || admin else owner || moderator || admin
 
         if (!authorized || storage.isImportedArchive(worldData.uuid)) {
-            player.sendMessage(CCSystem.getAPI().getI18nComponent(player, "general.no_permission"))
+            player.sendMessage(CCSystem.getAPI().getI18nComponent(player, CommonKeys.GENERAL_NO_PERMISSION))
             denySound(player)
             return false
         }
@@ -37,7 +41,7 @@ internal class WorldSettingsAccessGuard(
         // 公開レベル・訪問通知・ポータル取得の3項目は管理者/所有者が事後調整できるよう例外として許可する。
         if (protectionService.isProtected(worldData) && protectedSettings == ProtectedSettingsKind.NONE) {
             player.sendMessage(
-                CCSystem.getAPI().getI18nComponent(player, "chanpon.message.protected_world"),
+                CCSystem.getAPI().getI18nComponent(player, ChanponSystemKeys.CHANPON_MESSAGE_PROTECTED_WORLD),
             )
             denySound(player)
             return false
@@ -48,7 +52,7 @@ internal class WorldSettingsAccessGuard(
                 player.sendMessage(
                     CCSystem.getAPI().getI18nComponent(
                         player,
-                        "gui.settings.common.must_be_in_world",
+                        MyworldGuiSettingsKeys.GUI_SETTINGS_COMMON_MUST_BE_IN_WORLD,
                     ),
                 )
                 denySound(player)
