@@ -1,5 +1,7 @@
 package me.awabi2048.mwmchanpon.extension
 
+import com.awabi2048.ccsystem.api.localization.generated.ChanponSystemKeys
+
 import com.awabi2048.ccsystem.CCSystem
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
@@ -14,7 +16,8 @@ class ChanponWorldPortalPolicy(
     override fun getId(): String = "mwmchanpon.world_portal"
 
     override fun isPortalOpen(destination: WorldData): Boolean {
-        return storage.getVisibility(destination.uuid) == ChanponWorldVisibility.PUBLIC
+        return storage.hasCurrentWorldData(destination.uuid) &&
+            storage.getVisibility(destination.uuid) == ChanponWorldVisibility.PUBLIC
     }
 
     override fun canUsePortal(player: Player, destination: WorldData): Boolean {
@@ -24,12 +27,12 @@ class ChanponWorldPortalPolicy(
     override fun blockedMessages(player: Player, destination: WorldData): List<String> {
         val visibility = storage.getVisibility(destination.uuid)
         val key = when (visibility) {
-            ChanponWorldVisibility.DEVELOPMENT -> "chanpon.portal.development"
-            ChanponWorldVisibility.PRIVATE -> "chanpon.portal.locked"
+            ChanponWorldVisibility.DEVELOPMENT -> ChanponSystemKeys.CHANPON_PORTAL_DEVELOPMENT
+            ChanponWorldVisibility.PRIVATE -> ChanponSystemKeys.CHANPON_PORTAL_LOCKED
             ChanponWorldVisibility.PUBLIC -> return emptyList()
         }
         val ownerName = Bukkit.getOfflinePlayer(destination.owner).name ?: destination.owner.toString()
-        return CCSystem.getAPI().getI18nStringList(
+        return CCSystem.getAPI().getLocalized(
             player,
             key,
             mapOf(

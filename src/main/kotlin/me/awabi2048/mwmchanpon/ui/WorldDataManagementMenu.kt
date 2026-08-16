@@ -1,5 +1,9 @@
 package me.awabi2048.mwmchanpon.ui
 
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
+
+import com.awabi2048.ccsystem.api.localization.generated.ChanponBackupKeys
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
@@ -98,20 +102,20 @@ class WorldDataManagementMenu(
         if (safePage > 0) {
             elements += simpleActionEntry(
                 player, layout.previousPageSlot, Material.ARROW,
-                i18n(player, "common.prev"), GuiElementRole.NAVIGATION,
-                ACTION_PAGE, i18n(player, "common.prev_action"), mapOf(PAGE to (safePage - 1).toString()),
+                i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_PREV), GuiElementRole.NAVIGATION,
+                ACTION_PAGE, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_PREV_ACTION), mapOf(PAGE to (safePage - 1).toString()),
             )
         }
         if (safePage < pages - 1) {
             elements += simpleActionEntry(
                 player, layout.nextPageSlot, Material.ARROW,
-                i18n(player, "common.next"), GuiElementRole.NAVIGATION,
-                ACTION_PAGE, i18n(player, "common.next_action"), mapOf(PAGE to (safePage + 1).toString()),
+                i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_NEXT), GuiElementRole.NAVIGATION,
+                ACTION_PAGE, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_NEXT_ACTION), mapOf(PAGE to (safePage + 1).toString()),
             )
         }
         elements += simpleActionEntry(
             player, layout.backSlot, Material.REDSTONE,
-            i18n(player, "common.back"), GuiElementRole.BACK, ACTION_BACK, i18n(player, "common.back_action"),
+            i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_BACK), GuiElementRole.BACK, ACTION_BACK, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_BACK_ACTION),
         )
         elements += infoEntry(player, layout.infoSlot, worlds.size, safePage + 1, pages)
         worlds.drop(safePage * ITEMS_PER_PAGE).take(ITEMS_PER_PAGE).forEachIndexed { index, world ->
@@ -137,20 +141,20 @@ class WorldDataManagementMenu(
             )
         }
         elements += controlEntry(
-            player, 47, Material.CHEST, "world_data.bulk_backup",
+            player, 47, Material.CHEST, ControlPresentation(ChanponBackupKeys.CHANPON_BACKUP_WORLD_DATA_BULK_BACKUP_DISPLAY, ChanponBackupKeys.CHANPON_BACKUP_WORLD_DATA_BULK_BACKUP_DESCRIPTION, null, ChanponBackupKeys.CHANPON_BACKUP_WORLD_DATA_BULK_BACKUP_ACTION),
             ACTION_BULK_BACKUP, mapOf(PAGE to safePage.toString()),
         )
         elements += controlEntry(
-            player, 51, Material.RECOVERY_COMPASS, "world_data.bulk_rollback",
+            player, 51, Material.RECOVERY_COMPASS, ControlPresentation(ChanponBackupKeys.CHANPON_BACKUP_WORLD_DATA_BULK_ROLLBACK_DISPLAY, ChanponBackupKeys.CHANPON_BACKUP_WORLD_DATA_BULK_ROLLBACK_DESCRIPTION, null, ChanponBackupKeys.CHANPON_BACKUP_WORLD_DATA_BULK_ROLLBACK_ACTION),
             ACTION_BULK_ROLLBACK, mapOf(PAGE to safePage.toString()),
         )
         elements += controlEntry(
-            player, 53, Material.ENDER_CHEST, "world_data.annual_archive",
+            player, 53, Material.ENDER_CHEST, ControlPresentation(ChanponBackupKeys.CHANPON_BACKUP_WORLD_DATA_ANNUAL_ARCHIVE_DISPLAY, ChanponBackupKeys.CHANPON_BACKUP_WORLD_DATA_ANNUAL_ARCHIVE_DESCRIPTION, ChanponBackupKeys.CHANPON_BACKUP_WORLD_DATA_ANNUAL_ARCHIVE_WARNING, ChanponBackupKeys.CHANPON_BACKUP_WORLD_DATA_ANNUAL_ARCHIVE_ACTION),
             ACTION_ANNUAL_ARCHIVE, warning = true,
         )
         return InventoryMenuView(
             layout.size,
-            i18nComponent(player, "world_data.title"),
+            i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_WORLD_DATA_TITLE),
             elements,
         )
     }
@@ -159,12 +163,15 @@ class WorldDataManagementMenu(
         val worldUuid = route.payload[WORLD_UUID]?.let {
             runCatching { UUID.fromString(it) }.getOrNull()
         }
-        val key = if (worldUuid == null) "confirm.backup_all" else "confirm.backup_world"
+        val key = if (worldUuid == null) {
+            ConfirmationPresentation(ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BACKUP_ALL_TITLE, ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BACKUP_ALL_DISPLAY, ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BACKUP_ALL_LORE)
+        } else {
+            ConfirmationPresentation(ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BACKUP_WORLD_TITLE, ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BACKUP_WORLD_DISPLAY, ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BACKUP_WORLD_LORE)
+        }
         return confirmationView(
             player,
-            "$key.title",
-            Material.CHEST,
             key,
+            Material.CHEST,
             ACTION_CONFIRM_BACKUP,
         )
     }
@@ -172,42 +179,40 @@ class WorldDataManagementMenu(
     private fun renderBulkRollbackConfirmation(player: Player): InventoryMenuView =
         confirmationView(
             player,
-            "confirm.rollback_all.title",
+            ConfirmationPresentation(ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_ROLLBACK_ALL_TITLE, ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_ROLLBACK_ALL_DISPLAY, ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_ROLLBACK_ALL_LORE),
             Material.RECOVERY_COMPASS,
-            "confirm.rollback_all",
             ACTION_CONFIRM_ROLLBACK,
         )
 
     private fun confirmationView(
         player: Player,
-        titleKey: String,
+        presentation: ConfirmationPresentation,
         previewMaterial: Material,
-        previewKey: String,
         confirmAction: String,
     ): InventoryMenuView {
         val layout = ChanponGuiElements.confirmationLayout()
         return InventoryMenuView(
             layout.size,
-            i18nComponent(player, titleKey),
+            i18nComponent(player, presentation.title),
             listOf(
                 displayEntry(
                     layout.previewSlot,
                     previewMaterial,
-                    GuiNameSpec.FixedLabel(i18nComponent(player, "$previewKey.display")),
+                    GuiNameSpec.FixedLabel(i18nComponent(player, presentation.display)),
                     me.awabi2048.mwmchanpon.ui.framedLore(
-                        i18nList(player, "$previewKey.lore").map(GuiLoreLine::Text),
+                        i18nList(player, presentation.lore).map(GuiLoreLine::Text),
                         GuiLoreFrame.BOTH,
                     ),
                 ),
                 simpleActionEntry(
                     player, layout.confirmSlot, Material.LIME_CONCRETE,
-                    i18n(player, "confirm.button.confirm"), GuiElementRole.CONFIRM,
-                    confirmAction, i18n(player, "confirm.button.confirm_action"),
+                    i18n(player, ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BUTTON_CONFIRM), GuiElementRole.CONFIRM,
+                    confirmAction, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BUTTON_CONFIRM_ACTION),
                 ),
                 simpleActionEntry(
                     player, layout.cancelSlot, Material.RED_CONCRETE,
-                    i18n(player, "confirm.button.cancel"), GuiElementRole.CANCEL,
-                    ACTION_CANCEL, i18n(player, "confirm.button.cancel_action"),
+                    i18n(player, ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BUTTON_CANCEL), GuiElementRole.CANCEL,
+                    ACTION_CANCEL, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BUTTON_CANCEL_ACTION),
                 ),
             ),
         ).asConfirmation()
@@ -298,9 +303,9 @@ class WorldDataManagementMenu(
                     i18nComponent(
                         player,
                         if (result.status == BackupOperationStatus.SUCCESS) {
-                            "message.backup_success"
+                            ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_BACKUP_SUCCESS
                         } else {
-                            "message.backup_failed"
+                            ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_BACKUP_FAILED
                         },
                     ),
                 )
@@ -348,25 +353,25 @@ class WorldDataManagementMenu(
             slot = slot,
             material = world.icon,
             name = GuiNameSpec.TargetIdentity(
-                i18nComponent(player, "world_data.world.display", mapOf("world" to world.name)),
+                i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_WORLD_DATA_WORLD_DISPLAY, mapOf("world" to world.name)),
             ),
             role = GuiElementRole.ACTION,
             data = listOf(
                 com.awabi2048.ccsystem.api.gui.GuiMenuEntryData(
-                    i18n(player, "world_data.world.owner_label"),
+                    i18n(player, ChanponBackupKeys.CHANPON_BACKUP_WORLD_DATA_WORLD_OWNER_LABEL),
                     Bukkit.getOfflinePlayer(world.owner).name ?: "-",
                 ),
                 com.awabi2048.ccsystem.api.gui.GuiMenuEntryData(
-                    i18n(player, "world_data.world.created_label"),
+                    i18n(player, ChanponBackupKeys.CHANPON_BACKUP_WORLD_DATA_WORLD_CREATED_LABEL),
                     world.createdAt,
                 ),
                 com.awabi2048.ccsystem.api.gui.GuiMenuEntryData(
-                    i18n(player, "world_data.world.backups_label"),
+                    i18n(player, ChanponBackupKeys.CHANPON_BACKUP_WORLD_DATA_WORLD_BACKUPS_LABEL),
                     backupService.listBackupsForWorld(world.uuid).size,
                 ),
             ),
             actions = listOf(
-                chanponGestureAction(ACTION_WORLD_LIST, MenuGesture.ANY, i18n(player, "world_data.world.list_action"), payload, safety = MenuActionSafety.NAVIGATION_ONLY),
+                chanponGestureAction(ACTION_WORLD_LIST, MenuGesture.ANY, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_WORLD_DATA_WORLD_LIST_ACTION), payload, safety = MenuActionSafety.NAVIGATION_ONLY),
             ),
         ),
     )
@@ -383,15 +388,15 @@ class WorldDataManagementMenu(
             slot = slot,
             material = Material.CHEST,
             name = GuiNameSpec.TargetIdentity(
-                i18nComponent(player, "world_data.world_backup.display", mapOf("world" to world.name)),
+                i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_WORLD_DATA_WORLD_BACKUP_DISPLAY, mapOf("world" to world.name)),
             ),
             role = GuiElementRole.ACTION,
-            description = listOf(i18n(player, "world_data.world_backup.description")),
+            description = listOf(i18n(player, ChanponBackupKeys.CHANPON_BACKUP_WORLD_DATA_WORLD_BACKUP_DESCRIPTION)),
             actions = listOf(
                 chanponGestureAction(
                     ACTION_WORLD_BACKUP,
                     MenuGesture.ANY,
-                    i18n(player, "world_data.world_backup.action"),
+                    i18n(player, ChanponBackupKeys.CHANPON_BACKUP_WORLD_DATA_WORLD_BACKUP_ACTION),
                     payload,
                     safety = MenuActionSafety.CONFIRM_ENTRY,
                 ),
@@ -403,7 +408,7 @@ class WorldDataManagementMenu(
         player: Player,
         slot: Int,
         material: Material,
-        key: String,
+        presentation: ControlPresentation,
         actionId: String,
         payload: Map<String, String> = emptyMap(),
         warning: Boolean = false,
@@ -412,18 +417,31 @@ class WorldDataManagementMenu(
         GuiMenuEntrySpec(
             slot = slot,
             material = material,
-            name = GuiNameSpec.FixedLabel(i18nComponent(player, "$key.display")),
+            name = GuiNameSpec.FixedLabel(i18nComponent(player, presentation.display)),
             role = GuiElementRole.ACTION,
-            description = listOf(i18n(player, "$key.description")),
-            warnings = if (warning) listOf(i18n(player, "$key.warning")) else emptyList(),
+            description = listOf(i18n(player, presentation.description)),
+            warnings = if (warning) listOf(i18n(player, requireNotNull(presentation.warning))) else emptyList(),
             actions = listOf(chanponGestureAction(
                 actionId,
                 MenuGesture.ANY,
-                i18n(player, "$key.action"),
+                i18n(player, presentation.action),
                 payload,
                 safety = worldDataActionSafety(actionId),
             )),
         ),
+    )
+
+    private data class ConfirmationPresentation(
+        val title: LocalizationKey<String>,
+        val display: LocalizationKey<String>,
+        val lore: LocalizationKey<List<String>>,
+    )
+
+    private data class ControlPresentation(
+        val display: LocalizationKey<String>,
+        val description: LocalizationKey<String>,
+        val warning: LocalizationKey<String>?,
+        val action: LocalizationKey<String>,
     )
 
     private fun simpleActionEntry(
@@ -472,11 +490,11 @@ class WorldDataManagementMenu(
     ): MenuElement = displayEntry(
         slot,
         Material.BOOK,
-        GuiNameSpec.FixedLabel(i18nComponent(player, "world_data.info.display")),
+        GuiNameSpec.FixedLabel(i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_WORLD_DATA_INFO_DISPLAY)),
         me.awabi2048.mwmchanpon.ui.framedLore(
             i18nList(
                 player,
-                "world_data.info.lore",
+                ChanponBackupKeys.CHANPON_BACKUP_WORLD_DATA_INFO_LORE,
                 mapOf("count" to count, "page" to page, "pages" to pages),
             ).map(GuiLoreLine::Text),
             GuiLoreFrame.BOTH,
@@ -485,21 +503,21 @@ class WorldDataManagementMenu(
 
     private fun i18nComponent(
         player: Player?,
-        key: String,
+        key: LocalizationKey<String>,
         placeholders: Map<String, Any> = emptyMap(),
-    ) = CCSystem.getAPI().getI18nComponent(player, "chanpon.backup.$key", placeholders)
+    ) = CCSystem.getAPI().getI18nComponent(player, key, placeholders)
 
     private fun i18n(
         player: Player?,
-        key: String,
+        key: LocalizationKey<String>,
         placeholders: Map<String, Any> = emptyMap(),
-    ) = CCSystem.getAPI().getI18nString(player, "chanpon.backup.$key", placeholders)
+    ) = CCSystem.getAPI().getLocalized(player, key, placeholders)
 
     private fun i18nList(
         player: Player?,
-        key: String,
+        key: LocalizationKey<List<String>>,
         placeholders: Map<String, Any> = emptyMap(),
-    ) = CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
+    ) = CCSystem.getAPI().getLocalized(player, key, placeholders)
 
     private fun worldDataActionSafety(actionId: String): MenuActionSafety = when (actionId) {
         ACTION_BACK, ACTION_PAGE, ACTION_CANCEL -> MenuActionSafety.NAVIGATION_ONLY

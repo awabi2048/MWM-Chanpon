@@ -1,5 +1,9 @@
 package me.awabi2048.mwmchanpon.ui
 
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
+
+import com.awabi2048.ccsystem.api.localization.generated.ChanponBackupKeys
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
@@ -87,18 +91,18 @@ class WorldDataExportMenu(
         val layout = ChanponGuiElements.pagedListLayout()
         val elements = mutableListOf<MenuElement>()
         if (safePage > 0) elements += simpleActionEntry(
-            player, 45, Material.ARROW, i18n(player, "common.prev"),
-            GuiElementRole.NAVIGATION, ACTION_PAGE, i18n(player, "common.prev_action"),
+            player, 45, Material.ARROW, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_PREV),
+            GuiElementRole.NAVIGATION, ACTION_PAGE, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_PREV_ACTION),
             mapOf(PAGE to (safePage - 1).toString()),
         )
         elements += simpleActionEntry(
-            player, 49, Material.REDSTONE, i18n(player, "common.back"),
-            GuiElementRole.BACK, ACTION_BACK, i18n(player, "common.back_action"),
+            player, 49, Material.REDSTONE, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_BACK),
+            GuiElementRole.BACK, ACTION_BACK, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_BACK_ACTION),
         )
         elements += infoEntry(player, 50, worlds.size, safeSelected.size, safePage + 1, pages)
         if (safePage < pages - 1) elements += simpleActionEntry(
-            player, 53, Material.ARROW, i18n(player, "common.next"),
-            GuiElementRole.NAVIGATION, ACTION_PAGE, i18n(player, "common.next_action"),
+            player, 53, Material.ARROW, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_NEXT),
+            GuiElementRole.NAVIGATION, ACTION_PAGE, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_NEXT_ACTION),
             mapOf(PAGE to (safePage + 1).toString()),
         )
         worlds.drop(safePage * ITEMS_PER_PAGE).take(ITEMS_PER_PAGE).forEachIndexed { index, world ->
@@ -109,10 +113,10 @@ class WorldDataExportMenu(
                 world.uuid in safeSelected,
             )
         }
-        elements += controlEntry(player, 47, Material.CHEST, "export_menu.select_all", ACTION_SELECT_ALL)
-        elements += controlEntry(player, 48, Material.BARRIER, "export_menu.clear", ACTION_CLEAR_SELECTION)
+        elements += controlEntry(player, 47, Material.CHEST, ControlPresentation(ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_SELECT_ALL_DISPLAY, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_SELECT_ALL_DESCRIPTION, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_SELECT_ALL_ACTION), ACTION_SELECT_ALL)
+        elements += controlEntry(player, 48, Material.BARRIER, ControlPresentation(ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_CLEAR_DISPLAY, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_CLEAR_DESCRIPTION, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_CLEAR_ACTION), ACTION_CLEAR_SELECTION)
         elements += exportSelectionItem(player, 51, safeSelected.size)
-        return InventoryMenuView(layout.size, i18nComponent(player, "export_menu.title"), elements)
+        return InventoryMenuView(layout.size, i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_TITLE), elements)
     }
 
     private fun renderConfirmation(player: Player, route: MenuRoute): InventoryMenuView {
@@ -134,17 +138,17 @@ class WorldDataExportMenu(
                 player,
                 layout.confirmSlot,
                 if (primary != null) Material.LIME_CONCRETE else Material.GRAY_DYE,
-                "export_menu.confirm.execute",
+                ControlPresentation(ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_CONFIRM_EXECUTE_DISPLAY, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_CONFIRM_EXECUTE_DESCRIPTION, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_CONFIRM_EXECUTE_ACTION),
                 ACTION_CONFIRM,
                 GuiElementRole.CONFIRM,
                 primary != null,
             ),
             simpleActionEntry(
-                player, layout.cancelSlot, Material.REDSTONE, i18n(player, "common.back"),
-                GuiElementRole.CANCEL, ACTION_BACK, i18n(player, "common.back_action"),
+                player, layout.cancelSlot, Material.REDSTONE, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_BACK),
+                GuiElementRole.CANCEL, ACTION_BACK, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_BACK_ACTION),
             ),
         )
-        return InventoryMenuView(layout.size, i18nComponent(player, "export_menu.confirm.title"), elements)
+        return InventoryMenuView(layout.size, i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_CONFIRM_TITLE), elements)
             .asConfirmation()
     }
 
@@ -188,7 +192,7 @@ class WorldDataExportMenu(
                             context.player.sendMessage(
                                 i18nComponent(
                                     context.player,
-                                    "message.export_failure_detail",
+                                    ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_EXPORT_FAILURE_DETAIL,
                                     mapOf("detail" to detail),
                                 )
                             )
@@ -211,24 +215,24 @@ class WorldDataExportMenu(
             slot = slot,
             material = world.icon,
             name = GuiNameSpec.TargetIdentity(
-                i18nComponent(player, "export_menu.world.display", mapOf("world" to world.name)),
+                i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_WORLD_DISPLAY, mapOf("world" to world.name)),
             ),
             role = GuiElementRole.ACTION,
             data = listOf(
                 GuiMenuEntryData(
-                    i18n(player, "export_menu.world.owner_label"),
+                    i18n(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_WORLD_OWNER_LABEL),
                     Bukkit.getOfflinePlayer(world.owner).name ?: "-",
                 ),
-                GuiMenuEntryData(i18n(player, "export_menu.world.created_label"), world.createdAt),
+                GuiMenuEntryData(i18n(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_WORLD_CREATED_LABEL), world.createdAt),
             ),
             options = listOf(GuiMenuEntryOption(
-                i18n(player, if (selected) "export_menu.world.selected" else "export_menu.world.not_selected"),
+                i18n(player, if (selected) ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_WORLD_SELECTED else ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_WORLD_NOT_SELECTED),
                 selected,
             )),
             actions = listOf(chanponGestureAction(
                 ACTION_TOGGLE,
                 MenuGesture.ANY,
-                i18n(player, "export_menu.world.action"),
+                i18n(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_WORLD_ACTION),
                 mapOf(WORLD_UUID to world.uuid.toString()),
                 // 選択集合は次Routeにのみ保持され、サーバー状態を変更しません。
                 safety = MenuActionSafety.NAVIGATION_ONLY,
@@ -245,26 +249,26 @@ class WorldDataExportMenu(
         val spec = GuiMenuEntrySpec(
                 slot = slot,
                 material = if (enabled) Material.DISPENSER else Material.GRAY_DYE,
-                name = GuiNameSpec.FixedLabel(i18nComponent(player, "export_menu.execute.display")),
+                name = GuiNameSpec.FixedLabel(i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_EXECUTE_DISPLAY)),
                 role = if (enabled) GuiElementRole.CONFIRM else GuiElementRole.CONTENT,
                 data = listOf(GuiMenuEntryData(
-                    i18n(player, "export_menu.execute.selected_label"),
+                    i18n(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_EXECUTE_SELECTED_LABEL),
                     selectedCount,
                 )),
                 warnings = if (enabled) emptyList() else {
-                    listOf(i18n(player, "export_menu.execute.disabled"))
+                    listOf(i18n(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_EXECUTE_DISABLED))
                 },
                 actions = if (enabled) listOf(chanponGestureAction(
                     ACTION_EXPORT_SELECTION,
                     MenuGesture.ANY,
-                    i18n(player, "export_menu.execute.action"),
+                    i18n(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_EXECUTE_ACTION),
                     safety = MenuActionSafety.CONFIRM_ENTRY,
                 )) else emptyList(),
             )
         return if (enabled) gui.menuEntry(player, spec) else gui.menuUnavailable(
             player,
             spec,
-            i18nComponent(player, "export_menu.execute.disabled"),
+            i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_EXECUTE_DISABLED),
         )
     }
 
@@ -272,7 +276,7 @@ class WorldDataExportMenu(
         player: Player,
         slot: Int,
         material: Material,
-        key: String,
+        presentation: ControlPresentation,
         actionId: String,
         role: GuiElementRole = GuiElementRole.ACTION,
         enabled: Boolean = true,
@@ -281,13 +285,13 @@ class WorldDataExportMenu(
         val spec = GuiMenuEntrySpec(
             slot = slot,
             material = material,
-            name = GuiNameSpec.FixedLabel(i18nComponent(player, "$key.display")),
+            name = GuiNameSpec.FixedLabel(i18nComponent(player, presentation.display)),
             role = if (enabled) role else GuiElementRole.CONTENT,
-            description = listOf(i18n(player, "$key.description")),
+            description = listOf(i18n(player, presentation.description)),
             actions = if (enabled) listOf(chanponGestureAction(
                 actionId,
                 MenuGesture.ANY,
-                i18n(player, "$key.action"),
+                i18n(player, presentation.action),
                 safety = exportActionSafety(actionId),
                 classification = exportRouteClassification(actionId),
             )) else emptyList(),
@@ -295,9 +299,15 @@ class WorldDataExportMenu(
         return if (enabled) gui.menuEntry(player, spec) else gui.menuUnavailable(
             player,
             spec,
-            i18nComponent(player, "export_menu.execute.disabled"),
+            i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_EXECUTE_DISABLED),
         )
     }
+
+    private data class ControlPresentation(
+        val display: LocalizationKey<String>,
+        val description: LocalizationKey<String>,
+        val action: LocalizationKey<String>,
+    )
 
     private fun confirmationInfoEntry(
         player: Player,
@@ -308,13 +318,13 @@ class WorldDataExportMenu(
     ): MenuElement = displayEntry(
         slot,
         Material.BOOK,
-        GuiNameSpec.FixedLabel(i18nComponent(player, "export_menu.confirm.info.display")),
+        GuiNameSpec.FixedLabel(i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_CONFIRM_INFO_DISPLAY)),
         me.awabi2048.mwmchanpon.ui.framedLore(
                     listOf(
-                        GuiLoreLine.Data(i18n(player, "export_menu.confirm.info.primary_label"), primaryName, "§f"),
-                        GuiLoreLine.Data(i18n(player, "export_menu.confirm.info.count_label"), selectedCount, "§f"),
-                        GuiLoreLine.Data(i18n(player, "export_menu.confirm.info.file_label"), fileName, "§f"),
-                        GuiLoreLine.Warning(i18n(player, "export_menu.confirm.info.warning")),
+                        GuiLoreLine.Data(i18n(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_CONFIRM_INFO_PRIMARY_LABEL), primaryName, "§f"),
+                        GuiLoreLine.Data(i18n(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_CONFIRM_INFO_COUNT_LABEL), selectedCount, "§f"),
+                        GuiLoreLine.Data(i18n(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_CONFIRM_INFO_FILE_LABEL), fileName, "§f"),
+                        GuiLoreLine.Warning(i18n(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_CONFIRM_INFO_WARNING)),
                     ),
             GuiLoreFrame.BOTH,
         ),
@@ -346,11 +356,11 @@ class WorldDataExportMenu(
     ): MenuElement = displayEntry(
         slot,
         Material.BOOK,
-        GuiNameSpec.FixedLabel(i18nComponent(player, "export_menu.info.display")),
+        GuiNameSpec.FixedLabel(i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_INFO_DISPLAY)),
         me.awabi2048.mwmchanpon.ui.framedLore(
                     i18nList(
                         player,
-                        "export_menu.info.lore",
+                        ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_INFO_LORE,
                         mapOf("count" to count, "selected" to selectedCount, "page" to page, "pages" to pages)
                     ).map(GuiLoreLine::Text),
             GuiLoreFrame.BOTH,
@@ -397,15 +407,15 @@ class WorldDataExportMenu(
     private fun resultMessage(player: Player, success: Boolean, fileName: String?): Component =
         i18nComponent(
             player,
-            if (success) "message.export_success" else "message.export_failed",
+            if (success) ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_EXPORT_SUCCESS else ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_EXPORT_FAILED,
             mapOf("file" to (fileName ?: "-"))
         )
 
-    private fun i18nComponent(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
-        CCSystem.getAPI().getI18nComponent(player, "chanpon.backup.$key", placeholders)
+    private fun i18nComponent(player: Player?, key: LocalizationKey<String>, placeholders: Map<String, Any> = emptyMap()) =
+        CCSystem.getAPI().getI18nComponent(player, key, placeholders)
 
-    private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
-        CCSystem.getAPI().getI18nString(player, "chanpon.backup.$key", placeholders)
+    private fun i18n(player: Player?, key: LocalizationKey<String>, placeholders: Map<String, Any> = emptyMap()) =
+        CCSystem.getAPI().getLocalized(player, key, placeholders)
 
     private fun exportActionSafety(actionId: String): MenuActionSafety = when (actionId) {
         ACTION_BACK, ACTION_PAGE, ACTION_TOGGLE, ACTION_SELECT_ALL, ACTION_CLEAR_SELECTION -> MenuActionSafety.NAVIGATION_ONLY
@@ -420,8 +430,8 @@ class WorldDataExportMenu(
         else -> null
     }
 
-    private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
-        CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
+    private fun i18nList(player: Player?, key: LocalizationKey<List<String>>, placeholders: Map<String, Any> = emptyMap()) =
+        CCSystem.getAPI().getLocalized(player, key, placeholders)
 
     companion object {
         private const val OWNER = "mwm-chanpon"

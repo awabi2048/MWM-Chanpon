@@ -1,4 +1,8 @@
 package me.awabi2048.mwmchanpon.extension
+
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
+
+import com.awabi2048.ccsystem.api.localization.generated.ChanponSubmissionKeys
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
@@ -182,7 +186,7 @@ class ProductionToggleExtension(
                         id = "toggle",
                         trigger = MenuCapabilityTrigger.ANY,
                         textProvider = MenuCapabilityActionTextProvider {
-                            i18n(it.player, "production.lore.action")
+                            i18n(it.player, ChanponSubmissionKeys.CHANPON_SUBMISSION_PRODUCTION_LORE_ACTION)
                         },
                         handler = MenuCapabilityActionHandler {
                             val draft = creationDraft(it)
@@ -201,6 +205,7 @@ class ProductionToggleExtension(
 
     @EventHandler
     fun onWorldCreated(event: MwmWorldCreatedEvent) {
+        if (!plugin.isConfigurationMigrationCurrent()) return
         storage.initializeSubmissionState(event.worldUuid)
         val enabled = creationSelectionState.takePending(event.ownerUuid, event.worldName) ?: return
         if (enabled) {
@@ -213,6 +218,7 @@ class ProductionToggleExtension(
     }
 
     fun syncForcedTagsForProductionWorlds() {
+        if (!plugin.isConfigurationMigrationCurrent()) return
         val repository = MyWorldManagerApi.getWorldRepository() ?: return
         repository.findAll()
             .filter { storage.isProductionWorld(it.uuid) }
@@ -225,7 +231,7 @@ class ProductionToggleExtension(
         }
         val next = !(draft.getBoolean(EXTRA_KEY) ?: false)
         if (next && ownerHasProductionWorld(player.uniqueId, null)) {
-            player.sendMessage(i18n(player, "message.production_limit"))
+            player.sendMessage(i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_MESSAGE_PRODUCTION_LIMIT))
             draft.setBoolean(EXTRA_KEY, false)
             return
         }
@@ -300,38 +306,41 @@ class ProductionToggleExtension(
     private fun productionDecision(
         context: com.awabi2048.ccsystem.api.gui.MenuCapabilityContext,
     ): ProductionDecision {
+        if (!plugin.isConfigurationMigrationCurrent()) {
+            return ProductionDecision(false, ChanponSubmissionKeys.CHANPON_SUBMISSION_PRODUCTION_UNAVAILABLE_PHASE)
+        }
         val worldData = worldData(context.arguments)
-            ?: return ProductionDecision(false, "production.unavailable.world_missing")
+            ?: return ProductionDecision(false, ChanponSubmissionKeys.CHANPON_SUBMISSION_PRODUCTION_UNAVAILABLE_WORLD_MISSING)
         if (plugin.isSubmissionClosed()) {
-            return ProductionDecision(false, "production.unavailable.submission_closed")
+            return ProductionDecision(false, ChanponSubmissionKeys.CHANPON_SUBMISSION_PRODUCTION_UNAVAILABLE_SUBMISSION_CLOSED)
         }
         if (globalStorage.getWorldCreationAvailability() != WorldCreationAvailability.PRODUCTION) {
-            return ProductionDecision(false, "production.unavailable.phase")
+            return ProductionDecision(false, ChanponSubmissionKeys.CHANPON_SUBMISSION_PRODUCTION_UNAVAILABLE_PHASE)
         }
         if (protectionService.isProtected(worldData)) {
-            return ProductionDecision(false, "production.unavailable.protected")
+            return ProductionDecision(false, ChanponSubmissionKeys.CHANPON_SUBMISSION_PRODUCTION_UNAVAILABLE_PROTECTED)
         }
         if (worldData.owner != context.player.uniqueId && !context.player.hasPermission("mwmchanpon.admin")) {
-            return ProductionDecision(false, "production.unavailable.owner_only")
+            return ProductionDecision(false, ChanponSubmissionKeys.CHANPON_SUBMISSION_PRODUCTION_UNAVAILABLE_OWNER_ONLY)
         }
         if (!storage.isProductionWorld(worldData.uuid) && ownerHasProductionWorld(worldData.owner, worldData.uuid)) {
-            return ProductionDecision(false, "production.unavailable.limit")
+            return ProductionDecision(false, ChanponSubmissionKeys.CHANPON_SUBMISSION_PRODUCTION_UNAVAILABLE_LIMIT)
         }
         if (resolveCapabilityRoute(context) == null) {
-            return ProductionDecision(false, "production.unavailable.state")
+            return ProductionDecision(false, ChanponSubmissionKeys.CHANPON_SUBMISSION_PRODUCTION_UNAVAILABLE_STATE)
         }
-        return ProductionDecision(true, "production.unavailable.world_missing")
+        return ProductionDecision(true, ChanponSubmissionKeys.CHANPON_SUBMISSION_PRODUCTION_UNAVAILABLE_WORLD_MISSING)
     }
 
-    private fun productionUnavailablePresentation(player: Player, messageKey: String) =
+    private fun productionUnavailablePresentation(player: Player, messageKey: LocalizationKey<String>) =
         capabilityPresentation(
             Material.BARRIER,
-            i18nComponent(player, "production.unavailable.display"),
+            i18nComponent(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_PRODUCTION_UNAVAILABLE_DISPLAY),
             structuredLore(listOf(GuiLoreLine.Warning(i18n(player, messageKey)))),
             GuiElementRole.CONTENT,
         )
 
-    private data class ProductionDecision(val available: Boolean, val messageKey: String)
+    private data class ProductionDecision(val available: Boolean, val messageKey: LocalizationKey<String>)
 
     private fun resolveCapabilityRoute(
         context: com.awabi2048.ccsystem.api.gui.MenuCapabilityContext,
@@ -375,16 +384,16 @@ class ProductionToggleExtension(
     ): String {
         val worldData = requireNotNull(worldData(context.arguments))
         return if (storage.isProductionWorld(worldData.uuid)) {
-            i18n(context.player, "submission.lore.unsubmitted.action")
+            i18n(context.player, ChanponSubmissionKeys.CHANPON_SUBMISSION_SUBMISSION_LORE_UNSUBMITTED_ACTION)
         } else {
-            i18n(context.player, "production.lore.action")
+            i18n(context.player, ChanponSubmissionKeys.CHANPON_SUBMISSION_PRODUCTION_LORE_ACTION)
         }
     }
 
     private fun renderConfirmation(player: Player, route: MenuRoute): InventoryMenuView {
         val action = confirmationAction(route)
         val layout = ChanponGuiElements.confirmationLayout()
-        val title = i18nComponent(player, "confirm.${action.key}.title")
+        val title = i18nComponent(player, action.title)
         val gui = CCSystem.getAPI().getGuiElementService()
         return InventoryMenuView(
             layout.size,
@@ -397,7 +406,7 @@ class ProductionToggleExtension(
                             Material.PAPER,
                             GuiNameSpec.FixedLabel(title),
                             me.awabi2048.mwmchanpon.ui.framedLore(
-                                i18nList(player, "confirm.${action.key}.lore")
+                                i18nList(player, action.lore)
                                     .map(GuiLoreLine::Text),
                                 GuiLoreFrame.NONE,
                             ),
@@ -410,7 +419,7 @@ class ProductionToggleExtension(
                     player,
                     layout.confirmSlot,
                     Material.LIME_CONCRETE,
-                    "confirm.button.confirm.display",
+                    ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_BUTTON_CONFIRM_DISPLAY,
                     GuiElementRole.CONFIRM,
                     ACTION_CONFIRM,
                 ),
@@ -418,7 +427,7 @@ class ProductionToggleExtension(
                     player,
                     layout.cancelSlot,
                     Material.RED_CONCRETE,
-                    "confirm.button.cancel.display",
+                    ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_BUTTON_CANCEL_DISPLAY,
                     GuiElementRole.CANCEL,
                     ACTION_CANCEL,
                 ),
@@ -430,7 +439,7 @@ class ProductionToggleExtension(
         player: Player,
         slot: Int,
         material: Material,
-        textKey: String,
+        textKey: LocalizationKey<String>,
         role: GuiElementRole,
         actionId: String,
     ): MenuElement {
@@ -466,7 +475,7 @@ class ProductionToggleExtension(
     }
 
     private fun cancel(context: MenuActionContext): MenuActionResult {
-        context.player.sendMessage(i18n(context.player, "message.cancelled_confirmation"))
+        context.player.sendMessage(i18n(context.player, ChanponSubmissionKeys.CHANPON_SUBMISSION_MESSAGE_CANCELLED_CONFIRMATION))
         return MenuActionResult.Success(MenuUpdate.Back)
     }
 
@@ -491,17 +500,18 @@ class ProductionToggleExtension(
             ?: error("確認操作が見つかりません")
 
     private fun executeConfirmedAction(player: Player, worldUuid: UUID, action: ConfirmationAction) {
+        if (!plugin.isConfigurationMigrationCurrent()) return
         when (action) {
             ConfirmationAction.SET_PRODUCTION -> {
                 if (!canUseProduction(player)) return
                 val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
                 if (worldData != null && ownerHasProductionWorld(worldData.owner, worldUuid)) {
-                    player.sendMessage(i18n(player, "message.production_limit"))
+                    player.sendMessage(i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_MESSAGE_PRODUCTION_LIMIT))
                     return
                 }
                 storage.setProductionWorld(worldUuid, true)
                 applyForcedTags(worldUuid)
-                player.sendMessage(i18n(player, "message.production_set"))
+                player.sendMessage(i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_MESSAGE_PRODUCTION_SET))
             }
             ConfirmationAction.UNSET_PRODUCTION -> {
                 storage.setProductionWorld(worldUuid, false)
@@ -509,12 +519,12 @@ class ProductionToggleExtension(
                     protectionService.sync(it)
                     toolPermissionController.syncWorld(it)
                 }
-                player.sendMessage(i18n(player, "message.production_unset"))
+                player.sendMessage(i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_MESSAGE_PRODUCTION_UNSET))
             }
             ConfirmationAction.SUBMIT -> {
                 val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
                 if (worldData == null || worldData.owner != player.uniqueId) {
-                    player.sendMessage(i18n(player, "message.owner_only_submit"))
+                    player.sendMessage(i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_MESSAGE_OWNER_ONLY_SUBMIT))
                     return
                 }
                 if (!ensureSubmissionState(player, worldUuid, SubmissionState.UNSUBMITTED)) return
@@ -530,7 +540,7 @@ class ProductionToggleExtension(
                     protectionService.sync(it)
                     toolPermissionController.syncWorld(it)
                 }
-                player.sendMessage(i18n(player, "message.submitted"))
+                player.sendMessage(i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_MESSAGE_SUBMITTED))
             }
         }
     }
@@ -539,11 +549,11 @@ class ProductionToggleExtension(
         val current = try {
             storage.getSubmissionState(worldUuid)
         } catch (ex: IllegalStateException) {
-            player.sendMessage(i18n(player, "message.state_error"))
+            player.sendMessage(i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_MESSAGE_STATE_ERROR))
             return false
         }
         if (current != expected) {
-            player.sendMessage(i18n(player, "message.state_changed"))
+            player.sendMessage(i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_MESSAGE_STATE_CHANGED))
             return false
         }
         return true
@@ -590,14 +600,14 @@ class ProductionToggleExtension(
     private fun creationPresentation(enabled: Boolean) = MenuCapabilityPresentation(
         item = GuiItemSpec(
             material = if (enabled) Material.YELLOW_WOOL else Material.GRAY_WOOL,
-            name = GuiNameSpec.FixedLabel(i18nComponent(null, "creation.display")),
+            name = GuiNameSpec.FixedLabel(i18nComponent(null, ChanponSubmissionKeys.CHANPON_SUBMISSION_CREATION_DISPLAY)),
             lore = me.awabi2048.mwmchanpon.ui.framedLore(
                 listOf(
-                    GuiLoreLine.Text(i18n(null, "creation.lore.description")),
-                    GuiLoreLine.Warning(i18n(null, "creation.lore.delete_guard")),
+                    GuiLoreLine.Text(i18n(null, ChanponSubmissionKeys.CHANPON_SUBMISSION_CREATION_LORE_DESCRIPTION)),
+                    GuiLoreLine.Warning(i18n(null, ChanponSubmissionKeys.CHANPON_SUBMISSION_CREATION_LORE_DELETE_GUARD)),
                     GuiLoreLine.Data(
-                        i18n(null, "creation.lore.state"),
-                        i18n(null, if (enabled) "common.on" else "common.off"),
+                        i18n(null, ChanponSubmissionKeys.CHANPON_SUBMISSION_CREATION_LORE_STATE),
+                        i18n(null, if (enabled) ChanponSubmissionKeys.CHANPON_SUBMISSION_COMMON_ON else ChanponSubmissionKeys.CHANPON_SUBMISSION_COMMON_OFF),
                         if (enabled) "§e" else "§7",
                     ),
                 ),
@@ -612,10 +622,10 @@ class ProductionToggleExtension(
     private fun productionPresentation(player: Player): MenuCapabilityPresentation =
         capabilityPresentation(
             Material.HEART_OF_THE_SEA,
-            i18nComponent(player, "production.display"),
+            i18nComponent(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_PRODUCTION_DISPLAY),
             structuredLore(
                 listOf(
-                    GuiLoreLine.Warning(i18n(player, "production.lore.limit_warning")),
+                    GuiLoreLine.Warning(i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_PRODUCTION_LORE_LIMIT_WARNING)),
                 ),
             ),
         )
@@ -628,9 +638,9 @@ class ProductionToggleExtension(
             .getOrElse {
                 return capabilityPresentation(
                     Material.BARRIER,
-                    i18nComponent(player, "error.display"),
+                    i18nComponent(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ERROR_DISPLAY),
                     me.awabi2048.mwmchanpon.ui.framedLore(
-                        i18nList(player, "error.lore").map(GuiLoreLine::Text),
+                        i18nList(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ERROR_LORE).map(GuiLoreLine::Text),
                         GuiLoreFrame.BOTH,
                     ),
                     GuiElementRole.CONTENT,
@@ -643,7 +653,7 @@ class ProductionToggleExtension(
         }
         return capabilityPresentation(
             material,
-            i18nComponent(player, "submission.display"),
+            i18nComponent(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_SUBMISSION_DISPLAY),
             createSubmissionLore(player, state),
             if (state == SubmissionState.UNSUBMITTED) {
                 GuiElementRole.ACTION
@@ -669,14 +679,10 @@ class ProductionToggleExtension(
     )
 
     private fun createSubmissionLore(player: Player, state: SubmissionState): GuiLoreSpec {
-        val key = when (state) {
-            SubmissionState.UNSUBMITTED -> "submission.lore.unsubmitted"
-            SubmissionState.SUBMITTED -> "submission.lore.submitted"
-            SubmissionState.COMPLETED -> "submission.lore.completed"
-        }
+        val presentation = submissionStatePresentation(state)
         val stateLine = GuiLoreLine.Data(
-            i18n(player, "progress.label"),
-            i18n(player, "state.${state.i18nKey}"),
+            i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_PROGRESS_LABEL),
+            i18n(player, presentation.state),
             when (state) {
                 SubmissionState.UNSUBMITTED -> "§6"
                 SubmissionState.SUBMITTED -> "§a"
@@ -686,30 +692,55 @@ class ProductionToggleExtension(
         return when (state) {
             SubmissionState.UNSUBMITTED -> structuredLore(listOf(
                 stateLine,
-                GuiLoreLine.Warning(i18n(player, "$key.warning"))
+                GuiLoreLine.Warning(i18n(player, presentation.warning))
             ))
             SubmissionState.SUBMITTED,
             SubmissionState.COMPLETED -> structuredLore(listOf(
                 stateLine,
-                GuiLoreLine.Text(i18n(player, "$key.description")),
-                GuiLoreLine.Warning(i18n(player, "$key.warning"))
+                GuiLoreLine.Text(i18n(player, requireNotNull(presentation.description))),
+                GuiLoreLine.Warning(i18n(player, presentation.warning))
             ))
         }
     }
 
+    /** 提出状態と表示キーの対応を有限な型付き定義として固定します。 */
+    private fun submissionStatePresentation(state: SubmissionState): SubmissionStatePresentation = when (state) {
+        SubmissionState.UNSUBMITTED -> SubmissionStatePresentation(
+            ChanponSubmissionKeys.CHANPON_SUBMISSION_STATE_UNSUBMITTED,
+            null,
+            ChanponSubmissionKeys.CHANPON_SUBMISSION_SUBMISSION_LORE_UNSUBMITTED_WARNING,
+        )
+        SubmissionState.SUBMITTED -> SubmissionStatePresentation(
+            ChanponSubmissionKeys.CHANPON_SUBMISSION_STATE_SUBMITTED,
+            ChanponSubmissionKeys.CHANPON_SUBMISSION_SUBMISSION_LORE_SUBMITTED_DESCRIPTION,
+            ChanponSubmissionKeys.CHANPON_SUBMISSION_SUBMISSION_LORE_SUBMITTED_WARNING,
+        )
+        SubmissionState.COMPLETED -> SubmissionStatePresentation(
+            ChanponSubmissionKeys.CHANPON_SUBMISSION_STATE_COMPLETED,
+            ChanponSubmissionKeys.CHANPON_SUBMISSION_SUBMISSION_LORE_COMPLETED_DESCRIPTION,
+            ChanponSubmissionKeys.CHANPON_SUBMISSION_SUBMISSION_LORE_COMPLETED_WARNING,
+        )
+    }
+
+    private data class SubmissionStatePresentation(
+        val state: LocalizationKey<String>,
+        val description: LocalizationKey<String>?,
+        val warning: LocalizationKey<String>,
+    )
+
     private fun structuredLore(lines: List<GuiLoreLine>): GuiLoreSpec =
         me.awabi2048.mwmchanpon.ui.framedLore(lines, GuiLoreFrame.BOTH)
 
-    private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): String {
-        return CCSystem.getAPI().getI18nString(player, "chanpon.submission.$key", placeholders)
+    private fun i18n(player: Player?, key: LocalizationKey<String>, placeholders: Map<String, Any> = emptyMap()): String {
+        return CCSystem.getAPI().getLocalized(player, key, placeholders)
     }
 
-    private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): List<String> {
-        return CCSystem.getAPI().getI18nStringList(player, "chanpon.submission.$key", placeholders)
+    private fun i18nList(player: Player?, key: LocalizationKey<List<String>>, placeholders: Map<String, Any> = emptyMap()): List<String> {
+        return CCSystem.getAPI().getLocalized(player, key, placeholders)
     }
 
-    private fun i18nComponent(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): Component {
-        return CCSystem.getAPI().getI18nComponent(player, "chanpon.submission.$key", placeholders)
+    private fun i18nComponent(player: Player?, key: LocalizationKey<String>, placeholders: Map<String, Any> = emptyMap()): Component {
+        return CCSystem.getAPI().getI18nComponent(player, key, placeholders)
     }
 
     companion object {
@@ -726,10 +757,14 @@ class ProductionToggleExtension(
         private const val ACTION_CANCEL = "cancel"
     }
 
-    private enum class ConfirmationAction(val key: String) {
-        SET_PRODUCTION("set_production"),
-        UNSET_PRODUCTION("unset_production"),
-        SUBMIT("submit")
+    private enum class ConfirmationAction(
+        val key: String,
+        val title: LocalizationKey<String>,
+        val lore: LocalizationKey<List<String>>,
+    ) {
+        SET_PRODUCTION("set_production", ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_SET_PRODUCTION_TITLE, ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_SET_PRODUCTION_LORE),
+        UNSET_PRODUCTION("unset_production", ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_UNSET_PRODUCTION_TITLE, ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_UNSET_PRODUCTION_LORE),
+        SUBMIT("submit", ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_SUBMIT_TITLE, ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_SUBMIT_LORE),
     }
 
 }

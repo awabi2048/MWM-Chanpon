@@ -1,4 +1,10 @@
-package me.awabi2048.mwmchanpon.ui
+﻿package me.awabi2048.mwmchanpon.ui
+
+import com.awabi2048.ccsystem.api.localization.generated.CommonKeys
+import com.awabi2048.ccsystem.api.localization.generated.MyworldGuiAdminKeys
+import com.awabi2048.ccsystem.api.localization.generated.MyworldMessagesKeys
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
+import com.awabi2048.ccsystem.api.localization.generated.ChanponSubmissionKeys
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiCycle
@@ -79,7 +85,7 @@ class ChanponAdminWorldListMenu(
                 id = WORLD_LIST_CAPABILITY,
                 placement = AdminMenuCapabilityPlacements.WORLD_LIST_ACTION,
                 availability = reasonedAvailability(
-                    reason = { i18nComponent(it.player, "error.no_permission") },
+                    reason = { i18nComponent(it.player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_NO_PERMISSION) },
                 ) {
                     it.player.hasPermission("mwmchanpon.admin")
                 },
@@ -92,7 +98,7 @@ class ChanponAdminWorldListMenu(
                         trigger = MenuCapabilityTrigger.ANY,
                         textProvider = MenuCapabilityActionTextProvider {
                             CCSystem.getAPI()
-                                .getI18nString(it.player, "gui.admin_menu.info.action")
+                                .getLocalized(it.player, MyworldGuiAdminKeys.GUI_ADMIN_MENU_INFO_ACTION)
                         },
                         handler = MenuCapabilityActionHandler { context ->
                             val state = ListState(fromAdminMenu = true)
@@ -145,8 +151,8 @@ class ChanponAdminWorldListMenu(
             }
         if (CCSystem.getAPI().getMenuNavigationService().canGoBack(player)) {
             elements += simpleActionEntry(
-                player, 45, Material.REDSTONE, i18n(player, "admin_list.back.display"),
-                GuiElementRole.BACK, ACTION_BACK, i18n(player, "admin_list.back.action"),
+                player, 45, Material.REDSTONE, i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_BACK_DISPLAY),
+                GuiElementRole.BACK, ACTION_BACK, i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_BACK_ACTION),
             )
         }
         elements += infoEntry(player, 49, worlds.size, current.page + 1, totalPages)
@@ -154,21 +160,21 @@ class ChanponAdminWorldListMenu(
         elements += sortEntry(player, 51, current.sortType)
         if (current.page > 0) {
             elements += simpleActionEntry(
-                player, 52, Material.ARROW, i18n(player, "admin_list.prev"),
-                GuiElementRole.NAVIGATION, ACTION_PAGE, i18n(player, "admin_list.prev_action"),
+                player, 52, Material.ARROW, i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_PREV),
+                GuiElementRole.NAVIGATION, ACTION_PAGE, i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_PREV_ACTION),
                 statePayload(current.copy(page = current.page - 1)),
             )
         }
         if (current.page < totalPages - 1) {
             elements += simpleActionEntry(
-                player, 53, Material.ARROW, i18n(player, "admin_list.next"),
-                GuiElementRole.NAVIGATION, ACTION_PAGE, i18n(player, "admin_list.next_action"),
+                player, 53, Material.ARROW, i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_NEXT),
+                GuiElementRole.NAVIGATION, ACTION_PAGE, i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_NEXT_ACTION),
                 statePayload(current.copy(page = current.page + 1)),
             )
         }
         return InventoryMenuView(
             layout.size,
-            i18nComponent(player, "admin_list.title"),
+            i18nComponent(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_TITLE),
             elements,
         )
     }
@@ -178,14 +184,14 @@ class ChanponAdminWorldListMenu(
             GuiItemSpec(
                 material = Material.FILLED_MAP,
                 name = me.awabi2048.mwmchanpon.ui.fixedName(
-                    CCSystem.getAPI().getI18nString(player, "gui.admin_menu.info.display"),
+                    CCSystem.getAPI().getLocalized(player, MyworldGuiAdminKeys.GUI_ADMIN_MENU_INFO_DISPLAY),
                     GuiNameStyle.DEFAULT,
                 ),
                 lore = GuiLoreSpec.Blocks(
                     listOf(
                         GuiLoreBlock(
                             CCSystem.getAPI()
-                                .getI18nStringList(player, "gui.admin_menu.info.lore")
+                                .getLocalized(player, MyworldGuiAdminKeys.GUI_ADMIN_MENU_INFO_LORE)
                                 .map(GuiLoreLine::Text),
                         ),
                     ),
@@ -305,20 +311,20 @@ class ChanponAdminWorldListMenu(
         payload: Map<String, String>,
     ): MenuElement {
         val visibility = storage.getVisibility(worldData.uuid)
-        val owner = Bukkit.getOfflinePlayer(worldData.owner).name ?: i18n(player, "admin_list.unknown")
+        val owner = Bukkit.getOfflinePlayer(worldData.owner).name ?: i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_UNKNOWN)
         val members = (worldData.moderators + worldData.members)
             .distinct()
-            .map { Bukkit.getOfflinePlayer(it).name ?: i18n(player, "admin_list.unknown") }
+            .map { Bukkit.getOfflinePlayer(it).name ?: i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_UNKNOWN) }
             .let { names ->
-                if (names.isEmpty()) i18n(player, "admin_list.world.no_members") else names.joinToString(", ")
+                if (names.isEmpty()) i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_WORLD_NO_MEMBERS) else names.joinToString(", ")
             }
         val actions = buildList {
-            add(chanponGestureAction(ACTION_WORLD, MenuGesture.LEFT, i18n(player, "admin_list.world.action_warp"), payload, safety = MenuActionSafety.EXTERNAL_SIDE_EFFECT))
+            add(chanponGestureAction(ACTION_WORLD, MenuGesture.LEFT, i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_WORLD_ACTION_WARP), payload, safety = MenuActionSafety.EXTERNAL_SIDE_EFFECT))
             if (!current) {
-                add(chanponGestureAction(ACTION_WORLD, MenuGesture.RIGHT, i18n(player, "admin_list.world.action_settings"), payload, safety = MenuActionSafety.EXTERNAL_SIDE_EFFECT))
+                add(chanponGestureAction(ACTION_WORLD, MenuGesture.RIGHT, i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_WORLD_ACTION_SETTINGS), payload, safety = MenuActionSafety.EXTERNAL_SIDE_EFFECT))
             }
             if (player.gameMode == GameMode.CREATIVE) {
-                add(chanponGestureAction(ACTION_WORLD, MenuGesture.MIDDLE, i18n(player, "admin_list.world.action_copy"), payload, safety = MenuActionSafety.EXTERNAL_SIDE_EFFECT))
+                add(chanponGestureAction(ACTION_WORLD, MenuGesture.MIDDLE, i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_WORLD_ACTION_COPY), payload, safety = MenuActionSafety.EXTERNAL_SIDE_EFFECT))
             }
         }
         return CCSystem.getAPI().getGuiElementService().menuEntry(
@@ -327,17 +333,17 @@ class ChanponAdminWorldListMenu(
                 slot = slot,
                 material = worldData.icon,
                 name = GuiNameSpec.TargetIdentity(
-                    i18nComponent(player, "admin_list.world.display", mapOf("world" to worldData.name)),
+                    i18nComponent(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_WORLD_DISPLAY, mapOf("world" to worldData.name)),
                 ),
                 role = GuiElementRole.ACTION,
                 data = listOf(
-                    GuiMenuEntryData(i18n(player, "admin_list.world.owner_label"), owner),
-                    GuiMenuEntryData(i18n(player, "admin_list.world.members_label"), members),
-                    GuiMenuEntryData(i18n(player, "admin_list.world.created_label"), formatCreatedAt(worldData.createdAt)),
-                    GuiMenuEntryData(i18n(player, "admin_list.world.visibility_label"), visibilityName(player, visibility)),
-                    GuiMenuEntryData(i18n(player, "admin_list.world.directory_label"), worldDirectory(worldData)),
+                    GuiMenuEntryData(i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_WORLD_OWNER_LABEL), owner),
+                    GuiMenuEntryData(i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_WORLD_MEMBERS_LABEL), members),
+                    GuiMenuEntryData(i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_WORLD_CREATED_LABEL), formatCreatedAt(worldData.createdAt)),
+                    GuiMenuEntryData(i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_WORLD_VISIBILITY_LABEL), visibilityName(player, visibility)),
+                    GuiMenuEntryData(i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_WORLD_DIRECTORY_LABEL), worldDirectory(worldData)),
                 ),
-                warnings = if (current) listOf(i18n(player, "admin_list.world.action_settings_current")) else emptyList(),
+                warnings = if (current) listOf(i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_WORLD_ACTION_SETTINGS_CURRENT)) else emptyList(),
                 actions = actions,
             ),
         )
@@ -347,10 +353,10 @@ class ChanponAdminWorldListMenu(
         player: Player,
         visibility: ChanponWorldVisibility,
     ): String = when (visibility) {
-        ChanponWorldVisibility.PUBLIC -> i18n(player, "admin_list.visibility.public")
+        ChanponWorldVisibility.PUBLIC -> i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_VISIBILITY_PUBLIC)
         ChanponWorldVisibility.DEVELOPMENT ->
-            i18n(player, "admin_list.visibility.development")
-        ChanponWorldVisibility.PRIVATE -> i18n(player, "admin_list.visibility.private")
+            i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_VISIBILITY_DEVELOPMENT)
+        ChanponWorldVisibility.PRIVATE -> i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_VISIBILITY_PRIVATE)
     }
 
     private fun visibilityFilterEntry(
@@ -361,7 +367,7 @@ class ChanponAdminWorldListMenu(
         player,
         slot,
         Material.ENDER_EYE,
-        "admin_list.visibility_filter",
+        ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_VISIBILITY_FILTER_DISPLAY,
         VisibilityFilter.entries.map { it.key },
         filter.key,
         ACTION_VISIBILITY_FILTER,
@@ -375,7 +381,7 @@ class ChanponAdminWorldListMenu(
         player,
         slot,
         Material.COMPARATOR,
-        "admin_list.sort",
+        ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_SORT_DISPLAY,
         SortType.entries.map { it.key },
         sortType.key,
         ACTION_SORT,
@@ -385,9 +391,9 @@ class ChanponAdminWorldListMenu(
         player: Player,
         slot: Int,
         material: Material,
-        key: String,
-        optionKeys: List<String>,
-        selectedKey: String,
+        key: LocalizationKey<String>,
+        optionKeys: List<LocalizationKey<String>>,
+        selectedKey: LocalizationKey<String>,
         actionId: String,
     ): MenuElement {
         return CCSystem.getAPI().getGuiElementService().menuEntry(
@@ -395,13 +401,13 @@ class ChanponAdminWorldListMenu(
         GuiMenuEntrySpec(
             slot = slot,
             material = material,
-            name = GuiNameSpec.FixedLabel(i18nComponent(player, "$key.display")),
+            name = GuiNameSpec.FixedLabel(i18nComponent(player, key)),
             role = GuiElementRole.ACTION,
             options = optionKeys.map { GuiMenuEntryOption(i18n(player, it), it == selectedKey) },
             actions = listOf(chanponCycleAction(
                 actionId,
-                i18n(player, "common.action_next"),
-                // Route payloadだけを置換する一覧表示の操作で、ワールド状態は変更しません。
+                i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_COMMON_ACTION_NEXT),
+                // 表示順だけを変更し、翻訳キーをルートへ持ち込みません。
                 safety = MenuActionSafety.NAVIGATION_ONLY,
                 classification = adminListRouteClassification(actionId),
             )),
@@ -421,11 +427,10 @@ class ChanponAdminWorldListMenu(
             slot,
             GuiItemSpec(
                 Material.BOOK,
-                GuiNameSpec.FixedLabel(i18nComponent(player, "admin_list.info.display")),
+                GuiNameSpec.FixedLabel(i18nComponent(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_INFO_DISPLAY)),
                 me.awabi2048.mwmchanpon.ui.framedLore(
                     i18nList(
-                        player,
-                        "admin_list.info.lore",
+                        player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_INFO_LORE,
                         mapOf("count" to total, "page" to page, "pages" to totalPages),
                     ).map(GuiLoreLine::Text),
                     GuiLoreFrame.BOTH,
@@ -464,7 +469,7 @@ class ChanponAdminWorldListMenu(
     private fun openSettings(player: Player, worldData: WorldData): MenuActionResult {
         val folderName = worldDirectory(worldData)
         if (!worldData.isArchived && Bukkit.getWorld(folderName) == null) {
-            player.sendMessage(CCSystem.getAPI().getI18nString(player, "messages.world_loading"))
+            player.sendMessage(CCSystem.getAPI().getLocalized(player, MyworldMessagesKeys.MESSAGES_WORLD_LOADING))
             runtime.suspendForExternal(player)
             Bukkit.getScheduler().runTask(plugin, Runnable {
                 if (!player.isOnline) {
@@ -472,7 +477,7 @@ class ChanponAdminWorldListMenu(
                     return@Runnable
                 }
                 if (MyWorldManagerApi.getWorldService()?.loadWorld(worldData.uuid) != true) {
-                    player.sendMessage(CCSystem.getAPI().getI18nString(player, "error.load_failed"))
+                    player.sendMessage(CCSystem.getAPI().getLocalized(player, CommonKeys.ERROR_LOAD_FAILED))
                     runtime.finishExternal(player)
                     return@Runnable
                 }
@@ -512,17 +517,17 @@ class ChanponAdminWorldListMenu(
 
     private fun sendCopyMessage(player: Player, worldData: WorldData) {
         val directory = worldDirectory(worldData)
-        player.sendMessage(Component.text("§8§m----------------"))
-        player.sendMessage(Component.text("§e${worldData.name}"))
+        player.sendMessage(Component.text("ﾂｧ8ﾂｧm----------------"))
+        player.sendMessage(Component.text("ﾂｧe${worldData.name}"))
         player.sendMessage(
-            Component.text("§7World: §f$directory")
+            Component.text("ﾂｧ7World: ﾂｧf$directory")
                 .clickEvent(ClickEvent.copyToClipboard(directory)),
         )
         player.sendMessage(
-            Component.text("§7Owner: §f${worldData.owner}")
+            Component.text("ﾂｧ7Owner: ﾂｧf${worldData.owner}")
                 .clickEvent(ClickEvent.copyToClipboard(worldData.owner.toString())),
         )
-        player.sendMessage(Component.text("§8§m----------------"))
+        player.sendMessage(Component.text("ﾂｧ8ﾂｧm----------------"))
     }
 
     private fun formatCreatedAt(value: String): String = runCatching {
@@ -570,31 +575,31 @@ class ChanponAdminWorldListMenu(
 
     private fun i18n(
         player: Player?,
-        key: String,
+        key: LocalizationKey<String>,
         placeholders: Map<String, Any> = emptyMap(),
-    ): String = CCSystem.getAPI().getI18nString(
+    ): String = CCSystem.getAPI().getLocalized(
         player,
-        "chanpon.submission.$key",
+        key,
         placeholders,
     )
 
     private fun i18nList(
         player: Player?,
-        key: String,
+        key: LocalizationKey<List<String>>,
         placeholders: Map<String, Any> = emptyMap(),
-    ): List<String> = CCSystem.getAPI().getI18nStringList(
+    ): List<String> = CCSystem.getAPI().getLocalized(
         player,
-        "chanpon.submission.$key",
+        key,
         placeholders,
     )
 
     private fun i18nComponent(
         player: Player?,
-        key: String,
+        key: LocalizationKey<String>,
         placeholders: Map<String, Any> = emptyMap(),
     ): Component = CCSystem.getAPI().getI18nComponent(
         player,
-        "chanpon.submission.$key",
+        key,
         placeholders,
     )
 
@@ -605,17 +610,17 @@ class ChanponAdminWorldListMenu(
         val fromAdminMenu: Boolean = false,
     )
 
-    enum class VisibilityFilter(val key: String) {
-        ALL("admin_list.visibility_filter.all"),
-        PUBLIC("admin_list.visibility_filter.public"),
-        DEVELOPMENT("admin_list.visibility_filter.development"),
-        PRIVATE("admin_list.visibility_filter.private"),
+    enum class VisibilityFilter(val key: LocalizationKey<String>) {
+        ALL(ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_VISIBILITY_FILTER_ALL),
+        PUBLIC(ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_VISIBILITY_FILTER_PUBLIC),
+        DEVELOPMENT(ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_VISIBILITY_FILTER_DEVELOPMENT),
+        PRIVATE(ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_VISIBILITY_FILTER_PRIVATE),
     }
 
-    enum class SortType(val key: String) {
-        CREATED_DESC("admin_list.sort.created_desc"),
-        CREATED_ASC("admin_list.sort.created_asc"),
-        WORLD_SIZE_DESC("admin_list.sort.world_size_desc"),
+    enum class SortType(val key: LocalizationKey<String>) {
+        CREATED_DESC(ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_SORT_CREATED_DESC),
+        CREATED_ASC(ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_SORT_CREATED_ASC),
+        WORLD_SIZE_DESC(ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_LIST_SORT_WORLD_SIZE_DESC),
     }
 
     companion object {

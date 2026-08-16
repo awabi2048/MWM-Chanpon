@@ -56,7 +56,7 @@ class GuiSemanticProducerContractTest {
         val settings = Files.readString(sourceRoot().resolve("extension/ChanponWorldSettingsCapabilities.kt"))
 
         assertEquals(2, Regex("menuUnavailable\\(").findAll(export).count())
-        assertEquals(3, Regex("export_menu\\.execute\\.disabled").findAll(export).count())
+        assertEquals(3, Regex("CHANPON_BACKUP_EXPORT_MENU_EXECUTE_DISABLED").findAll(export).count())
         assertTrue(settings.contains("reasonedAvailability("))
         assertTrue(settings.contains("featureUnavailableReason("))
         assertFalse(Regex("reason\\s*=\\s*\\{\\s*(null|Component\\.empty\\(\\))").containsMatchIn(export + settings))
@@ -85,7 +85,7 @@ class GuiSemanticProducerContractTest {
 
         assertTrue(source.contains("MenuCapabilityPresentation.hostAugmentation("))
         assertTrue(source.contains("toolPermissionLoreBlock("))
-        assertTrue(source.contains("tool_permission_operation"))
+        assertTrue(source.contains("CHANPON_MEMBER_LORE_TOOL_PERMISSION_OPERATION"))
         assertFalse(source.contains("GuiNameSpec.TargetIdentity("))
         assertFalse(source.contains("playerHeadOwner"))
         assertFalse(source.contains("Material.PLAYER_HEAD"))

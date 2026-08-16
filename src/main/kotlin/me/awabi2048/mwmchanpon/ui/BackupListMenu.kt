@@ -1,5 +1,9 @@
 package me.awabi2048.mwmchanpon.ui
 
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
+
+import com.awabi2048.ccsystem.api.localization.generated.ChanponBackupKeys
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
@@ -68,7 +72,11 @@ class BackupListMenu(
                 renderer = { context ->
                     renderConfirmation(
                         context.player,
-                        "confirm.restore",
+                        ConfirmationPresentation(
+                            ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_RESTORE_TITLE,
+                            ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_RESTORE_DISPLAY,
+                            ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_RESTORE_LORE,
+                        ),
                         Material.CHEST,
                         ACTION_CONFIRM_RESTORE,
                     )
@@ -149,21 +157,21 @@ class BackupListMenu(
         val elements = mutableListOf<MenuElement>()
         if (safePage > 0) {
             elements += simpleActionEntry(
-                player, previousPageSlot, Material.ARROW, i18n(player, "common.prev"),
-                GuiElementRole.NAVIGATION, ACTION_PAGE, i18n(player, "common.prev_action"),
+                player, previousPageSlot, Material.ARROW, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_PREV),
+                GuiElementRole.NAVIGATION, ACTION_PAGE, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_PREV_ACTION),
                 sourcePayload(source.copy(page = safePage - 1)),
             )
         }
         if (safePage < pages - 1) {
             elements += simpleActionEntry(
-                player, nextPageSlot, Material.ARROW, i18n(player, "common.next"),
-                GuiElementRole.NAVIGATION, ACTION_PAGE, i18n(player, "common.next_action"),
+                player, nextPageSlot, Material.ARROW, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_NEXT),
+                GuiElementRole.NAVIGATION, ACTION_PAGE, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_NEXT_ACTION),
                 sourcePayload(source.copy(page = safePage + 1)),
             )
         }
         elements += simpleActionEntry(
-            player, slots.backSlot, Material.REDSTONE, i18n(player, "common.back"),
-            GuiElementRole.BACK, ACTION_BACK, i18n(player, "common.back_action"),
+            player, slots.backSlot, Material.REDSTONE, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_BACK),
+            GuiElementRole.BACK, ACTION_BACK, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_BACK_ACTION),
         )
         elements += infoEntry(player, slots.infoSlot, backups.size, safePage + 1, pages)
         backups.drop(startIndex).take(itemCount).forEachIndexed { index, backup ->
@@ -176,16 +184,29 @@ class BackupListMenu(
         }
         return InventoryMenuView(
             inventorySize,
-            i18nComponent(player, "backup_list.title"),
+            i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_BACKUP_LIST_TITLE),
             elements,
         )
     }
 
     private fun renderDeleteConfirmation(player: Player, route: MenuRoute): InventoryMenuView {
         val stage = route.payload[STAGE]?.toIntOrNull()?.coerceIn(1, 2) ?: 1
+        val presentation = if (stage == 1) {
+            ConfirmationPresentation(
+                ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_DELETE1_TITLE,
+                ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_DELETE1_DISPLAY,
+                ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_DELETE1_LORE,
+            )
+        } else {
+            ConfirmationPresentation(
+                ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_DELETE2_TITLE,
+                ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_DELETE2_DISPLAY,
+                ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_DELETE2_LORE,
+            )
+        }
         return renderConfirmation(
             player,
-            "confirm.delete$stage",
+            presentation,
             Material.BARRIER,
             ACTION_CONFIRM_DELETE,
         )
@@ -193,21 +214,21 @@ class BackupListMenu(
 
     private fun renderConfirmation(
         player: Player,
-        key: String,
+        presentation: ConfirmationPresentation,
         material: Material,
         confirmAction: String,
     ): InventoryMenuView {
         val layout = ChanponGuiElements.confirmationLayout()
         return InventoryMenuView(
             layout.size,
-            i18nComponent(player, "$key.title"),
+            i18nComponent(player, presentation.title),
             listOf(
                 displayEntry(
                     layout.previewSlot,
                     material,
-                    GuiNameSpec.FixedLabel(i18nComponent(player, "$key.display")),
+                    GuiNameSpec.FixedLabel(i18nComponent(player, presentation.display)),
                     me.awabi2048.mwmchanpon.ui.framedLore(
-                        i18nList(player, "$key.lore").map(GuiLoreLine::Text),
+                        i18nList(player, presentation.lore).map(GuiLoreLine::Text),
                         GuiLoreFrame.BOTH,
                     ),
                 ),
@@ -250,7 +271,7 @@ class BackupListMenu(
     private fun confirmRestore(context: MenuActionContext): MenuActionResult {
         val player = context.player
         if (automationService?.isManualOperationBlocked(player) == true) {
-            player.sendMessage(i18nComponent(player, "message.manual_operation_blocked"))
+            player.sendMessage(i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_MANUAL_OPERATION_BLOCKED))
             return MenuActionResult.Rejected()
         }
         val backup = findBackup(context.route)
@@ -262,7 +283,7 @@ class BackupListMenu(
             player.sendMessage(
                 i18nComponent(
                     player,
-                    "message.rollback_cooldown",
+                    ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_ROLLBACK_COOLDOWN,
                     mapOf("remaining" to BackupDisplay.formatDuration(rollbackCooldown)),
                 ),
             )
@@ -321,7 +342,7 @@ class BackupListMenu(
         context.player.sendMessage(
             i18nComponent(
                 context.player,
-                if (deleted) "message.delete_success" else "message.delete_failed",
+                if (deleted) ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_DELETE_SUCCESS else ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_DELETE_FAILED,
             ),
         )
         return MenuActionResult.Success(MenuUpdate.Back)
@@ -347,7 +368,13 @@ class BackupListMenu(
     }
 
     private fun sendRestoreResult(player: Player, result: RestoreOperationResult) {
-        player.sendMessage(i18nComponent(player, "message.restore_${result.status.name.lowercase()}"))
+        val resultKey = when (result.status) {
+            BackupOperationStatus.SUCCESS -> ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_RESTORE_SUCCESS
+            BackupOperationStatus.FAILED -> ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_RESTORE_FAILED
+            BackupOperationStatus.RECOVERED -> ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_RESTORE_RECOVERED
+            BackupOperationStatus.RECOVERY_FAILED -> ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_RESTORE_RECOVERY_FAILED
+        }
+        player.sendMessage(i18nComponent(player, resultKey))
         if (result.status != BackupOperationStatus.SUCCESS) {
             player.sendMessage(
                 Component.text("要因: ${restoreReason(result.message)}", NamedTextColor.RED),
@@ -434,21 +461,21 @@ class BackupListMenu(
             name = GuiNameSpec.TargetIdentity(
                 i18nComponent(
                     player,
-                    "backup_list.item.display",
+                    ChanponBackupKeys.CHANPON_BACKUP_BACKUP_LIST_ITEM_DISPLAY,
                     mapOf("name" to BackupDisplay.displayName(backup)),
                 ),
             ),
             role = GuiElementRole.ACTION,
             data = listOf(
-                GuiMenuEntryData(i18n(player, "backup_list.item.kind_label"), i18n(player, "kind.${backup.kind.i18nKey}")),
-                GuiMenuEntryData(i18n(player, "backup_list.item.created_label"), BackupDisplay.formatCreatedAt(backup.createdAt)),
-                GuiMenuEntryData(i18n(player, "backup_list.item.worlds_label"), backup.worldUuids.size),
-                GuiMenuEntryData(i18n(player, "backup_list.item.size_label"), formatBytes(backup.sizeBytes)),
-                GuiMenuEntryData(i18n(player, "backup_list.item.actor_label"), BackupDisplay.actorName(backup)),
+                GuiMenuEntryData(i18n(player, ChanponBackupKeys.CHANPON_BACKUP_BACKUP_LIST_ITEM_KIND_LABEL), i18n(player, backup.kind.displayKey)),
+                GuiMenuEntryData(i18n(player, ChanponBackupKeys.CHANPON_BACKUP_BACKUP_LIST_ITEM_CREATED_LABEL), BackupDisplay.formatCreatedAt(backup.createdAt)),
+                GuiMenuEntryData(i18n(player, ChanponBackupKeys.CHANPON_BACKUP_BACKUP_LIST_ITEM_WORLDS_LABEL), backup.worldUuids.size),
+                GuiMenuEntryData(i18n(player, ChanponBackupKeys.CHANPON_BACKUP_BACKUP_LIST_ITEM_SIZE_LABEL), formatBytes(backup.sizeBytes)),
+                GuiMenuEntryData(i18n(player, ChanponBackupKeys.CHANPON_BACKUP_BACKUP_LIST_ITEM_ACTOR_LABEL), BackupDisplay.actorName(backup)),
             ),
             actions = listOf(
-                chanponGestureAction(ACTION_BACKUP, MenuGesture.LEFT, i18n(player, "backup_list.item.rollback_action"), payload, safety = MenuActionSafety.CONFIRM_ENTRY),
-                chanponGestureAction(ACTION_BACKUP, MenuGesture.MIDDLE, i18n(player, "backup_list.item.delete_action"), payload, safety = MenuActionSafety.CONFIRM_ENTRY),
+                chanponGestureAction(ACTION_BACKUP, MenuGesture.LEFT, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_BACKUP_LIST_ITEM_ROLLBACK_ACTION), payload, safety = MenuActionSafety.CONFIRM_ENTRY),
+                chanponGestureAction(ACTION_BACKUP, MenuGesture.MIDDLE, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_BACKUP_LIST_ITEM_DELETE_ACTION), payload, safety = MenuActionSafety.CONFIRM_ENTRY),
             ),
         ),
     )
@@ -509,11 +536,11 @@ class BackupListMenu(
     ): MenuElement = displayEntry(
         slot,
         Material.BOOK,
-        GuiNameSpec.FixedLabel(i18nComponent(player, "backup_list.info.display")),
+        GuiNameSpec.FixedLabel(i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_BACKUP_LIST_INFO_DISPLAY)),
         me.awabi2048.mwmchanpon.ui.framedLore(
             i18nList(
                 player,
-                "backup_list.info.lore",
+                ChanponBackupKeys.CHANPON_BACKUP_BACKUP_LIST_INFO_LORE,
                 mapOf("count" to count, "page" to page, "pages" to pages),
             ).map(GuiLoreLine::Text),
             GuiLoreFrame.BOTH,
@@ -527,7 +554,11 @@ class BackupListMenu(
         actionId: String,
         safety: MenuActionSafety = backupActionSafety(actionId),
     ): MenuElement {
-        val key = if (confirm) "confirm.button.confirm" else "confirm.button.cancel"
+        val key = if (confirm) {
+            ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BUTTON_CONFIRM
+        } else {
+            ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BUTTON_CANCEL
+        }
         val text = i18n(player, key)
         return simpleActionEntry(
             player,
@@ -536,10 +567,17 @@ class BackupListMenu(
             text,
             if (confirm) GuiElementRole.CONFIRM else GuiElementRole.CANCEL,
             actionId,
-            i18n(player, if (confirm) "confirm.button.confirm_action" else "confirm.button.cancel_action"),
+            i18n(player, if (confirm) ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BUTTON_CONFIRM_ACTION else ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BUTTON_CANCEL_ACTION),
             safety = safety,
         )
     }
+
+    /** 確認画面を構成する異なる値型のキーを、単一の有限な定義として扱います。 */
+    private data class ConfirmationPresentation(
+        val title: LocalizationKey<String>,
+        val display: LocalizationKey<String>,
+        val lore: LocalizationKey<List<String>>,
+    )
 
     private fun backupActionSafety(actionId: String): MenuActionSafety = when (actionId) {
         ACTION_BACK, ACTION_PAGE, ACTION_CANCEL -> MenuActionSafety.NAVIGATION_ONLY
@@ -557,20 +595,20 @@ class BackupListMenu(
         return "%.1fGB".format(mb / 1024.0)
     }
 
-    private fun i18n(player: Player?, key: String) =
-        CCSystem.getAPI().getI18nString(player, "chanpon.backup.$key")
+    private fun i18n(player: Player?, key: LocalizationKey<String>) =
+        CCSystem.getAPI().getLocalized(player, key)
 
     private fun i18nComponent(
         player: Player?,
-        key: String,
+        key: LocalizationKey<String>,
         placeholders: Map<String, Any> = emptyMap(),
-    ) = CCSystem.getAPI().getI18nComponent(player, "chanpon.backup.$key", placeholders)
+    ) = CCSystem.getAPI().getI18nComponent(player, key, placeholders)
 
     private fun i18nList(
         player: Player?,
-        key: String,
+        key: LocalizationKey<List<String>>,
         placeholders: Map<String, Any> = emptyMap(),
-    ) = CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
+    ) = CCSystem.getAPI().getLocalized(player, key, placeholders)
 
     enum class BackupListMode {
         ALL,

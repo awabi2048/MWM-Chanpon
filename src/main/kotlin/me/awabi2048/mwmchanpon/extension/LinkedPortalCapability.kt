@@ -1,5 +1,9 @@
 package me.awabi2048.mwmchanpon.extension
 
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
+
+import com.awabi2048.ccsystem.api.localization.generated.ChanponBackupKeys
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
@@ -47,7 +51,7 @@ class LinkedPortalCapability {
                         id = "receive",
                         trigger = MenuCapabilityTrigger.ANY,
                         textProvider = MenuCapabilityActionTextProvider {
-                            i18n(it.player, "linked_portal.action")
+                            i18n(it.player, ChanponBackupKeys.CHANPON_BACKUP_LINKED_PORTAL_ACTION)
                         },
                         handler = MenuCapabilityActionHandler(::receivePortal),
                         safety = MenuActionSafety.EXTERNAL_SIDE_EFFECT,
@@ -64,21 +68,21 @@ class LinkedPortalCapability {
         val portal = MyWorldManagerApi.getWorldService()
             ?.createLinkedWorldPortalItem(context.player, worldUuid)
         if (portal == null) {
-            context.player.sendMessage(i18n(context.player, "linked_portal.failed"))
+            context.player.sendMessage(i18n(context.player, ChanponBackupKeys.CHANPON_BACKUP_LINKED_PORTAL_FAILED))
             return MenuActionResult.Rejected()
         }
         val remaining = context.player.inventory.addItem(portal)
         remaining.values.forEach {
             context.player.world.dropItemNaturally(context.player.location, it)
         }
-        context.player.sendMessage(i18n(context.player, "linked_portal.received"))
+        context.player.sendMessage(i18n(context.player, ChanponBackupKeys.CHANPON_BACKUP_LINKED_PORTAL_RECEIVED))
         return MenuActionResult.Success(MenuUpdate.None)
     }
 
     private fun portalPresentation(player: Player) = MenuCapabilityPresentation(
         GuiItemSpec(
             material = Material.END_PORTAL_FRAME,
-            name = GuiNameSpec.FixedLabel(i18nComponent(player, "linked_portal.display")),
+            name = GuiNameSpec.FixedLabel(i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_LINKED_PORTAL_DISPLAY)),
             lore = GuiLoreSpec.None,
             role = GuiElementRole.ACTION,
             amount = 1,
@@ -92,11 +96,11 @@ class LinkedPortalCapability {
             ?.let { runCatching { java.util.UUID.fromString(it) }.getOrNull() }
             ?.let { MyWorldManagerApi.getWorldRepository()?.findByUuid(it) }
 
-    private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
-        CCSystem.getAPI().getI18nString(player, "chanpon.backup.$key", placeholders)
+    private fun i18n(player: Player?, key: LocalizationKey<String>, placeholders: Map<String, Any> = emptyMap()) =
+        CCSystem.getAPI().getLocalized(player, key, placeholders)
 
-    private fun i18nComponent(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
-        CCSystem.getAPI().getI18nComponent(player, "chanpon.backup.$key", placeholders)
+    private fun i18nComponent(player: Player?, key: LocalizationKey<String>, placeholders: Map<String, Any> = emptyMap()) =
+        CCSystem.getAPI().getI18nComponent(player, key, placeholders)
 
     companion object {
         private const val OWNER = "mwm-chanpon"

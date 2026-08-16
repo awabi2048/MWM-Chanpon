@@ -51,7 +51,7 @@ class MenuRuntimeNavigationContractTest {
         assertTrue("MyWorldManagerApi.createCurrentWorldMenuElement(player, layout.layout.actionSlot)" in body)
         assertTrue("pendingElement(layout.layout.size - 2, player)" in body)
         assertTrue("layout.layout.size - 1" in body)
-        assertTrue("description = textList(player, \"gui.user_settings.button.description\")" in body)
+        assertTrue("description = textList(player, MyworldGuiSettingsKeys.GUI_USER_SETTINGS_BUTTON_DESCRIPTION)" in body)
         assertFalse("slot = layout.layout.actionSlot,\n                    capability" in body)
     }
 

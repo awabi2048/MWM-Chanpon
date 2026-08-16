@@ -12,8 +12,8 @@ class ChanponWorldListMenuContractTest {
     fun `Chanpon Discovery exposes only explanation and navigation controls`() {
         val source = Files.readString(sourceRoot().resolve("ui/ChanponDiscoveryMenu.kt"))
 
-        assertTrue(source.contains("i18nComponent(player, \"info.name\")"))
-        assertTrue(source.contains("i18nList(player, \"info.lore\")"))
+        assertTrue(source.contains("i18nComponent(player, ChanponDiscoveryKeys.CHANPON_DISCOVERY_INFO_NAME)"))
+        assertTrue(source.contains("i18nList(player, ChanponDiscoveryKeys.CHANPON_DISCOVERY_INFO_LORE)"))
         assertTrue(source.contains("infoEntry(player, layout.actionSlot)"))
         assertFalse(source.contains("infoEntry(player, 4)"))
         assertTrue(source.contains("GuiElementRole.CONTENT"))

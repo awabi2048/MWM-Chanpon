@@ -1,6 +1,11 @@
 package me.awabi2048.mwmchanpon.ui
 
+import com.awabi2048.ccsystem.api.localization.generated.CommonKeys
+import com.awabi2048.ccsystem.api.localization.generated.MyworldRoleKeys
+
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
+import com.awabi2048.ccsystem.api.localization.generated.ChanponMemberLoreKeys
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
@@ -106,7 +111,7 @@ class ToolPermissionMenu(
         elements += CCSystem.getAPI().getGuiElementService().backEntry(player, 40)
         return InventoryMenuView(
             45,
-            CCSystem.getAPI().getGuiElementService().name(i18n("title")),
+            CCSystem.getAPI().getGuiElementService().name(i18n(ChanponMemberLoreKeys.CHANPON_MEMBER_LORE_PERMISSION_MENU_TITLE)),
             elements,
         )
     }
@@ -161,17 +166,17 @@ class ToolPermissionMenu(
             GuiMenuEntrySpec(
                 slot = slot,
                 material = Material.PLAYER_HEAD,
-                name = fixedName(i18n("role.display"), GuiNameStyle.DEFAULT),
+                name = fixedName(i18n(ChanponMemberLoreKeys.CHANPON_MEMBER_LORE_PERMISSION_MENU_ROLE_DISPLAY), GuiNameStyle.DEFAULT),
                 role = GuiElementRole.ACTION,
                 data = listOf(GuiMenuEntryData(
-                    i18n("role.state_label"),
-                    i18n(if (moderator) "role.moderator" else "role.member"),
+                    i18n(ChanponMemberLoreKeys.CHANPON_MEMBER_LORE_PERMISSION_MENU_ROLE_STATE_LABEL),
+                    i18n(if (moderator) ChanponMemberLoreKeys.CHANPON_MEMBER_LORE_PERMISSION_MENU_ROLE_MODERATOR else ChanponMemberLoreKeys.CHANPON_MEMBER_LORE_PERMISSION_MENU_ROLE_MEMBER),
                     if (moderator) GuiValueTone.PRIMARY else GuiValueTone.DEFAULT,
                 )),
                 actions = listOf(chanponGestureAction(
                     ACTION_ROLE,
                     MenuGesture.ANY,
-                    i18n("role.action"),
+                    i18n(ChanponMemberLoreKeys.CHANPON_MEMBER_LORE_PERMISSION_MENU_ROLE_ACTION),
                     safety = MenuActionSafety.REVERSIBLE,
                     reversibleContract = ChanponReversibleContracts.toolPermission(
                         worldData.uuid,
@@ -232,14 +237,14 @@ class ToolPermissionMenu(
                 name = fixedName(definition.displayName, GuiNameStyle.DEFAULT),
                 role = GuiElementRole.ACTION,
                 data = listOf(GuiMenuEntryData(
-                    i18n("state_label"),
-                    i18n(if (enabled) "enabled" else "disabled"),
+                    i18n(ChanponMemberLoreKeys.CHANPON_MEMBER_LORE_PERMISSION_MENU_STATE_LABEL),
+                    i18n(if (enabled) ChanponMemberLoreKeys.CHANPON_MEMBER_LORE_PERMISSION_MENU_ENABLED else ChanponMemberLoreKeys.CHANPON_MEMBER_LORE_PERMISSION_MENU_DISABLED),
                     if (enabled) GuiValueTone.SUCCESS else GuiValueTone.DANGER,
                 )),
                 actions = listOf(chanponGestureAction(
                     ACTION_TOGGLE,
                     MenuGesture.ANY,
-                    i18n("toggle_action"),
+                    i18n(ChanponMemberLoreKeys.CHANPON_MEMBER_LORE_PERMISSION_MENU_TOGGLE_ACTION),
                     mapOf(TOOL_ID to definition.id),
                     safety = MenuActionSafety.REVERSIBLE,
                     reversibleContract = ChanponReversibleContracts.toolPermission(
@@ -261,8 +266,8 @@ class ToolPermissionMenu(
     private fun uuid(value: String?): UUID? =
         value?.let { runCatching { UUID.fromString(it) }.getOrNull() }
 
-    private fun i18n(key: String): String =
-        CCSystem.getAPI().getI18nString(null, "chanpon.member_lore.permission_menu.$key")
+    private fun i18n(key: LocalizationKey<String>): String =
+        CCSystem.getAPI().getLocalized(null, key)
 
     companion object {
         const val EXTENSION_ID = "chanpon.tool_permissions"

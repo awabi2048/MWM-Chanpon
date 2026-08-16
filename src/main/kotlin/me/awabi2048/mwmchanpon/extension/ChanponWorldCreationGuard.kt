@@ -1,5 +1,8 @@
 package me.awabi2048.mwmchanpon.extension
 
+import com.awabi2048.ccsystem.api.localization.generated.ChanponPhaseKeys
+import com.awabi2048.ccsystem.api.localization.generated.MyworldGuiCreationKeys
+
 import com.awabi2048.ccsystem.CCSystem
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
@@ -17,6 +20,16 @@ class ChanponWorldCreationGuard(
     override fun getId(): String = POLICY_ID
 
     override fun evaluate(request: WorldCreationRequest): WorldCreationDecision {
+        if (!plugin.isConfigurationMigrationCurrent()) {
+            return WorldCreationDecision.deny(
+                request.actor?.let {
+                    CCSystem.getAPI().getI18nComponent(
+                        it as? org.bukkit.entity.Player,
+                        ChanponPhaseKeys.CHANPON_CONTROLS_CREATION_DENIED,
+                    )
+                },
+            )
+        }
         val availability = globalStorage.getWorldCreationAvailability()
         val creationAllowed = when (request.operation) {
             WorldCreationOperation.NORMAL -> availability != WorldCreationAvailability.DENIED
@@ -24,9 +37,9 @@ class ChanponWorldCreationGuard(
         }
         if (!creationAllowed) {
             val key = if (request.operation == WorldCreationOperation.PRODUCTION) {
-                "chanpon.controls.production_denied"
+                ChanponPhaseKeys.CHANPON_CONTROLS_PRODUCTION_DENIED
             } else {
-                "chanpon.controls.creation_denied"
+                ChanponPhaseKeys.CHANPON_CONTROLS_CREATION_DENIED
             }
             return WorldCreationDecision.deny(
                 request.player?.let { CCSystem.getAPI().getI18nComponent(it, key) }
@@ -40,14 +53,14 @@ class ChanponWorldCreationGuard(
             (player == null || !canBypassWorldLimits(player))
         ) {
             val repository = MyWorldManagerApi.getWorldRepository()
-            val ownerCount = repository?.findByOwner(targetUuid)?.size ?: 0
+            val ownerCount = repository?.ownerCountIncludingQuarantine(targetUuid) ?: 0
             val maxWorlds = plugin.config.getInt("creation.max_worlds_per_player", 50)
             if (ownerCount >= maxWorlds) {
                 return WorldCreationDecision.deny(
                     request.actor?.let {
                         CCSystem.getAPI().getI18nComponent(
                         it as? org.bukkit.entity.Player,
-                        "myworld.gui.creation.limit_reached",
+                        MyworldGuiCreationKeys.GUI_CREATION_LIMIT_REACHED,
                         mapOf("current" to ownerCount, "max" to maxWorlds)
                         )
                     }

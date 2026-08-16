@@ -1,5 +1,7 @@
 package me.awabi2048.mwmchanpon.service
 
+import com.awabi2048.ccsystem.api.localization.generated.ChanponSystemKeys
+
 import com.awabi2048.ccsystem.CCSystem
 import java.util.logging.Logger
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
@@ -38,7 +40,7 @@ class OfflineMemberInviteNotifier(
         val lines = runCatching {
             CCSystem.getAPI().getI18nComponentList(
                 player,
-                "chanpon.message.offline_member_invite",
+                ChanponSystemKeys.CHANPON_MESSAGE_OFFLINE_MEMBER_INVITE,
                 mapOf("world" to notification.worldName),
             )
         }.getOrElse { error ->

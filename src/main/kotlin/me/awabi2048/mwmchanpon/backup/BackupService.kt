@@ -1,9 +1,11 @@
 package me.awabi2048.mwmchanpon.backup
 
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
+import me.awabi2048.mwmchanpon.service.PortalSnapshotCodec
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.service.ApiPortalSnapshot
+import me.awabi2048.myworldmanager.api.service.ApiWorldService
 import me.awabi2048.myworldmanager.model.WorldData
 import org.bukkit.Bukkit
 import org.bukkit.Location
@@ -32,10 +34,12 @@ class BackupService(
     private val rootDir = File(plugin.dataFolder, "backups")
     private val activeBackupIds = ConcurrentHashMap.newKeySet<String>()
     private val createdFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+    @Volatile private var restoreRecoveryFailure: String? = null
     private var postRestoreHandler: (List<UUID>) -> Unit = {}
 
     init {
         rootDir.mkdirs()
+        recoverInterruptedRestoreTransactions()
     }
 
     fun listBackups(): List<BackupEntry> {
@@ -56,6 +60,273 @@ class BackupService(
 
     fun setPostRestoreHandler(handler: (List<UUID>) -> Unit) {
         postRestoreHandler = handler
+    }
+
+    /**
+     * 前回プロセスが復元途中で停止した場合、起動時にファイル世代を一つへ戻します。
+     * ジャーナルが壊れている場合は推測復旧せず、手動確認が必要な状態として残します。
+     */
+    private fun recoverInterruptedRestoreTransactions() {
+        RestoreOperationMarker.directories(rootDir).forEach { directory ->
+            val marker = runCatching { RestoreOperationMarker.load(directory) }.getOrNull()
+            if (marker == null) {
+                if (directory.listFiles().orEmpty().isEmpty()) {
+                    directory.delete()
+                    return@forEach
+                }
+                restoreRecoveryFailure = "restore operation marker is unreadable: ${directory.absolutePath}"
+                plugin.logger.severe("Could not read interrupted restore operation marker: $directory")
+                return@forEach
+            }
+            runCatching {
+                if (marker.isCommitted()) {
+                    // 操作マーカーを複数ワールド復元のコミット記録とします。
+                    // コミット後の個別ジャーナルは、プロセス停止時に各ジャーナルの
+                    // operation_committed が保存されていなくても後始末用の記録です。
+                    marker.journals().forEach { journalDirectory ->
+                        if (journalDirectory.exists()) {
+                            val journal = RestoreTransactionJournal.load(journalDirectory)
+                                ?: error("restore journal is unreadable: $journalDirectory")
+                            journal.worlds().forEach(::cleanupInterruptedWorld)
+                            journal.delete()
+                        }
+                        marker.removeJournal(journalDirectory)
+                    }
+                    marker.delete()
+                } else {
+                    marker.journals().forEach { journalDirectory ->
+                        if (journalDirectory.exists()) {
+                            val journal = RestoreTransactionJournal.load(journalDirectory)
+                                ?: error("restore journal is unreadable: $journalDirectory")
+                            rollbackRestoreJournal(journal, MyWorldManagerApi.getWorldService())
+                        }
+                        // rollbackRestoreJournal はロールバック完了後にジャーナルを削除します。
+                        // その後でマーカーからも外すことで、復旧途中の停止を再実行可能にします。
+                        marker.removeJournal(journalDirectory)
+                    }
+                    marker.delete()
+                }
+            }.onFailure { error ->
+                restoreRecoveryFailure = "restore operation recovery failed: ${error.message ?: error.javaClass.simpleName}"
+                plugin.logger.log(
+                    java.util.logging.Level.SEVERE,
+                    "Could not recover interrupted restore operation marker: $directory",
+                    error,
+                )
+            }
+        }
+        RestoreTransactionJournal.directories(rootDir).forEach { directory ->
+            val journal = RestoreTransactionJournal.load(directory) ?: run {
+                if (directory.listFiles().orEmpty().isEmpty()) {
+                    directory.delete()
+                    return@forEach
+                }
+                restoreRecoveryFailure = "restore recovery journal is unreadable: ${directory.absolutePath}"
+                plugin.logger.severe("Could not read interrupted backup restore journal: $directory")
+                return@forEach
+            }
+            runCatching {
+                if (journal.isOperationCommitted()) {
+                    journal.worlds().forEach(::cleanupInterruptedWorld)
+                    journal.delete()
+                    return@runCatching
+                }
+                rollbackRestoreJournal(journal, MyWorldManagerApi.getWorldService())
+                plugin.logger.warning("Recovered interrupted backup restore transaction: ${journal.backupId}")
+            }.onFailure { error ->
+                restoreRecoveryFailure = "restore recovery failed: ${error.message ?: error.javaClass.simpleName}"
+                plugin.logger.log(
+                    java.util.logging.Level.SEVERE,
+                    "Could not recover interrupted backup restore transaction: ${journal.directory}",
+                    error,
+                )
+            }
+        }
+    }
+
+    private fun rollbackInterruptedWorld(record: RestoreJournalWorld) {
+        val targetWorld = File(record.targetWorldPath)
+        val temporaryWorld = File(record.temporaryWorldPath)
+        val previousWorld = File(record.previousWorldPath)
+        if (record.targetWorldReplaced && targetWorld.exists()) {
+            require(targetWorld.deleteRecursively()) { "Could not remove interrupted restored world: $targetWorld" }
+        }
+        if (record.previousWorldExisted) {
+            if (previousWorld.exists() && !targetWorld.exists()) {
+                moveWithoutReplacement(previousWorld, targetWorld)
+            } else if (previousWorld.exists() && targetWorld.exists()) {
+                require(targetWorld.deleteRecursively()) { "Could not remove interrupted restored world: $targetWorld" }
+                moveWithoutReplacement(previousWorld, targetWorld)
+            } else if (!targetWorld.exists()) {
+                error("Original world directory is missing during recovery: $targetWorld")
+            }
+        } else if (targetWorld.exists() && record.targetWorldReplaceStarted) {
+            // targetWorldReplaceStarted is persisted before the replacement
+            // move, so an unmarked target is not removed as an unrelated
+            // directory when the original target did not exist.
+            require(targetWorld.deleteRecursively()) { "Could not remove interrupted new world: $targetWorld" }
+        }
+        if (temporaryWorld.exists()) require(temporaryWorld.deleteRecursively()) {
+            "Could not remove interrupted temporary world: $temporaryWorld"
+        }
+        restoreFileSnapshot(
+            target = File(record.targetMetadataPath),
+            snapshot = File(record.previousMetadataPath),
+            existed = record.previousMetadataExisted,
+        )
+        restoreFileSnapshot(
+            target = File(record.targetChanponPath),
+            snapshot = File(record.previousChanponPath),
+            existed = record.previousChanponExisted,
+        )
+    }
+
+    /**
+     * スナップショット作成を独立したジャーナル段階として扱います。これが永続化される前に
+     * 停止した場合、対象ワールドとメタデータはまだ置換されていないため準備用ファイルだけを
+     * 削除します。不完全なスナップショットから復元するより、確認が必要な状態で停止する方が安全です。
+     */
+    private fun cleanupPreparedRestoreArtifacts(record: RestoreJournalWorld) {
+        val previousWorld = File(record.previousWorldPath)
+        require(!previousWorld.exists()) {
+            "Previous world appeared before restore snapshots were ready: $previousWorld"
+        }
+        listOf(
+            File(record.temporaryWorldPath),
+            File(record.previousMetadataPath),
+            File(record.previousChanponPath),
+            File(record.previousPortalsPath),
+        ).forEach { file ->
+            if (file.isDirectory) require(file.deleteRecursively()) { "Could not remove restore artifact: $file" }
+            else Files.deleteIfExists(file.toPath())
+        }
+    }
+
+    private fun cleanupInterruptedWorld(record: RestoreJournalWorld) {
+        listOf(
+            File(record.temporaryWorldPath),
+            File(record.previousWorldPath),
+            File(record.previousMetadataPath),
+            File(record.previousChanponPath),
+            File(record.previousPortalsPath),
+        ).forEach { file ->
+            if (file.isDirectory) require(file.deleteRecursively()) { "Could not remove restore artifact: $file" }
+            else Files.deleteIfExists(file.toPath())
+        }
+    }
+
+    private fun restoreFileSnapshot(target: File, snapshot: File, existed: Boolean) {
+        if (!existed) {
+            Files.deleteIfExists(target.toPath())
+            return
+        }
+        require(snapshot.isFile) { "Restore snapshot is missing: $snapshot" }
+        target.parentFile?.mkdirs()
+        Files.copy(snapshot.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+    }
+
+    private fun moveWithoutReplacement(source: File, target: File) {
+        target.parentFile?.mkdirs()
+        require(!target.exists()) { "Restore target already exists during recovery: $target" }
+        try {
+            Files.move(source.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE)
+        } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+            Files.move(source.toPath(), target.toPath())
+        }
+    }
+
+    /** 実行中のポータル同期失敗時にも、ジャーナル単位でファイルとポータルを戻します。 */
+    private fun rollbackRestoreJournal(journal: RestoreTransactionJournal, core: ApiWorldService?) {
+        if (!journal.areSnapshotsReady()) {
+            journal.worlds().forEach { record ->
+                if (record.phase != RestoreJournalPhase.ROLLED_BACK) {
+                    require(!record.previousWorldMoveStarted && !record.targetWorldReplaceStarted) {
+                        "Restore journal reached world replacement before snapshots were ready: ${record.worldUuid}"
+                    }
+                }
+                cleanupPreparedRestoreArtifacts(record)
+                if (record.phase != RestoreJournalPhase.ROLLED_BACK) {
+                    journal.markRolledBack(record.worldUuid)
+                }
+            }
+            journal.delete()
+            return
+        }
+        val service = core ?: error("core api unavailable during restore rollback")
+        val repository = MyWorldManagerApi.getWorldRepository() ?: error("world repository unavailable during restore rollback")
+        service.reloadWorldData()
+        journal.worlds()
+            .forEach { record ->
+                if (record.phase != RestoreJournalPhase.ROLLED_BACK) {
+                    journal.markRollbackWorldMoveStarted(record.worldUuid)
+                    rollbackInterruptedWorld(record)
+                    val worldData = repository.findByUuid(record.worldUuid)
+                        ?: error("world data missing during restore rollback: ${record.worldUuid}")
+                    val portals = PortalSnapshotCodec.read(
+                        File(record.previousPortalsPath),
+                        expectedWorldUuid = record.worldUuid,
+                        expectedWorldKey = worldData.worldKey,
+                    )
+                    service.replaceRelatedPortals(record.worldUuid, portals)
+                    journal.markRolledBack(record.worldUuid)
+                }
+                cleanupInterruptedWorld(journal.record(record.worldUuid) ?: record)
+            }
+        service.reloadPortalData()
+        journal.delete()
+    }
+
+    private fun rollbackJournalFilesOnly(journal: RestoreTransactionJournal) {
+        if (!journal.areSnapshotsReady()) {
+            journal.worlds().forEach { record ->
+                if (record.phase != RestoreJournalPhase.ROLLED_BACK) {
+                    require(!record.previousWorldMoveStarted && !record.targetWorldReplaceStarted) {
+                        "Restore journal reached world replacement before snapshots were ready: ${record.worldUuid}"
+                    }
+                }
+                cleanupPreparedRestoreArtifacts(record)
+                if (record.phase != RestoreJournalPhase.ROLLED_BACK) {
+                    journal.markRolledBack(record.worldUuid)
+                }
+            }
+            journal.delete()
+            return
+        }
+        journal.worlds()
+            .forEach { record ->
+                if (record.phase != RestoreJournalPhase.ROLLED_BACK) {
+                    journal.markRollbackWorldMoveStarted(record.worldUuid)
+                    rollbackInterruptedWorld(record)
+                    journal.markRolledBack(record.worldUuid)
+                }
+                cleanupInterruptedWorld(journal.record(record.worldUuid) ?: record)
+            }
+        journal.delete()
+    }
+
+    private fun rollbackOperationMarker(marker: RestoreOperationMarker) {
+        if (marker.isCommitted()) {
+            marker.journals().forEach { journalDirectory ->
+                if (journalDirectory.exists()) {
+                    val journal = RestoreTransactionJournal.load(journalDirectory)
+                        ?: error("restore journal is unreadable: $journalDirectory")
+                    journal.worlds().forEach(::cleanupInterruptedWorld)
+                    journal.delete()
+                }
+                marker.removeJournal(journalDirectory)
+            }
+            marker.delete()
+            return
+        }
+        marker.journals().forEach { directory ->
+            if (directory.exists()) {
+                val journal = RestoreTransactionJournal.load(directory)
+                    ?: error("restore journal is unreadable: $directory")
+                rollbackRestoreJournal(journal, MyWorldManagerApi.getWorldService())
+            }
+            marker.removeJournal(directory)
+        }
+        marker.delete()
     }
 
     fun createWorldBackup(
@@ -133,13 +404,20 @@ class BackupService(
         return restoreBackup(entry, entry.worldUuids)
     }
 
-    fun restorePreflightFailure(entry: BackupEntry, requestedWorlds: List<UUID> = entry.worldUuids): String? {
+    fun restorePreflightFailure(
+        entry: BackupEntry,
+        requestedWorlds: List<UUID> = entry.worldUuids,
+        includeBackupLock: Boolean = true,
+    ): String? {
+        restoreRecoveryFailure?.let { return it }
         val core = MyWorldManagerApi.getWorldService()
         val repository = MyWorldManagerApi.getWorldRepository()
         val distinctTargets = requestedWorlds.distinct()
         val targetStates = distinctTargets.map { worldUuid ->
             val worldData = repository?.findByUuid(worldUuid)
-            val targetDirectory = if (core != null && worldData != null) {
+            val worldMigrationCurrent = !MyWorldManagerApi.isWorldMigrationPending(worldUuid)
+            val chanponDataCurrent = storage.isWorldDataCurrent(worldUuid)
+            val targetDirectory = if (core != null && worldData != null && worldMigrationCurrent && chanponDataCurrent) {
                 core.getWorldDirectory(worldData)
             } else {
                 null
@@ -155,20 +433,43 @@ class BackupService(
                 targetDirectoryWritable =
                     targetParent != null &&
                         targetParent.isDirectory &&
-                        targetParent.canWrite()
+                        targetParent.canWrite(),
+                worldMigrationCurrent = worldMigrationCurrent,
+                chanponDataCurrent = chanponDataCurrent,
             )
+        }
+        val backupMetadataFailure = repository?.let { worldRepository ->
+            distinctTargets.firstOrNull { worldUuid ->
+                val current = worldRepository.findByUuid(worldUuid) ?: return@firstOrNull true
+                val source = File(backupDir(entry.id), "worlds/$worldUuid/mwm.yml")
+                val sourceChanpon = File(backupDir(entry.id), "worlds/$worldUuid/chanpon.yml")
+                runCatching {
+                    val restored = worldRepository.readCurrentDataFile(source, worldUuid)
+                    check(restored.worldKey == current.worldKey) { "world_key does not match the target world" }
+                    check(restored.dimension == current.dimension) { "dimension does not match the target world" }
+                    if (sourceChanpon.exists()) {
+                        storage.validateExternalWorldFile(sourceChanpon, worldUuid)
+                    }
+                    PortalSnapshotCodec.read(
+                        File(backupDir(entry.id), "worlds/$worldUuid/portals.yml"),
+                        expectedWorldUuid = worldUuid,
+                        expectedWorldKey = current.worldKey,
+                    )
+                }.isFailure
+            }
         }
         val targetSet = distinctTargets.toSet()
         val evacuationRequired = Bukkit.getOnlinePlayers().any { player ->
             repository?.findByWorldName(player.world.name)?.uuid in targetSet
         }
         return RestorePreflightPolicy.failureReason(
-            backupLocked = entry.id in activeBackupIds,
+            backupLocked = includeBackupLock && entry.id in activeBackupIds,
             coreAvailable = core != null && repository != null,
+            globalMigrationPending = MyWorldManagerApi.isGlobalMigrationPending(),
             targets = targetStates,
             evacuationRequired = evacuationRequired,
             evacuationAvailable = MyWorldManagerApi.getEvacuationLocationOverride() != null
-        )
+        ) ?: backupMetadataFailure?.let { "backup world metadata is missing or invalid" }
     }
 
     fun restoreWorldBackup(entry: BackupEntry, worldUuid: UUID): CompletableFuture<RestoreOperationResult> {
@@ -207,6 +508,13 @@ class BackupService(
             return CompletableFuture.completedFuture(
                 restoreFailure(entry, targets, "world is locked")
             )
+        }
+
+        // ロック取得後にも移行状態が変わり得るため、副作用開始直前に再検証します。
+        restorePreflightFailure(entry, requestedWorlds, includeBackupLock = false)?.let { reason ->
+            leases.forEach(WorldOperationLease::close)
+            activeBackupIds.remove(entry.id)
+            return CompletableFuture.completedFuture(restoreFailure(entry, targets, reason))
         }
 
         val future = CompletableFuture<RestoreOperationResult>()
@@ -363,6 +671,11 @@ class BackupService(
                 BackupOperationResult(BackupOperationStatus.FAILED, null, "no production worlds")
             )
         }
+        backupPreflightFailure(targets, includeUnresolved = scope == BackupScope.ALL)?.let { reason ->
+            return CompletableFuture.completedFuture(
+                BackupOperationResult(BackupOperationStatus.FAILED, null, reason)
+            )
+        }
         val leases = if (acquireLocks) {
             targets.mapNotNull { MyWorldManagerApi.tryAcquireWorldOperation(it, WorldOperation.BACKUP) }
         } else {
@@ -372,6 +685,13 @@ class BackupService(
             leases.forEach(WorldOperationLease::close)
             return CompletableFuture.completedFuture(
                 BackupOperationResult(BackupOperationStatus.FAILED, null, "world is locked")
+            )
+        }
+        // ロック取得中に migration が開始されても、ワールド保存を先行させないため再検証します。
+        backupPreflightFailure(targets, includeUnresolved = scope == BackupScope.ALL)?.let { reason ->
+            leases.forEach(WorldOperationLease::close)
+            return CompletableFuture.completedFuture(
+                BackupOperationResult(BackupOperationStatus.FAILED, null, reason)
             )
         }
         runCatching { saveLoadedWorlds(targets) }.getOrElse { ex ->
@@ -404,19 +724,70 @@ class BackupService(
         return future
     }
 
+    /**
+     * バックアップ作成は原本の読み取りだけに見えて、実際にはロード済みワールドの保存と
+     * last_backup_hashの更新を伴います。移行対象を含む状態で「正常なバックアップ」を
+     * 作らないよう、副作用開始前に対象集合を一括検査します。
+     */
+    private fun backupPreflightFailure(targets: List<UUID>, includeUnresolved: Boolean): String? {
+        restoreRecoveryFailure?.let { return it }
+        val evaluation = MyWorldManagerApi.evaluateMigration(
+            worldUuids = targets,
+            includeGlobal = true,
+            includeUnresolved = includeUnresolved,
+        )
+        if (!evaluation.allowed) return evaluation.blocks.first().message
+        if (targets.any { !storage.isWorldDataCurrent(it) }) return "Chanpon world data requires /mwm migration"
+        return null
+    }
+
     private fun restoreFilesAsync(entry: BackupEntry, targets: List<UUID>): CompletableFuture<RestoreOperationResult> {
         val future = CompletableFuture<RestoreOperationResult>()
         Bukkit.getScheduler().runTaskAsynchronously(plugin, Runnable {
+            restoreRecoveryFailure?.let { reason ->
+                future.complete(
+                    RestoreOperationResult(
+                        BackupOperationStatus.FAILED,
+                        emptyList(),
+                        targets,
+                        null,
+                        reason,
+                    ),
+                )
+                return@Runnable
+            }
             val restored = mutableListOf<UUID>()
             val failed = mutableListOf<UUID>()
             val portalsByWorld = mutableMapOf<UUID, List<ApiPortalSnapshot>>()
+            val journalsByWorld = mutableMapOf<UUID, RestoreTransactionJournal>()
+            var operationCommitAttempted = false
+            var operationCommitPersisted = false
             val core = MyWorldManagerApi.getWorldService()
             if (core == null) {
                 future.complete(RestoreOperationResult(BackupOperationStatus.FAILED, emptyList(), targets, null, "core api unavailable"))
                 return@Runnable
             }
+            val operationMarker = runCatching { RestoreOperationMarker.create(rootDir, entry.id) }
+                .getOrElse { error ->
+                    plugin.logger.log(
+                        java.util.logging.Level.SEVERE,
+                        "Could not create restore operation marker",
+                        error,
+                    )
+                    future.complete(
+                        RestoreOperationResult(
+                            BackupOperationStatus.FAILED,
+                            emptyList(),
+                            targets,
+                            null,
+                            "restore journal could not be created",
+                        ),
+                    )
+                    return@Runnable
+                }
 
-            for (worldUuid in targets) {
+            try {
+                for (worldUuid in targets) {
                 try {
                     val source = File(backupDir(entry.id), "worlds/$worldUuid")
                     val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
@@ -424,22 +795,115 @@ class BackupService(
                         ?: error("world data missing: $worldUuid")
                     val backupWorldZip = File(source, "world.zip")
                     if (!backupWorldZip.isFile) error("backup world zip missing: $worldUuid")
-
+                    val worldRepository = MyWorldManagerApi.getWorldRepository()
+                        ?: error("world repository unavailable: $worldUuid")
+                    val sourceMetadata = File(source, "mwm.yml")
+                    val restoredWorldData = worldRepository.readCurrentDataFile(sourceMetadata, worldUuid)
+                    check(restoredWorldData.worldKey == worldData.worldKey) {
+                        "backup world metadata targets a different world key: $worldUuid"
+                    }
+                    check(restoredWorldData.dimension == worldData.dimension) {
+                        "backup world metadata targets a different dimension: $worldUuid"
+                    }
+                    val sourceChanpon = File(source, "chanpon.yml")
+                    if (sourceChanpon.exists()) {
+                        storage.validateExternalWorldFile(sourceChanpon, worldUuid)
+                    }
+                    val sourcePortals = PortalSnapshotCodec.read(
+                        File(source, "portals.yml"),
+                        expectedWorldUuid = worldUuid,
+                        expectedWorldKey = worldData.worldKey,
+                    )
                     val tempWorldDir = File(
                         targetWorldDir.parentFile ?: error("world directory parent missing: $targetWorldDir"),
                         "${targetWorldDir.name}.restore-${UUID.randomUUID()}"
                     )
+                    val previousWorldDir = tempWorldDir.resolveSibling("${tempWorldDir.name}.previous")
+                    val targetMetadata = core.getWorldDataFile(worldUuid)
+                    val previousMetadataFile = File(tempWorldDir.parentFile, "${tempWorldDir.name}.metadata.previous")
+                    val targetChanpon = storage.worldFile(worldUuid)
+                    val previousChanponFile = File(tempWorldDir.parentFile, "${tempWorldDir.name}.chanpon.previous")
+                    val previousPortalsFile = File(tempWorldDir.parentFile, "${tempWorldDir.name}.portals.previous.yml")
+                    val journalDirectory = RestoreTransactionJournal.allocateDirectory(rootDir)
+                    val journal = RestoreTransactionJournal.create(
+                        journalDirectory,
+                        entry.id,
+                        listOf(
+                            RestoreJournalWorld(
+                                worldUuid = worldUuid,
+                                targetWorldPath = targetWorldDir.absolutePath,
+                                temporaryWorldPath = tempWorldDir.absolutePath,
+                                previousWorldPath = previousWorldDir.absolutePath,
+                                previousWorldExisted = targetWorldDir.exists(),
+                                targetMetadataPath = targetMetadata.absolutePath,
+                                previousMetadataPath = previousMetadataFile.absolutePath,
+                                previousMetadataExisted = targetMetadata.isFile,
+                                targetChanponPath = targetChanpon.absolutePath,
+                                previousChanponPath = previousChanponFile.absolutePath,
+                                previousChanponExisted = targetChanpon.isFile,
+                                previousPortalsPath = previousPortalsFile.absolutePath,
+                                previousWorldMoveStarted = false,
+                                previousWorldMoved = false,
+                                targetWorldReplaceStarted = false,
+                                targetWorldReplaced = false,
+                                phase = RestoreJournalPhase.PREPARED,
+                            ),
+                        ),
+                    )
+                    journalsByWorld[worldUuid] = journal
+                    operationMarker.addJournal(journal.directory)
                     try {
+                        if (targetMetadata.isFile) Files.copy(targetMetadata.toPath(), previousMetadataFile.toPath())
+                        if (targetChanpon.isFile) Files.copy(targetChanpon.toPath(), previousChanponFile.toPath())
+                        PortalSnapshotCodec.write(previousPortalsFile, core.getRelatedPortals(worldUuid))
+                        // ロールバック用スナップショットがすべて永続化されるまで、
+                        // ワールドとメタデータの置換を開始しません。
+                        journal.markSnapshotsReady()
                         extractWorldZip(backupWorldZip.toPath(), tempWorldDir.toPath())
-                        if (targetWorldDir.exists()) targetWorldDir.deleteRecursively()
+                        if (targetWorldDir.exists()) {
+                            journal.markPreviousWorldMoveStarted(worldUuid)
+                            Files.move(targetWorldDir.toPath(), previousWorldDir.toPath())
+                            journal.markPreviousWorldMoved(worldUuid)
+                        }
+                        journal.markTargetWorldReplaceStarted(worldUuid)
                         Files.move(tempWorldDir.toPath(), targetWorldDir.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                        journal.markTargetWorldReplaced(worldUuid)
+                        restoreCoreMetadataFile(sourceMetadata, targetMetadata)
+                        if (sourceChanpon.isFile) {
+                            restoreChanponFileForRestore(sourceChanpon, worldUuid)
+                        } else {
+                            // バックアップにない状態も復元結果の一部です。旧ファイルを残すと、復元後に別世代の設定が混在します。
+                            storage.removeWorldFileForRestore(worldUuid)
+                        }
+                        portalsByWorld[worldUuid] = sourcePortals
+                        journal.markDataCommitted(worldUuid)
+                    } catch (error: Exception) {
+                        val record = journal.record(worldUuid) ?: error("restore journal record missing: $worldUuid")
+                        runCatching {
+                            if (journal.areSnapshotsReady()) {
+                                rollbackInterruptedWorld(record)
+                            } else {
+                                require(!record.previousWorldMoveStarted && !record.targetWorldReplaceStarted) {
+                                    "Restore reached world replacement before snapshots were ready: $worldUuid"
+                                }
+                                cleanupPreparedRestoreArtifacts(record)
+                            }
+                            journal.markRolledBack(worldUuid)
+                            cleanupInterruptedWorld(journal.record(worldUuid) ?: record)
+                            operationMarker.removeJournal(journal.directory)
+                            journal.delete()
+                            journalsByWorld.remove(worldUuid)
+                        }.onFailure { rollbackError ->
+                            plugin.logger.log(
+                                java.util.logging.Level.SEVERE,
+                                "Could not roll back restored world data; journal was retained: $worldUuid",
+                                rollbackError,
+                            )
+                        }
+                        throw error
                     } finally {
                         if (tempWorldDir.exists()) tempWorldDir.deleteRecursively()
                     }
-
-                    copyFileIfExists(File(source, "mwm.yml"), core.getWorldDataFile(worldUuid))
-                    copyChanponFileForRestore(File(source, "chanpon.yml"), storage.worldFile(worldUuid))
-                    portalsByWorld[worldUuid] = readPortalSnapshots(File(source, "portals.yml"))
                     restored.add(worldUuid)
                 } catch (ex: Exception) {
                     plugin.logger.warning("Restore failed for $worldUuid: ${ex.message}")
@@ -447,11 +911,16 @@ class BackupService(
                 }
             }
 
-            Bukkit.getScheduler().runTask(plugin, Runnable {
+                Bukkit.getScheduler().runTask(plugin, Runnable {
                 val syncFailed = failed.toMutableList()
                 val syncRestored = restored.toMutableList()
                 val syncCore = MyWorldManagerApi.getWorldService()
                 if (syncCore == null) {
+                    restoreRecoveryFailure = "core api became unavailable during restore rollback"
+                    plugin.logger.severe(
+                        "Restore rollback was deferred because the MyWorld API became unavailable; " +
+                            "the restore journal was retained for startup recovery",
+                    )
                     future.complete(RestoreOperationResult(BackupOperationStatus.FAILED, emptyList(), targets, null, "core api unavailable"))
                     return@Runnable
                 }
@@ -460,15 +929,87 @@ class BackupService(
                     restored.forEach { worldUuid ->
                         runCatching {
                             syncCore.replaceRelatedPortals(worldUuid, portalsByWorld[worldUuid].orEmpty())
-                            storage.setLastBackupHash(worldUuid, backupHash(entry, worldUuid))
+                            journalsByWorld[worldUuid]?.let { journal ->
+                                journal.markPortalsCommitted(worldUuid)
+                            }
                         }.onFailure { ex ->
                             plugin.logger.warning("Restore portal sync failed for $worldUuid: ${ex.message}")
+                            journalsByWorld[worldUuid]?.let { journal ->
+                                runCatching { rollbackRestoreJournal(journal, syncCore) }
+                                    .onSuccess {
+                                        operationMarker.removeJournal(journal.directory)
+                                        journalsByWorld.remove(worldUuid)
+                                    }
+                                    .onFailure { rollbackError ->
+                                        restoreRecoveryFailure =
+                                            "portal synchronization rollback failed for $worldUuid: " +
+                                                (rollbackError.message ?: rollbackError.javaClass.simpleName)
+                                        plugin.logger.log(
+                                            java.util.logging.Level.SEVERE,
+                                            "Could not roll back failed portal synchronization: $worldUuid",
+                                            rollbackError,
+                                        )
+                                    }
+                            }
                             syncRestored.remove(worldUuid)
                             syncFailed.add(worldUuid)
                         }
                     }
                     syncCore.reloadPortalData()
                     val distinctFailed = syncFailed.distinct()
+                    if (distinctFailed.isEmpty()) {
+                        // 操作マーカーを全ワールドの永続コミット点とします。
+                        // この点が保存されるまでバックアップハッシュを公開しません。
+                        operationCommitAttempted = true
+                        operationMarker.markCommitted()
+                        operationCommitPersisted = true
+                        restored.distinct().forEach { worldUuid ->
+                            runCatching { storage.setLastBackupHash(worldUuid, backupHash(entry, worldUuid)) }
+                                .onFailure { error ->
+                                    plugin.logger.log(
+                                        java.util.logging.Level.WARNING,
+                                        "Could not update restore hash for $worldUuid after committed restore",
+                                        error,
+                                    )
+                                }
+                        }
+                        journalsByWorld.values.distinct().forEach { journal ->
+                            // Keep a per-world commit marker as a fallback for
+                            // the orphan-journal scan if the process stops after
+                            // the operation marker is updated but before this
+                            // journal is removed.
+                            journal.markOperationCommitted()
+                            journal.worlds().forEach(::cleanupInterruptedWorld)
+                            journal.delete()
+                            operationMarker.removeJournal(journal.directory)
+                        }
+                        journalsByWorld.clear()
+                        operationMarker.delete()
+                    } else {
+                        var rollbackSucceeded = true
+                        journalsByWorld.values.distinct().forEach { journal ->
+                            runCatching { rollbackRestoreJournal(journal, syncCore) }
+                                .onSuccess {
+                                    operationMarker.removeJournal(journal.directory)
+                                    journalsByWorld.entries.removeIf { it.value === journal }
+                                }
+                                .onFailure { rollbackError ->
+                                    rollbackSucceeded = false
+                                    restoreRecoveryFailure =
+                                        "partial restore rollback failed: " +
+                                            (rollbackError.message ?: rollbackError.javaClass.simpleName)
+                                    plugin.logger.log(
+                                        java.util.logging.Level.SEVERE,
+                                        "Could not roll back partial multi-world restore",
+                                        rollbackError,
+                                    )
+                                }
+                        }
+                        syncRestored.clear()
+                        if (rollbackSucceeded) {
+                            operationMarker.delete()
+                        }
+                    }
                     val status = if (distinctFailed.isEmpty()) BackupOperationStatus.SUCCESS else BackupOperationStatus.FAILED
                     future.complete(
                         RestoreOperationResult(
@@ -481,6 +1022,75 @@ class BackupService(
                     )
                 } catch (ex: Exception) {
                     plugin.logger.warning("Restore repository reload failed: ${ex.message}")
+                    if (operationCommitAttempted && !operationCommitPersisted) {
+                        restoreRecoveryFailure = "restore commit marker persistence is uncertain"
+                        plugin.logger.log(
+                            java.util.logging.Level.SEVERE,
+                            "Restore commit marker persistence was uncertain; retaining journals for startup recovery",
+                            ex,
+                        )
+                        future.complete(
+                            RestoreOperationResult(
+                                BackupOperationStatus.FAILED,
+                                emptyList(),
+                                targets,
+                                null,
+                                "restore commit state is uncertain; restart is required for recovery",
+                            ),
+                        )
+                        return@Runnable
+                    }
+                    if (operationMarker.isCommitted()) {
+                        // The data commit is already durable. Cleanup failure
+                        // must not turn a committed restore back into a
+                        // rollback; startup recovery will retry this cleanup
+                        // from the committed operation marker.
+                        runCatching {
+                            operationMarker.journals().forEach { journalDirectory ->
+                                if (journalDirectory.exists()) {
+                                    val journal = RestoreTransactionJournal.load(journalDirectory)
+                                        ?: error("restore journal is unreadable: $journalDirectory")
+                                    journal.worlds().forEach(::cleanupInterruptedWorld)
+                                    journal.delete()
+                                }
+                                operationMarker.removeJournal(journalDirectory)
+                            }
+                            operationMarker.delete()
+                        }.onFailure { cleanupError ->
+                            plugin.logger.log(
+                                java.util.logging.Level.SEVERE,
+                                "Committed restore cleanup was deferred to startup recovery",
+                                cleanupError,
+                            )
+                        }
+                        future.complete(
+                            RestoreOperationResult(
+                                BackupOperationStatus.SUCCESS,
+                                syncRestored.distinct(),
+                                emptyList(),
+                                null,
+                                "restore completed; cleanup pending",
+                            ),
+                        )
+                        return@Runnable
+                    }
+                    journalsByWorld.values.toList().forEach { journal ->
+                        runCatching { rollbackRestoreJournal(journal, syncCore) }
+                            .onFailure { rollbackError ->
+                                restoreRecoveryFailure =
+                                    "restore rollback after repository reload failed: " +
+                                        (rollbackError.message ?: rollbackError.javaClass.simpleName)
+                                plugin.logger.log(
+                                    java.util.logging.Level.SEVERE,
+                                    "Could not roll back failed restore repository reload",
+                                    rollbackError,
+                                )
+                            }
+                        if (!journal.directory.exists()) {
+                            journalsByWorld.entries.removeIf { it.value === journal }
+                        }
+                    }
+                    runCatching { rollbackOperationMarker(operationMarker) }
                     future.complete(
                         RestoreOperationResult(
                             BackupOperationStatus.FAILED,
@@ -491,7 +1101,27 @@ class BackupService(
                         )
                     )
                 }
-            })
+                })
+            } catch (fatal: Exception) {
+                val committed = operationMarker.isCommitted()
+                if (!committed) {
+                    restoreRecoveryFailure = "restore transaction failed before completion: ${fatal.message ?: fatal.javaClass.simpleName}"
+                }
+                plugin.logger.log(
+                    java.util.logging.Level.SEVERE,
+                    "Unexpected restore transaction failure; ${if (committed) "cleanup will be retried" else "journal was retained for startup recovery"}",
+                    fatal,
+                )
+                future.complete(
+                    RestoreOperationResult(
+                        if (committed) BackupOperationStatus.SUCCESS else BackupOperationStatus.FAILED,
+                        if (committed) restored.distinct() else emptyList(),
+                        if (committed) emptyList() else targets,
+                        null,
+                        if (committed) "restore completed; cleanup pending" else "restore failed; restart is required for recovery",
+                    ),
+                )
+            }
         })
         return future
     }
@@ -644,9 +1274,11 @@ class BackupService(
         digest.update(hashPath(worldDir.toPath()).toByteArray(Charsets.UTF_8))
         updateFile(core.getWorldDataFile(worldData.uuid), "mwm")
         updateChanponFile(digest, storage.worldFile(worldData.uuid))
-        core.getRelatedPortals(worldData.uuid)
-            .sortedBy { it.id.toString() }
-            .forEach { digest.update(portalToMap(it).toString().toByteArray(Charsets.UTF_8)) }
+        digest.update(
+            PortalSnapshotCodec.writeToString(
+                core.getRelatedPortals(worldData.uuid).sortedBy { it.id.toString() },
+            ).toByteArray(Charsets.UTF_8),
+        )
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
@@ -661,9 +1293,12 @@ class BackupService(
         }
         updateFile(File(dir, "mwm.yml"), "mwm")
         updateChanponFile(digest, File(dir, "chanpon.yml"))
-        readPortalSnapshots(File(dir, "portals.yml"))
-            .sortedBy { it.id.toString() }
-            .forEach { digest.update(portalToMap(it).toString().toByteArray(Charsets.UTF_8)) }
+        digest.update(
+            PortalSnapshotCodec.writeToString(
+                PortalSnapshotCodec.read(File(dir, "portals.yml"), requireFile = false)
+                    .sortedBy { it.id.toString() },
+            ).toByteArray(Charsets.UTF_8),
+        )
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
@@ -701,62 +1336,7 @@ class BackupService(
     }
 
     private fun writePortalSnapshots(file: File, snapshots: List<ApiPortalSnapshot>) {
-        val config = YamlConfiguration()
-        config.set("portals", snapshots.map(::portalToMap))
-        config.save(file)
-    }
-
-    private fun readPortalSnapshots(file: File): List<ApiPortalSnapshot> {
-        if (!file.exists()) return emptyList()
-        return YamlConfiguration.loadConfiguration(file).getMapList("portals").mapNotNull(::mapToPortal)
-    }
-
-    private fun portalToMap(portal: ApiPortalSnapshot): Map<String, Any?> = linkedMapOf(
-        "id" to portal.id.toString(),
-        "world_key" to portal.worldKey,
-        "x" to portal.x,
-        "y" to portal.y,
-        "z" to portal.z,
-        "world_uuid" to portal.worldUuid?.toString(),
-        "target_world_key" to portal.targetWorldKey,
-        "show_text" to portal.showText,
-        "particle_color_rgb" to portal.particleColorRgb,
-        "owner_uuid" to portal.ownerUuid.toString(),
-        "created_at" to portal.createdAt,
-        "text_display_uuid" to portal.textDisplayUuid?.toString(),
-        "type" to portal.type,
-        "min_x" to portal.minX,
-        "min_y" to portal.minY,
-        "min_z" to portal.minZ,
-        "max_x" to portal.maxX,
-        "max_y" to portal.maxY,
-        "max_z" to portal.maxZ
-    )
-
-    private fun mapToPortal(map: Map<*, *>): ApiPortalSnapshot? {
-        return runCatching {
-            ApiPortalSnapshot(
-                UUID.fromString(map["id"] as String),
-                map["world_key"] as String,
-                (map["x"] as Number).toInt(),
-                (map["y"] as Number).toInt(),
-                (map["z"] as Number).toInt(),
-                (map["world_uuid"] as? String)?.let(UUID::fromString),
-                map["target_world_key"] as? String,
-                map["show_text"] as? Boolean ?: true,
-                (map["particle_color_rgb"] as Number).toInt(),
-                UUID.fromString(map["owner_uuid"] as String),
-                map["created_at"] as String,
-                (map["text_display_uuid"] as? String)?.let(UUID::fromString),
-                map["type"] as? String ?: "portal",
-                (map["min_x"] as? Number)?.toInt(),
-                (map["min_y"] as? Number)?.toInt(),
-                (map["min_z"] as? Number)?.toInt(),
-                (map["max_x"] as? Number)?.toInt(),
-                (map["max_y"] as? Number)?.toInt(),
-                (map["max_z"] as? Number)?.toInt()
-            )
-        }.getOrNull()
+        PortalSnapshotCodec.write(file, snapshots)
     }
 
     private fun backupDir(id: String): File = File(rootDir, id)
@@ -776,21 +1356,58 @@ class BackupService(
         digest.update(config.saveToString().toByteArray(Charsets.UTF_8))
     }
 
-    private fun copyChanponFileForRestore(source: File, target: File) {
+    private fun restoreChanponFileForRestore(source: File, worldUuid: UUID) {
         if (!source.exists()) return
-        val lastOwnerBackupAt = if (target.exists()) {
-            YamlConfiguration.loadConfiguration(target).getLong("backup.owner_manual.last_created_at", 0L)
-        } else {
-            0L
+        storage.restoreExternalWorldFile(source, worldUuid)
+    }
+
+    /**
+     * 復元先の既存メタデータを直接上書きせず、同一ディレクトリ内の一時ファイルから
+     * atomic move します。呼び出し前に ApiWorldRepository で内容を検証済みであることが前提です。
+     */
+    private fun restoreCoreMetadataFile(source: File, target: File) {
+        require(source.isFile) { "backup world metadata is missing: ${source.path}" }
+        target.parentFile?.mkdirs()
+        val temporary = target.resolveSibling("${target.name}.restore-${UUID.randomUUID()}.tmp")
+        try {
+            Files.copy(source.toPath(), temporary.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            try {
+                Files.move(
+                    temporary.toPath(),
+                    target.toPath(),
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING,
+                )
+            } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+                Files.move(temporary.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
+        } finally {
+            Files.deleteIfExists(temporary.toPath())
         }
-        copyFileIfExists(source, target)
-        val restored = YamlConfiguration.loadConfiguration(target)
-        restored.set("backup.last_hash", null)
-        restored.set(
-            "backup.owner_manual.last_created_at",
-            if (lastOwnerBackupAt > 0L) lastOwnerBackupAt else null
-        )
-        restored.save(target)
+    }
+
+    private fun restoreCoreMetadataSnapshot(target: File, bytes: ByteArray?) {
+        if (bytes == null) {
+            Files.deleteIfExists(target.toPath())
+            return
+        }
+        target.parentFile?.mkdirs()
+        val temporary = target.resolveSibling("${target.name}.rollback-${UUID.randomUUID()}.tmp")
+        try {
+            Files.write(temporary.toPath(), bytes)
+            try {
+                Files.move(
+                    temporary.toPath(),
+                    target.toPath(),
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING,
+                )
+            } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+                Files.move(temporary.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
+        } finally {
+            Files.deleteIfExists(temporary.toPath())
+        }
     }
 
     private fun zipWorldDirectory(source: Path, target: Path) {

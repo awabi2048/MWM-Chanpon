@@ -1,6 +1,8 @@
 package me.awabi2048.mwmchanpon.service
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
+import com.awabi2048.ccsystem.api.localization.generated.ChanponBackupKeys
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.backup.BackupOperationStatus
 import me.awabi2048.mwmchanpon.backup.BackupService
@@ -56,6 +58,10 @@ class BackupAutomationService(
     }
 
     private fun tick() {
+        // 旧形式の設定を読み込んだまま自動処理を進めると、実行日時などの書き込みだけが
+        // 先に発生し、移行前の設定と処理状態が食い違います。/mwm migration 完了まで
+        // タスク自体は保持しますが、判定と書き込みを含む自動処理は停止します。
+        if (!plugin.isConfigurationMigrationCurrent()) return
         handleAutoBackup()
         handleAutoRollback()
     }
@@ -86,7 +92,7 @@ class BackupAutomationService(
         if (restorePoint == null) {
             if (isDue(LocalTime.now(), targetTime)) {
                 plugin.config.set("backup.auto_rollback.last_run_date", today)
-                plugin.saveConfig()
+                plugin.saveConfigIfCurrent()
                 plugin.logger.warning("Auto rollback skipped because restore point is missing.")
             }
             return
@@ -126,10 +132,10 @@ class BackupAutomationService(
         run.started = true
         val configPath = if (run.type == AutomationType.BACKUP) "backup.auto_backup.last_run_date" else "backup.auto_rollback.last_run_date"
         plugin.config.set(configPath, run.date)
-        plugin.saveConfig()
+        plugin.saveConfigIfCurrent()
 
         run.evacuatedPlayers = evacuatePlayers(run.worldUuids) ?: emptyList()
-        run.bossBar?.setTitle(i18n("${run.type.key}_running"))
+        run.bossBar?.setTitle(i18n(run.type.runningKey))
         run.bossBar?.progress = 1.0
 
         operation().whenComplete { success, throwable ->
@@ -141,7 +147,7 @@ class BackupAutomationService(
                 if (succeeded) {
                     restoreEvacuatedPlayers(run.evacuatedPlayers, run.worldUuids)
                 }
-                run.players().forEach { it.sendMessage(i18nComponent("${run.type.key}_finished")) }
+                run.players().forEach { it.sendMessage(i18nComponent(run.type.finishedKey)) }
                 finishRun(run.type)
             })
         }
@@ -158,18 +164,17 @@ class BackupAutomationService(
             if (warning in run.notifiedWarnings) return@forEach
             if (remaining > warning || remaining <= warning - WARNING_WINDOW_SECONDS) return@forEach
             run.notifiedWarnings.add(warning)
-            val key = "${run.type.key}_warning"
-            run.players().forEach { it.sendMessage(i18nComponent(key, mapOf("remaining" to warningLabel(warning)))) }
+            run.players().forEach { it.sendMessage(i18nComponent(run.type.warningKey, mapOf("remaining" to warningLabel(warning)))) }
         }
     }
 
     private fun updateBossBar(run: AutomationRun, remaining: Long) {
         val bar = run.bossBar ?: Bukkit.createBossBar(
-            i18n("${run.type.key}_countdown", mapOf("remaining" to warningLabel(remaining))),
+            i18n(run.type.countdownKey, mapOf("remaining" to warningLabel(remaining))),
             if (run.type == AutomationType.BACKUP) BarColor.BLUE else BarColor.RED,
             BarStyle.SEGMENTED_10
         ).also { run.bossBar = it }
-        bar.setTitle(i18n("${run.type.key}_countdown", mapOf("remaining" to warningLabel(remaining))))
+        bar.setTitle(i18n(run.type.countdownKey, mapOf("remaining" to warningLabel(remaining))))
         bar.progress = (remaining.toDouble() / PREPARE_SECONDS.toDouble()).coerceIn(0.0, 1.0)
         run.players().forEach { if (!bar.players.contains(it)) bar.addPlayer(it) }
         bar.players.filter { it !in run.players().toSet() }.forEach(bar::removePlayer)
@@ -253,17 +258,23 @@ class BackupAutomationService(
         }
     }
 
-    private fun i18n(key: String, placeholders: Map<String, Any> = emptyMap()): String {
-        return CCSystem.getAPI().getI18nString(null, "chanpon.backup.automation_notice.$key", placeholders)
+    private fun i18n(key: LocalizationKey<String>, placeholders: Map<String, Any> = emptyMap()): String {
+        return CCSystem.getAPI().getLocalized(null, key, placeholders)
     }
 
-    private fun i18nComponent(key: String, placeholders: Map<String, Any> = emptyMap()): Component {
-        return CCSystem.getAPI().getI18nComponent(null, "chanpon.backup.automation_notice.$key", placeholders)
+    private fun i18nComponent(key: LocalizationKey<String>, placeholders: Map<String, Any> = emptyMap()): Component {
+        return CCSystem.getAPI().getI18nComponent(null, key, placeholders)
     }
 
-    private enum class AutomationType(val key: String, val logName: String) {
-        BACKUP("backup", "Scheduled backup"),
-        ROLLBACK("rollback", "Auto rollback")
+    private enum class AutomationType(
+        val logName: String,
+        val warningKey: LocalizationKey<String>,
+        val countdownKey: LocalizationKey<String>,
+        val runningKey: LocalizationKey<String>,
+        val finishedKey: LocalizationKey<String>,
+    ) {
+        BACKUP("Scheduled backup", ChanponBackupKeys.CHANPON_BACKUP_AUTOMATION_NOTICE_BACKUP_WARNING, ChanponBackupKeys.CHANPON_BACKUP_AUTOMATION_NOTICE_BACKUP_COUNTDOWN, ChanponBackupKeys.CHANPON_BACKUP_AUTOMATION_NOTICE_BACKUP_RUNNING, ChanponBackupKeys.CHANPON_BACKUP_AUTOMATION_NOTICE_BACKUP_FINISHED),
+        ROLLBACK("Auto rollback", ChanponBackupKeys.CHANPON_BACKUP_AUTOMATION_NOTICE_ROLLBACK_WARNING, ChanponBackupKeys.CHANPON_BACKUP_AUTOMATION_NOTICE_ROLLBACK_COUNTDOWN, ChanponBackupKeys.CHANPON_BACKUP_AUTOMATION_NOTICE_ROLLBACK_RUNNING, ChanponBackupKeys.CHANPON_BACKUP_AUTOMATION_NOTICE_ROLLBACK_FINISHED),
     }
 
     private data class AutomationRun(

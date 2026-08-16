@@ -12,8 +12,18 @@ import java.util.UUID
  * 実際の可視性はChanponWorldStorageを正本としてPolicyが判定する。
  */
 class PublishLevelSynchronizer : Listener {
+    private var synchronizationGate: (UUID) -> Boolean = { true }
+
+    /**
+     * MWM metadataの公開状態を同期する処理も外部データの読み取り結果に依存するため、
+     * 移行前・隔離中のワールドを推測値で上書きしないよう最終ゲートを持たせます。
+     */
+    fun setSynchronizationGate(gate: (UUID) -> Boolean) {
+        synchronizationGate = gate
+    }
 
     fun sync(worldUuid: UUID): Boolean {
+        if (!synchronizationGate(worldUuid)) return false
         val repository = MyWorldManagerApi.getWorldRepository() ?: return false
         val worldData = repository.findByUuid(worldUuid) ?: return false
         if (worldData.publishLevel == PublishLevel.PRIVATE) return true
@@ -27,6 +37,7 @@ class PublishLevelSynchronizer : Listener {
         val repository = MyWorldManagerApi.getWorldRepository() ?: return 0
         var changed = 0
         repository.findAll().forEach { worldData ->
+            if (!synchronizationGate(worldData.uuid)) return@forEach
             if (worldData.publishLevel != PublishLevel.PRIVATE || worldData.publicAt != null) {
                 worldData.publishLevel = PublishLevel.PRIVATE
                 worldData.publicAt = null

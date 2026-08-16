@@ -18,11 +18,20 @@ class SubmittedWorldProtectionService(
     private val logger: Logger,
     private val autoRollbackEnabled: () -> Boolean = { false }
 ) {
+    private var configurationAvailable: () -> Boolean = { true }
+
+    fun setConfigurationAvailability(gate: () -> Boolean) {
+        configurationAvailable = gate
+    }
+
     fun syncAll(worlds: Iterable<WorldData>) {
         worlds.forEach { sync(it) }
     }
 
     fun sync(worldData: WorldData) {
+        if (!configurationAvailable()) return
+        // 破損・旧形式をproduction=falseとして扱い、保護を解除しないようにします。
+        if (!storage.hasCurrentWorldData(worldData.uuid)) return
         if (!storage.isProductionWorld(worldData.uuid)) {
             setProtected(worldData, false)
             return
@@ -32,9 +41,17 @@ class SubmittedWorldProtectionService(
         setProtected(worldData, reasons.isNotEmpty())
     }
 
-    fun isProtected(worldData: WorldData): Boolean = protectionReasons(worldData).isNotEmpty()
+    /**
+     * 設定の移行中は保護状態を確定できないため、変更操作側が安全側に倒れるよう保護扱いにする。
+     * sync() は移行前の設定を上書きしないよう停止しているため、既存の保護状態も維持される。
+     */
+    fun isProtected(worldData: WorldData): Boolean =
+        !configurationAvailable() ||
+            !storage.hasCurrentWorldData(worldData.uuid) ||
+            protectionReasons(worldData).isNotEmpty()
 
     fun protectionReasons(worldData: WorldData): Set<ProtectionReason> {
+        if (!storage.hasCurrentWorldData(worldData.uuid)) return emptySet()
         if (!storage.isProductionWorld(worldData.uuid)) return emptySet()
         val reasons = linkedSetOf<ProtectionReason>()
         if (autoRollbackEnabled()) {

@@ -12,9 +12,16 @@ class ChanponWorldWorkPermissionPolicy(
     private val storage: ChanponWorldStorage,
     private val autoRollbackLocked: () -> Boolean
 ) : WorldWorkPermissionPolicy {
+    private var configurationAvailable: () -> Boolean = { true }
+
+    fun setConfigurationAvailability(gate: () -> Boolean) {
+        configurationAvailable = gate
+    }
     override fun getId(): String = "mwm-chanpon:world-work-permission"
 
     override fun canAssign(worldData: WorldData, playerUuid: UUID): Boolean {
+        if (!configurationAvailable()) return false
+        if (!storage.hasCurrentWorldData(worldData.uuid)) return false
         if (storage.isImportedArchive(worldData.uuid)) return false
         if (storage.isProductionWorld(worldData.uuid) && autoRollbackLocked()) return false
         if (storage.getProtectionMode(worldData.uuid) == ChanponWorldProtectionMode.OWNER_ONLY &&

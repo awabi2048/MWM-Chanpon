@@ -1,6 +1,9 @@
 package me.awabi2048.mwmchanpon.extension
 
+import com.awabi2048.ccsystem.api.localization.generated.ChanponSystemKeys
+
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.myworldmanager.model.WorldData
@@ -9,18 +12,31 @@ import me.awabi2048.myworldmanager.api.extension.WorldPublishReversibleRestoreRe
 import me.awabi2048.myworldmanager.api.extension.WorldPublishReversibleState
 import org.bukkit.entity.Player
 
+private fun defaultPublishUpdated(player: Player, visibility: ChanponWorldVisibility) {
+    player.sendMessage(
+        CCSystem.getAPI().getLocalized(
+            player,
+            ChanponSystemKeys.CHANPON_PUBLISH_UPDATED,
+            mapOf("level" to CCSystem.getAPI().getLocalized(player, publishVisibilityKey(visibility))),
+        ),
+    )
+}
+
+private fun publishVisibilityKey(visibility: ChanponWorldVisibility): LocalizationKey<String> = when (visibility) {
+    ChanponWorldVisibility.PUBLIC -> ChanponSystemKeys.CHANPON_PUBLISH_PUBLIC
+    ChanponWorldVisibility.DEVELOPMENT -> ChanponSystemKeys.CHANPON_PUBLISH_DEVELOPMENT
+    ChanponWorldVisibility.PRIVATE -> ChanponSystemKeys.CHANPON_PUBLISH_PRIVATE
+}
+
 class ChanponWorldPublishPolicy(
     private val storage: ChanponWorldStorage,
-    private val onPublishUpdated: (Player, ChanponWorldVisibility) -> Unit = { player, visibility ->
-        player.sendMessage(
-            CCSystem.getAPI().getI18nString(
-                player,
-                "chanpon.publish.updated",
-                mapOf("level" to CCSystem.getAPI().getI18nString(player, "chanpon.publish.${visibility.name.lowercase()}")),
-            ),
-        )
-    },
+    private val onPublishUpdated: (Player, ChanponWorldVisibility) -> Unit = ::defaultPublishUpdated,
 ) : ReversibleWorldPublishPolicy {
+    private var canWriteConfiguration: () -> Boolean = { true }
+
+    fun setConfigurationWriteGate(gate: () -> Boolean) {
+        canWriteConfiguration = gate
+    }
     override fun getId(): String = "mwmchanpon.world_publish"
 
     override fun getPublishDisplayName(
@@ -28,12 +44,19 @@ class ChanponWorldPublishPolicy(
         worldData: WorldData,
         defaultDisplayName: String
     ): String {
-        return displayName(player, storage.getVisibility(worldData.uuid))
+        val visibility = if (storage.hasCurrentWorldData(worldData.uuid)) {
+            storage.getVisibility(worldData.uuid)
+        } else {
+            ChanponWorldVisibility.PRIVATE
+        }
+        return displayName(player, visibility)
     }
 
-    override fun handlesPublishCycle(worldData: WorldData): Boolean = true
+    override fun handlesPublishCycle(worldData: WorldData): Boolean =
+        storage.hasCurrentWorldData(worldData.uuid)
 
     override fun cyclePublishLevel(player: Player, worldData: WorldData): Boolean {
+        if (!canWriteConfiguration() || !storage.hasCurrentWorldData(worldData.uuid)) return false
         val next = next(storage.getVisibility(worldData.uuid))
         storage.setVisibility(worldData.uuid, next)
         onPublishUpdated(player, next)
@@ -53,6 +76,11 @@ class ChanponWorldPublishPolicy(
         before: WorldPublishReversibleState,
         expectedAfter: WorldPublishReversibleState,
     ): WorldPublishReversibleRestoreResult {
+        if (!canWriteConfiguration() || !storage.hasCurrentWorldData(worldData.uuid)) {
+            return WorldPublishReversibleRestoreResult.Rejected(
+                "Chanpon world data requires /mwm migration before restoring publish state",
+            )
+        }
         val beforeState = before as? VisibilityState
             ?: return WorldPublishReversibleRestoreResult.Rejected("Chanpon publish before-state type is invalid")
         val expectedState = expectedAfter as? VisibilityState
@@ -83,10 +111,16 @@ class ChanponWorldPublishPolicy(
     ) : WorldPublishReversibleState
 
     private fun displayName(player: Player?, visibility: ChanponWorldVisibility): String {
-        return text(player, "chanpon.publish.${visibility.name.lowercase()}")
+        val key = when (visibility) {
+            ChanponWorldVisibility.PUBLIC -> ChanponSystemKeys.CHANPON_PUBLISH_PUBLIC
+            ChanponWorldVisibility.DEVELOPMENT -> ChanponSystemKeys.CHANPON_PUBLISH_DEVELOPMENT
+            ChanponWorldVisibility.PRIVATE -> ChanponSystemKeys.CHANPON_PUBLISH_PRIVATE
+        }
+        return text(player, key)
     }
 
-    private fun text(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): String {
-        return CCSystem.getAPI().getI18nString(player, key, placeholders)
+    private fun text(player: Player?, key: LocalizationKey<String>, placeholders: Map<String, Any> = emptyMap()): String {
+        return CCSystem.getAPI().getLocalized(player, key, placeholders)
     }
+
 }

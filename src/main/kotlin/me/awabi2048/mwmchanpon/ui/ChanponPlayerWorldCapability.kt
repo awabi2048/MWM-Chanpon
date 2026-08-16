@@ -1,6 +1,17 @@
 package me.awabi2048.mwmchanpon.ui
 
+import com.awabi2048.ccsystem.api.localization.generated.MyworldGuiBedrockKeys
+import com.awabi2048.ccsystem.api.localization.generated.MyworldGuiCommonKeys
+import com.awabi2048.ccsystem.api.localization.generated.MyworldGuiSettingsKeys
+import com.awabi2048.ccsystem.api.localization.generated.MyworldMessagesKeys
+import com.awabi2048.ccsystem.api.localization.generated.ChanponBackupKeys
+
+import com.awabi2048.ccsystem.api.localization.generated.ChanponSystemKeys
+
+import com.awabi2048.ccsystem.api.localization.generated.CommonKeys
+
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiInteractionGuidance
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
@@ -89,7 +100,7 @@ class ChanponPlayerWorldCapability(
                         id = "settings",
                         trigger = MenuCapabilityTrigger.LEFT_RIGHT,
                         textProvider = MenuCapabilityActionTextProvider {
-                            text(it.player, "gui.player_world.world_item.settings")
+                            text(it.player, MyworldGuiBedrockKeys.GUI_PLAYER_WORLD_WORLD_ITEM_SETTINGS)
                         },
                         availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
                             world(it)?.let { world ->
@@ -104,7 +115,7 @@ class ChanponPlayerWorldCapability(
                         id = "prioritize",
                         trigger = MenuCapabilityTrigger.SHIFT_LEFT,
                         textProvider = MenuCapabilityActionTextProvider {
-                            text(it.player, "gui.player_world.world_item.move_to_top")
+                            text(it.player, MyworldGuiBedrockKeys.GUI_PLAYER_WORLD_WORLD_ITEM_MOVE_TO_TOP)
                         },
                         availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
                             subject(it)?.targetPlayerUuid == it.player.uniqueId
@@ -143,7 +154,7 @@ class ChanponPlayerWorldCapability(
                         id = "settings",
                         trigger = MenuCapabilityTrigger.RIGHT,
                         textProvider = MenuCapabilityActionTextProvider {
-                            text(it.player, "gui.player_world.world_item.settings")
+                            text(it.player, MyworldGuiBedrockKeys.GUI_PLAYER_WORLD_WORLD_ITEM_SETTINGS)
                         },
                         availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
                             world(it)?.let { world -> canOpenSettings(it.player, world) } == true
@@ -155,7 +166,7 @@ class ChanponPlayerWorldCapability(
                         id = "prioritize",
                         trigger = MenuCapabilityTrigger.SHIFT_LEFT,
                         textProvider = MenuCapabilityActionTextProvider {
-                            text(it.player, "gui.player_world.world_item.move_to_top")
+                            text(it.player, MyworldGuiBedrockKeys.GUI_PLAYER_WORLD_WORLD_ITEM_MOVE_TO_TOP)
                         },
                         availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
                             canPrioritizeWorld(it)
@@ -201,7 +212,7 @@ class ChanponPlayerWorldCapability(
                         id = "standard-create",
                         trigger = MenuCapabilityTrigger.LEFT,
                         textProvider = MenuCapabilityActionTextProvider {
-                            text(it.player, "gui.player_world.creation_button.action")
+                            text(it.player, MyworldGuiBedrockKeys.GUI_PLAYER_WORLD_CREATION_BUTTON_ACTION)
                         },
                         availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
                             creationBlockReason(it) == null && hasCreatePermission(it.player)
@@ -215,7 +226,7 @@ class ChanponPlayerWorldCapability(
                         textProvider = MenuCapabilityActionTextProvider {
                             plugin.getMessage(
                                 it.player,
-                                "chanpon.player_world.easy_creation.action",
+                                ChanponSystemKeys.CHANPON_PLAYER_WORLD_EASY_CREATION_ACTION,
                             )
                         },
                         availability = me.awabi2048.mwmchanpon.ui.optionalAvailability {
@@ -325,10 +336,10 @@ class ChanponPlayerWorldCapability(
                 layout.layout.actionSlot + 2,
                 player,
                 Material.WRITABLE_BOOK,
-                text(player, "gui.user_settings.button.display"),
-                text(player, "gui.user_settings.button.action"),
+                text(player, MyworldGuiSettingsKeys.GUI_USER_SETTINGS_BUTTON_DISPLAY),
+                text(player, MyworldGuiSettingsKeys.GUI_USER_SETTINGS_BUTTON_ACTION),
                 ACTION_SETTINGS,
-                description = textList(player, "gui.user_settings.button.description"),
+                description = textList(player, MyworldGuiSettingsKeys.GUI_USER_SETTINGS_BUTTON_DESCRIPTION),
             )
             elements += pendingElement(layout.layout.size - 2, player)
         }
@@ -354,7 +365,7 @@ class ChanponPlayerWorldCapability(
         }
         return InventoryMenuView(
             layout.layout.size,
-            component(player, "gui.player_world.title"),
+            component(player, MyworldGuiBedrockKeys.GUI_PLAYER_WORLD_TITLE),
             elements,
         )
     }
@@ -363,9 +374,11 @@ class ChanponPlayerWorldCapability(
         context: MenuCapabilityContext,
     ): MenuCapabilityPresentation {
         val subject = requireNotNull(subject(context))
+        val ownerCount = MyWorldManagerApi.getWorldRepository()?.ownerCountIncludingQuarantine(subject.targetPlayerUuid)
+            ?: subject.worlds.count { it.owner == subject.targetPlayerUuid }
         val reason = creationBlockReason(
             context.player,
-            subject.worlds.count { it.owner == subject.targetPlayerUuid },
+            ownerCount,
             plugin.config.getInt("creation.max_worlds_per_player", 50),
         )
         return if (reason == null && hasCreatePermission(context.player)) {
@@ -383,7 +396,7 @@ class ChanponPlayerWorldCapability(
         val player = context.player
         if (subject.targetPlayerUuid != player.uniqueId) return MenuActionResult.Rejected()
         if (!hasCreatePermission(player)) {
-            player.sendMessage(i18n(player, "message.world_creation_no_permission"))
+            player.sendMessage(text(player, ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_WORLD_CREATION_NO_PERMISSION))
             return MenuActionResult.Rejected()
         }
         if (context.click.isRightClick && !context.click.isShiftClick) {
@@ -419,7 +432,7 @@ class ChanponPlayerWorldCapability(
             }
             MyWorldManagerApi.getWorldService()?.teleportToWorld(player, worldData.uuid)
             player.sendMessage(
-                text(player, "messages.warp_success", mapOf("world" to worldData.name)),
+                text(player, MyworldMessagesKeys.MESSAGES_WARP_SUCCESS, mapOf("world" to worldData.name)),
             )
             return MenuActionResult.Success(MenuUpdate.Close)
         }
@@ -435,9 +448,9 @@ class ChanponPlayerWorldCapability(
     private fun primaryWorldActionText(context: MenuCapabilityContext): String {
         val world = requireNotNull(world(context))
         return if (isCurrentWorld(context.player, world)) {
-            text(context.player, "gui.player_world.world_item.settings")
+            text(context.player, MyworldGuiBedrockKeys.GUI_PLAYER_WORLD_WORLD_ITEM_SETTINGS)
         } else {
-            text(context.player, "gui.player_world.world_item.warp")
+            text(context.player, MyworldGuiBedrockKeys.GUI_PLAYER_WORLD_WORLD_ITEM_WARP)
         }
     }
 
@@ -471,19 +484,19 @@ class ChanponPlayerWorldCapability(
         world: WorldData,
     ): MenuCapabilityPresentation {
         val ownerName = Bukkit.getOfflinePlayer(world.owner).name
-            ?: text(player, "general.unknown")
+            ?: text(player, CommonKeys.GENERAL_UNKNOWN)
         val progressLine = SubmissionProgressDisplay.loreLine(player, storage, world.uuid)
         val information = buildList {
             add(
                 GuiLoreLine.Data(
-                    CCSystem.getAPI().getI18nString(player, "gui_data.owner"),
+                    CCSystem.getAPI().getLocalized(player, CommonKeys.GUI_DATA_OWNER),
                     ownerName,
                     "§f",
                 ),
             )
             add(
                 GuiLoreLine.Data(
-                    CCSystem.getAPI().getI18nString(player, "gui_data.visibility"),
+                    CCSystem.getAPI().getLocalized(player, CommonKeys.GUI_DATA_VISIBILITY),
                     visibilityName(player, storage.getVisibility(world.uuid)),
                     "§e",
                 ),
@@ -500,7 +513,7 @@ class ChanponPlayerWorldCapability(
                     GuiLoreBlock(
                         listOf(
                             GuiLoreLine.Danger(
-                                text(player, "gui.player_world.world_item.expired"),
+                                text(player, MyworldGuiBedrockKeys.GUI_PLAYER_WORLD_WORLD_ITEM_EXPIRED),
                             ),
                         ),
                     ),
@@ -513,7 +526,7 @@ class ChanponPlayerWorldCapability(
                 name = GuiNameSpec.TargetIdentity(
                     component(
                         player,
-                        "gui.common.world_item_name",
+                        MyworldGuiCommonKeys.GUI_COMMON_WORLD_ITEM_NAME,
                         mapOf("world" to world.name),
                     ).decoration(TextDecoration.ITALIC, false),
                 ),
@@ -530,12 +543,12 @@ class ChanponPlayerWorldCapability(
             GuiItemSpec(
                 material = Material.NETHER_STAR,
                 name = GuiNameSpec.FixedLabel(
-                    component(player, "gui.player_world.creation_button.display"),
+                    component(player, MyworldGuiBedrockKeys.GUI_PLAYER_WORLD_CREATION_BUTTON_DISPLAY),
                 ),
                 lore = GuiLoreSpec.Blocks(
                     listOf(
                         GuiLoreBlock(
-                            textList(player, "gui.player_world.creation_button.description")
+                            textList(player, MyworldGuiBedrockKeys.GUI_PLAYER_WORLD_CREATION_BUTTON_DESCRIPTION)
                                 .map(GuiLoreLine::Text),
                         ),
                     ),
@@ -586,9 +599,9 @@ class ChanponPlayerWorldCapability(
         visibility: ChanponWorldVisibility,
     ): String {
         val key = when (visibility) {
-            ChanponWorldVisibility.PUBLIC -> "chanpon.publish.public"
-            ChanponWorldVisibility.DEVELOPMENT -> "chanpon.publish.development"
-            ChanponWorldVisibility.PRIVATE -> "chanpon.publish.private"
+            ChanponWorldVisibility.PUBLIC -> ChanponSystemKeys.CHANPON_PUBLISH_PUBLIC
+            ChanponWorldVisibility.DEVELOPMENT -> ChanponSystemKeys.CHANPON_PUBLISH_DEVELOPMENT
+            ChanponWorldVisibility.PRIVATE -> ChanponSystemKeys.CHANPON_PUBLISH_PRIVATE
         }
         return plugin.getMessage(player, key)
     }
@@ -631,9 +644,11 @@ class ChanponPlayerWorldCapability(
         context: MenuCapabilityContext,
     ): CreationBlockReason? {
         val subject = subject(context) ?: return CreationBlockReason.POLICY_DENIED
+        val ownerCount = MyWorldManagerApi.getWorldRepository()?.ownerCountIncludingQuarantine(subject.targetPlayerUuid)
+            ?: subject.worlds.count { it.owner == subject.targetPlayerUuid }
         return creationBlockReason(
             context.player,
-            subject.worlds.count { it.owner == subject.targetPlayerUuid },
+            ownerCount,
             plugin.config.getInt("creation.max_worlds_per_player", 50),
         )
     }
@@ -669,21 +684,18 @@ class ChanponPlayerWorldCapability(
 
     private fun text(
         player: Player,
-        key: String,
+        key: LocalizationKey<String>,
         placeholders: Map<String, Any> = emptyMap(),
-    ): String = CCSystem.getAPI().getI18nString(player, key, placeholders)
+    ): String = CCSystem.getAPI().getLocalized(player, key, placeholders)
 
-    private fun textList(player: Player, key: String): List<String> =
-        CCSystem.getAPI().getI18nStringList(player, key)
+    private fun textList(player: Player, key: LocalizationKey<List<String>>): List<String> =
+        CCSystem.getAPI().getLocalized(player, key)
 
     private fun component(
         player: Player,
-        key: String,
+        key: LocalizationKey<String>,
         placeholders: Map<String, Any> = emptyMap(),
     ) = CCSystem.getAPI().getI18nComponent(player, key, placeholders)
-
-    private fun i18n(player: Player, key: String): String =
-        CCSystem.getAPI().getI18nString(player, "chanpon.backup.$key")
 
     private fun changePage(context: MenuActionContext): MenuActionResult {
         val page = context.payload[PAYLOAD_PAGE]?.toIntOrNull()
@@ -750,7 +762,7 @@ class ChanponPlayerWorldCapability(
         next: Boolean,
         request: PlayerWorldRouteRequest,
     ): MenuElement {
-        val label = text(player, if (next) "gui.common.next_page" else "gui.common.prev_page")
+        val label = text(player, if (next) CommonKeys.GUI_COMMON_NEXT_PAGE else CommonKeys.GUI_COMMON_PREV_PAGE)
         return CCSystem.getAPI().getGuiElementService().menuEntry(
             player,
             GuiMenuEntrySpec(
@@ -784,14 +796,14 @@ class ChanponPlayerWorldCapability(
                     GuiItemSpec(
                         material = Material.BARRIER,
                         name = GuiNameSpec.FixedLabel(
-                            component(player, "gui.player_world.pending_button.display"),
+                            component(player, MyworldGuiBedrockKeys.GUI_PLAYER_WORLD_PENDING_BUTTON_DISPLAY),
                         ),
                         lore = GuiLoreSpec.Blocks(
                             listOf(
                                 GuiLoreBlock(
                                     listOf(
                                         GuiLoreLine.Text(
-                                            text(player, "gui.player_world.pending_button.empty"),
+                                            text(player, MyworldGuiBedrockKeys.GUI_PLAYER_WORLD_PENDING_BUTTON_EMPTY),
                                         ),
                                     ),
                                 ),
@@ -807,23 +819,23 @@ class ChanponPlayerWorldCapability(
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
                 .withZone(ZoneId.systemDefault())
                 .format(Instant.ofEpochMilli(it))
-        } ?: text(player, "gui.player_world.pending_button.none")
+        } ?: text(player, MyworldGuiBedrockKeys.GUI_PLAYER_WORLD_PENDING_BUTTON_NONE)
         return CCSystem.getAPI().getGuiElementService().menuEntry(
             player,
             GuiMenuEntrySpec(
                 slot = slot,
                 material = Material.WRITABLE_BOOK,
-                name = GuiNameSpec.FixedLabel(component(player, "gui.player_world.pending_button.display")),
+                name = GuiNameSpec.FixedLabel(component(player, MyworldGuiBedrockKeys.GUI_PLAYER_WORLD_PENDING_BUTTON_DISPLAY)),
                 role = GuiElementRole.ACTION,
-                description = textList(player, "gui.player_world.pending_button.description"),
+                description = textList(player, MyworldGuiBedrockKeys.GUI_PLAYER_WORLD_PENDING_BUTTON_DESCRIPTION),
                 data = listOf(
                     GuiMenuEntryData(
-                        text(player, "gui.player_world.pending_button.count_label"),
+                        text(player, MyworldGuiBedrockKeys.GUI_PLAYER_WORLD_PENDING_BUTTON_COUNT_LABEL),
                         summary.count,
                         GuiValueTone.PRIMARY,
                     ),
                     GuiMenuEntryData(
-                        text(player, "gui.player_world.pending_button.latest_label"),
+                        text(player, MyworldGuiBedrockKeys.GUI_PLAYER_WORLD_PENDING_BUTTON_LATEST_LABEL),
                         latest,
                         GuiValueTone.INFO,
                     ),
@@ -831,7 +843,7 @@ class ChanponPlayerWorldCapability(
                 actions = listOf(chanponGestureAction(
                     ACTION_PENDING,
                     MenuGesture.ANY,
-                    text(player, "gui.player_world.pending_button.action"),
+                    text(player, MyworldGuiBedrockKeys.GUI_PLAYER_WORLD_PENDING_BUTTON_ACTION),
                     safety = MenuActionSafety.NAVIGATION_ONLY,
                 )),
                 glint = true,
@@ -886,20 +898,20 @@ class ChanponPlayerWorldCapability(
         )
 
     private enum class CreationBlockReason(
-        val displayKey: String,
-        val loreKey: String,
+        val displayKey: LocalizationKey<String>,
+        val loreKey: LocalizationKey<List<String>>,
     ) {
         POLICY_DENIED(
-            "gui.player_world.creation_unavailable.policy_denied.display",
-            "gui.player_world.creation_unavailable.policy_denied.lore",
+            MyworldGuiBedrockKeys.GUI_PLAYER_WORLD_CREATION_UNAVAILABLE_POLICY_DENIED_DISPLAY,
+            MyworldGuiBedrockKeys.GUI_PLAYER_WORLD_CREATION_UNAVAILABLE_POLICY_DENIED_LORE,
         ),
         NO_SLOT(
-            "gui.player_world.creation_unavailable.no_slot.display",
-            "gui.player_world.creation_unavailable.no_slot.lore",
+            MyworldGuiBedrockKeys.GUI_PLAYER_WORLD_CREATION_UNAVAILABLE_NO_SLOT_DISPLAY,
+            MyworldGuiBedrockKeys.GUI_PLAYER_WORLD_CREATION_UNAVAILABLE_NO_SLOT_LORE,
         ),
         NO_PERMISSION(
-            "gui.player_world.creation_unavailable.no_permission.display",
-            "gui.player_world.creation_unavailable.no_permission.lore",
+            MyworldGuiBedrockKeys.GUI_PLAYER_WORLD_CREATION_UNAVAILABLE_NO_PERMISSION_DISPLAY,
+            MyworldGuiBedrockKeys.GUI_PLAYER_WORLD_CREATION_UNAVAILABLE_NO_PERMISSION_LORE,
         ),
     }
 

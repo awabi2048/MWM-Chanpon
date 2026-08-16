@@ -1,12 +1,18 @@
 package me.awabi2048.mwmchanpon.storage
 
 import java.io.File
+import java.nio.channels.FileChannel
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.nio.file.StandardOpenOption
 import java.util.UUID
 import org.bukkit.configuration.file.YamlConfiguration
 
 class ChanponGlobalStorage(dataFolder: File) {
     private val settingsFile = File(dataFolder, "settings.yml")
     private val playersDir = File(dataFolder, "players")
+    private var currentWriteGate: (() -> Boolean)? = null
 
     init {
         dataFolder.mkdirs()
@@ -19,21 +25,23 @@ class ChanponGlobalStorage(dataFolder: File) {
     }
 
     fun setSpawnWorldUuid(worldUuid: UUID) {
+        ensureCurrentForWrite()
         val config = settings()
         if (config.getString("spawn_world.uuid") != worldUuid.toString()) {
             config.set("spawn_world.policy_initialized_uuid", null)
         }
         config.set("spawn_world.uuid", worldUuid.toString())
-        config.save(settingsFile)
+        saveSettings(config)
     }
 
     fun isSpawnPolicyInitialized(worldUuid: UUID): Boolean =
         settings().getString("spawn_world.policy_initialized_uuid") == worldUuid.toString()
 
     fun setSpawnPolicyInitialized(worldUuid: UUID) {
+        ensureCurrentForWrite()
         val config = settings()
         config.set("spawn_world.policy_initialized_uuid", worldUuid.toString())
-        config.save(settingsFile)
+        saveSettings(config)
     }
 
     fun isInitialSpawnVisitCompleted(playerUuid: UUID): Boolean {
@@ -101,35 +109,55 @@ class ChanponGlobalStorage(dataFolder: File) {
         settings().getBoolean("archive_locked", false)
 
     fun setArchiveLocked(locked: Boolean) {
+        ensureCurrentForWrite()
         val config = settings()
         config.set("archive_locked", locked)
-        config.save(settingsFile)
+        saveSettings(config)
     }
 
     fun isBuildingAllowed(): Boolean {
-        migrateLegacyPhase()
-        return settings().getBoolean("building_allowed", true)
+        val config = settings()
+        return if (config.contains("building_allowed")) {
+            config.getBoolean("building_allowed", true)
+        } else {
+            legacyBuildingAllowed(config)
+        }
     }
 
+    fun setCurrentWriteGate(gate: () -> Boolean) {
+        currentWriteGate = gate
+    }
+
+    fun canWriteSettings(): Boolean = runCatching {
+        ensureCurrentForWrite()
+        true
+    }.getOrDefault(false)
+
     fun setBuildingAllowed(allowed: Boolean) {
-        migrateLegacyPhase()
+        ensureCurrentForWrite()
         val config = settings()
+        require(!config.contains("phase")) {
+            "settings.yml requires /mwm migration before building controls can be changed"
+        }
         config.set("building_allowed", allowed)
-        config.save(settingsFile)
+        saveSettings(config)
     }
 
     fun getWorldCreationAvailability(): WorldCreationAvailability {
-        migrateLegacyPhase()
-        val raw = settings().getString("world_creation_availability")
+        val config = settings()
+        val raw = config.getString("world_creation_availability")
         return runCatching { WorldCreationAvailability.valueOf(raw.orEmpty()) }
-            .getOrDefault(WorldCreationAvailability.PRODUCTION)
+            .getOrElse { legacyCreationAvailability(config) }
     }
 
     fun setWorldCreationAvailability(availability: WorldCreationAvailability) {
-        migrateLegacyPhase()
+        ensureCurrentForWrite()
         val config = settings()
+        require(!config.contains("phase")) {
+            "settings.yml requires /mwm migration before world creation controls can be changed"
+        }
         config.set("world_creation_availability", availability.name)
-        config.save(settingsFile)
+        saveSettings(config)
     }
 
     /** 管理ワールド制御の可逆操作で比較・復元する不変スナップショットです。 */
@@ -142,10 +170,13 @@ class ChanponGlobalStorage(dataFolder: File) {
 
     @Synchronized
     fun captureAdminWorldControls(): AdminWorldControlsSnapshot {
-        migrateLegacyPhase()
         val config = settings()
         return AdminWorldControlsSnapshot(
-            buildingAllowed = config.getBoolean("building_allowed", true),
+            buildingAllowed = if (config.contains("building_allowed")) {
+                config.getBoolean("building_allowed", true)
+            } else {
+                legacyBuildingAllowed(config)
+            },
             creationAvailability = getWorldCreationAvailability(),
             spawnWorldUuid = config.getString("spawn_world.uuid")?.let(::parseUuid),
             spawnPolicyInitializedUuid = config.getString("spawn_world.policy_initialized_uuid")?.let(::parseUuid),
@@ -154,38 +185,76 @@ class ChanponGlobalStorage(dataFolder: File) {
 
     @Synchronized
     fun restoreAdminWorldControls(snapshot: AdminWorldControlsSnapshot) {
+        ensureCurrentForWrite()
         val config = settings()
+        require(!config.contains("phase")) {
+            "settings.yml requires /mwm migration before world controls can be restored"
+        }
         config.set("building_allowed", snapshot.buildingAllowed)
         config.set("world_creation_availability", snapshot.creationAvailability.name)
         config.set("spawn_world.uuid", snapshot.spawnWorldUuid?.toString())
         config.set("spawn_world.policy_initialized_uuid", snapshot.spawnPolicyInitializedUuid?.toString())
-        config.save(settingsFile)
+        saveSettings(config)
     }
 
-    private fun migrateLegacyPhase() {
-        val config = settings()
-        if (config.contains("building_allowed") && config.contains("world_creation_availability")) return
-        when (config.getString("phase")) {
-            "BUILD_LOCKED" -> {
-                config.set("building_allowed", false)
-                config.set("world_creation_availability", WorldCreationAvailability.DENIED.name)
-            }
-            "CREATION_ALLOWED" -> {
-                config.set("building_allowed", true)
-                config.set("world_creation_availability", WorldCreationAvailability.NON_PRODUCTION.name)
-            }
-            else -> {
-                config.set("building_allowed", true)
-                config.set("world_creation_availability", WorldCreationAvailability.PRODUCTION.name)
-            }
-        }
-        config.set("phase", null)
-        config.save(settingsFile)
+    /** 旧 phase は読み取り時に解釈するだけで、ファイルへは書き戻しません。 */
+    private fun legacyBuildingAllowed(config: YamlConfiguration): Boolean =
+        config.getString("phase") != "BUILD_LOCKED"
+
+    /** 旧 phase は読み取り時に解釈するだけで、ファイルへは書き戻しません。 */
+    private fun legacyCreationAvailability(config: YamlConfiguration): WorldCreationAvailability = when (config.getString("phase")) {
+        "BUILD_LOCKED" -> WorldCreationAvailability.DENIED
+        "CREATION_ALLOWED" -> WorldCreationAvailability.NON_PRODUCTION
+        else -> WorldCreationAvailability.PRODUCTION
     }
 
     private fun settings(): YamlConfiguration {
         if (!settingsFile.exists()) settingsFile.createNewFile()
         return YamlConfiguration.loadConfiguration(settingsFile)
+    }
+
+    /** settings.yml も移行後の通常更新を原子的に確定し、途中書き込みを残しません。 */
+    private fun saveSettings(config: YamlConfiguration) {
+        val temporary = File(settingsFile.parentFile, settingsFile.name + ".save.tmp")
+        try {
+            config.save(temporary)
+            FileChannel.open(temporary.toPath(), StandardOpenOption.WRITE).use { it.force(true) }
+            val verified = YamlConfiguration().also { it.load(temporary) }
+            check(!verified.contains("phase")) {
+                "settings.yml still contains the legacy phase field"
+            }
+            if (verified.contains("building_allowed")) {
+                check(verified.isBoolean("building_allowed")) {
+                    "settings.yml building_allowed was not serialized as boolean"
+                }
+            }
+            if (verified.contains("world_creation_availability")) {
+                WorldCreationAvailability.valueOf(verified.getString("world_creation_availability").orEmpty())
+            }
+            try {
+                Files.move(
+                    temporary.toPath(),
+                    settingsFile.toPath(),
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING,
+                )
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(temporary.toPath(), settingsFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
+        } catch (error: Exception) {
+            Files.deleteIfExists(temporary.toPath())
+            throw IllegalStateException("Could not save current Chanpon settings", error)
+        }
+    }
+
+    /** 旧 phase の設定を通常処理が暗黙再保存しないための書き込み境界です。 */
+    private fun ensureCurrentForWrite() {
+        check(currentWriteGate?.invoke() != false) {
+            "settings.yml requires /mwm migration before it can be modified"
+        }
+        check(!settingsFile.exists() || !YamlConfiguration().also { it.load(settingsFile) }.contains("phase")) {
+            "settings.yml requires /mwm migration before it can be modified"
+        }
     }
 
     private fun playerFile(playerUuid: UUID): File = File(playersDir, "$playerUuid.yml")

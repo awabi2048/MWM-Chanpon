@@ -1,4 +1,8 @@
-package me.awabi2048.mwmchanpon.ui
+﻿package me.awabi2048.mwmchanpon.ui
+
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
+
+import com.awabi2048.ccsystem.api.localization.generated.ChanponBackupKeys
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
@@ -57,18 +61,10 @@ class AutomationSettingsMenu(
                 actions = mapOf(
                     ACTION_BACK to MenuActionHandler(::back),
                     ACTION_AUTO_BACKUP to MenuActionHandler { context ->
-                        showToggleConfirmation(
-                            context,
-                            "backup.auto_backup.enabled",
-                            "confirm.auto_backup_toggle",
-                        )
+                        showToggleConfirmation(context, AutomationToggle.AUTO_BACKUP)
                     },
                     ACTION_AUTO_ROLLBACK to MenuActionHandler { context ->
-                        showToggleConfirmation(
-                            context,
-                            "backup.auto_rollback.enabled",
-                            "confirm.auto_rollback_toggle",
-                        )
+                        showToggleConfirmation(context, AutomationToggle.AUTO_ROLLBACK)
                     },
                     ACTION_RESTORE_POINT to MenuActionHandler {
                         MenuActionResult.Success(
@@ -112,12 +108,12 @@ class AutomationSettingsMenu(
     private fun renderMain(player: Player): InventoryMenuView {
         val elements = mutableListOf(
             toggleEntry(
-                player, 20, Material.CLOCK, "automation.auto_backup",
+                player, 20, Material.CLOCK, AutomationToggle.AUTO_BACKUP.menu,
                 plugin.config.getBoolean("backup.auto_backup.enabled", false),
                 ACTION_AUTO_BACKUP,
             ),
             toggleEntry(
-                player, 24, Material.RECOVERY_COMPASS, "automation.auto_rollback",
+                player, 24, Material.RECOVERY_COMPASS, AutomationToggle.AUTO_ROLLBACK.menu,
                 plugin.config.getBoolean("backup.auto_rollback.enabled", false),
                 ACTION_AUTO_ROLLBACK,
             ),
@@ -125,10 +121,10 @@ class AutomationSettingsMenu(
                 player,
                 40,
                 Material.REDSTONE,
-                i18n(player, "common.back"),
+                i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_BACK),
                 GuiElementRole.BACK,
                 ACTION_BACK,
-                i18n(player, "common.back_action"),
+                i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_BACK_ACTION),
             ),
         )
         if (plugin.config.getBoolean("backup.auto_rollback.enabled", false)) {
@@ -137,59 +133,56 @@ class AutomationSettingsMenu(
                 GuiMenuEntrySpec(
                     slot = 36,
                     material = Material.END_CRYSTAL,
-                    name = GuiNameSpec.FixedLabel(i18nComponent(player, "automation.restore_point.display")),
+                    name = GuiNameSpec.FixedLabel(i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_AUTOMATION_RESTORE_POINT_DISPLAY)),
                     role = GuiElementRole.ACTION,
-                    description = i18nList(player, "automation.restore_point.lore"),
+                    description = i18nList(player, ChanponBackupKeys.CHANPON_BACKUP_AUTOMATION_RESTORE_POINT_LORE),
                     actions = listOf(chanponGestureAction(
                         ACTION_RESTORE_POINT,
                         MenuGesture.ANY,
-                        i18n(player, "automation.restore_point.action"),
+                        i18n(player, ChanponBackupKeys.CHANPON_BACKUP_AUTOMATION_RESTORE_POINT_ACTION),
                         safety = MenuActionSafety.CONFIRM_ENTRY,
                     )),
                 ),
             )
         }
-        return InventoryMenuView(45, i18nComponent(player, "automation.title"), elements)
+        return InventoryMenuView(45, i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_AUTOMATION_TITLE), elements)
     }
 
     private fun renderToggleConfirmation(player: Player, route: MenuRoute): InventoryMenuView {
-        val configPath = route.payload[CONFIG_PATH]
-            ?: error("切替対象の設定パスがありません")
-        val translationKey = route.payload[TRANSLATION_KEY]
-            ?: error("切替確認の言語キーがありません")
-        val current = plugin.config.getBoolean(configPath, false)
+        val target = AutomationToggle.fromRoute(route.payload[TOGGLE_ID])
+        val current = plugin.config.getBoolean(target.configPath, false)
         val layout = ChanponGuiElements.confirmationLayout()
         return InventoryMenuView(
             layout.size,
-            i18nComponent(player, "$translationKey.title"),
+            i18nComponent(player, target.confirmationTitle),
             listOf(
                 centerEntry(
                     player,
                     layout.previewSlot,
                         player,
                         Material.LEVER,
-                        translationKey,
-                        mapOf("state" to i18n(player, if (!current) "common.on" else "common.off")),
+                        target.confirmation,
+                        mapOf("state" to i18n(player, if (!current) ChanponBackupKeys.CHANPON_BACKUP_COMMON_ON else ChanponBackupKeys.CHANPON_BACKUP_COMMON_OFF)),
                 ),
                 simpleActionEntry(
                     player,
                     layout.confirmSlot,
                     Material.LIME_CONCRETE,
-                    i18n(player, "confirm.button.confirm"),
+                    i18n(player, ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BUTTON_CONFIRM),
                     GuiElementRole.CONFIRM,
                     ACTION_CONFIRM_TOGGLE,
-                    i18n(player, "confirm.button.confirm_action"),
-                    reversibleContract = ChanponReversibleContracts.automation(configPath),
+                    i18n(player, ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BUTTON_CONFIRM_ACTION),
+                    reversibleContract = ChanponReversibleContracts.automation(target.configPath),
                     classification = ChanponReversibleActionClassification.Operation.AUTOMATION_TOGGLE,
                 ),
                 simpleActionEntry(
                     player,
                     layout.cancelSlot,
                     Material.RED_CONCRETE,
-                    i18n(player, "confirm.button.cancel"),
+                    i18n(player, ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BUTTON_CANCEL),
                     GuiElementRole.CANCEL,
                     ACTION_CANCEL,
-                    i18n(player, "confirm.button.cancel_action"),
+                    i18n(player, ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BUTTON_CANCEL_ACTION),
                 ),
             ),
         ).asConfirmation()
@@ -199,26 +192,35 @@ class AutomationSettingsMenu(
         val layout = ChanponGuiElements.confirmationLayout()
         return InventoryMenuView(
             layout.size,
-            i18nComponent(player, "confirm.restore_point.title"),
+            i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_RESTORE_POINT_TITLE),
             listOf(
-                centerEntry(player, layout.previewSlot, player, Material.END_CRYSTAL, "confirm.restore_point"),
+                centerEntry(
+                    player,
+                    layout.previewSlot,
+                    player,
+                    Material.END_CRYSTAL,
+                    LocalizedContent(
+                        ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_RESTORE_POINT_DISPLAY,
+                        ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_RESTORE_POINT_LORE,
+                    ),
+                ),
                 simpleActionEntry(
                     player,
                     layout.confirmSlot,
                     Material.LIME_CONCRETE,
-                    i18n(player, "confirm.button.confirm"),
+                    i18n(player, ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BUTTON_CONFIRM),
                     GuiElementRole.CONFIRM,
                     ACTION_CONFIRM_RESTORE_POINT,
-                    i18n(player, "confirm.button.confirm_action"),
+                    i18n(player, ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BUTTON_CONFIRM_ACTION),
                 ),
                 simpleActionEntry(
                     player,
                     layout.cancelSlot,
                     Material.RED_CONCRETE,
-                    i18n(player, "confirm.button.cancel"),
+                    i18n(player, ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BUTTON_CANCEL),
                     GuiElementRole.CANCEL,
                     ACTION_CANCEL,
-                    i18n(player, "confirm.button.cancel_action"),
+                    i18n(player, ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BUTTON_CANCEL_ACTION),
                 ),
             ),
         ).asConfirmation()
@@ -230,26 +232,25 @@ class AutomationSettingsMenu(
 
     private fun showToggleConfirmation(
         context: MenuActionContext,
-        configPath: String,
-        translationKey: String,
+        target: AutomationToggle,
     ): MenuActionResult = MenuActionResult.Success(
         MenuUpdate.Navigate(
             MenuRoute(
                 OWNER,
                 ROUTE_TOGGLE_CONFIRM,
                 mapOf(
-                    CONFIG_PATH to configPath,
-                    TRANSLATION_KEY to translationKey,
+                    TOGGLE_ID to target.routeId,
                 ),
             ),
         ),
     )
 
     private fun confirmToggle(context: MenuActionContext): MenuActionResult {
-        val configPath = context.route.payload[CONFIG_PATH]
-            ?: return MenuActionResult.Rejected()
-        plugin.config.set(configPath, !plugin.config.getBoolean(configPath, false))
-        plugin.saveConfig()
+        val target = runCatching { AutomationToggle.fromRoute(context.route.payload[TOGGLE_ID]) }
+            .getOrElse { return MenuActionResult.Rejected() }
+        if (!plugin.isConfigurationMigrationCurrent()) return MenuActionResult.Rejected()
+        plugin.config.set(target.configPath, !plugin.config.getBoolean(target.configPath, false))
+        plugin.saveConfigIfCurrent()
         automationService.start()
         onSettingsChanged()
         return MenuActionResult.Success(MenuUpdate.Back)
@@ -270,9 +271,9 @@ class AutomationSettingsMenu(
                     i18nComponent(
                         player,
                         if (result.status == BackupOperationStatus.SUCCESS) {
-                            "message.restore_point_success"
+                            ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_RESTORE_POINT_SUCCESS
                         } else {
-                            "message.backup_failed"
+                            ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_BACKUP_FAILED
                         },
                     ),
                 )
@@ -286,7 +287,7 @@ class AutomationSettingsMenu(
         player: Player,
         slot: Int,
         material: Material,
-        key: String,
+        presentation: LocalizedContent,
         enabled: Boolean,
         actionId: String,
     ): MenuElement = CCSystem.getAPI().getGuiElementService().menuEntry(
@@ -294,17 +295,17 @@ class AutomationSettingsMenu(
         GuiMenuEntrySpec(
             slot = slot,
             material = material,
-            name = GuiNameSpec.FixedLabel(i18nComponent(player, "$key.display")),
+            name = GuiNameSpec.FixedLabel(i18nComponent(player, presentation.display)),
             role = GuiElementRole.ACTION,
             description = i18nList(
                 player,
-                "$key.lore",
-                mapOf("state" to i18n(player, if (enabled) "common.on" else "common.off")),
+                presentation.lore,
+                mapOf("state" to i18n(player, if (enabled) ChanponBackupKeys.CHANPON_BACKUP_COMMON_ON else ChanponBackupKeys.CHANPON_BACKUP_COMMON_OFF)),
             ),
             actions = listOf(chanponGestureAction(
                 actionId,
                 MenuGesture.ANY,
-                i18n(player, "$key.action"),
+                i18n(player, requireNotNull(presentation.action)),
                 safety = automationActionSafety(actionId),
             )),
             glint = enabled,
@@ -316,7 +317,7 @@ class AutomationSettingsMenu(
         slot: Int,
         player: Player,
         material: Material,
-        key: String,
+        presentation: LocalizedContent,
         placeholders: Map<String, Any> = emptyMap(),
     ): MenuElement =
         CCSystem.getAPI().getGuiElementService().menuDisplay(
@@ -324,9 +325,9 @@ class AutomationSettingsMenu(
                 slot,
                 GuiItemSpec(
                     material,
-                    GuiNameSpec.FixedLabel(i18nComponent(player, "$key.display", placeholders)),
+                    GuiNameSpec.FixedLabel(i18nComponent(player, presentation.display, placeholders)),
                     me.awabi2048.mwmchanpon.ui.framedLore(
-                        i18nList(player, "$key.lore", placeholders).map(GuiLoreLine::Text),
+                        i18nList(player, presentation.lore, placeholders).map(GuiLoreLine::Text),
                         GuiLoreFrame.BOTH,
                     ),
                     GuiElementRole.CONTENT,
@@ -370,20 +371,20 @@ class AutomationSettingsMenu(
         )
     }
 
-    private fun i18n(player: Player?, key: String) =
-        CCSystem.getAPI().getI18nString(player, "chanpon.backup.$key")
+    private fun i18n(player: Player?, key: LocalizationKey<String>) =
+        CCSystem.getAPI().getLocalized(player, key)
 
     private fun i18nComponent(
         player: Player?,
-        key: String,
+        key: LocalizationKey<String>,
         placeholders: Map<String, Any> = emptyMap(),
-    ) = CCSystem.getAPI().getI18nComponent(player, "chanpon.backup.$key", placeholders)
+    ) = CCSystem.getAPI().getI18nComponent(player, key, placeholders)
 
     private fun i18nList(
         player: Player?,
-        key: String,
+        key: LocalizationKey<List<String>>,
         placeholders: Map<String, Any> = emptyMap(),
-    ) = CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
+    ) = CCSystem.getAPI().getLocalized(player, key, placeholders)
 
     private fun automationActionSafety(actionId: String): MenuActionSafety = when (actionId) {
         ACTION_BACK, ACTION_CANCEL -> MenuActionSafety.NAVIGATION_ONLY
@@ -392,6 +393,56 @@ class AutomationSettingsMenu(
         ACTION_CONFIRM_RESTORE_POINT -> MenuActionSafety.IRREVERSIBLE
         else -> error("Automation action must declare a dedicated safety mapping: $actionId")
     }
+
+    /** 画面遷移では有限なIDだけを渡し、言語キーは型付き定義から復元します。 */
+    private enum class AutomationToggle(
+        val routeId: String,
+        val configPath: String,
+        val menu: LocalizedContent,
+        val confirmationTitle: LocalizationKey<String>,
+        val confirmation: LocalizedContent,
+    ) {
+        AUTO_BACKUP(
+            "auto-backup",
+            "backup.auto_backup.enabled",
+            LocalizedContent(
+                ChanponBackupKeys.CHANPON_BACKUP_AUTOMATION_AUTO_BACKUP_DISPLAY,
+                ChanponBackupKeys.CHANPON_BACKUP_AUTOMATION_AUTO_BACKUP_LORE,
+                ChanponBackupKeys.CHANPON_BACKUP_AUTOMATION_AUTO_BACKUP_ACTION,
+            ),
+            ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_AUTO_BACKUP_TOGGLE_TITLE,
+            LocalizedContent(
+                ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_AUTO_BACKUP_TOGGLE_DISPLAY,
+                ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_AUTO_BACKUP_TOGGLE_LORE,
+            ),
+        ),
+        AUTO_ROLLBACK(
+            "auto-rollback",
+            "backup.auto_rollback.enabled",
+            LocalizedContent(
+                ChanponBackupKeys.CHANPON_BACKUP_AUTOMATION_AUTO_ROLLBACK_DISPLAY,
+                ChanponBackupKeys.CHANPON_BACKUP_AUTOMATION_AUTO_ROLLBACK_LORE,
+                ChanponBackupKeys.CHANPON_BACKUP_AUTOMATION_AUTO_ROLLBACK_ACTION,
+            ),
+            ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_AUTO_ROLLBACK_TOGGLE_TITLE,
+            LocalizedContent(
+                ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_AUTO_ROLLBACK_TOGGLE_DISPLAY,
+                ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_AUTO_ROLLBACK_TOGGLE_LORE,
+            ),
+        );
+
+        companion object {
+            fun fromRoute(raw: String?): AutomationToggle =
+                entries.firstOrNull { it.routeId == raw }
+                    ?: error("未知の自動化設定IDです: $raw")
+        }
+    }
+
+    private data class LocalizedContent(
+        val display: LocalizationKey<String>,
+        val lore: LocalizationKey<List<String>>,
+        val action: LocalizationKey<String>? = null,
+    )
 
     companion object {
         private const val OWNER = "mwm-chanpon"
@@ -405,7 +456,6 @@ class AutomationSettingsMenu(
         private const val ACTION_CONFIRM_TOGGLE = "confirm-toggle"
         private const val ACTION_CONFIRM_RESTORE_POINT = "confirm-restore-point"
         private const val ACTION_CANCEL = "cancel"
-        private const val CONFIG_PATH = "config-path"
-        private const val TRANSLATION_KEY = "translation-key"
+        private const val TOGGLE_ID = "toggle-id"
     }
 }

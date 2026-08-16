@@ -16,6 +16,8 @@ import me.awabi2048.mwmchanpon.api.StandaloneExportContributors
 import me.awabi2048.mwmchanpon.api.StandaloneExportWorld
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
+import me.awabi2048.myworldmanager.api.service.WorldOperation
+import me.awabi2048.myworldmanager.api.service.WorldOperationLease
 import me.awabi2048.myworldmanager.model.WorldData
 import org.bukkit.Bukkit
 import org.bukkit.configuration.file.YamlConfiguration
@@ -49,11 +51,75 @@ class WorldDataExportService(
             )
         }
 
+        // Exportはワールド本体・MWMメタデータ・Chanponデータを一つの成果物へ
+        // 固定するため、対象の一部だけが旧形式のままなら開始しません。
+        // UIの選択制限だけに依存せず、このサービス境界で再検証します。
+        val migration = MyWorldManagerApi.evaluateMigration(
+            worldUuids = worlds.map { it.uuid },
+            includeGlobal = true,
+            includeUnresolved = false,
+        )
+        if (!migration.allowed) {
+            return CompletableFuture.completedFuture(
+                WorldDataExportResult(false, null, migration.blocks.first().message)
+            )
+        }
+        val nonCurrentChanpon = worlds.firstOrNull { !storage.isWorldDataCurrent(it.uuid) }
+        if (nonCurrentChanpon != null) {
+            return CompletableFuture.completedFuture(
+                WorldDataExportResult(
+                    false,
+                    null,
+                    "Chanpon world data requires /mwm migration: ${nonCurrentChanpon.uuid}",
+                )
+            )
+        }
+
         val core = MyWorldManagerApi.getWorldService()
             ?: return CompletableFuture.completedFuture(
                 WorldDataExportResult(false, null, "core api unavailable")
             )
-        saveLoadedWorlds(worlds)
+        // 状態確認後にロード済みワールドを保存します。以降のファイル生成は
+        // この不変スナップショットを基準に行い、移行中データを混在させません。
+        val leases = worlds.mapNotNull {
+            MyWorldManagerApi.tryAcquireWorldOperation(it.uuid, WorldOperation.BACKUP)
+        }
+        if (leases.size != worlds.size) {
+            leases.forEach(WorldOperationLease::close)
+            return CompletableFuture.completedFuture(
+                WorldDataExportResult(false, null, "world is locked")
+            )
+        }
+        var handedOffToAsync = false
+        try {
+        val lockedMigration = MyWorldManagerApi.evaluateMigration(
+            worldUuids = worlds.map { it.uuid },
+            includeGlobal = true,
+            includeUnresolved = false,
+        )
+        if (!lockedMigration.allowed) {
+            return CompletableFuture.completedFuture(
+                WorldDataExportResult(false, null, lockedMigration.blocks.first().message)
+            )
+        }
+        val lockedNonCurrentChanpon = worlds.firstOrNull { !storage.isWorldDataCurrent(it.uuid) }
+        if (lockedNonCurrentChanpon != null) {
+            return CompletableFuture.completedFuture(
+                WorldDataExportResult(
+                    false,
+                    null,
+                    "Chanpon world data requires /mwm migration: ${lockedNonCurrentChanpon.uuid}",
+                )
+            )
+        }
+        try {
+            saveLoadedWorlds(worlds)
+        } catch (error: Exception) {
+            return CompletableFuture.completedFuture(
+                WorldDataExportResult(false, null, error.message ?: "failed to save worlds")
+            )
+        }
+        // 以降の読み取りはこのリースで保護します。
         val worldDirectories = worlds.associate { it.uuid to core.getWorldDirectory(it).toPath() }
         val worldKeys = worlds.associate { world ->
             world.uuid to "minecraft:${core.getWorldFolderName(world)}"
@@ -121,10 +187,13 @@ class WorldDataExportService(
                 )
                 val now = System.currentTimeMillis()
                 val primarySpawn = spawnCoordinates.getValue(primary.uuid)
+                @Suppress("DEPRECATION")
+                val serverDataVersion = Bukkit.getUnsafe().dataVersion
                 val metadata = StandaloneLevelMetadata(
                     levelName = primary.name,
                     lastPlayed = now,
-                    dataVersion = Bukkit.getUnsafe().dataVersion,
+                    // level.dat のDataVersionはワールド書き出し時点の実行環境に合わせます。
+                    dataVersion = serverDataVersion,
                     versionName = Bukkit.getMinecraftVersion(),
                     spawnX = kotlin.math.floor(primarySpawn.x).toInt(),
                     spawnY = kotlin.math.floor(primarySpawn.y).toInt(),
@@ -182,9 +251,20 @@ class WorldDataExportService(
                 future.complete(WorldDataExportResult(false, null, ex.message ?: "export failed"))
             } finally {
                 staging.deleteRecursively()
+                leases.forEach(WorldOperationLease::close)
             }
         })
+        handedOffToAsync = true
         return future
+        } catch (error: Exception) {
+            return CompletableFuture.completedFuture(
+                WorldDataExportResult(false, null, error.message ?: "standalone export preparation failed")
+            )
+        } finally {
+            if (!handedOffToAsync) {
+                leases.forEach(WorldOperationLease::close)
+            }
+        }
     }
 
     fun productionWorlds(): List<WorldData> =

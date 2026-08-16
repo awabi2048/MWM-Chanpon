@@ -1,5 +1,9 @@
 package me.awabi2048.mwmchanpon.ui
 
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
+
+import com.awabi2048.ccsystem.api.localization.generated.ChanponSubmissionKeys
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiInteractionGuidance
@@ -114,7 +118,7 @@ class SubmissionAdminMenu(
         sortType: SortType = SortType.CREATED_DESC
     ) {
         if (!player.hasPermission("mwmchanpon.admin")) {
-            player.sendMessage(i18nComponent(player, "admin_menu.no_permission"))
+            player.sendMessage(i18nComponent(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_NO_PERMISSION))
             return
         }
         JavaPluginBridge.endCoreMenuSession(player)
@@ -138,21 +142,21 @@ class SubmissionAdminMenu(
         if (safePage > 0) {
             elements += simpleActionEntry(
                 player, layout.previousPageSlot, Material.ARROW,
-                i18n(player, "admin_menu.prev"), GuiElementRole.NAVIGATION,
-                ACTION_PAGE, i18n(player, "admin_menu.prev_action"), statePayload(current.copy(page = safePage - 1)),
+                i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_PREV), GuiElementRole.NAVIGATION,
+                ACTION_PAGE, i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_PREV_ACTION), statePayload(current.copy(page = safePage - 1)),
             )
         }
         if (safePage < totalPages - 1) {
             elements += simpleActionEntry(
                 player, layout.nextPageSlot, Material.ARROW,
-                i18n(player, "admin_menu.next"), GuiElementRole.NAVIGATION,
-                ACTION_PAGE, i18n(player, "admin_menu.next_action"), statePayload(current.copy(page = safePage + 1)),
+                i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_NEXT), GuiElementRole.NAVIGATION,
+                ACTION_PAGE, i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_NEXT_ACTION), statePayload(current.copy(page = safePage + 1)),
             )
         }
         elements += simpleActionEntry(
             player, layout.backSlot, Material.REDSTONE,
-            i18n(player, "admin_menu.back.display"), GuiElementRole.BACK, ACTION_BACK,
-            i18n(player, "admin_menu.back.action"),
+            i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_BACK_DISPLAY), GuiElementRole.BACK, ACTION_BACK,
+            i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_BACK_ACTION),
         )
         elements += statsEntry(player, layout.infoSlot)
         worlds.drop(safePage * ITEMS_PER_PAGE)
@@ -169,7 +173,7 @@ class SubmissionAdminMenu(
             player,
             47,
             Material.HOPPER,
-            "admin_menu.progress_filter.display",
+            ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_PROGRESS_FILTER_DISPLAY,
             ProgressFilter.entries.map { it.key },
             current.progressFilter.key,
             ACTION_PROGRESS_FILTER,
@@ -178,7 +182,7 @@ class SubmissionAdminMenu(
             player,
             51,
             Material.COMPARATOR,
-            "admin_menu.sort.display",
+            ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_SORT_DISPLAY,
             SortType.entries.map { it.key },
             current.sortType.key,
             ACTION_SORT,
@@ -186,7 +190,7 @@ class SubmissionAdminMenu(
         elements += closeSubmissionItem(player)
         return InventoryMenuView(
             layout.size,
-            i18nComponent(player, "admin_menu.title"),
+            i18nComponent(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_TITLE),
             elements,
         )
     }
@@ -234,9 +238,10 @@ class SubmissionAdminMenu(
 
     private fun toggleSubmissionClosure(context: MenuActionContext): MenuActionResult {
         if (plugin.isSubmissionClosed()) {
+            if (!plugin.isConfigurationMigrationCurrent()) return MenuActionResult.Rejected()
             plugin.config.set("submission.closed", false)
-            plugin.saveConfig()
-            context.player.sendMessage(i18nComponent(context.player, "admin_menu.reopened_message"))
+            plugin.saveConfigIfCurrent()
+            context.player.sendMessage(i18nComponent(context.player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_REOPENED_MESSAGE))
             return MenuActionResult.Success(MenuUpdate.Refresh)
         }
         return MenuActionResult.Success(
@@ -301,7 +306,7 @@ class SubmissionAdminMenu(
         if (current == SubmissionState.COMPLETED) return MenuActionResult.Rejected()
 
         if (!storage.isProductionWorld(worldData.uuid)) {
-            player.sendMessage(i18nComponent(player, "admin_menu.not_production"))
+            player.sendMessage(i18nComponent(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_NOT_PRODUCTION))
             return MenuActionResult.Rejected()
         }
         storage.setSubmissionState(
@@ -313,7 +318,7 @@ class SubmissionAdminMenu(
         )
         protectionService.sync(worldData)
         toolPermissionController.syncWorld(worldData)
-        player.sendMessage(i18nComponent(player, "admin_menu.completed_message"))
+        player.sendMessage(i18nComponent(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_COMPLETED_MESSAGE))
         return MenuActionResult.Success(MenuUpdate.Replace(listRoute(source)))
     }
 
@@ -334,7 +339,7 @@ class SubmissionAdminMenu(
         )
         protectionService.sync(worldData)
         toolPermissionController.syncWorld(worldData)
-        player.sendMessage(i18nComponent(player, "admin_menu.unmarked_message"))
+        player.sendMessage(i18nComponent(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_UNMARKED_MESSAGE))
         return MenuActionResult.Success(MenuUpdate.Replace(listRoute(source)))
     }
 
@@ -387,11 +392,11 @@ class SubmissionAdminMenu(
         return displayEntry(
             slot,
             Material.WRITABLE_BOOK,
-            GuiNameSpec.FixedLabel(i18nComponent(player, "admin_menu.stats.display")),
+            GuiNameSpec.FixedLabel(i18nComponent(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_STATS_DISPLAY)),
             me.awabi2048.mwmchanpon.ui.framedLore(
                 i18nList(
                     player,
-                    "admin_menu.stats.lore",
+                    ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_STATS_LORE,
                     mapOf(
                         "submitted" to submitted,
                         "total" to worlds.size,
@@ -406,9 +411,12 @@ class SubmissionAdminMenu(
     private fun renderCloseSubmissionConfirmation(player: Player): InventoryMenuView =
         confirmationView(
             player,
-            "confirm.close_submissions.title",
+            ConfirmationPresentation(
+                ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_CLOSE_SUBMISSIONS_TITLE,
+                ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_CLOSE_SUBMISSIONS_DISPLAY,
+                ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_CLOSE_SUBMISSIONS_LORE,
+            ),
             Material.REDSTONE_BLOCK,
-            "confirm.close_submissions",
             ACTION_CONFIRM_CLOSE,
             ChanponReversibleContracts.submission("global", "close"),
             ChanponReversibleActionClassification.Operation.SUBMISSION_CLOSURE,
@@ -420,12 +428,15 @@ class SubmissionAdminMenu(
     ): InventoryMenuView {
         val enabling = route.payload[ENABLING]?.toBooleanStrictOrNull()
             ?: error("本番用ワールド切替方向がありません")
-        val key = if (enabling) "confirm.set_production" else "confirm.unset_production"
+        val key = if (enabling) {
+            ConfirmationPresentation(ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_SET_PRODUCTION_TITLE, ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_SET_PRODUCTION_DISPLAY, ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_SET_PRODUCTION_LORE)
+        } else {
+            ConfirmationPresentation(ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_UNSET_PRODUCTION_TITLE, ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_UNSET_PRODUCTION_DISPLAY, ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_UNSET_PRODUCTION_LORE)
+        }
         return confirmationView(
             player,
-            "$key.title",
-            Material.HEART_OF_THE_SEA,
             key,
+            Material.HEART_OF_THE_SEA,
             ACTION_CONFIRM_PRODUCTION,
         )
     }
@@ -433,9 +444,12 @@ class SubmissionAdminMenu(
     private fun renderCompleteConfirmation(player: Player, route: MenuRoute): InventoryMenuView =
         confirmationView(
             player,
-            "confirm.complete_unsubmitted.title",
+            ConfirmationPresentation(
+                ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_COMPLETE_UNSUBMITTED_TITLE,
+                ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_COMPLETE_UNSUBMITTED_DISPLAY,
+                ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_COMPLETE_UNSUBMITTED_LORE,
+            ),
             Material.GOLDEN_APPLE,
-            "confirm.complete_unsubmitted",
             ACTION_CONFIRM_COMPLETE,
             route.payload[WORLD_UUID]?.let { ChanponReversibleContracts.submission(it, "complete") },
             ChanponReversibleActionClassification.Operation.SUBMISSION_COMPLETION,
@@ -443,9 +457,8 @@ class SubmissionAdminMenu(
 
     private fun confirmationView(
         player: Player,
-        titleKey: String,
+        presentation: ConfirmationPresentation,
         previewMaterial: Material,
-        previewKey: String,
         confirmAction: String,
         reversibleContract: com.awabi2048.ccsystem.api.gui.MenuReversibleContract? = null,
         classification: ChanponReversibleActionClassification.Operation? = null,
@@ -453,14 +466,14 @@ class SubmissionAdminMenu(
         val layout = ChanponGuiElements.confirmationLayout()
         return InventoryMenuView(
             layout.size,
-            i18nComponent(player, titleKey),
+            i18nComponent(player, presentation.title),
             listOf(
                 displayEntry(
                     layout.previewSlot,
                     previewMaterial,
-                    GuiNameSpec.FixedLabel(i18nComponent(player, "$previewKey.display")),
+                    GuiNameSpec.FixedLabel(i18nComponent(player, presentation.display)),
                     me.awabi2048.mwmchanpon.ui.framedLore(
-                        i18nList(player, "$previewKey.lore").map(GuiLoreLine::Text),
+                        i18nList(player, presentation.lore).map(GuiLoreLine::Text),
                         GuiLoreFrame.BOTH,
                     ),
                 ),
@@ -479,9 +492,10 @@ class SubmissionAdminMenu(
     )
 
     private fun confirmCloseSubmissions(context: MenuActionContext): MenuActionResult {
+        if (!plugin.isConfigurationMigrationCurrent()) return MenuActionResult.Rejected()
         plugin.config.set("submission.closed", true)
-        plugin.saveConfig()
-        context.player.sendMessage(i18nComponent(context.player, "admin_menu.closed_message"))
+        plugin.saveConfigIfCurrent()
+        context.player.sendMessage(i18nComponent(context.player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_CLOSED_MESSAGE))
         return MenuActionResult.Success(MenuUpdate.Back)
     }
 
@@ -496,7 +510,7 @@ class SubmissionAdminMenu(
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
             ?: return MenuActionResult.Rejected()
         if (enabling && ownerHasProductionWorld(worldData.owner, worldUuid)) {
-            player.sendMessage(i18nComponent(player, "admin_menu.production_limit"))
+            player.sendMessage(i18nComponent(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_PRODUCTION_LIMIT))
             return MenuActionResult.Rejected()
         }
         storage.setProductionWorld(worldUuid, enabling)
@@ -507,9 +521,9 @@ class SubmissionAdminMenu(
             i18nComponent(
                 player,
                 if (enabling) {
-                    "admin_menu.production_enabled"
+                    ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_PRODUCTION_ENABLED
                 } else {
-                    "admin_menu.production_disabled"
+                    ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_PRODUCTION_DISABLED
                 },
             ),
         )
@@ -537,20 +551,20 @@ class SubmissionAdminMenu(
         payload: Map<String, String>,
     ): MenuElement {
         val state = stateFor(worldData)
-        val unknown = i18n(player, "admin_menu.unknown")
+        val unknown = i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_UNKNOWN)
         val ownerName = playerName(worldData.owner, unknown)
         val members = (worldData.moderators + worldData.members)
             .distinct()
             .map { playerName(it, unknown) }
-            .let { if (it.isEmpty()) i18n(player, "admin_menu.world.no_members") else it.joinToString(", ") }
+            .let { if (it.isEmpty()) i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_WORLD_NO_MEMBERS) else it.joinToString(", ") }
         val production = storage.isProductionWorld(worldData.uuid)
         val actions = buildList {
-            add(chanponGestureAction(ACTION_WORLD, MenuGesture.LEFT, i18n(player, "admin_menu.world.action_warp"), payload, safety = MenuActionSafety.EXTERNAL_SIDE_EFFECT))
+            add(chanponGestureAction(ACTION_WORLD, MenuGesture.LEFT, i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_WORLD_ACTION_WARP), payload, safety = MenuActionSafety.EXTERNAL_SIDE_EFFECT))
             if (player.gameMode == GameMode.CREATIVE) {
                 add(chanponGestureAction(
                     ACTION_WORLD,
                     MenuGesture.RIGHT,
-                    i18n(player, "admin_menu.world.action_complete"),
+                    i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_WORLD_ACTION_COMPLETE),
                     payload,
                     safety = if (state == SubmissionState.UNSUBMITTED) MenuActionSafety.CONFIRM_ENTRY else MenuActionSafety.REVERSIBLE,
                     reversibleContract = when (state) {
@@ -564,7 +578,7 @@ class SubmissionAdminMenu(
                 ))
             }
             if (production) {
-                add(chanponGestureAction(ACTION_WORLD, MenuGesture.MIDDLE, i18n(player, "admin_menu.world.action_remove_production"), payload, safety = MenuActionSafety.CONFIRM_ENTRY))
+                add(chanponGestureAction(ACTION_WORLD, MenuGesture.MIDDLE, i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_WORLD_ACTION_REMOVE_PRODUCTION), payload, safety = MenuActionSafety.CONFIRM_ENTRY))
             }
         }
         return CCSystem.getAPI().getGuiElementService().menuEntry(
@@ -572,20 +586,20 @@ class SubmissionAdminMenu(
             GuiMenuEntrySpec(
                 slot = slot,
                 material = worldData.icon,
-                name = GuiNameSpec.TargetIdentity(i18nComponent(player, "admin_menu.world.display", mapOf("world" to worldData.name))),
+                name = GuiNameSpec.TargetIdentity(i18nComponent(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_WORLD_DISPLAY, mapOf("world" to worldData.name))),
                 role = GuiElementRole.ACTION,
                 data = listOf(
-                    GuiMenuEntryData(i18n(player, "admin_menu.world.owner_label"), ownerName),
-                    GuiMenuEntryData(i18n(player, "admin_menu.world.members_label"), members),
-                    GuiMenuEntryData(i18n(player, "admin_menu.world.created_label"), formatCreatedAt(worldData.createdAt)),
+                    GuiMenuEntryData(i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_WORLD_OWNER_LABEL), ownerName),
+                    GuiMenuEntryData(i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_WORLD_MEMBERS_LABEL), members),
+                    GuiMenuEntryData(i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_WORLD_CREATED_LABEL), formatCreatedAt(worldData.createdAt)),
                     GuiMenuEntryData(
-                        i18n(player, "admin_menu.world.production_label"),
-                        i18n(player, if (production) "admin_menu.world.production_yes" else "admin_menu.world.production_no"),
+                        i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_WORLD_PRODUCTION_LABEL),
+                        i18n(player, if (production) ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_WORLD_PRODUCTION_YES else ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_WORLD_PRODUCTION_NO),
                         if (production) GuiValueTone.SUCCESS else GuiValueTone.MUTED,
                     ),
                     GuiMenuEntryData(
-                        i18n(player, "admin_menu.world.state_label"),
-                        i18n(player, "state.${state.i18nKey}"),
+                        i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_WORLD_STATE_LABEL),
+                        i18n(player, submissionStateKey(state)),
                         when (state) {
                             SubmissionState.UNSUBMITTED -> GuiValueTone.WARNING
                             SubmissionState.SUBMITTED -> GuiValueTone.SUCCESS
@@ -593,8 +607,8 @@ class SubmissionAdminMenu(
                         },
                     ),
                     GuiMenuEntryData(
-                        i18n(player, "admin_menu.world.completed_label"),
-                        i18n(player, if (state == SubmissionState.COMPLETED) "admin_menu.world.completed_yes" else "admin_menu.world.completed_no"),
+                        i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_WORLD_COMPLETED_LABEL),
+                        i18n(player, if (state == SubmissionState.COMPLETED) ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_WORLD_COMPLETED_YES else ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_WORLD_COMPLETED_NO),
                     ),
                 ),
                 actions = actions,
@@ -650,9 +664,9 @@ class SubmissionAdminMenu(
         player: Player,
         slot: Int,
         material: Material,
-        displayKey: String,
-        optionKeys: List<String>,
-        selectedKey: String,
+        displayKey: LocalizationKey<String>,
+        optionKeys: List<LocalizationKey<String>>,
+        selectedKey: LocalizationKey<String>,
         actionId: String,
     ): MenuElement {
         return CCSystem.getAPI().getGuiElementService().menuEntry(
@@ -665,7 +679,7 @@ class SubmissionAdminMenu(
             options = optionKeys.map { GuiMenuEntryOption(i18n(player, it), it == selectedKey) },
             actions = listOf(chanponCycleAction(
                 actionId,
-                i18n(player, "common.action_next"),
+                i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_COMMON_ACTION_NEXT),
                 // フィルタ／並び順は次Routeの表示状態のみを変更します。
                 safety = MenuActionSafety.NAVIGATION_ONLY,
                 classification = submissionRouteClassification(actionId),
@@ -676,23 +690,23 @@ class SubmissionAdminMenu(
     }
 
     private fun closeSubmissionItem(player: Player): MenuElement {
-        val key = if (plugin.isSubmissionClosed()) {
-            "admin_menu.close.closed"
+        val presentation = if (plugin.isSubmissionClosed()) {
+            MenuPresentation(ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_CLOSE_CLOSED_DISPLAY, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_CLOSE_CLOSED_LORE, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_CLOSE_CLOSED_ACTION)
         } else {
-            "admin_menu.close.open"
+            MenuPresentation(ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_CLOSE_OPEN_DISPLAY, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_CLOSE_OPEN_LORE, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_CLOSE_OPEN_ACTION)
         }
         return CCSystem.getAPI().getGuiElementService().menuEntry(
             player,
             GuiMenuEntrySpec(
                 slot = 52,
                 material = if (plugin.isSubmissionClosed()) Material.BARRIER else Material.REDSTONE_BLOCK,
-                name = GuiNameSpec.FixedLabel(i18nComponent(player, "$key.display")),
+                name = GuiNameSpec.FixedLabel(i18nComponent(player, presentation.display)),
                 role = GuiElementRole.ACTION,
-                description = i18nList(player, "$key.lore"),
+                description = i18nList(player, presentation.lore),
                 actions = listOf(chanponGestureAction(
                     ACTION_CLOSE_SUBMISSIONS,
                     MenuGesture.ANY,
-                    i18n(player, "$key.action"),
+                    i18n(player, presentation.action),
                     safety = if (plugin.isSubmissionClosed()) MenuActionSafety.REVERSIBLE else MenuActionSafety.CONFIRM_ENTRY,
                     reversibleContract = if (plugin.isSubmissionClosed()) {
                         ChanponReversibleContracts.submission("global", "reopen")
@@ -717,20 +731,24 @@ class SubmissionAdminMenu(
         reversibleContract: com.awabi2048.ccsystem.api.gui.MenuReversibleContract? = null,
         classification: ChanponReversibleActionClassification.Operation? = null,
     ): MenuElement {
-        val key = if (confirm) "confirm.button.confirm" else "confirm.button.cancel"
+        val presentation = if (confirm) {
+            MenuPresentation(ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_BUTTON_CONFIRM_DISPLAY, ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_BUTTON_CONFIRM_LORE, ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_BUTTON_CONFIRM_ACTION)
+        } else {
+            MenuPresentation(ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_BUTTON_CANCEL_DISPLAY, ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_BUTTON_CANCEL_LORE, ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_BUTTON_CANCEL_ACTION)
+        }
         return CCSystem.getAPI().getGuiElementService().menuEntry(
             player,
             GuiMenuEntrySpec(
                 slot = slot,
                 material = if (confirm) Material.LIME_CONCRETE else Material.RED_CONCRETE,
-                name = GuiNameSpec.FixedLabel(i18nComponent(player, "$key.display")),
+                name = GuiNameSpec.FixedLabel(i18nComponent(player, presentation.display)),
                 role = if (confirm) GuiElementRole.CONFIRM else GuiElementRole.CANCEL,
-                description = i18nList(player, "$key.lore"),
+                description = i18nList(player, presentation.lore),
                 actions = listOf(
                     chanponGestureAction(
                         actionId,
                         MenuGesture.ANY,
-                        i18n(player, "$key.action"),
+                        i18n(player, presentation.action),
                         safety = submissionActionSafety(actionId),
                         reversibleContract = reversibleContract,
                         classification = classification,
@@ -777,8 +795,8 @@ class SubmissionAdminMenu(
         ),
     )
 
-    private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): String {
-        return CCSystem.getAPI().getI18nString(player, "chanpon.submission.$key", placeholders)
+    private fun i18n(player: Player?, key: LocalizationKey<String>, placeholders: Map<String, Any> = emptyMap()): String {
+        return CCSystem.getAPI().getLocalized(player, key, placeholders)
     }
 
     private fun submissionActionSafety(actionId: String): MenuActionSafety = when (actionId) {
@@ -795,25 +813,43 @@ class SubmissionAdminMenu(
         else -> null
     }
 
-    private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): List<String> {
-        return CCSystem.getAPI().getI18nStringList(player, "chanpon.submission.$key", placeholders)
+    private fun i18nList(player: Player?, key: LocalizationKey<List<String>>, placeholders: Map<String, Any> = emptyMap()): List<String> {
+        return CCSystem.getAPI().getLocalized(player, key, placeholders)
     }
 
-    private fun i18nComponent(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): Component {
-        return CCSystem.getAPI().getI18nComponent(player, "chanpon.submission.$key", placeholders)
+    private fun i18nComponent(player: Player?, key: LocalizationKey<String>, placeholders: Map<String, Any> = emptyMap()): Component {
+        return CCSystem.getAPI().getI18nComponent(player, key, placeholders)
     }
 
-    enum class ProgressFilter(val key: String) {
-        ALL("admin_menu.progress_filter.all"),
-        UNSUBMITTED("admin_menu.progress_filter.unsubmitted"),
-        SUBMITTED("admin_menu.progress_filter.submitted"),
-        COMPLETED("admin_menu.progress_filter.completed")
+    private fun submissionStateKey(state: SubmissionState): LocalizationKey<String> = when (state) {
+        SubmissionState.UNSUBMITTED -> ChanponSubmissionKeys.CHANPON_SUBMISSION_STATE_UNSUBMITTED
+        SubmissionState.SUBMITTED -> ChanponSubmissionKeys.CHANPON_SUBMISSION_STATE_SUBMITTED
+        SubmissionState.COMPLETED -> ChanponSubmissionKeys.CHANPON_SUBMISSION_STATE_COMPLETED
     }
 
-    enum class SortType(val key: String) {
-        CREATED_DESC("admin_menu.sort.created_desc"),
-        CREATED_ASC("admin_menu.sort.created_asc"),
-        NAME_ASC("admin_menu.sort.name_asc")
+    private data class ConfirmationPresentation(
+        val title: LocalizationKey<String>,
+        val display: LocalizationKey<String>,
+        val lore: LocalizationKey<List<String>>,
+    )
+
+    private data class MenuPresentation(
+        val display: LocalizationKey<String>,
+        val lore: LocalizationKey<List<String>>,
+        val action: LocalizationKey<String>,
+    )
+
+    enum class ProgressFilter(val key: LocalizationKey<String>) {
+        ALL(ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_PROGRESS_FILTER_ALL),
+        UNSUBMITTED(ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_PROGRESS_FILTER_UNSUBMITTED),
+        SUBMITTED(ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_PROGRESS_FILTER_SUBMITTED),
+        COMPLETED(ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_PROGRESS_FILTER_COMPLETED)
+    }
+
+    enum class SortType(val key: LocalizationKey<String>) {
+        CREATED_DESC(ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_SORT_CREATED_DESC),
+        CREATED_ASC(ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_SORT_CREATED_ASC),
+        NAME_ASC(ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_SORT_NAME_ASC)
     }
 
     private data class SubmissionViewState(

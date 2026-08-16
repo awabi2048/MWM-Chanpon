@@ -16,7 +16,15 @@ class WorldBuildPermissionService(
     private val storage: ChanponWorldStorage,
     private val logger: Logger
 ) {
+    private var configurationAvailable: () -> Boolean = { true }
+
+    fun setConfigurationAvailability(gate: () -> Boolean) {
+        configurationAvailable = gate
+    }
+
     fun sync(worldData: WorldData) {
+        if (!configurationAvailable()) return
+        if (!storage.hasCurrentWorldData(worldData.uuid)) return
         val bukkitWorld = Bukkit.getWorld(worldData.customWorldName ?: "my_world.${worldData.uuid}") ?: return
         val regionManager = WorldGuard.getInstance()
             .platform

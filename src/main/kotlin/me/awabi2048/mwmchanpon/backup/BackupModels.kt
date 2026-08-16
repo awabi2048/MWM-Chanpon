@@ -1,14 +1,16 @@
 package me.awabi2048.mwmchanpon.backup
 
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
+import com.awabi2048.ccsystem.api.localization.generated.ChanponBackupKeys
 import java.time.LocalDateTime
 import java.util.UUID
 
-enum class BackupKind(val storageValue: String, val i18nKey: String) {
-    USER_MANUAL("user_manual", "user_manual"),
-    ADMIN_MANUAL("admin_manual", "admin_manual"),
-    SCHEDULED("scheduled", "scheduled"),
-    RESTORE_POINT("restore_point", "restore_point"),
-    PRE_ROLLBACK("pre_rollback", "pre_rollback");
+enum class BackupKind(val storageValue: String, val displayKey: LocalizationKey<String>) {
+    USER_MANUAL("user_manual", ChanponBackupKeys.CHANPON_BACKUP_KIND_USER_MANUAL),
+    ADMIN_MANUAL("admin_manual", ChanponBackupKeys.CHANPON_BACKUP_KIND_ADMIN_MANUAL),
+    SCHEDULED("scheduled", ChanponBackupKeys.CHANPON_BACKUP_KIND_SCHEDULED),
+    RESTORE_POINT("restore_point", ChanponBackupKeys.CHANPON_BACKUP_KIND_RESTORE_POINT),
+    PRE_ROLLBACK("pre_rollback", ChanponBackupKeys.CHANPON_BACKUP_KIND_PRE_ROLLBACK);
 
     companion object {
         fun fromStorageValue(value: String?): BackupKind? = entries.firstOrNull { it.storageValue == value }

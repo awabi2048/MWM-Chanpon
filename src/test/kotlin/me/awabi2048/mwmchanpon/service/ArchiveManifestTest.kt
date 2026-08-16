@@ -17,6 +17,7 @@ class ArchiveManifestTest {
         val uuid = UUID.randomUUID()
         val file = writeManifest("""
             schema_version: 1
+            world_count: 1
             worlds:
               - uuid: $uuid
                 world_key: world_alpha
@@ -36,7 +37,7 @@ class ArchiveManifestTest {
     @Test
     fun rejectsMissingWorldIdentity() {
         val error = assertThrows(IllegalStateException::class.java) {
-            ArchiveManifest.read(writeManifest("schema_version: 1\nworlds:\n  - uuid: invalid"), 1)
+            ArchiveManifest.read(writeManifest("schema_version: 1\nworld_count: 1\nworlds:\n  - uuid: invalid"), 1)
         }
         assertEquals("archive_world_data_missing", error.message)
     }

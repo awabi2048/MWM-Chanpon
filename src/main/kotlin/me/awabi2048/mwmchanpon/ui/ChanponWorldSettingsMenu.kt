@@ -1,5 +1,12 @@
 package me.awabi2048.mwmchanpon.ui
+
+import com.awabi2048.ccsystem.api.localization.generated.ChanponSystemKeys
+
+import com.awabi2048.ccsystem.api.localization.generated.MyworldGuiBedrockKeys
+import com.awabi2048.ccsystem.api.localization.generated.MyworldGuiCommonKeys
+import com.awabi2048.ccsystem.api.localization.generated.MyworldGuiSettingsKeys
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
 import com.awabi2048.ccsystem.api.gui.GuiCycle
 import com.awabi2048.ccsystem.api.gui.GuiCycleDirection
 import com.awabi2048.ccsystem.api.gui.GuiConfirmationLayout
@@ -141,7 +148,7 @@ class ChanponWorldSettingsMenu(
                     ),
                 ) == true
                 if (!started) {
-                    player.sendMessage(i18nComponent(player, "message.expand_failed"))
+                    player.sendMessage(i18nComponent(player, ChanponSystemKeys.CHANPON_SETTINGS_MESSAGE_EXPAND_FAILED))
                     MenuActionResult.Rejected()
                 } else {
                     MenuActionResult.Success(MenuUpdate.None)
@@ -233,15 +240,15 @@ class ChanponWorldSettingsMenu(
             addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.PUBLISH_ACTION, 21)
             addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.NOTIFICATION_ACTION, 22)
         } else if (canInspectSettings) {
-            elements += mwmActionEntry(player, 19, worldData, WorldSettingsAction.EDIT_INFO, "info", Material.NAME_TAG, OPERATION_EDIT_INFO, listOf(i18n(player, "mwm_action.action")))
-            elements += mwmActionEntry(player, 20, worldData, WorldSettingsAction.SELECT_ICON, "icon", Material.ANVIL, OPERATION_SELECT_ICON, listOf(i18n(player, "mwm_action.action")))
-            elements += mwmActionEntry(player, 21, worldData, WorldSettingsAction.SET_SPAWN, "spawn", Material.COMPASS, OPERATION_SET_SPAWN,
-                if (MyWorldManagerApi.getBedrockFormService()?.isBedrock(player) == true) listOf(text(player, "gui.settings.spawn.action.select_type")) else listOf(text(player, "gui.settings.spawn.action.set_guest"), text(player, "gui.settings.spawn.action.set_member")),
+            elements += mwmActionEntry(player, 19, worldData, WorldSettingsAction.EDIT_INFO, "info", MyworldGuiSettingsKeys.GUI_SETTINGS_INFO_DISPLAY, Material.NAME_TAG, OPERATION_EDIT_INFO, listOf(i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_MWM_ACTION_ACTION)))
+            elements += mwmActionEntry(player, 20, worldData, WorldSettingsAction.SELECT_ICON, "icon", MyworldGuiSettingsKeys.GUI_SETTINGS_ICON_DISPLAY, Material.ANVIL, OPERATION_SELECT_ICON, listOf(i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_MWM_ACTION_ACTION)))
+            elements += mwmActionEntry(player, 21, worldData, WorldSettingsAction.SET_SPAWN, "spawn", MyworldGuiSettingsKeys.GUI_SETTINGS_SPAWN_DISPLAY, Material.COMPASS, OPERATION_SET_SPAWN,
+                if (MyWorldManagerApi.getBedrockFormService()?.isBedrock(player) == true) listOf(text(player, MyworldGuiSettingsKeys.GUI_SETTINGS_SPAWN_ACTION_SELECT_TYPE)) else listOf(text(player, MyworldGuiSettingsKeys.GUI_SETTINGS_SPAWN_ACTION_SET_GUEST), text(player, MyworldGuiSettingsKeys.GUI_SETTINGS_SPAWN_ACTION_SET_MEMBER)),
                 requireTargetWorld = true,
                 interactionGuidance = GuiInteractionGuidance.SINGLE_ACTION_CLICK,
             )
-            elements += mwmActionEntry(player, 28, worldData, WorldSettingsAction.EDIT_ANNOUNCEMENT, "announcement", Material.OAK_SIGN, OPERATION_ANNOUNCEMENT,
-                listOf(text(player, "gui.settings.announcement.action.set_message"), text(player, "gui.settings.announcement.action.reset_message")))
+            elements += mwmActionEntry(player, 28, worldData, WorldSettingsAction.EDIT_ANNOUNCEMENT, "announcement", MyworldGuiSettingsKeys.GUI_SETTINGS_ANNOUNCEMENT_DISPLAY, Material.OAK_SIGN, OPERATION_ANNOUNCEMENT,
+                listOf(text(player, MyworldGuiSettingsKeys.GUI_SETTINGS_ANNOUNCEMENT_ACTION_SET_MESSAGE), text(player, MyworldGuiSettingsKeys.GUI_SETTINGS_ANNOUNCEMENT_ACTION_RESET_MESSAGE)))
             addCapability(
                 elements,
                 player,
@@ -250,8 +257,8 @@ class ChanponWorldSettingsMenu(
                 29,
                 displayOnlyWhenUnavailable = !isFeatureRoleActionable(player, worldData, WorldSettingsFeature.NOTIFICATION),
             )
-            elements += mwmActionEntry(player, 47, worldData, WorldSettingsAction.MANAGE_TOUR, "tour", Material.PALE_OAK_BOAT, OPERATION_TOUR,
-                listOf(i18n(player, "mwm_action.action")), "gui.tour.worldmenu", requireTargetWorld = true)
+            elements += mwmActionEntry(player, 47, worldData, WorldSettingsAction.MANAGE_TOUR, "tour", MyworldGuiCommonKeys.GUI_TOUR_WORLDMENU_DISPLAY, Material.PALE_OAK_BOAT, OPERATION_TOUR,
+                listOf(i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_MWM_ACTION_ACTION)), requireTargetWorld = true)
         }
         if (canInspectSettings && !protected) {
             addCapability(
@@ -271,7 +278,7 @@ class ChanponWorldSettingsMenu(
                 24,
                 displayOnlyWhenUnavailable = !isFeatureRoleActionable(player, worldData, WorldSettingsFeature.PUBLISH),
             )
-            elements += mwmActionEntry(player, 25, worldData, WorldSettingsAction.MANAGE_MEMBERS, "member", Material.PLAYER_HEAD, OPERATION_MEMBERS, listOf(i18n(player, "mwm_action.action")))
+            elements += mwmActionEntry(player, 25, worldData, WorldSettingsAction.MANAGE_MEMBERS, "member", MyworldGuiSettingsKeys.GUI_SETTINGS_MEMBER_DISPLAY, Material.PLAYER_HEAD, OPERATION_MEMBERS, listOf(i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_MWM_ACTION_ACTION)))
             addCapability(
                 elements,
                 player,
@@ -291,12 +298,12 @@ class ChanponWorldSettingsMenu(
                     !isFeatureRoleActionable(player, worldData, WorldSettingsFeature.CRITICAL),
             )
             if (MyWorldManagerApi.hasWorldPortals(worldData.uuid)) {
-                elements += mwmActionEntry(player, ChanponWorldSettingsLayout.PORTAL_MANAGEMENT_SLOT, worldData, WorldSettingsAction.MANAGE_PORTALS, "portals", Material.END_PORTAL_FRAME, OPERATION_PORTALS, listOf(i18n(player, "mwm_action.action")))
+                elements += mwmActionEntry(player, ChanponWorldSettingsLayout.PORTAL_MANAGEMENT_SLOT, worldData, WorldSettingsAction.MANAGE_PORTALS, "portals", MyworldGuiSettingsKeys.GUI_SETTINGS_PORTALS_DISPLAY, Material.END_PORTAL_FRAME, OPERATION_PORTALS, listOf(i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_MWM_ACTION_ACTION)))
             }
         }
         elements += worldInfoElement(player, worldData)
         if (CCSystem.getAPI().getMenuNavigationService().canGoBack(player)) {
-            elements += actionElement(player, ChanponGuiElements.backSlot(size), null, i18n(player, "common.back"), OPERATION_BACK, GuiElementRole.BACK)
+            elements += actionElement(player, ChanponGuiElements.backSlot(size), null, i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_COMMON_BACK), OPERATION_BACK, GuiElementRole.BACK)
         }
         if (owner) {
             addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.FOOTER_ACTIONS, ChanponWorldSettingsLayout.productionSubmissionSlot(size), displayOnlyWhenUnavailable = true)
@@ -307,7 +314,7 @@ class ChanponWorldSettingsMenu(
         }
         return InventoryMenuView(
             size,
-            CCSystem.getAPI().getI18nComponent(player, "gui.settings.title", mapOf("world" to worldData.name)),
+            CCSystem.getAPI().getI18nComponent(player, MyworldGuiSettingsKeys.GUI_SETTINGS_TITLE, mapOf("world" to worldData.name)),
             elements,
             playerInventoryInteraction = PlayerInventoryInteraction.INTERACTIVE,
         )
@@ -343,8 +350,8 @@ class ChanponWorldSettingsMenu(
 
     private fun mwmActionEntry(
         player: Player, slot: Int, worldData: WorldData, action: WorldSettingsAction,
-        iconKey: String, material: Material, operation: String, actionTexts: List<String>,
-        langPrefix: String = "gui.settings.$iconKey", requireTargetWorld: Boolean = false,
+        iconKey: String, displayKey: LocalizationKey<String>, material: Material, operation: String, actionTexts: List<String>,
+        requireTargetWorld: Boolean = false,
         interactionGuidance: GuiInteractionGuidance = GuiInteractionGuidance.DEFAULT,
     ): MenuElement {
         val contract = requireNotNull(MyWorldManagerApi.getWorldSettingsActionContract(player, worldData.uuid, action))
@@ -362,7 +369,7 @@ class ChanponWorldSettingsMenu(
         return CCSystem.getAPI().getGuiElementService().menuEntry(player, GuiMenuEntrySpec(
             slot = slot,
             material = MyWorldManagerApi.getConfiguredMenuIcon("world_settings", iconKey, material),
-            name = fixedName(text(player, "$langPrefix.display"), GuiNameStyle.DEFAULT),
+            name = fixedName(text(player, displayKey), GuiNameStyle.DEFAULT),
             role = if (actionable) GuiElementRole.ACTION else GuiElementRole.CONTENT,
             description = mwmDescription(player, iconKey),
             warnings = warningKey?.let { listOf(i18n(player, it)) } ?: emptyList(),
@@ -385,21 +392,21 @@ class ChanponWorldSettingsMenu(
         return CCSystem.getAPI().getGuiElementService().menuEntry(player, GuiMenuEntrySpec(
             slot = 4, material = worldData.icon, name = fixedName(worldData.name, GuiNameStyle.PRIMARY),
             role = if (actionable) GuiElementRole.ACTION else GuiElementRole.CONTENT,
-            data = listOf(GuiMenuEntryData(i18n(player, "info.description_label"), worldData.description.ifBlank { "-" })),
-            actions = if (actionable) listOf(chanponGestureAction(ACTION_SELECT, MenuGesture.fromClicks(requireNotNull(contract).acceptedClicks), text(player, "gui.player_world.world_item.warp"), mapOf(OPERATION to OPERATION_WARP), safety = MenuActionSafety.EXTERNAL_SIDE_EFFECT)) else emptyList(),
+            data = listOf(GuiMenuEntryData(i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_INFO_DESCRIPTION_LABEL), worldData.description.ifBlank { "-" })),
+            actions = if (actionable) listOf(chanponGestureAction(ACTION_SELECT, MenuGesture.fromClicks(requireNotNull(contract).acceptedClicks), text(player, MyworldGuiBedrockKeys.GUI_PLAYER_WORLD_WORLD_ITEM_WARP), mapOf(OPERATION to OPERATION_WARP), safety = MenuActionSafety.EXTERNAL_SIDE_EFFECT)) else emptyList(),
             sounds = contract?.sounds,
         ))
     }
 
     private fun mwmDescription(player: Player, iconKey: String): List<String> {
         val key = when (iconKey) {
-            "info" -> "gui.settings.info.blocks.summary"
-            "icon" -> "gui.settings.icon.blocks.description"
-            "spawn" -> "gui.settings.spawn.blocks.description"
-            "announcement" -> "gui.settings.announcement.blocks.description"
-            "member" -> "gui.settings.member.blocks.description"
-            "tour" -> "gui.tour.worldmenu.blocks.description"
-            "portals" -> "gui.settings.portals.blocks.summary"
+            "info" -> MyworldGuiSettingsKeys.GUI_SETTINGS_INFO_BLOCKS_SUMMARY
+            "icon" -> MyworldGuiSettingsKeys.GUI_SETTINGS_ICON_BLOCKS_DESCRIPTION
+            "spawn" -> MyworldGuiSettingsKeys.GUI_SETTINGS_SPAWN_BLOCKS_DESCRIPTION
+            "announcement" -> MyworldGuiSettingsKeys.GUI_SETTINGS_ANNOUNCEMENT_BLOCKS_DESCRIPTION
+            "member" -> MyworldGuiSettingsKeys.GUI_SETTINGS_MEMBER_BLOCKS_DESCRIPTION
+            "tour" -> MyworldGuiCommonKeys.GUI_TOUR_WORLDMENU_BLOCKS_DESCRIPTION
+            "portals" -> MyworldGuiSettingsKeys.GUI_SETTINGS_PORTALS_BLOCKS_SUMMARY
             else -> return emptyList()
         }
         return textList(player, key)
@@ -434,7 +441,7 @@ class ChanponWorldSettingsMenu(
                 player.sendMessage(
                     i18nComponent(
                         player,
-                        if (success) "critical.deleted" else "critical.delete_failed",
+                        if (success) ChanponSystemKeys.CHANPON_SETTINGS_CRITICAL_DELETED else ChanponSystemKeys.CHANPON_SETTINGS_CRITICAL_DELETE_FAILED,
                     ),
                 )
                 if (success) MyWorldManagerApi.closeWorldSettingsContext(player)
@@ -450,7 +457,7 @@ class ChanponWorldSettingsMenu(
 
     private fun openCriticalMenu(player: Player, worldData: WorldData): MenuActionResult {
         if (criticalUnavailableLoreKey(player, worldData) != null) {
-            player.sendMessage(i18nComponent(player, "critical.unavailable_message"))
+            player.sendMessage(i18nComponent(player, ChanponSystemKeys.CHANPON_SETTINGS_CRITICAL_UNAVAILABLE_MESSAGE))
             return MenuActionResult.Rejected()
         }
         return MenuActionResult.Success(
@@ -486,16 +493,16 @@ class ChanponWorldSettingsMenu(
     }
 
     private fun openBedrockConfirmForm(player: Player, worldData: WorldData, action: ConfirmAction, direction: BlockFace?): Boolean {
-        val directionName = direction?.let { directionName(player, it) } ?: i18n(player, "direction.center")
+        val directionName = direction?.let { directionName(player, it) } ?: i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_DIRECTION_CENTER)
         val modified = action == ConfirmAction.STEP_BACK && worldData.latestBorderExpansionRecord()?.modified == true
         val forms = MyWorldManagerApi.getBedrockFormService() ?: return false
         val opened = forms.sendSimpleForm(
             player = player,
-            title = i18n(player, "confirm.${action.key}.title"),
+            title = i18n(player, action.titleKey),
             content = confirmContentLines(player, action, directionName, modified).joinToString("\n"),
             buttons = listOf(
-                i18n(player, "confirm.button.confirm"),
-                i18n(player, "confirm.button.cancel")
+                i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_CONFIRM_BUTTON_CONFIRM),
+                i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_CONFIRM_BUTTON_CANCEL)
             ),
             onSelect = { index ->
                 val latest = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldData.uuid)
@@ -538,19 +545,23 @@ class ChanponWorldSettingsMenu(
         val elements = mutableListOf(
             simpleActionEntry(
                 player, 20, Material.MAP,
-                "expand_menu.center.display", "expand_menu.center.description",
-                "expand_menu.center.action", OPERATION_EXPAND_CENTER,
+                ChanponSystemKeys.CHANPON_SETTINGS_EXPAND_MENU_CENTER_DISPLAY,
+                ChanponSystemKeys.CHANPON_SETTINGS_EXPAND_MENU_CENTER_DESCRIPTION,
+                ChanponSystemKeys.CHANPON_SETTINGS_EXPAND_MENU_CENTER_ACTION,
+                OPERATION_EXPAND_CENTER,
             ),
             simpleActionEntry(
                 player, 24, Material.COMPASS,
-                "expand_menu.direction_select.display", "expand_menu.direction_select.description",
-                "expand_menu.direction_select.action", OPERATION_EXPAND_DIRECTION,
+                ChanponSystemKeys.CHANPON_SETTINGS_EXPAND_MENU_DIRECTION_SELECT_DISPLAY,
+                ChanponSystemKeys.CHANPON_SETTINGS_EXPAND_MENU_DIRECTION_SELECT_DESCRIPTION,
+                ChanponSystemKeys.CHANPON_SETTINGS_EXPAND_MENU_DIRECTION_SELECT_ACTION,
+                OPERATION_EXPAND_DIRECTION,
             ),
             actionElement(
                 player,
                 ChanponGuiElements.backSlot(45),
                 null,
-                i18n(player, "common.back"),
+                i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_COMMON_BACK),
                 OPERATION_BACK,
                 GuiElementRole.BACK,
             ),
@@ -560,33 +571,33 @@ class ChanponWorldSettingsMenu(
                 player,
                 42,
                 Material.RECOVERY_COMPASS,
-                "step_back.display",
-                "step_back.description",
-                "step_back.action",
+                ChanponSystemKeys.CHANPON_SETTINGS_STEP_BACK_DISPLAY,
+                ChanponSystemKeys.CHANPON_SETTINGS_STEP_BACK_DESCRIPTION,
+                ChanponSystemKeys.CHANPON_SETTINGS_STEP_BACK_ACTION,
                 OPERATION_STEP_BACK,
                 warnings = if (worldData.latestBorderExpansionRecord()?.modified == true) {
-                    listOf(i18n(player, "step_back.modified_warning"))
+                    listOf(i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_STEP_BACK_MODIFIED_WARNING))
                 } else {
                     emptyList()
                 },
             )
         }
-        return InventoryMenuView(45, i18nComponent(player, "expand_menu.title"), elements)
+        return InventoryMenuView(45, i18nComponent(player, ChanponSystemKeys.CHANPON_SETTINGS_EXPAND_MENU_TITLE), elements)
     }
 
     private fun renderModifiedWarning(player: Player): InventoryMenuView {
         val layout = ChanponGuiElements.confirmationLayout()
         return InventoryMenuView(
             layout.size,
-            i18nComponent(player, "modified_warning.title"),
+            i18nComponent(player, ChanponSystemKeys.CHANPON_SETTINGS_MODIFIED_WARNING_TITLE),
             confirmationElements(
                 player,
                 layout,
                 modifiedWarningItem(player),
                 warningButton(player, true),
                 warningButton(player, false),
-                i18n(player, "modified_warning.button.continue"),
-                i18n(player, "modified_warning.button.cancel"),
+                i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_MODIFIED_WARNING_BUTTON_CONTINUE),
+                i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_MODIFIED_WARNING_BUTTON_CANCEL),
                 MenuActionSafety.CONFIRM_ENTRY,
             ),
         )
@@ -597,15 +608,15 @@ class ChanponWorldSettingsMenu(
         val layout = ChanponGuiElements.confirmationLayout()
         return InventoryMenuView(
             layout.size,
-            i18nComponent(player, "confirm.${action.key}.title"),
+            i18nComponent(player, action.titleKey),
             confirmationElements(
                 player,
                 layout,
                 confirmCenterItem(player, worldData, action, source.direction),
                 confirmButton(player, true),
                 confirmButton(player, false),
-                i18n(player, "confirm.button.confirm"),
-                i18n(player, "confirm.button.cancel"),
+                i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_CONFIRM_BUTTON_CONFIRM),
+                i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_CONFIRM_BUTTON_CANCEL),
                 MenuActionSafety.IRREVERSIBLE,
             ),
         )
@@ -614,13 +625,13 @@ class ChanponWorldSettingsMenu(
     private fun renderCritical(player: Player, worldData: WorldData): InventoryMenuView =
         InventoryMenuView(
             45,
-            i18nComponent(player, "critical.menu_title"),
+            i18nComponent(player, ChanponSystemKeys.CHANPON_SETTINGS_CRITICAL_MENU_TITLE),
             listOf(
                 actionElement(
                     player,
                     ChanponGuiElements.backSlot(45),
                     null,
-                    i18n(player, "common.back"),
+                    i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_COMMON_BACK),
                     OPERATION_BACK,
                     GuiElementRole.BACK,
                 ),
@@ -628,11 +639,11 @@ class ChanponWorldSettingsMenu(
                     player,
                     22,
                     Material.TNT,
-                    "critical.delete_display",
-                    "critical.delete_description",
-                    "critical.delete_action",
+                    ChanponSystemKeys.CHANPON_SETTINGS_CRITICAL_DELETE_DISPLAY,
+                    ChanponSystemKeys.CHANPON_SETTINGS_CRITICAL_DELETE_DESCRIPTION,
+                    ChanponSystemKeys.CHANPON_SETTINGS_CRITICAL_DELETE_ACTION,
                     OPERATION_DELETE,
-                    dangers = listOf(i18n(player, "critical.delete_danger")),
+                    dangers = listOf(i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_CRITICAL_DELETE_DANGER)),
                 ),
             ),
         )
@@ -642,37 +653,41 @@ class ChanponWorldSettingsMenu(
         worldData: WorldData,
         finalStep: Boolean,
     ): InventoryMenuView {
-        val key = if (finalStep) "critical.final" else "critical.confirm"
+        val presentation = if (finalStep) {
+            CriticalConfirmationPresentation(ChanponSystemKeys.CHANPON_SETTINGS_CRITICAL_FINAL_TITLE, ChanponSystemKeys.CHANPON_SETTINGS_CRITICAL_FINAL_DISPLAY)
+        } else {
+            CriticalConfirmationPresentation(ChanponSystemKeys.CHANPON_SETTINGS_CRITICAL_CONFIRM_TITLE, ChanponSystemKeys.CHANPON_SETTINGS_CRITICAL_CONFIRM_DISPLAY)
+        }
         val layout = ChanponGuiElements.confirmationLayout()
         val lore = GuiLoreSpec.Blocks(if (finalStep) {
             listOf(GuiLoreBlock(listOf(
-                GuiLoreLine.Text(i18n(player, "critical.final_description")),
-                GuiLoreLine.Danger(i18n(player, "critical.final_danger"))
+                GuiLoreLine.Text(i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_CRITICAL_FINAL_DESCRIPTION)),
+                GuiLoreLine.Danger(i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_CRITICAL_FINAL_DANGER))
             )))
         } else {
             listOf(GuiLoreBlock(listOf(
-                GuiLoreLine.Data(i18n(player, "critical.confirm_target_label"), worldData.name, "§e"),
-                GuiLoreLine.Danger(i18n(player, "critical.confirm_danger"))
+                GuiLoreLine.Data(i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_CRITICAL_CONFIRM_TARGET_LABEL), worldData.name, "§e"),
+                GuiLoreLine.Danger(i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_CRITICAL_CONFIRM_DANGER))
             )))
         })
         val centerItem = GuiItemSpec(
             material = Material.TNT,
-            name = me.awabi2048.mwmchanpon.ui.fixedName(i18n(player, "${key}_display"), GuiNameStyle.DEFAULT),
+            name = me.awabi2048.mwmchanpon.ui.fixedName(i18n(player, presentation.display), GuiNameStyle.DEFAULT),
             lore = lore,
             role = GuiElementRole.CONTENT,
             amount = 1,
         )
         return InventoryMenuView(
             layout.size,
-            i18nComponent(player, "${key}_title"),
+            i18nComponent(player, presentation.title),
             confirmationElements(
                 player,
                 layout,
                 centerItem,
                 confirmButton(player, true),
                 confirmButton(player, false),
-                i18n(player, "confirm.button.confirm"),
-                i18n(player, "confirm.button.cancel"),
+                i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_CONFIRM_BUTTON_CONFIRM),
+                i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_CONFIRM_BUTTON_CANCEL),
                 if (finalStep) MenuActionSafety.IRREVERSIBLE else MenuActionSafety.CONFIRM_ENTRY,
             ),
         )
@@ -690,16 +705,16 @@ class ChanponWorldSettingsMenu(
             Triple(ChanponWorldVisibility.PRIVATE, visibilityName(player, ChanponWorldVisibility.PRIVATE), "\u00A77")
         )
         val description = when (visibility) {
-            ChanponWorldVisibility.PUBLIC -> i18n(player, "publish.public_description")
-            ChanponWorldVisibility.DEVELOPMENT -> i18n(player, "publish.development_description")
-            ChanponWorldVisibility.PRIVATE -> i18n(player, "publish.private_description")
+            ChanponWorldVisibility.PUBLIC -> i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_PUBLISH_PUBLIC_DESCRIPTION)
+            ChanponWorldVisibility.DEVELOPMENT -> i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_PUBLISH_DEVELOPMENT_DESCRIPTION)
+            ChanponWorldVisibility.PRIVATE -> i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_PUBLISH_PRIVATE_DESCRIPTION)
         }
         val loreBlocks = buildList {
             add(GuiLoreBlock(listOf(GuiLoreLine.Text(description))))
             if (isFeatureRoleActionable(player, worldData, WorldSettingsFeature.PUBLISH)) {
                 add(GuiLoreBlock(listOf(
                     GuiLoreLine.Data(
-                        i18n(player, "publish.current_label"),
+                        i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_PUBLISH_CURRENT_LABEL),
                         display,
                         options.first { it.first == visibility }.third,
                     ),
@@ -719,7 +734,7 @@ class ChanponWorldSettingsMenu(
         }
         return capabilityPresentation(
             Material.OAK_SIGN,
-            i18n(player, "publish.title"),
+            i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_PUBLISH_TITLE),
             loreBlocks,
             role = if (isFeatureActionable(player, worldData, WorldSettingsFeature.PUBLISH)) GuiElementRole.ACTION else GuiElementRole.CONTENT,
         )
@@ -732,16 +747,16 @@ class ChanponWorldSettingsMenu(
         val level = worldData.borderExpansionLevel
         val max = maxExpansionLevel()
         val lines = if (level >= max) {
-            i18nList(player, "expand.status_max").map(GuiLoreLine::Text)
+            i18nList(player, ChanponSystemKeys.CHANPON_SETTINGS_EXPAND_STATUS_MAX).map(GuiLoreLine::Text)
         } else {
             emptyList()
         }
         return capabilityPresentation(
             Material.FILLED_MAP,
-            i18n(player, "expand.display"),
+            i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_EXPAND_DISPLAY),
             describedStructuredLore(
                 player,
-                textList(player, "gui.settings.expand.blocks.description").map(GuiLoreLine::Text),
+                textList(player, MyworldGuiSettingsKeys.GUI_SETTINGS_EXPAND_BLOCKS_DESCRIPTION).map(GuiLoreLine::Text),
                 lines,
                 requireTargetWorld = true,
                 worldData = worldData,
@@ -755,17 +770,17 @@ class ChanponWorldSettingsMenu(
         player: Player,
         worldData: WorldData,
     ): MenuCapabilityPresentation {
-        val status = i18n(player, if (worldData.notificationEnabled) "common.on" else "common.off")
+        val status = i18n(player, if (worldData.notificationEnabled) ChanponSystemKeys.CHANPON_SETTINGS_COMMON_ON else ChanponSystemKeys.CHANPON_SETTINGS_COMMON_OFF)
         val restrictionWarning = featureRestrictionWarning(player, worldData, WorldSettingsFeature.NOTIFICATION)
         val loreBlocks = buildList {
             add(GuiLoreBlock(
-                textList(player, "gui.settings.notification.blocks.description")
+                textList(player, MyworldGuiSettingsKeys.GUI_SETTINGS_NOTIFICATION_BLOCKS_DESCRIPTION)
                     .map(GuiLoreLine::Text),
             ))
             if (isFeatureRoleActionable(player, worldData, WorldSettingsFeature.NOTIFICATION)) {
                 add(GuiLoreBlock(listOf(
                     GuiLoreLine.Data(
-                        i18n(player, "notification.current_label"),
+                        i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_NOTIFICATION_CURRENT_LABEL),
                         status,
                         "\u00A7e",
                     ),
@@ -777,7 +792,7 @@ class ChanponWorldSettingsMenu(
             GuiItemSpec(
                 material = Material.BELL,
                 name = fixedName(
-                    text(player, "gui.settings.notification.display"),
+                    text(player, MyworldGuiSettingsKeys.GUI_SETTINGS_NOTIFICATION_DISPLAY),
                     GuiNameStyle.DEFAULT,
                 ),
                 lore = GuiLoreSpec.Blocks(loreBlocks),
@@ -795,10 +810,10 @@ class ChanponWorldSettingsMenu(
         featureRestrictionWarning(player, worldData, WorldSettingsFeature.CRITICAL)?.let { warning ->
             return capabilityPresentation(
                 Material.BARRIER,
-                i18n(player, "critical.unavailable_display"),
+                i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_CRITICAL_UNAVAILABLE_DISPLAY),
                 describedStructuredLore(
                     player,
-                    textList(player, "gui.settings.critical.blocks.summary").map(GuiLoreLine::Text),
+                    textList(player, MyworldGuiSettingsKeys.GUI_SETTINGS_CRITICAL_BLOCKS_SUMMARY).map(GuiLoreLine::Text),
                     emptyList(),
                     requireTargetWorld = true,
                     worldData = worldData,
@@ -812,10 +827,10 @@ class ChanponWorldSettingsMenu(
         }
         return capabilityPresentation(
             Material.TNT,
-            i18n(player, "critical.display"),
+            i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_CRITICAL_DISPLAY),
             describedStructuredLore(
                 player,
-                textList(player, "gui.settings.critical.blocks.summary").map(GuiLoreLine::Text),
+                textList(player, MyworldGuiSettingsKeys.GUI_SETTINGS_CRITICAL_BLOCKS_SUMMARY).map(GuiLoreLine::Text),
                 emptyList(),
                 requireTargetWorld = true,
                 worldData = worldData,
@@ -824,11 +839,11 @@ class ChanponWorldSettingsMenu(
         )
     }
 
-    private fun criticalUnavailableLoreKey(player: Player, worldData: WorldData): String? {
+    private fun criticalUnavailableLoreKey(player: Player, worldData: WorldData): LocalizationKey<String>? {
         // 重大な設定に入れない理由を一覧表示と遷移防御で共有し、専用メニューへの侵入を防ぐ。
-        if (storage.isProductionWorld(worldData.uuid)) return "critical.production_warning"
+        if (storage.isProductionWorld(worldData.uuid)) return ChanponSystemKeys.CHANPON_SETTINGS_CRITICAL_PRODUCTION_WARNING
         if (!MyWorldManagerApi.isCriticalSettingsEnabled(player.uniqueId)) {
-            return "critical.disabled_warning"
+            return ChanponSystemKeys.CHANPON_SETTINGS_CRITICAL_DISABLED_WARNING
         }
         return null
     }
@@ -836,14 +851,14 @@ class ChanponWorldSettingsMenu(
     private fun criticalUnavailablePresentation(
         player: Player,
         worldData: WorldData,
-        loreKey: String,
+        loreKey: LocalizationKey<String>,
     ): MenuCapabilityPresentation {
         return capabilityPresentation(
             Material.BARRIER,
-            i18n(player, "critical.unavailable_display"),
+            i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_CRITICAL_UNAVAILABLE_DISPLAY),
             describedStructuredLore(
                 player,
-                textList(player, "gui.settings.critical.blocks.summary").map(GuiLoreLine::Text),
+                textList(player, MyworldGuiSettingsKeys.GUI_SETTINGS_CRITICAL_BLOCKS_SUMMARY).map(GuiLoreLine::Text),
                 listOf(GuiLoreLine.Warning(i18n(player, loreKey))),
                 requireTargetWorld = true,
                 worldData = worldData,
@@ -856,10 +871,10 @@ class ChanponWorldSettingsMenu(
         player: Player,
         worldData: WorldData,
     ): MenuCapabilityPresentation {
-        val display = text(player, "gui.settings.environment.display")
+        val display = text(player, MyworldGuiSettingsKeys.GUI_SETTINGS_ENVIRONMENT_DISPLAY)
         val lore = describedStructuredLore(
             player,
-            textList(player, "gui.settings.environment.blocks.summary").map(GuiLoreLine::Text),
+            textList(player, MyworldGuiSettingsKeys.GUI_SETTINGS_ENVIRONMENT_BLOCKS_SUMMARY).map(GuiLoreLine::Text),
             emptyList(),
             requireTargetWorld = true,
             worldData = worldData,
@@ -929,7 +944,7 @@ class ChanponWorldSettingsMenu(
                 existing
             }
             if (visibleExisting.isNotEmpty()) add(GuiLoreBlock(visibleExisting))
-            if (outsideTargetWorld) add(GuiLoreBlock(listOf(GuiLoreLine.Warning(i18n(player, "common.must_be_in_world_warning")))))
+            if (outsideTargetWorld) add(GuiLoreBlock(listOf(GuiLoreLine.Warning(i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_COMMON_MUST_BE_IN_WORLD_WARNING)))))
             else if (restrictionWarning != null) add(GuiLoreBlock(listOf(restrictionWarning)))
         }
     }
@@ -938,9 +953,9 @@ class ChanponWorldSettingsMenu(
         player: Player,
         slot: Int,
         material: Material,
-        nameKey: String,
-        descriptionKey: String,
-        actionKey: String,
+        nameKey: LocalizationKey<String>,
+        descriptionKey: LocalizationKey<String>,
+        actionKey: LocalizationKey<String>,
         operation: String,
         warnings: List<String> = emptyList(),
         dangers: List<String> = emptyList(),
@@ -970,13 +985,13 @@ class ChanponWorldSettingsMenu(
     private fun modifiedWarningItem(player: Player): GuiItemSpec =
         GuiItemSpec(
             material = Material.REDSTONE_TORCH,
-            name = me.awabi2048.mwmchanpon.ui.fixedName(i18n(player, "modified_warning.display"), GuiNameStyle.DEFAULT),
+            name = me.awabi2048.mwmchanpon.ui.fixedName(i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_MODIFIED_WARNING_DISPLAY), GuiNameStyle.DEFAULT),
             lore = GuiLoreSpec.Blocks(
                 listOf(
                     GuiLoreBlock(
                         listOf(
-                            GuiLoreLine.Warning(i18n(player, "modified_warning.description")),
-                            GuiLoreLine.Text(i18n(player, "modified_warning.consequence")),
+                            GuiLoreLine.Warning(i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_MODIFIED_WARNING_DESCRIPTION)),
+                            GuiLoreLine.Text(i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_MODIFIED_WARNING_CONSEQUENCE)),
                         ),
                     ),
                 ),
@@ -986,23 +1001,23 @@ class ChanponWorldSettingsMenu(
         )
 
     private fun confirmCenterItem(player: Player, worldData: WorldData, action: ConfirmAction, direction: BlockFace?): GuiItemSpec {
-        val directionName = direction?.let { directionName(player, it) } ?: i18n(player, "direction.center")
+        val directionName = direction?.let { directionName(player, it) } ?: i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_DIRECTION_CENTER)
         val modified = action == ConfirmAction.STEP_BACK && worldData.latestBorderExpansionRecord()?.modified == true
         val lines = when (action) {
             ConfirmAction.EXPAND -> listOf(
-                GuiLoreLine.Data(i18n(player, "confirm.expand.direction_label"), directionName, "§e"),
-                GuiLoreLine.Text(i18n(player, "confirm.expand.description"))
+                GuiLoreLine.Data(i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_CONFIRM_EXPAND_DIRECTION_LABEL), directionName, "§e"),
+                GuiLoreLine.Text(i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_CONFIRM_EXPAND_DESCRIPTION))
             )
             ConfirmAction.STEP_BACK -> buildList {
-                add(GuiLoreLine.Text(i18n(player, "confirm.step_back.description")))
+                add(GuiLoreLine.Text(i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_CONFIRM_STEP_BACK_DESCRIPTION)))
                 if (modified) {
-                    add(GuiLoreLine.Warning(i18n(player, "confirm.step_back.modified_warning")))
+                    add(GuiLoreLine.Warning(i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_CONFIRM_STEP_BACK_MODIFIED_WARNING)))
                 }
             }
         }
         return GuiItemSpec(
             material = action.material,
-            name = me.awabi2048.mwmchanpon.ui.fixedName(i18n(player, "confirm.${action.key}.display"), GuiNameStyle.DEFAULT),
+            name = me.awabi2048.mwmchanpon.ui.fixedName(i18n(player, action.displayKey), GuiNameStyle.DEFAULT),
             lore = GuiLoreSpec.Blocks(listOf(GuiLoreBlock(lines))),
             role = GuiElementRole.CONTENT,
             amount = 1,
@@ -1012,12 +1027,12 @@ class ChanponWorldSettingsMenu(
     private fun confirmContentLines(player: Player, action: ConfirmAction, directionName: String, modified: Boolean): List<String> {
         return when (action) {
             ConfirmAction.EXPAND -> listOf(
-                "${i18n(player, "confirm.expand.direction_label")}: $directionName",
-                i18n(player, "confirm.expand.description")
+                "${i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_CONFIRM_EXPAND_DIRECTION_LABEL)}: $directionName",
+                i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_CONFIRM_EXPAND_DESCRIPTION)
             )
             ConfirmAction.STEP_BACK -> buildList {
-                add(i18n(player, "confirm.step_back.description"))
-                if (modified) add(i18n(player, "confirm.step_back.modified_warning"))
+                add(i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_CONFIRM_STEP_BACK_DESCRIPTION))
+                if (modified) add(i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_CONFIRM_STEP_BACK_MODIFIED_WARNING))
             }
         }
     }
@@ -1026,7 +1041,7 @@ class ChanponWorldSettingsMenu(
         return GuiItemSpec(
             material = if (confirm) Material.LIME_CONCRETE else Material.RED_CONCRETE,
             name = me.awabi2048.mwmchanpon.ui.fixedName(
-                i18n(player, if (confirm) "confirm.button.confirm" else "confirm.button.cancel"),
+                i18n(player, if (confirm) ChanponSystemKeys.CHANPON_SETTINGS_CONFIRM_BUTTON_CONFIRM else ChanponSystemKeys.CHANPON_SETTINGS_CONFIRM_BUTTON_CANCEL),
                 GuiNameStyle.DEFAULT,
             ),
             lore = GuiLoreSpec.None,
@@ -1039,7 +1054,7 @@ class ChanponWorldSettingsMenu(
         return GuiItemSpec(
             material = if (continueAction) Material.LIME_CONCRETE else Material.RED_CONCRETE,
             name = me.awabi2048.mwmchanpon.ui.fixedName(
-                i18n(player, if (continueAction) "modified_warning.button.continue" else "modified_warning.button.cancel"),
+                i18n(player, if (continueAction) ChanponSystemKeys.CHANPON_SETTINGS_MODIFIED_WARNING_BUTTON_CONTINUE else ChanponSystemKeys.CHANPON_SETTINGS_MODIFIED_WARNING_BUTTON_CANCEL),
                 GuiNameStyle.DEFAULT,
             ),
             lore = GuiLoreSpec.None,
@@ -1056,11 +1071,22 @@ class ChanponWorldSettingsMenu(
     }
 
     private fun directionName(player: Player, direction: BlockFace): String {
-        return i18n(player, "direction.${direction.name.lowercase()}")
+        val key = when (direction) {
+            BlockFace.NORTH_WEST -> ChanponSystemKeys.CHANPON_SETTINGS_DIRECTION_NORTH_WEST
+            BlockFace.NORTH_EAST -> ChanponSystemKeys.CHANPON_SETTINGS_DIRECTION_NORTH_EAST
+            BlockFace.SOUTH_WEST -> ChanponSystemKeys.CHANPON_SETTINGS_DIRECTION_SOUTH_WEST
+            BlockFace.SOUTH_EAST -> ChanponSystemKeys.CHANPON_SETTINGS_DIRECTION_SOUTH_EAST
+            else -> error("未定義の拡張方向です: $direction")
+        }
+        return i18n(player, key)
     }
 
     private fun visibilityName(player: Player?, visibility: ChanponWorldVisibility): String {
-        return i18n(player, "visibility.${visibility.storageValue}")
+        return i18n(player, when (visibility) {
+            ChanponWorldVisibility.PUBLIC -> ChanponSystemKeys.CHANPON_SETTINGS_VISIBILITY_PUBLIC
+            ChanponWorldVisibility.DEVELOPMENT -> ChanponSystemKeys.CHANPON_SETTINGS_VISIBILITY_DEVELOPMENT
+            ChanponWorldVisibility.PRIVATE -> ChanponSystemKeys.CHANPON_SETTINGS_VISIBILITY_PRIVATE
+        })
     }
 
     private fun cycleVisibility(
@@ -1078,28 +1104,28 @@ class ChanponWorldSettingsMenu(
         )
     }
 
-    private fun text(player: Player, key: String): String =
-        CCSystem.getAPI().getI18nString(player, key)
+    private fun text(player: Player, key: LocalizationKey<String>): String =
+        CCSystem.getAPI().getLocalized(player, key)
 
-    private fun textList(player: Player, key: String): List<String> =
-        CCSystem.getAPI().getI18nStringList(player, key)
+    private fun textList(player: Player, key: LocalizationKey<List<String>>): List<String> =
+        CCSystem.getAPI().getLocalized(player, key)
 
     private fun textWithPlaceholders(
         player: Player,
-        key: String,
+        key: LocalizationKey<String>,
         placeholders: Map<String, Any>,
-    ): String = CCSystem.getAPI().getI18nString(player, key, placeholders)
+    ): String = CCSystem.getAPI().getLocalized(player, key, placeholders)
 
-    private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): String {
-        return CCSystem.getAPI().getI18nString(player, "chanpon.settings.$key", placeholders)
+    private fun i18n(player: Player?, key: LocalizationKey<String>, placeholders: Map<String, Any> = emptyMap()): String {
+        return CCSystem.getAPI().getLocalized(player, key, placeholders)
     }
 
-    private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): List<String> {
-        return CCSystem.getAPI().getI18nStringList(player, "chanpon.settings.$key", placeholders)
+    private fun i18nList(player: Player?, key: LocalizationKey<List<String>>, placeholders: Map<String, Any> = emptyMap()): List<String> {
+        return CCSystem.getAPI().getLocalized(player, key, placeholders)
     }
 
-    private fun i18nComponent(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): Component {
-        return CCSystem.getAPI().getI18nComponent(player, "chanpon.settings.$key", placeholders)
+    private fun i18nComponent(player: Player?, key: LocalizationKey<String>, placeholders: Map<String, Any> = emptyMap()): Component {
+        return CCSystem.getAPI().getI18nComponent(player, key, placeholders)
     }
 
     internal fun isFeatureVisible(
@@ -1176,15 +1202,15 @@ class ChanponWorldSettingsMenu(
         player: Player,
         feature: WorldSettingsFeature,
     ): String = when (feature) {
-        WorldSettingsFeature.PUBLISH -> i18n(player, "publish.cycle_action")
+        WorldSettingsFeature.PUBLISH -> i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_PUBLISH_CYCLE_ACTION)
         WorldSettingsFeature.EXPANSION ->
-            text(player, "gui.settings.expand.action.open_menu")
+            text(player, MyworldGuiSettingsKeys.GUI_SETTINGS_EXPAND_ACTION_OPEN_MENU)
         WorldSettingsFeature.NOTIFICATION ->
-            i18n(player, "notification.action")
+            i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_NOTIFICATION_ACTION)
         WorldSettingsFeature.ENVIRONMENT ->
-            i18n(player, "mwm_action.action")
+            i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_MWM_ACTION_ACTION)
         WorldSettingsFeature.CRITICAL ->
-            i18n(player, "critical.action")
+            i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_CRITICAL_ACTION)
     }
 
     internal fun handleFeature(
@@ -1294,7 +1320,7 @@ class ChanponWorldSettingsMenu(
         feature: WorldSettingsFeature,
     ): Component {
         if (!isCurrentWorld(player, worldData)) {
-            return i18nComponent(player, "common.must_be_in_world_warning")
+            return i18nComponent(player, ChanponSystemKeys.CHANPON_SETTINGS_COMMON_MUST_BE_IN_WORLD_WARNING)
         }
         if (!isFeatureRoleActionable(player, worldData, feature)) {
             return i18nComponent(
@@ -1306,18 +1332,18 @@ class ChanponWorldSettingsMenu(
                         member = player.uniqueId in worldData.members,
                     ),
                     outsideTargetWorld = false,
-                ) ?: "common.member_cannot_change_warning",
+                ) ?: ChanponSystemKeys.CHANPON_SETTINGS_COMMON_MEMBER_CANNOT_CHANGE_WARNING,
             )
         }
         return when (feature) {
-            WorldSettingsFeature.EXPANSION -> i18nComponent(player, "message.expand_max")
+            WorldSettingsFeature.EXPANSION -> i18nComponent(player, ChanponSystemKeys.CHANPON_SETTINGS_MESSAGE_EXPAND_MAX)
             WorldSettingsFeature.CRITICAL -> i18nComponent(
                 player,
-                criticalUnavailableLoreKey(player, worldData) ?: "critical.unavailable_message",
+                criticalUnavailableLoreKey(player, worldData) ?: ChanponSystemKeys.CHANPON_SETTINGS_CRITICAL_UNAVAILABLE_MESSAGE,
             )
             WorldSettingsFeature.ENVIRONMENT,
             WorldSettingsFeature.PUBLISH,
-            WorldSettingsFeature.NOTIFICATION -> i18nComponent(player, "common.must_be_in_world_warning")
+            WorldSettingsFeature.NOTIFICATION -> i18nComponent(player, ChanponSystemKeys.CHANPON_SETTINGS_COMMON_MUST_BE_IN_WORLD_WARNING)
         }
     }
 
@@ -1390,12 +1416,19 @@ class ChanponWorldSettingsMenu(
     private enum class ConfirmAction(
         val key: String,
         val material: Material,
-        val successKey: String,
-        val failedKey: String
+        val titleKey: LocalizationKey<String>,
+        val displayKey: LocalizationKey<String>,
+        val successKey: LocalizationKey<String>,
+        val failedKey: LocalizationKey<String>,
     ) {
-        EXPAND("expand", Material.FILLED_MAP, "message.expand_success", "message.expand_failed"),
-        STEP_BACK("step_back", Material.RECOVERY_COMPASS, "message.step_back_success", "message.step_back_failed")
+        EXPAND("expand", Material.FILLED_MAP, ChanponSystemKeys.CHANPON_SETTINGS_CONFIRM_EXPAND_TITLE, ChanponSystemKeys.CHANPON_SETTINGS_CONFIRM_EXPAND_DISPLAY, ChanponSystemKeys.CHANPON_SETTINGS_MESSAGE_EXPAND_SUCCESS, ChanponSystemKeys.CHANPON_SETTINGS_MESSAGE_EXPAND_FAILED),
+        STEP_BACK("step_back", Material.RECOVERY_COMPASS, ChanponSystemKeys.CHANPON_SETTINGS_CONFIRM_STEP_BACK_TITLE, ChanponSystemKeys.CHANPON_SETTINGS_CONFIRM_STEP_BACK_DISPLAY, ChanponSystemKeys.CHANPON_SETTINGS_MESSAGE_STEP_BACK_SUCCESS, ChanponSystemKeys.CHANPON_SETTINGS_MESSAGE_STEP_BACK_FAILED),
     }
+
+    private data class CriticalConfirmationPresentation(
+        val title: LocalizationKey<String>,
+        val display: LocalizationKey<String>,
+    )
 
     companion object {
         private const val RUNTIME_OWNER = "mwm-chanpon"

@@ -2,6 +2,7 @@ package me.awabi2048.mwmchanpon
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.CCSystemAPI
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
 import com.awabi2048.ccsystem.api.gui.MenuTargetPolicy
 import com.awabi2048.ccsystem.api.gui.PublicMenuDefinition
 import me.awabi2048.mwmchanpon.backup.BackupService
@@ -65,9 +66,17 @@ import me.awabi2048.mwmchanpon.ui.WorldDataExportMenu
 import me.awabi2048.mwmchanpon.ui.WorldDataManagementMenu
 import me.awabi2048.mwmchanpon.ui.bedrock.AdminWizardForm
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
+import me.awabi2048.myworldmanager.api.service.ApiMigrationParticipant
+import me.awabi2048.myworldmanager.api.service.ApiMigrationParticipantState
 import net.luckperms.api.LuckPermsProvider
 import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
+import java.io.File
+import java.nio.channels.FileChannel
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.nio.file.StandardOpenOption
 
 class MWMChanponPlugin : JavaPlugin() {
     private val coreApiBridge = CoreApiBridge()
@@ -116,77 +125,38 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var worldSafetyDefaultsService: MyWorldSafetyDefaultsService
     private lateinit var easyVoidWorldCreationService: EasyVoidWorldCreationService
     private lateinit var publishLevelSynchronizer: PublishLevelSynchronizer
+    private lateinit var configMigrationParticipant: ChanponConfigMigrationParticipant
+    private lateinit var chanponStorage: ChanponWorldStorage
 
     override fun onEnable() {
         if (!verifyGuiRuntimeContract()) return
-        CCSystem.getAPI().getConfigSchemaService().register(
-            "mwm-chanpon",
-            listOf(
-                com.awabi2048.ccsystem.api.config.ManagedConfigSpec(
-                    owner = "mwm-chanpon",
-                    sourcePlugin = this,
-                    resourcePath = "config.yml",
-                    targetPath = dataFolder.resolve("config.yml").toPath(),
-                    currentVersion = 4,
-                    classification = com.awabi2048.ccsystem.api.config.ConfigClassification.MANAGED_CONFIG,
-                    migrations = mapOf(
-                        1 to com.awabi2048.ccsystem.api.config.ConfigMigration { config ->
-                            if (!config.contains("creation.max_worlds_per_player")) {
-                                config.set("creation.max_worlds_per_player", 50)
-                            }
-                        },
-                        2 to com.awabi2048.ccsystem.api.config.ConfigMigration { config ->
-                            if (!config.contains("standalone_export.fiscal_year")) {
-                                config.set("standalone_export.fiscal_year", 2026)
-                            }
-                        },
-                        3 to com.awabi2048.ccsystem.api.config.ConfigMigration { config ->
-                            if (!config.contains("creation.easy.platform_material")) {
-                                config.set("creation.easy.platform_material", "OBSIDIAN")
-                            }
-                        }
-                    ),
-                    validator = com.awabi2048.ccsystem.api.config.ConfigValidator { config ->
-                        require(config.getInt("creation.max_worlds_per_player", 50) >= 1) {
-                            "creation.max_worlds_per_player must be at least 1"
-                        }
-                        require(config.getInt("world_expansion.max_level", 3) >= 0) {
-                            "world_expansion.max_level must not be negative"
-                        }
-                        require(config.isInt("standalone_export.fiscal_year")) {
-                            "standalone_export.fiscal_year must be an integer"
-                        }
-                        require(config.getInt("standalone_export.fiscal_year") in 2000..9999) {
-                            "standalone_export.fiscal_year must be between 2000 and 9999"
-                        }
-                        require(
-                            me.awabi2048.mwmchanpon.service.EasyPlatformMaterialPolicy.resolve(
-                                config.getString("creation.easy.platform_material").orEmpty()
-                            ) != null
-                        ) {
-                            "creation.easy.platform_material must be a placeable solid block material"
-                        }
-                    },
-                    reloadAction = { reloadConfig() }
-                )
-            )
-        )
-        check(CCSystem.getAPI().getConfigSchemaService().prepare("mwm-chanpon").successful) {
-            "MWM-Chanpon Config preparation failed"
-        }
+        saveDefaultConfig()
+        configMigrationParticipant = ChanponConfigMigrationParticipant(this)
+        MyWorldManagerApi.registerMigrationParticipant(configMigrationParticipant, configMigrationParticipant::executeMigration)
         reloadConfig()
-        val chanponStorage = ChanponWorldStorage(dataFolder)
+        chanponStorage = ChanponWorldStorage(dataFolder)
         publishLevelSynchronizer = PublishLevelSynchronizer()
+        publishLevelSynchronizer.setSynchronizationGate(chanponStorage::hasCurrentWorldData)
         chanponStorage.setVisibilitySyncHandler(publishLevelSynchronizer::sync)
+        chanponStorage.setWorldWriteGate { worldUuid ->
+            isConfigurationMigrationCurrent() && !MyWorldManagerApi.isWorldMigrationPending(worldUuid)
+        }
         globalStorage = ChanponGlobalStorage(dataFolder)
+        globalStorage.setCurrentWriteGate {
+            isConfigurationMigrationCurrent()
+        }
         offlineMemberInviteNotifier = OfflineMemberInviteNotifier(globalStorage, logger)
         spawnWorldService = ChanponSpawnWorldService(this, globalStorage)
         val luckPerms = LuckPermsProvider.get()
         spawnProtectionService = SpawnWorldProtectionService()
         worldSafetyDefaultsService = MyWorldSafetyDefaultsService(logger)
         val toolDefinitions = ToolPermissionConfig(this).load()
-        val isAutoRollbackEnabled = { config.getBoolean("backup.auto_rollback.enabled", false) }
-        worldWorkPermissionPolicy = ChanponWorldWorkPermissionPolicy(chanponStorage, isAutoRollbackEnabled)
+        val isAutoRollbackEnabled = {
+            isConfigurationMigrationCurrent() && config.getBoolean("backup.auto_rollback.enabled", false)
+        }
+        worldWorkPermissionPolicy = ChanponWorldWorkPermissionPolicy(chanponStorage, isAutoRollbackEnabled).also {
+            it.setConfigurationAvailability(::isConfigurationMigrationCurrent)
+        }
         toolController = ToolPermissionController(
             chanponStorage,
             LuckPermsToolPermissionService(luckPerms, logger),
@@ -213,8 +183,12 @@ class MWMChanponPlugin : JavaPlugin() {
         backupListMenu.setManualRollbackService(manualRollbackService)
 
         productionWorldGuard = ProductionWorldGuard(chanponStorage)
-        submittedProtectionService = SubmittedWorldProtectionService(chanponStorage, logger, isAutoRollbackEnabled)
-        buildPermissionService = WorldBuildPermissionService(chanponStorage, logger)
+        submittedProtectionService = SubmittedWorldProtectionService(chanponStorage, logger, isAutoRollbackEnabled).also {
+            it.setConfigurationAvailability(::isConfigurationMigrationCurrent)
+        }
+        buildPermissionService = WorldBuildPermissionService(chanponStorage, logger).also {
+            it.setConfigurationAvailability(::isConfigurationMigrationCurrent)
+        }
         automationSettingsMenu = AutomationSettingsMenu(this, backupService, automationService) {
             MyWorldManagerApi.getWorldRepository()?.findAll()?.let { worlds ->
                 submittedProtectionService.syncAll(worlds)
@@ -269,6 +243,7 @@ class MWMChanponPlugin : JavaPlugin() {
         )
         easyVoidWorldCreationService = EasyVoidWorldCreationService(this)
         val archiveOperationGuard = ArchiveOperationGuard(globalStorage)
+        archiveOperationGuard.setConfigurationAvailability(::isConfigurationMigrationCurrent)
         playerWorldCapability = ChanponPlayerWorldCapability(this, chanponStorage, easyVoidWorldCreationService)
         MyWorldManagerApi.registerPlayerWorldRouteCapability(playerWorldCapability)
         chanponDiscoveryMenu = ChanponDiscoveryMenu(this, chanponStorage)
@@ -278,11 +253,15 @@ class MWMChanponPlugin : JavaPlugin() {
         worldAccessPolicy = ChanponWorldAccessPolicy(archiveOperationGuard, chanponStorage)
         worldMenuAccessPolicy = ChanponWorldMenuAccessPolicy(chanponStorage)
         worldPortalPolicy = ChanponWorldPortalPolicy(chanponStorage)
-        worldPublishPolicy = ChanponWorldPublishPolicy(chanponStorage)
+        worldPublishPolicy = ChanponWorldPublishPolicy(chanponStorage).also {
+            it.setConfigurationWriteGate(::isConfigurationMigrationCurrent)
+        }
         worldRuntimePolicy = ChanponWorldRuntimePolicy()
         commandExtension = ChanponCommandExtension(archiveOperationGuard)
         worldCreationGuard = ChanponWorldCreationGuard(this, globalStorage)
-        worldPlayerStatePolicy = ChanponWorldPlayerStatePolicy(globalStorage)
+        worldPlayerStatePolicy = ChanponWorldPlayerStatePolicy(globalStorage, chanponStorage).also {
+            it.setConfigurationAvailability(::isConfigurationMigrationCurrent)
+        }
         worldSettingsStatePolicy =
             ChanponWorldSettingsStatePolicy(chanponStorage, submittedProtectionService)
         MyWorldManagerApi.registerWorldCreationGuard(worldCreationGuard)
@@ -312,8 +291,8 @@ class MWMChanponPlugin : JavaPlugin() {
             server.pluginManager.registerEvents(FreecamWorldPolicyListener(chanponStorage), this)
         }
         server.pluginManager.registerEvents(publishLevelSynchronizer, this)
-        server.pluginManager.registerEvents(SubmittedWorldProtectionListener(submittedProtectionService), this)
-        server.pluginManager.registerEvents(SpawnWorldProtectionListener(globalStorage, spawnProtectionService), this)
+        server.pluginManager.registerEvents(SubmittedWorldProtectionListener(this, submittedProtectionService), this)
+        server.pluginManager.registerEvents(SpawnWorldProtectionListener(this, globalStorage, spawnProtectionService), this)
         server.pluginManager.registerEvents(MyWorldSafetyDefaultsListener(this, worldSafetyDefaultsService), this)
 
         val toolMenu = ToolPermissionMenu(this, toolController, toolDefinitions, chanponStorage)
@@ -328,7 +307,11 @@ class MWMChanponPlugin : JavaPlugin() {
             manualRollbackService,
         )
         linkedPortalCapability = LinkedPortalCapability()
-        productionToggleExtension.syncForcedTagsForProductionWorlds()
+        if (isConfigurationMigrationCurrent()) {
+            productionToggleExtension.syncForcedTagsForProductionWorlds()
+        } else {
+            logger.warning("Production forced tags are paused until /mwm migration completes.")
+        }
         server.pluginManager.registerEvents(MemberPermissionSyncListener(toolController, chanponStorage), this)
         server.pluginManager.registerEvents(
             PlayerJoinListener(toolController, spawnWorldService, offlineMemberInviteNotifier),
@@ -338,6 +321,10 @@ class MWMChanponPlugin : JavaPlugin() {
         server.pluginManager.registerEvents(WorldCleanupListener(chanponStorage, toolController), this)
 
         server.scheduler.runTask(this, Runnable {
+            if (!isConfigurationMigrationCurrent()) {
+                logger.warning("Configuration-dependent Chanpon startup synchronization is paused until /mwm migration completes.")
+                return@Runnable
+            }
             MyWorldManagerApi.getWorldRepository()?.findAll()?.let {
                 worldSafetyDefaultsService.syncAll(it)
                 publishLevelSynchronizer.syncAll()
@@ -349,7 +336,10 @@ class MWMChanponPlugin : JavaPlugin() {
                 ?.let { MyWorldManagerApi.getWorldRepository()?.findByUuid(it) }
                 ?.let { worldData ->
                     if (spawnProtectionService.applyDefaults(worldData)) {
-                        globalStorage.setSpawnPolicyInitialized(worldData.uuid)
+                        runCatching { globalStorage.setSpawnPolicyInitialized(worldData.uuid) }
+                            .onFailure {
+                                logger.warning("Spawn policy state was not persisted until /mwm migration completes.")
+                            }
                     }
                 }
             toolController.syncOnlinePlayers()
@@ -397,7 +387,12 @@ class MWMChanponPlugin : JavaPlugin() {
             MyWorldManagerApi.unregisterFavoriteListRouteCapability(chanponFavoriteListMenu)
         }
         runCatching { CCSystem.getAPI().getMenuReversibleStateProviderRegistry().unregisterOwner("mwm-chanpon") }
-        runCatching { CCSystem.getAPI().getConfigSchemaService().unregister("mwm-chanpon") }
+        if (::configMigrationParticipant.isInitialized) {
+            MyWorldManagerApi.unregisterMigrationParticipant(configMigrationParticipant)
+        }
+        if (::chanponStorage.isInitialized) {
+            MyWorldManagerApi.unregisterMigrationParticipant(chanponStorage.migrationParticipant)
+        }
         runCatching { CCSystem.getAPI().getMenuCommandService().unregisterOwner("mwm-chanpon") }
         runCatching { CCSystem.getAPI().getMenuCapabilityService().unregisterOwner("mwm-chanpon") }
         runCatching { CCSystem.getAPI().getMenuRuntimeService().unregisterOwner("mwm-chanpon") }
@@ -453,11 +448,49 @@ class MWMChanponPlugin : JavaPlugin() {
         MyWorldManagerApi.syncOnlineWorldPlayerStates()
     }
 
-    fun getMessage(player: Player?, key: String, vararg placeholders: Pair<String, Any>): String {
-        var raw = CCSystem.getAPI().getI18nString(player, key)
-        for ((k, v) in placeholders) raw = raw.replace("{$k}", v.toString())
-        return raw
+    /**
+     * config.yml の通常更新は、/mwm migration が完了している場合だけ許可します。
+     * JavaPlugin.saveConfig() を各機能から直接呼ばせると旧形式が暗黙に再保存されるため、
+     * 既存の可逆操作・自動処理を含めてこのゲートを通します。
+     */
+    fun saveConfigIfCurrent() {
+        check(isConfigurationMigrationCurrent()) {
+            "MWM-Chanpon config.yml/settings.yml require /mwm migration before they can be modified"
+        }
+        val target = File(dataFolder, "config.yml")
+        val temporary = File(dataFolder, "config.yml.save.tmp")
+        try {
+            config.save(temporary)
+            FileChannel.open(temporary.toPath(), StandardOpenOption.WRITE).use { it.force(true) }
+            val verified = org.bukkit.configuration.file.YamlConfiguration().also { it.load(temporary) }
+            check((verified.get("config_version") as? Number)?.toInt() == 4) {
+                "Current Chanpon config was not verified after serialization"
+            }
+            try {
+                Files.move(
+                    temporary.toPath(),
+                    target.toPath(),
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING,
+                )
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(temporary.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
+        } catch (error: Exception) {
+            Files.deleteIfExists(temporary.toPath())
+            reloadConfig()
+            throw IllegalStateException("Could not save current Chanpon config", error)
+        }
     }
+
+    fun isConfigurationMigrationCurrent(): Boolean =
+        configMigrationParticipant.status().state == ApiMigrationParticipantState.CURRENT
+
+    fun getMessage(
+        player: Player?,
+        key: LocalizationKey<String>,
+        vararg placeholders: Pair<String, Any>,
+    ): String = CCSystem.getAPI().getLocalized(player, key, placeholders.toMap())
 
     fun getCoreApiBridge(): CoreApiBridge = coreApiBridge
 

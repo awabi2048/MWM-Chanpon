@@ -12,7 +12,7 @@ internal object ArchiveImportValidator {
         readWorldData: (UUID) -> WorldData?
     ): List<ImportedWorld> = manifestWorlds.map { entry ->
         val worldData = readWorldData(entry.uuid)
-        if (worldData == null || worldData.worldKey != entry.worldKey) {
+        if (worldData == null || worldData.uuid != entry.uuid || worldData.worldKey != entry.worldKey) {
             throw IllegalStateException("archive_world_data_missing")
         }
         ImportedWorld(entry.uuid, worldData)

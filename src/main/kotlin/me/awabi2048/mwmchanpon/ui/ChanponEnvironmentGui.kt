@@ -1,5 +1,9 @@
 package me.awabi2048.mwmchanpon.ui
 
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
+
+import com.awabi2048.ccsystem.api.localization.generated.ChanponEnvironmentKeys
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiInteractionGuidance
@@ -84,7 +88,7 @@ class ChanponEnvironmentGui(
         if (worldData == null ||
             !accessGuard.allow(player, worldData, ownerOnly = true, requireTargetWorld = true)
         ) {
-            return InventoryMenuView(9, i18nComponent(player, "title"), emptyList())
+            return InventoryMenuView(9, i18nComponent(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_TITLE), emptyList())
         }
         val weather = worldData.fixedWeather
         val time = worldData.fixedTime
@@ -96,7 +100,7 @@ class ChanponEnvironmentGui(
 
         return InventoryMenuView(
             45,
-            i18nComponent(player, "title"),
+            i18nComponent(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_TITLE),
             listOf(
                 directSettingEntry(player, 19, worldData.uuid, ACTION_WEATHER, Material.LIGHT_BLUE_WOOL, weatherDisplay(player, weather), weatherOptions(player), weather ?: NONE_KEY, outsideTargetWorld),
                 directSettingEntry(player, 20, worldData.uuid, ACTION_TIME, Material.CLOCK, timeDisplay(player, time), timeOptions(player, time), timeOptionKey(time), outsideTargetWorld, customTimeAction = true),
@@ -210,22 +214,22 @@ class ChanponEnvironmentGui(
             MenuDialogRequest(
                 owner = "mwmchanpon",
                 id = "environment-custom-time",
-                title = i18nComponent(player, "time.custom.title"),
-                body = listOf(i18nComponent(player, "time.custom.body")),
+                title = i18nComponent(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_TIME_CUSTOM_TITLE),
+                body = listOf(i18nComponent(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_TIME_CUSTOM_BODY)),
                 inputs = listOf(
                     MenuDialogInput.Text(
                         "custom_time",
-                        i18nComponent(player, "time.custom.label"),
+                        i18nComponent(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_TIME_CUSTOM_LABEL),
                         initial,
                         maxLength = 8,
                     ),
                 ),
                 confirm = MenuDialogButton(
-                    i18nComponent(player, "time.custom.apply"),
+                    i18nComponent(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_TIME_CUSTOM_APPLY),
                     MenuDialogHandler { target, response ->
                         val parsed = parseCustomTime(response.textValue("custom_time"))
                             ?: return@MenuDialogHandler MenuActionResult.Rejected(
-                                Component.text(i18n(target, "time.custom.invalid")),
+                                Component.text(i18n(target, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_TIME_CUSTOM_INVALID)),
                             )
                         worldData.fixedTime = parsed
                         MyWorldManagerApi.getWorldRepository()?.save(worldData)
@@ -234,7 +238,7 @@ class ChanponEnvironmentGui(
                     },
                 ),
                 cancel = MenuDialogButton(
-                    Component.text(i18n(player, "common.back"), NamedTextColor.GRAY),
+                    Component.text(i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_COMMON_BACK), NamedTextColor.GRAY),
                     MenuDialogHandler { target, _ ->
                         MenuActionResult.Success(MenuUpdate.Replace(route(worldData.uuid)))
                     },
@@ -249,33 +253,33 @@ class ChanponEnvironmentGui(
             MenuDialogRequest(
                 owner = "mwmchanpon",
                 id = "environment-protection-password",
-                title = i18nComponent(player, "protection.password_set_title"),
-                body = listOf(i18nComponent(player, "protection.password_set_body")),
+                title = i18nComponent(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_SET_TITLE),
+                body = listOf(i18nComponent(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_SET_BODY)),
                 inputs = listOf(
                     MenuDialogInput.Text(
                         "protection_password",
-                        i18nComponent(player, "protection.password_label"),
+                        i18nComponent(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_LABEL),
                         initial,
                         maxLength = 64,
                     ),
                 ),
                 confirm = MenuDialogButton(
-                    i18nComponent(player, "protection.password_apply"),
+                    i18nComponent(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_APPLY),
                     MenuDialogHandler { target, response ->
                         val input = response.textValue("protection_password").trim()
                         if (input.length < MIN_PROTECTION_PASSWORD_LENGTH) {
                             return@MenuDialogHandler MenuActionResult.Rejected(
-                                Component.text(i18n(target, "protection.password_too_short")),
+                                Component.text(i18n(target, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_TOO_SHORT)),
                             )
                         }
                         storage.setProtectionPassword(worldData.uuid, input)
                         buildPermissionService.sync(worldData)
-                        target.sendMessage(i18n(target, "protection.password_updated"))
+                        target.sendMessage(i18n(target, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_UPDATED))
                         MenuActionResult.Success(MenuUpdate.Replace(route(worldData.uuid)))
                     },
                 ),
                 cancel = MenuDialogButton(
-                    Component.text(i18n(player, "common.back"), NamedTextColor.GRAY),
+                    Component.text(i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_COMMON_BACK), NamedTextColor.GRAY),
                     MenuDialogHandler { target, _ ->
                         MenuActionResult.Success(MenuUpdate.Replace(route(worldData.uuid)))
                     },
@@ -332,6 +336,15 @@ class ChanponEnvironmentGui(
         showWorldRequiredWarning: Boolean,
         customTimeAction: Boolean = false,
     ): MenuElement {
+        val presentation = when (key) {
+            ACTION_WEATHER -> SettingPresentation(ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_WEATHER_DISPLAY, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_WEATHER_DESCRIPTION)
+            ACTION_TIME -> SettingPresentation(ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_TIME_DISPLAY, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_TIME_DESCRIPTION)
+            ACTION_GRAVITY -> SettingPresentation(ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_GRAVITY_DISPLAY, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_GRAVITY_DESCRIPTION)
+            ACTION_FREECAM -> SettingPresentation(ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_FREECAM_DISPLAY, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_FREECAM_DESCRIPTION)
+            ACTION_SCALE -> SettingPresentation(ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_SCALE_DISPLAY, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_SCALE_DESCRIPTION)
+            ACTION_FLIGHT -> SettingPresentation(ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_FLIGHT_DISPLAY, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_FLIGHT_DESCRIPTION)
+            else -> error("未定義の環境設定IDです: $key")
+        }
         val payload = mapOf(
             PAYLOAD_WORLD_UUID to worldUuid.toString(),
             PAYLOAD_SETTING to key,
@@ -339,7 +352,7 @@ class ChanponEnvironmentGui(
         val actions = buildList {
             add(chanponCycleAction(
                 ACTION_SETTING,
-                i18n(player, "common.action_next"),
+                i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_COMMON_ACTION_NEXT),
                 payload,
                 safety = MenuActionSafety.REVERSIBLE,
                 reversibleContract = ChanponReversibleContracts.environment(worldUuid),
@@ -349,7 +362,7 @@ class ChanponEnvironmentGui(
                 add(chanponGestureAction(
                     ACTION_SETTING,
                     MenuGesture.SHIFT_LEFT,
-                    i18n(player, "time.custom.action"),
+                    i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_TIME_CUSTOM_ACTION),
                     payload,
                     safety = MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE,
                 ))
@@ -360,17 +373,17 @@ class ChanponEnvironmentGui(
             GuiMenuEntrySpec(
                 slot = slot,
                 material = material,
-                name = GuiNameSpec.FixedLabel(i18nComponent(player, "$key.display")),
+                name = GuiNameSpec.FixedLabel(i18nComponent(player, presentation.display)),
                 role = GuiElementRole.ACTION,
-                description = listOf(i18n(player, "$key.description")),
+                description = listOf(i18n(player, presentation.description)),
                 data = listOf(GuiMenuEntryData(
-                    i18n(player, "common.current_label"),
+                    i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_COMMON_CURRENT_LABEL),
                     currentValue,
                     GuiValueTone.PRIMARY,
                 )),
                 options = options.map { GuiMenuEntryOption(it.display, it.key == currentKey) },
                 warnings = if (showWorldRequiredWarning) {
-                    listOf(i18n(player, "common.must_be_in_world_warning"))
+                    listOf(i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_COMMON_MUST_BE_IN_WORLD_WARNING))
                 } else {
                     emptyList()
                 },
@@ -398,7 +411,7 @@ class ChanponEnvironmentGui(
         val actions = buildList {
             add(chanponCycleAction(
                 ACTION_SETTING,
-                i18n(player, "common.action_next"),
+                i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_COMMON_ACTION_NEXT),
                 payload,
                 safety = MenuActionSafety.REVERSIBLE,
                 reversibleContract = ChanponReversibleContracts.environment(worldData.uuid),
@@ -408,7 +421,7 @@ class ChanponEnvironmentGui(
                 add(chanponGestureAction(
                     ACTION_SETTING,
                     MenuGesture.SHIFT_LEFT,
-                    i18n(player, "protection.password_change_action"),
+                    i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_CHANGE_ACTION),
                     payload,
                     safety = MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE,
                 ))
@@ -419,24 +432,24 @@ class ChanponEnvironmentGui(
             GuiMenuEntrySpec(
                 slot = slot,
                 material = Material.IRON_DOOR,
-                name = GuiNameSpec.FixedLabel(i18nComponent(player, "protection.display")),
+                name = GuiNameSpec.FixedLabel(i18nComponent(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_DISPLAY)),
                 role = GuiElementRole.ACTION,
-                description = listOf(i18n(player, "protection.description")),
+                description = listOf(i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_DESCRIPTION)),
                 data = buildList {
                     add(GuiMenuEntryData(
-                        i18n(player, "common.current_label"),
+                        i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_COMMON_CURRENT_LABEL),
                         protectionDisplay(player, mode),
                         GuiValueTone.PRIMARY,
                     ))
                     if (password != null) {
-                        add(GuiMenuEntryData(i18n(player, "protection.password_label"), password))
+                        add(GuiMenuEntryData(i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_LABEL), password))
                     }
                 },
                 options = protectionOptions(player).map {
                     GuiMenuEntryOption(it.display, it.key == mode.storageValue)
                 },
                 warnings = if (mode == ChanponWorldProtectionMode.PASSWORD && password == null) {
-                    listOf(i18n(player, "protection.password_missing_warning"))
+                    listOf(i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_MISSING_WARNING))
                 } else {
                     emptyList()
                 },
@@ -449,34 +462,34 @@ class ChanponEnvironmentGui(
     // ---- Display helpers ----
 
     private fun weatherDisplay(player: Player, weather: String?): String {
-        return if (weather != null) i18n(player, "weather.${weather.lowercase()}.display") else i18n(player, "common.not_set")
+        return if (weather != null) i18n(player, weatherKey(weather)) else i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_COMMON_NOT_SET)
     }
 
     private fun weatherOptions(player: Player): List<SettingOption> {
-        return listOf(SettingOption(NONE_KEY, i18n(player, "common.not_set"), "\u00A77")) +
+        return listOf(SettingOption(NONE_KEY, i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_COMMON_NOT_SET), "\u00A77")) +
                 WEATHER_VALUES.filterNotNull().map { weather ->
-            SettingOption(weather, i18n(player, "weather.${weather.lowercase()}.display"), weatherColor(weather))
+            SettingOption(weather, i18n(player, weatherKey(weather)), weatherColor(weather))
         }
     }
 
     private fun timeDisplay(player: Player, time: Long?): String {
         return when (time) {
-            0L -> i18n(player, "time.morning.display")
-            6000L -> i18n(player, "time.noon.display")
-            12500L -> i18n(player, "time.dusk.display")
-            18000L -> i18n(player, "time.night.display")
-            null -> i18n(player, "common.not_set")
-            else -> i18n(player, "time.custom.display", mapOf("time" to time))
+            0L -> i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_TIME_MORNING_DISPLAY)
+            6000L -> i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_TIME_NOON_DISPLAY)
+            12500L -> i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_TIME_DUSK_DISPLAY)
+            18000L -> i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_TIME_NIGHT_DISPLAY)
+            null -> i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_COMMON_NOT_SET)
+            else -> i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_TIME_CUSTOM_DISPLAY, mapOf("time" to time))
         }
     }
 
     private fun timeOptions(player: Player, current: Long?): List<SettingOption> {
         val base = listOf(
-            SettingOption(NONE_KEY, i18n(player, "common.not_set"), "\u00A77"),
-            SettingOption("0", i18n(player, "time.morning.display"), "\u00A7e"),
-            SettingOption("6000", i18n(player, "time.noon.display"), "\u00A7e"),
-            SettingOption("12500", i18n(player, "time.dusk.display"), "\u00A76"),
-            SettingOption("18000", i18n(player, "time.night.display"), "\u00A79")
+            SettingOption(NONE_KEY, i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_COMMON_NOT_SET), "\u00A77"),
+            SettingOption("0", i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_TIME_MORNING_DISPLAY), "\u00A7e"),
+            SettingOption("6000", i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_TIME_NOON_DISPLAY), "\u00A7e"),
+            SettingOption("12500", i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_TIME_DUSK_DISPLAY), "\u00A76"),
+            SettingOption("18000", i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_TIME_NIGHT_DISPLAY), "\u00A79")
         )
         if (current != null && current !in TIME_VALUES.filterNotNull()) {
             return base + SettingOption("CUSTOM", timeDisplay(player, current), "\u00A7d")
@@ -493,7 +506,7 @@ class ChanponEnvironmentGui(
     }
 
     private fun flightDisplay(player: Player, allowFlight: Boolean): String {
-        return i18n(player, if (allowFlight) "flight.enabled" else "flight.disabled")
+        return i18n(player, if (allowFlight) ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_FLIGHT_ENABLED else ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_FLIGHT_DISABLED)
     }
 
     private fun flightDisplay(player: Player, allowFlight: Boolean?): String {
@@ -502,65 +515,77 @@ class ChanponEnvironmentGui(
 
     private fun flightOptions(player: Player): List<SettingOption> {
         return listOf(
-            SettingOption("true", i18n(player, "flight.enabled"), "\u00A7a"),
-            SettingOption("false", i18n(player, "flight.disabled"), "\u00A7c")
+            SettingOption("true", i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_FLIGHT_ENABLED), "\u00A7a"),
+            SettingOption("false", i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_FLIGHT_DISABLED), "\u00A7c")
         )
     }
 
     private fun freecamDisplay(player: Player, allowed: Boolean): String {
-        return i18n(player, if (allowed) "freecam.enabled" else "freecam.disabled")
+        return i18n(player, if (allowed) ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_FREECAM_ENABLED else ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_FREECAM_DISABLED)
     }
 
     private fun freecamOptions(player: Player): List<SettingOption> {
         return listOf(
-            SettingOption("true", i18n(player, "freecam.enabled"), "\u00A7a"),
-            SettingOption("false", i18n(player, "freecam.disabled"), "\u00A7c")
+            SettingOption("true", i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_FREECAM_ENABLED), "\u00A7a"),
+            SettingOption("false", i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_FREECAM_DISABLED), "\u00A7c")
         )
     }
 
     private fun gravityDisplay(player: Player, gravity: Double?): String {
         return when (gravity) {
-            null -> i18n(player, "gravity.earth.display")
-            0.08 -> i18n(player, "gravity.earth.display")
-            0.02 -> i18n(player, "gravity.mars.display")
-            0.01 -> i18n(player, "gravity.moon.display")
-            else -> i18n(player, "common.not_set")
+            null -> i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_GRAVITY_EARTH_DISPLAY)
+            0.08 -> i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_GRAVITY_EARTH_DISPLAY)
+            0.02 -> i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_GRAVITY_MARS_DISPLAY)
+            0.01 -> i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_GRAVITY_MOON_DISPLAY)
+            else -> i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_COMMON_NOT_SET)
         }
     }
 
     private fun gravityOptions(player: Player): List<SettingOption> {
         return GRAVITY_VALUES.map { gravity ->
             val key = when (gravity) {
-                0.02 -> "mars"
-                0.01 -> "moon"
-                else -> "earth"
+                0.02 -> ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_GRAVITY_MARS_DISPLAY
+                0.01 -> ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_GRAVITY_MOON_DISPLAY
+                else -> ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_GRAVITY_EARTH_DISPLAY
             }
-            SettingOption(gravity.toString(), i18n(player, "gravity.$key.display"), "\u00A7e")
+            SettingOption(gravity.toString(), i18n(player, key), "\u00A7e")
         }
     }
 
     private fun scaleDisplay(player: Player, scale: Double?): String {
         return when (scale) {
-            1.0 -> i18n(player, "scale.normal.display")
-            0.5 -> i18n(player, "scale.small.display")
-            2.0 -> i18n(player, "scale.giant.display")
-            else -> i18n(player, "common.not_set")
+            1.0 -> i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_SCALE_NORMAL_DISPLAY)
+            0.5 -> i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_SCALE_SMALL_DISPLAY)
+            2.0 -> i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_SCALE_GIANT_DISPLAY)
+            else -> i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_COMMON_NOT_SET)
         }
     }
 
     private fun scaleOptions(player: Player): List<SettingOption> {
         return SCALE_VALUES.map { scale ->
             val key = when (scale) {
-                0.5 -> "small"
-                2.0 -> "giant"
-                else -> "normal"
+                0.5 -> ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_SCALE_SMALL_DISPLAY
+                2.0 -> ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_SCALE_GIANT_DISPLAY
+                else -> ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_SCALE_NORMAL_DISPLAY
             }
-            SettingOption(scale.toString(), i18n(player, "scale.$key.display"), "\u00A7e")
+            SettingOption(scale.toString(), i18n(player, key), "\u00A7e")
         }
     }
 
     private fun protectionDisplay(player: Player, mode: ChanponWorldProtectionMode): String =
-        i18n(player, "protection.${mode.i18nKey}.display")
+        i18n(player, when (mode) {
+            ChanponWorldProtectionMode.OWNER_ONLY -> ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_OWNER_ONLY_DISPLAY
+            ChanponWorldProtectionMode.MEMBERS -> ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_MEMBERS_DISPLAY
+            ChanponWorldProtectionMode.PASSWORD -> ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_DISPLAY
+            ChanponWorldProtectionMode.PUBLIC -> ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PUBLIC_DISPLAY
+        })
+
+    private fun weatherKey(weather: String): LocalizationKey<String> = when (weather.lowercase()) {
+        "clear" -> ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_WEATHER_CLEAR_DISPLAY
+        "rain" -> ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_WEATHER_RAIN_DISPLAY
+        "thunder" -> ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_WEATHER_THUNDER_DISPLAY
+        else -> error("未定義の天候IDです: $weather")
+    }
 
     private fun protectionOptions(player: Player): List<SettingOption> =
         PROTECTION_VALUES.map { mode ->
@@ -587,16 +612,16 @@ class ChanponEnvironmentGui(
     private fun isInTargetWorld(player: Player, worldData: WorldData): Boolean =
         MyWorldManagerApi.getWorldService()?.isPlayerInWorld(player, worldData) == true
 
-    private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): String {
-        return CCSystem.getAPI().getI18nString(player, "chanpon.environment.$key", placeholders)
+    private fun i18n(player: Player?, key: LocalizationKey<String>, placeholders: Map<String, Any> = emptyMap()): String {
+        return CCSystem.getAPI().getLocalized(player, key, placeholders)
     }
 
-    private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): List<String> {
-        return CCSystem.getAPI().getI18nStringList(player, "chanpon.environment.$key", placeholders)
+    private fun i18nList(player: Player?, key: LocalizationKey<List<String>>, placeholders: Map<String, Any> = emptyMap()): List<String> {
+        return CCSystem.getAPI().getLocalized(player, key, placeholders)
     }
 
-    private fun i18nComponent(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()): Component {
-        return CCSystem.getAPI().getI18nComponent(player, "chanpon.environment.$key", placeholders)
+    private fun i18nComponent(player: Player?, key: LocalizationKey<String>, placeholders: Map<String, Any> = emptyMap()): Component {
+        return CCSystem.getAPI().getI18nComponent(player, key, placeholders)
     }
 
     internal fun route(worldUuid: UUID): MenuRoute = MenuRoute(
@@ -616,6 +641,11 @@ class ChanponEnvironmentGui(
         val key: String,
         val display: String,
         val selectedColor: String
+    )
+
+    private data class SettingPresentation(
+        val display: LocalizationKey<String>,
+        val description: LocalizationKey<String>,
     )
 
     companion object {

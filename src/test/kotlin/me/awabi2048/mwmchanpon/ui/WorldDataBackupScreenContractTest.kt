@@ -17,7 +17,7 @@ class WorldDataBackupScreenContractTest {
         assertTrue("worldBackupEntry(" in source)
         assertTrue("ACTION_WORLD_BACKUP" in source)
         assertTrue("ITEMS_PER_WORLD_STRIDE = 2" in source)
-        assertTrue("world_data.world_backup.display" in source)
+        assertTrue("CHANPON_BACKUP_WORLD_DATA_WORLD_BACKUP_DISPLAY" in source)
         assertFalse("world_data.world.backup_action" in source)
     }
 

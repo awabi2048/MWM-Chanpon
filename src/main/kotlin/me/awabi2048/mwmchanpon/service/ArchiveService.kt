@@ -13,9 +13,12 @@ import java.util.zip.ZipOutputStream
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
+import me.awabi2048.myworldmanager.api.service.ApiWorldDataState
 import me.awabi2048.mwmchanpon.storage.SubmissionState
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.service.ApiPortalSnapshot
+import me.awabi2048.myworldmanager.api.service.WorldOperation
+import me.awabi2048.myworldmanager.api.service.WorldOperationLease
 import me.awabi2048.myworldmanager.model.WorldData
 import org.bukkit.Bukkit
 import org.bukkit.boss.BarColor
@@ -39,7 +42,8 @@ class ArchiveService(
         fullBackupDir.mkdirs()
         if (globalStorage.isArchiveLocked()) {
             plugin.logger.warning("Clearing stale archive operation lock from the previous server process.")
-            globalStorage.setArchiveLocked(false)
+            runCatching { globalStorage.setArchiveLocked(false) }
+                .onFailure { plugin.logger.warning("Archive lock remains until /mwm migration completes.") }
         }
     }
 
@@ -51,7 +55,7 @@ class ArchiveService(
             createAnnualArchiveLocked(archiveName.trim(), executor, bossBar).whenComplete { result, error ->
                 Bukkit.getScheduler().runTask(plugin, Runnable {
                     bossBar.isVisible = false
-                    globalStorage.setArchiveLocked(false)
+                    runCatching { globalStorage.setArchiveLocked(false) }
                     if (error != null) {
                         plugin.logger.warning("Annual archive failed: ${error.message}")
                         resultFuture.complete(ArchiveResult(false, error.message ?: "archive_failed"))
@@ -98,15 +102,40 @@ class ArchiveService(
             return CompletableFuture.completedFuture(ArchiveResult(false, "no_tracked_worlds"))
         }
 
-        val evacuateLocation = MyWorldManagerApi.getEvacuationLocationOverride()
-            ?: return CompletableFuture.completedFuture(ArchiveResult(false, "spawn_world_not_available"))
-        affectedWorlds.forEach { worldData ->
-            Bukkit.getWorld(worldService.getWorldFolderName(worldData))?.let { world ->
-                world.players.forEach { it.teleport(evacuateLocation) }
-                world.save()
-            }
+        archivePreflightFailure(affectedWorlds.map { it.uuid })?.let { reason ->
+            return CompletableFuture.completedFuture(ArchiveResult(false, reason))
         }
-        evacuateLocation.world.save()
+        val leases = affectedWorlds.mapNotNull {
+            MyWorldManagerApi.tryAcquireWorldOperation(it.uuid, WorldOperation.ARCHIVE)
+        }
+        if (leases.size != affectedWorlds.size) {
+            leases.forEach(WorldOperationLease::close)
+            return CompletableFuture.completedFuture(ArchiveResult(false, "world is locked"))
+        }
+        archivePreflightFailure(affectedWorlds.map { it.uuid })?.let { reason ->
+            leases.forEach(WorldOperationLease::close)
+            return CompletableFuture.completedFuture(ArchiveResult(false, reason))
+        }
+
+        val evacuateLocation = MyWorldManagerApi.getEvacuationLocationOverride()
+            ?: run {
+                leases.forEach(WorldOperationLease::close)
+                return CompletableFuture.completedFuture(ArchiveResult(false, "spawn_world_not_available"))
+            }
+        try {
+            affectedWorlds.forEach { worldData ->
+                Bukkit.getWorld(worldService.getWorldFolderName(worldData))?.let { world ->
+                    world.players.forEach { it.teleport(evacuateLocation) }
+                    world.save()
+                }
+            }
+            evacuateLocation.world.save()
+        } catch (error: Exception) {
+            leases.forEach(WorldOperationLease::close)
+            return CompletableFuture.completedFuture(
+                ArchiveResult(false, error.message ?: "failed to prepare archive")
+            )
+        }
 
         bossBar.isVisible = true
         syncBossBar(bossBar, executor, 0, affectedWorlds.size + worldsToArchive.size + worldsToDelete.size + 2)
@@ -132,13 +161,22 @@ class ArchiveService(
                 affectedWorlds.size + worldsToArchive.size + 2
             )
         }.thenCompose {
-            deleteWorldsSequential(worldsToDelete, worldService, bossBar, executor, affectedWorlds.size + worldsToArchive.size + 2)
+            deleteWorldsSequential(
+                worldsToDelete,
+                worldService,
+                bossBar,
+                executor,
+                affectedWorlds.size + worldsToArchive.size + 2,
+                leases.associateBy { it.worldUuid },
+            )
         }.thenApply { deleted ->
             if (!deleted) {
                 ArchiveResult(false, "world_delete_failed")
             } else {
                 ArchiveResult(true, "archive_created")
             }
+        }.whenComplete { _, _ ->
+            leases.forEach(WorldOperationLease::close)
         }
     }
 
@@ -150,7 +188,7 @@ class ArchiveService(
             unzipArchiveLocked(archiveName.trim(), executor, bossBar).whenComplete { result, error ->
                 Bukkit.getScheduler().runTask(plugin, Runnable {
                     bossBar.isVisible = false
-                    globalStorage.setArchiveLocked(false)
+                    runCatching { globalStorage.setArchiveLocked(false) }
                     if (error != null) {
                         plugin.logger.warning("Unzip archive failed: ${error.message}")
                         resultFuture.complete(ArchiveResult(false, error.message ?: "unzip_failed"))
@@ -185,6 +223,7 @@ class ArchiveService(
         bossBar.isVisible = true
         val future = CompletableFuture<ArchiveResult>()
         val copiedWorldDirectories = mutableListOf<File>()
+        var leases: List<WorldOperationLease> = emptyList()
         Bukkit.getScheduler().runTaskAsynchronously(plugin, Runnable {
             val tempDir = Files.createTempDirectory("mwmchan_${archiveName}_")
             try {
@@ -194,11 +233,12 @@ class ArchiveService(
                     ARCHIVE_SCHEMA_VERSION
                 )
                 val imports = ArchiveImportValidator.resolve(manifestWorlds) { uuid ->
-                    readWorldData(tempDir, uuid)
+                    readWorldData(tempDir, uuid, repository)
                 }
+                validateImportInputs(tempDir, imports)
                 ArchiveImportValidator.validateConflicts(
                     imports,
-                    uuidExists = { repository.findByUuid(it) != null },
+                    uuidExists = { repository.stateOf(it) != ApiWorldDataState.NOT_FOUND },
                     folder = { worldData ->
                         val folderName = worldService.getWorldFolderName(worldData)
                         ImportFolder(
@@ -207,14 +247,27 @@ class ArchiveService(
                         )
                     }
                 )
+                leases = imports.mapNotNull {
+                    MyWorldManagerApi.tryAcquireWorldOperation(it.uuid, WorldOperation.CREATE)
+                }
+                if (leases.size != imports.size) error("world is locked")
+                // Importing a validated archive only touches the selected UUIDs.
+                // Unrelated legacy world files must not prevent healthy archive
+                // imports from continuing; the annual full archive keeps the
+                // stricter unresolved-data check below.
+                archivePreflightFailure(imports.map { it.uuid }, includeUnresolved = false)?.let { reason ->
+                    error(reason)
+                }
 
                 imports.forEachIndexed { index, imported ->
                     val prefix = tempDir.resolve("worlds/${imported.uuid}")
                     val sourceDir = prefix.resolve("world").toFile()
                     val targetDir = worldService.getWorldCreationDirectory(imported.worldData)
                     if (sourceDir.isDirectory) {
-                        sourceDir.copyRecursively(targetDir, overwrite = false)
+                        // Register the target before copying so a partial copy is
+                        // removed by the same rollback path when extraction fails.
                         copiedWorldDirectories += targetDir
+                        sourceDir.copyRecursively(targetDir, overwrite = false)
                     }
                     syncBossBar(bossBar, executor, index + 1, imports.size + 1)
                 }
@@ -251,10 +304,12 @@ class ArchiveService(
                         rollbackImportedWorlds(imports, copiedWorldDirectories, repository)
                         future.completeExceptionally(ex)
                     } finally {
+                        leases.forEach(WorldOperationLease::close)
                         tempDir.toFile().deleteRecursively()
                     }
                 })
             } catch (ex: Exception) {
+                leases.forEach(WorldOperationLease::close)
                 copiedWorldDirectories.asReversed().forEach { directory ->
                     if (directory.exists() && !directory.deleteRecursively()) {
                         plugin.logger.severe("Failed to remove partially imported world directory: $directory")
@@ -290,11 +345,21 @@ class ArchiveService(
     }
 
     private fun beginOperation(resultFuture: CompletableFuture<ArchiveResult>): Boolean {
+        if (!globalStorage.canWriteSettings() || MyWorldManagerApi.isGlobalMigrationPending()) {
+            resultFuture.complete(ArchiveResult(false, "mwm_migration_required"))
+            return false
+        }
         if (globalStorage.isArchiveLocked()) {
             resultFuture.complete(ArchiveResult(false, "archive_in_progress"))
             return false
         }
-        globalStorage.setArchiveLocked(true)
+        try {
+            globalStorage.setArchiveLocked(true)
+        } catch (failure: RuntimeException) {
+            resultFuture.complete(ArchiveResult(false, "mwm_migration_required"))
+            plugin.logger.warning("Archive operation was blocked until /mwm migration completes: ${failure.message}")
+            return false
+        }
         return true
     }
 
@@ -351,7 +416,8 @@ class ArchiveService(
         worldService: me.awabi2048.myworldmanager.api.service.ApiWorldService,
         bossBar: BossBar,
         executor: Player,
-        progressOffset: Int
+        progressOffset: Int,
+        leases: Map<UUID, WorldOperationLease>,
     ): CompletableFuture<Boolean> {
         var chain = CompletableFuture.completedFuture(true)
         worlds.forEachIndexed { index, worldData ->
@@ -359,7 +425,7 @@ class ArchiveService(
                 if (!previous) {
                     CompletableFuture.completedFuture(false)
                 } else {
-                    worldService.deleteWorldForMaintenance(worldData.uuid).thenApply { deleted ->
+                    worldService.deleteWorldForMaintenance(worldData.uuid, leases[worldData.uuid]).thenApply { deleted ->
                         if (deleted) {
                             storage.deleteWorld(worldData.uuid)
                             plugin.logger.info("Deleted annual-update world: ${worldData.name} (${worldData.uuid})")
@@ -393,25 +459,81 @@ class ArchiveService(
         return null
     }
 
-    private fun readWorldData(tempDir: Path, uuid: UUID): WorldData? {
+    private fun readWorldData(
+        tempDir: Path,
+        uuid: UUID,
+        repository: me.awabi2048.myworldmanager.api.service.ApiWorldRepository,
+    ): WorldData? {
         val file = tempDir.resolve("worlds/$uuid/mwm_data.yml").toFile()
         if (!file.exists()) return null
-        val config = YamlConfiguration.loadConfiguration(file)
-        return WorldData.deserialize(config.getValues(true))
+        return runCatching { repository.readCurrentDataFile(file, uuid) }.getOrNull()
     }
 
     private fun restoreChanponData(tempDir: Path, uuid: UUID) {
         val source = tempDir.resolve("worlds/$uuid/chanpon_data.yml").toFile()
         if (source.exists()) {
-            source.copyTo(storage.worldFile(uuid), overwrite = true)
+            storage.restoreExternalWorldFile(source, uuid)
+        }
+    }
+
+    /** 年次アーカイブは全対象を検証してから避難・zip・削除を開始します。 */
+    private fun archivePreflightFailure(
+        worldUuids: List<UUID>,
+        includeUnresolved: Boolean = true,
+    ): String? {
+        if (worldUuids.isEmpty()) return null
+        val evaluation = MyWorldManagerApi.evaluateMigration(
+            worldUuids = worldUuids,
+            includeGlobal = true,
+            includeUnresolved = includeUnresolved,
+        )
+        if (!evaluation.allowed) return evaluation.blocks.first().message
+        if (worldUuids.any { !storage.isWorldDataCurrent(it) }) {
+            return "Chanpon world data requires /mwm migration"
+        }
+        return null
+    }
+
+    /**
+     * アーカイブ取込の永続化前検証です。manifestに記載されたUUIDと実データを一致させ、
+     * ワールド別Chanponデータは現行schemaのみ許可します。
+     */
+    private fun validateImportInputs(tempDir: Path, imports: List<ImportedWorld>) {
+        require(imports.isNotEmpty()) { "archive_empty" }
+        imports.forEach { imported ->
+            val prefix = tempDir.resolve("worlds/${imported.uuid}")
+            require(prefix.resolve("world").toFile().isDirectory) {
+                "archive_world_missing:${imported.uuid}"
+            }
+            val chanpon = prefix.resolve("chanpon_data.yml").toFile()
+            if (chanpon.exists()) {
+                me.awabi2048.mwmchanpon.storage.ChanponWorldDataMigrationParticipant
+                    .validateCurrentExternalFile(chanpon, imported.uuid)
+            }
+            val portals = prefix.resolve("portals.yml").toFile()
+            if (portals.exists()) {
+                PortalSnapshotCodec.read(
+                    portals,
+                    expectedWorldUuid = imported.uuid,
+                    expectedWorldKey = imported.worldData.worldKey,
+                )
+            }
         }
     }
 
     private fun restorePortals(tempDir: Path, uuid: UUID) {
         val file = tempDir.resolve("worlds/$uuid/portals.yml").toFile()
         if (!file.exists()) return
-        val yaml = YamlConfiguration.loadConfiguration(file)
-        MyWorldManagerApi.getWorldService()?.replaceRelatedPortals(uuid, deserializePortals(yaml))
+        val repository = MyWorldManagerApi.getWorldRepository() ?: error("core repository unavailable")
+        val worldData = repository.findByUuid(uuid) ?: error("world data missing: $uuid")
+        MyWorldManagerApi.getWorldService()?.replaceRelatedPortals(
+            uuid,
+            PortalSnapshotCodec.read(
+                file,
+                expectedWorldUuid = uuid,
+                expectedWorldKey = worldData.worldKey,
+            ),
+        )
     }
 
     private fun manifestYaml(archiveName: String, worlds: List<WorldData>): String {
@@ -468,70 +590,7 @@ class ArchiveService(
     }
 
     private fun serializePortals(portals: List<ApiPortalSnapshot>): String {
-        val yaml = YamlConfiguration()
-        yaml.set(
-            "portals",
-            portals.map { portal ->
-                linkedMapOf(
-                    "id" to portal.id.toString(),
-                    "world_uuid" to portal.worldUuid?.toString(),
-                    "world_key" to portal.worldKey,
-                    "x" to portal.x,
-                    "y" to portal.y,
-                    "z" to portal.z,
-                    "target_world_key" to portal.targetWorldKey,
-                    "show_text" to portal.showText,
-                    "particle_color_rgb" to portal.particleColorRgb,
-                    "owner_uuid" to portal.ownerUuid.toString(),
-                    "created_at" to portal.createdAt,
-                    "text_display_uuid" to portal.textDisplayUuid?.toString(),
-                    "type" to portal.type,
-                    "min_x" to portal.minX,
-                    "min_y" to portal.minY,
-                    "min_z" to portal.minZ,
-                    "max_x" to portal.maxX,
-                    "max_y" to portal.maxY,
-                    "max_z" to portal.maxZ
-                )
-            }
-        )
-        return yaml.saveToString()
-    }
-
-    private fun deserializePortals(yaml: YamlConfiguration): List<ApiPortalSnapshot> {
-        val list = yaml.getMapList("portals")
-        return list.mapNotNull {
-            val id = runCatching { UUID.fromString(it["id"]?.toString()) }.getOrNull() ?: return@mapNotNull null
-            val worldName = it["world_key"]?.toString() ?: ""
-            val x = (it["x"] as? Number)?.toInt() ?: 0
-            val y = (it["y"] as? Number)?.toInt() ?: 0
-            val z = (it["z"] as? Number)?.toInt() ?: 0
-            val worldUuid = it["world_uuid"]?.toString()?.let { raw ->
-                runCatching { UUID.fromString(raw) }.getOrNull()
-            }
-            val targetWorldName = it["target_world_key"]?.toString()
-            val showText = it["show_text"] as? Boolean ?: true
-            val ownerUuid = it["owner_uuid"]?.toString()?.let { raw ->
-                runCatching { UUID.fromString(raw) }.getOrNull()
-            } ?: return@mapNotNull null
-            ApiPortalSnapshot(
-                id, worldName, x, y, z,
-                worldUuid, targetWorldName, showText,
-                (it["particle_color_rgb"] as? Number)?.toInt() ?: 0,
-                ownerUuid,
-                it["created_at"]?.toString() ?: "",
-                it["text_display_uuid"]?.toString()?.let { raw ->
-                    runCatching { UUID.fromString(raw) }.getOrNull()
-                },
-                it["type"]?.toString() ?: "portal",
-                (it["min_x"] as? Number)?.toInt(),
-                (it["min_y"] as? Number)?.toInt(),
-                (it["min_z"] as? Number)?.toInt(),
-                (it["max_x"] as? Number)?.toInt(),
-                (it["max_y"] as? Number)?.toInt(),
-                (it["max_z"] as? Number)?.toInt()
-            )
-        }
+        return PortalSnapshotCodec.writeToString(portals)
     }
 
     private fun createBossBar(player: Player): BossBar {

@@ -1,5 +1,9 @@
 package me.awabi2048.mwmchanpon.extension
 
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
+
+import com.awabi2048.ccsystem.api.localization.generated.ChanponBackupKeys
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
@@ -129,7 +133,7 @@ class WorldBackupCapability(
                         id = "open",
                         trigger = MenuCapabilityTrigger.ANY,
                         textProvider = MenuCapabilityActionTextProvider {
-                            i18n(it.player, "owner_backup.action")
+                            i18n(it.player, ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_ACTION)
                         },
                         availability = reasonedAvailability(
                             reason = { context ->
@@ -160,7 +164,7 @@ class WorldBackupCapability(
 
     private fun render(player: Player, source: Holder): InventoryMenuView {
         val world = ownedProductionWorld(player, source.worldUuid)
-            ?: return InventoryMenuView(9, i18nComponent(player, "owner_backup.title"), emptyList())
+            ?: return InventoryMenuView(9, i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_TITLE), emptyList())
         val backups = backupService.listBackupsForWorld(source.worldUuid)
         val pages = if (backups.isEmpty()) 1 else (backups.size + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE
         val safePage = source.page.coerceIn(0, pages - 1)
@@ -169,21 +173,21 @@ class WorldBackupCapability(
         if (safePage > 0) {
             elements += simpleActionEntry(
                 player, layout.previousPageSlot, Material.ARROW,
-                i18n(player, "common.prev"), GuiElementRole.NAVIGATION,
-                ACTION_RUNTIME_PAGE, i18n(player, "common.prev_action"), payload(source.copy(page = safePage - 1)),
+                i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_PREV), GuiElementRole.NAVIGATION,
+                ACTION_RUNTIME_PAGE, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_PREV_ACTION), payload(source.copy(page = safePage - 1)),
             )
         }
         if (safePage < pages - 1) {
             elements += simpleActionEntry(
                 player, layout.nextPageSlot, Material.ARROW,
-                i18n(player, "common.next"), GuiElementRole.NAVIGATION,
-                ACTION_RUNTIME_PAGE, i18n(player, "common.next_action"), payload(source.copy(page = safePage + 1)),
+                i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_NEXT), GuiElementRole.NAVIGATION,
+                ACTION_RUNTIME_PAGE, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_NEXT_ACTION), payload(source.copy(page = safePage + 1)),
             )
         }
         elements += simpleActionEntry(
             player, layout.backSlot, Material.REDSTONE,
-            i18n(player, "common.back"), GuiElementRole.BACK,
-            ACTION_RUNTIME_BACK, i18n(player, "common.back_action"), payload(source),
+            i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_BACK), GuiElementRole.BACK,
+            ACTION_RUNTIME_BACK, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_BACK_ACTION), payload(source),
         )
         elements += infoEntry(player, layout.infoSlot, world, backups.size, safePage + 1, pages)
         backups.drop(safePage * ITEMS_PER_PAGE).take(ITEMS_PER_PAGE).forEachIndexed { index, backup ->
@@ -202,7 +206,7 @@ class WorldBackupCapability(
         )
         return InventoryMenuView(
             layout.size,
-            i18nComponent(player, "owner_backup.title"),
+            i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_TITLE),
             elements,
         )
     }
@@ -233,7 +237,7 @@ class WorldBackupCapability(
     private fun createBackup(context: MenuActionContext): MenuActionResult {
         val source = source(context.payload)
         if (automationService.isManualOperationBlocked(context.player)) {
-            context.player.sendMessage(i18nComponent(context.player, "message.manual_operation_blocked"))
+            context.player.sendMessage(i18nComponent(context.player, ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_MANUAL_OPERATION_BLOCKED))
             return MenuActionResult.Rejected()
         }
         val remaining = backupService.ownerBackupCooldownRemainingSeconds(source.worldUuid)
@@ -241,7 +245,7 @@ class WorldBackupCapability(
             context.player.sendMessage(
                 i18nComponent(
                     context.player,
-                    "message.owner_backup_cooldown",
+                    ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_OWNER_BACKUP_COOLDOWN,
                     mapOf("remaining" to BackupDisplay.formatDuration(remaining)),
                 ),
             )
@@ -254,7 +258,7 @@ class WorldBackupCapability(
     private fun executeOwnerBackup(player: Player, source: Holder, backupName: String) {
         if (ownedProductionWorld(player, source.worldUuid) == null) return
         if (automationService.isManualOperationBlocked(player)) {
-            player.sendMessage(i18nComponent(player, "message.manual_operation_blocked"))
+            player.sendMessage(i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_MANUAL_OPERATION_BLOCKED))
             open(player, source.worldUuid, source.page)
             return
         }
@@ -263,7 +267,7 @@ class WorldBackupCapability(
             player.sendMessage(
                 i18nComponent(
                     player,
-                    "message.owner_backup_cooldown",
+                    ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_OWNER_BACKUP_COOLDOWN,
                     mapOf("remaining" to BackupDisplay.formatDuration(remaining)),
                 ),
             )
@@ -279,19 +283,19 @@ class WorldBackupCapability(
         ).thenAccept { result ->
             Bukkit.getScheduler().runTask(plugin, Runnable {
                 if (result.status == BackupOperationStatus.SUCCESS) {
-                    player.sendMessage(i18nComponent(player, "message.backup_success"))
+                    player.sendMessage(i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_BACKUP_SUCCESS))
                 } else {
                     val cooldown = result.message.removePrefix("cooldown:").toLongOrNull()
                     if (cooldown != null) {
                         player.sendMessage(
                             i18nComponent(
                                 player,
-                                "message.owner_backup_cooldown",
+                                ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_OWNER_BACKUP_COOLDOWN,
                                 mapOf("remaining" to BackupDisplay.formatDuration(cooldown)),
                             ),
                         )
                     } else {
-                        player.sendMessage(i18nComponent(player, "message.backup_failed"))
+                        player.sendMessage(i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_BACKUP_FAILED))
                     }
                 }
             })
@@ -301,7 +305,7 @@ class WorldBackupCapability(
     private fun executeRestore(player: Player, backup: BackupEntry, source: Holder) {
         if (ownedProductionWorld(player, source.worldUuid) == null) return
         if (automationService.isManualOperationBlocked(player)) {
-            player.sendMessage(i18nComponent(player, "message.manual_operation_blocked"))
+            player.sendMessage(i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_MANUAL_OPERATION_BLOCKED))
             return
         }
         val rollbackCooldown =
@@ -310,7 +314,7 @@ class WorldBackupCapability(
             player.sendMessage(
                 i18nComponent(
                     player,
-                    "message.rollback_cooldown",
+                    ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_ROLLBACK_COOLDOWN,
                     mapOf("remaining" to BackupDisplay.formatDuration(rollbackCooldown)),
                 ),
             )
@@ -338,7 +342,13 @@ class WorldBackupCapability(
     }
 
     private fun sendRestoreResult(player: Player, result: RestoreOperationResult) {
-        player.sendMessage(i18nComponent(player, "message.restore_${result.status.name.lowercase()}"))
+        val resultKey = when (result.status) {
+            BackupOperationStatus.SUCCESS -> ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_RESTORE_SUCCESS
+            BackupOperationStatus.FAILED -> ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_RESTORE_FAILED
+            BackupOperationStatus.RECOVERED -> ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_RESTORE_RECOVERED
+            BackupOperationStatus.RECOVERY_FAILED -> ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_RESTORE_RECOVERY_FAILED
+        }
+        player.sendMessage(i18nComponent(player, resultKey))
         if (result.status == BackupOperationStatus.SUCCESS) return
         player.sendMessage(Component.text("要因: ${restoreReason(result.message)}", NamedTextColor.RED))
     }
@@ -369,17 +379,17 @@ class WorldBackupCapability(
             MenuDialogRequest(
                 owner = "mwmchanpon",
                 id = "owner-backup-name",
-                title = i18nComponent(player, "owner_backup.name_input.title"),
-                body = listOf(i18nComponent(player, "owner_backup.name_input.body")),
+                title = i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_NAME_INPUT_TITLE),
+                body = listOf(i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_NAME_INPUT_BODY)),
                 inputs = listOf(
                     MenuDialogInput.Text(
                         "backup_name",
-                        i18nComponent(player, "owner_backup.name_input.label"),
+                        i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_NAME_INPUT_LABEL),
                         maxLength = MAX_BACKUP_NAME_LENGTH,
                     ),
                 ),
                 confirm = MenuDialogButton(
-                    i18nComponent(player, "owner_backup.name_input.submit"),
+                    i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_NAME_INPUT_SUBMIT),
                     MenuDialogHandler { target, response ->
                         val name = BackupDisplay.normalizeManualName(response.textValue("backup_name"))
                         MenuActionResult.Success(
@@ -388,7 +398,7 @@ class WorldBackupCapability(
                     },
                 ),
                 cancel = MenuDialogButton(
-                    i18nComponent(player, "owner_backup.name_input.cancel"),
+                    i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_NAME_INPUT_CANCEL),
                     MenuDialogHandler { _, _ ->
                         MenuActionResult.Success(MenuUpdate.Resume)
                     },
@@ -401,10 +411,10 @@ class WorldBackupCapability(
         val backupName = route.payload[BACKUP_NAME_KEY].orEmpty()
         return confirmationView(
             player,
-            i18nComponent(player, "confirm.owner_backup.title"),
+            i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_OWNER_BACKUP_TITLE),
             i18nList(
                 player,
-                "confirm.owner_backup.lore",
+                ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_OWNER_BACKUP_LORE,
                 mapOf("name" to backupName),
             ),
         )
@@ -413,8 +423,8 @@ class WorldBackupCapability(
     private fun renderRestoreConfirmation(player: Player, route: MenuRoute): InventoryMenuView =
         confirmationView(
             player,
-            i18nComponent(player, "confirm.restore.title"),
-            i18nList(player, "confirm.restore.lore"),
+            i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_RESTORE_TITLE),
+            i18nList(player, ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_RESTORE_LORE),
         )
 
     private fun confirmationView(
@@ -429,8 +439,8 @@ class WorldBackupCapability(
             listOf(
                 simpleActionEntry(
                     player, layout.confirmSlot, Material.LIME_CONCRETE,
-                    i18n(player, "confirm.button.confirm"), GuiElementRole.CONFIRM,
-                    ACTION_RUNTIME_CONFIRM, i18n(player, "confirm.button.confirm_action"),
+                    i18n(player, ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BUTTON_CONFIRM), GuiElementRole.CONFIRM,
+                    ACTION_RUNTIME_CONFIRM, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BUTTON_CONFIRM_ACTION),
                 ),
                 displayEntry(
                     layout.previewSlot,
@@ -440,8 +450,8 @@ class WorldBackupCapability(
                 ),
                 simpleActionEntry(
                     player, layout.cancelSlot, Material.RED_CONCRETE,
-                    i18n(player, "confirm.button.cancel"), GuiElementRole.CANCEL,
-                    ACTION_RUNTIME_CANCEL, i18n(player, "confirm.button.cancel_action"),
+                    i18n(player, ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BUTTON_CANCEL), GuiElementRole.CANCEL,
+                    ACTION_RUNTIME_CANCEL, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_CONFIRM_BUTTON_CANCEL_ACTION),
                 ),
             ),
         ).asConfirmation()
@@ -471,11 +481,11 @@ class WorldBackupCapability(
     private fun entryPresentation(player: Player) = MenuCapabilityPresentation(
         GuiItemSpec(
             material = Material.CHEST,
-            name = GuiNameSpec.FixedLabel(i18nComponent(player, "owner_backup.display")),
+            name = GuiNameSpec.FixedLabel(i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_DISPLAY)),
             lore = GuiLoreSpec.Blocks(
                 listOf(
                     GuiLoreBlock(
-                        listOf(GuiLoreLine.Text(i18n(player, "owner_backup.description"))),
+                        listOf(GuiLoreLine.Text(i18n(player, ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_DESCRIPTION))),
                     ),
                 ),
             ),
@@ -488,7 +498,7 @@ class WorldBackupCapability(
         MenuCapabilityPresentation(
             GuiItemSpec(
                 material = Material.BARRIER,
-                name = GuiNameSpec.FixedLabel(i18nComponent(player, "owner_backup.unavailable.display")),
+                name = GuiNameSpec.FixedLabel(i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_UNAVAILABLE_DISPLAY)),
                 lore = GuiLoreSpec.Blocks(
                     listOf(GuiLoreBlock(listOf(GuiLoreLine.Warning(i18n(player, decision.messageKey))))),
                 ),
@@ -499,20 +509,20 @@ class WorldBackupCapability(
 
     private fun backupDecision(player: Player, worldUuid: UUID?): BackupDecision {
         val world = worldUuid?.let { MyWorldManagerApi.getWorldRepository()?.findByUuid(it) }
-            ?: return BackupDecision(false, "owner_backup.unavailable.world_missing")
+            ?: return BackupDecision(false, ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_UNAVAILABLE_WORLD_MISSING)
         if (world.owner != player.uniqueId) {
-            return BackupDecision(false, "owner_backup.unavailable.owner_only")
+            return BackupDecision(false, ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_UNAVAILABLE_OWNER_ONLY)
         }
         if (!storage.isProductionWorld(world.uuid)) {
-            return BackupDecision(false, "owner_backup.unavailable.not_production")
+            return BackupDecision(false, ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_UNAVAILABLE_NOT_PRODUCTION)
         }
         if (protectionService.isProtected(world)) {
-            return BackupDecision(false, "owner_backup.unavailable.protected")
+            return BackupDecision(false, ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_UNAVAILABLE_PROTECTED)
         }
-        return BackupDecision(true, "owner_backup.unavailable.world_missing")
+        return BackupDecision(true, ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_UNAVAILABLE_WORLD_MISSING)
     }
 
-    private data class BackupDecision(val available: Boolean, val messageKey: String)
+    private data class BackupDecision(val available: Boolean, val messageKey: LocalizationKey<String>)
 
     private fun backupEntry(
         player: Player,
@@ -526,23 +536,23 @@ class WorldBackupCapability(
             slot = slot,
             material = materialFor(backup),
             name = GuiNameSpec.TargetIdentity(
-                i18nComponent(player, "owner_backup.item.display", mapOf("name" to BackupDisplay.displayName(backup))),
+                i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_ITEM_DISPLAY, mapOf("name" to BackupDisplay.displayName(backup))),
             ),
             role = GuiElementRole.ACTION,
             data = listOf(
                 GuiMenuEntryData(
-                    i18n(player, "owner_backup.item.created_label"),
+                    i18n(player, ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_ITEM_CREATED_LABEL),
                     BackupDisplay.formatCreatedAt(backup.createdAt),
                 ),
                 GuiMenuEntryData(
-                    i18n(player, "owner_backup.item.actor_label"),
+                    i18n(player, ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_ITEM_ACTOR_LABEL),
                     BackupDisplay.actorName(backup),
                 ),
             ),
             actions = listOf(chanponGestureAction(
                 ACTION_RUNTIME_RESTORE,
                 MenuGesture.LEFT,
-                i18n(player, "owner_backup.item.rollback_action"),
+                i18n(player, ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_ITEM_ROLLBACK_ACTION),
                 payload,
                 safety = MenuActionSafety.CONFIRM_ENTRY,
             )),
@@ -557,7 +567,19 @@ class WorldBackupCapability(
         payload: Map<String, String>,
     ): MenuElement {
         val remaining = backupService.ownerBackupCooldownRemainingSeconds(worldUuid)
-        val key = if (remaining > 0) "owner_backup.cooldown" else "owner_backup.create"
+        val presentation = if (remaining > 0) {
+            BackupControlPresentation(
+                ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_COOLDOWN_DISPLAY,
+                ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_COOLDOWN_DESCRIPTION,
+                null,
+            )
+        } else {
+            BackupControlPresentation(
+                ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_CREATE_DISPLAY,
+                ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_CREATE_DESCRIPTION,
+                ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_CREATE_ACTION,
+            )
+        }
         return CCSystem.getAPI().getGuiElementService().menuEntry(
             player,
             GuiMenuEntrySpec(
@@ -565,25 +587,32 @@ class WorldBackupCapability(
                 material = if (remaining > 0) Material.CLOCK else Material.CHEST,
                 name = GuiNameSpec.FixedLabel(i18nComponent(
                     player,
-                    "$key.display",
+                    presentation.display,
                     mapOf("remaining" to BackupDisplay.formatDuration(remaining)),
                 )),
                 role = if (remaining > 0) GuiElementRole.CONTENT else GuiElementRole.ACTION,
                 description = listOf(i18n(
                     player,
-                    "$key.description",
+                    presentation.description,
                     mapOf("remaining" to BackupDisplay.formatDuration(remaining)),
                 )),
                 actions = if (remaining > 0) emptyList() else listOf(chanponGestureAction(
                     ACTION_RUNTIME_CREATE,
                     MenuGesture.ANY,
-                    i18n(player, "$key.action"),
+                    i18n(player, requireNotNull(presentation.action)),
                     payload,
                     safety = MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE,
                 )),
             ),
         )
     }
+
+    /** 関連する表示要素を型付きキーの組として保持し、接尾辞によるキー生成を防ぎます。 */
+    private data class BackupControlPresentation(
+        val display: LocalizationKey<String>,
+        val description: LocalizationKey<String>,
+        val action: LocalizationKey<String>?,
+    )
 
     private fun simpleActionEntry(
         player: Player,
@@ -633,12 +662,12 @@ class WorldBackupCapability(
         slot,
         world.icon,
         GuiNameSpec.TargetIdentity(
-            i18nComponent(player, "owner_backup.info.display", mapOf("world" to world.name)),
+            i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_INFO_DISPLAY, mapOf("world" to world.name)),
         ),
         me.awabi2048.mwmchanpon.ui.framedLore(
             i18nList(
                 player,
-                "owner_backup.info.lore",
+                ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_INFO_LORE,
                 mapOf("count" to count, "page" to page, "pages" to pages),
             ).map(GuiLoreLine::Text),
             GuiLoreFrame.BOTH,
@@ -705,12 +734,12 @@ class WorldBackupCapability(
         arguments[PAYLOAD_WORLD_UUID]
             ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
 
-    private fun i18nComponent(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
-        CCSystem.getAPI().getI18nComponent(player, "chanpon.backup.$key", placeholders)
-    private fun i18n(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
-        CCSystem.getAPI().getI18nString(player, "chanpon.backup.$key", placeholders)
-    private fun i18nList(player: Player?, key: String, placeholders: Map<String, Any> = emptyMap()) =
-        CCSystem.getAPI().getI18nStringList(player, "chanpon.backup.$key", placeholders)
+    private fun i18nComponent(player: Player?, key: LocalizationKey<String>, placeholders: Map<String, Any> = emptyMap()) =
+        CCSystem.getAPI().getI18nComponent(player, key, placeholders)
+    private fun i18n(player: Player?, key: LocalizationKey<String>, placeholders: Map<String, Any> = emptyMap()) =
+        CCSystem.getAPI().getLocalized(player, key, placeholders)
+    private fun i18nList(player: Player?, key: LocalizationKey<List<String>>, placeholders: Map<String, Any> = emptyMap()) =
+        CCSystem.getAPI().getLocalized(player, key, placeholders)
 
     private fun ownerBackupActionSafety(actionId: String): MenuActionSafety = when (actionId) {
         ACTION_RUNTIME_BACK, ACTION_RUNTIME_PAGE, ACTION_RUNTIME_CANCEL -> MenuActionSafety.NAVIGATION_ONLY

@@ -1,6 +1,12 @@
 package me.awabi2048.mwmchanpon.ui
 
+import com.awabi2048.ccsystem.api.localization.generated.CommonKeys
+import com.awabi2048.ccsystem.api.localization.generated.MyworldGuiCommonKeys
+import com.awabi2048.ccsystem.api.localization.generated.MyworldGuiDiscoveryKeys
+
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
+import com.awabi2048.ccsystem.api.localization.generated.ChanponDiscoveryKeys
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiInteractionGuidance
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
@@ -97,7 +103,7 @@ class ChanponDiscoveryMenu(
                     layout.itemSlots[layout.itemSlots.size / 2],
                     GuiItemSpec(
                         material = Material.GRAY_DYE,
-                        name = GuiNameSpec.FixedLabel(i18nComponent(player, "no_result")),
+                        name = GuiNameSpec.FixedLabel(i18nComponent(player, ChanponDiscoveryKeys.CHANPON_DISCOVERY_NO_RESULT)),
                         lore = GuiLoreSpec.None,
                         role = GuiElementRole.CONTENT,
                         amount = 1,
@@ -123,7 +129,7 @@ class ChanponDiscoveryMenu(
 
         return InventoryMenuView(
             size = layout.size,
-            title = GuiHelper.inventoryTitle(i18n(player, "title")),
+            title = GuiHelper.inventoryTitle(i18n(player, ChanponDiscoveryKeys.CHANPON_DISCOVERY_TITLE)),
             elements = elements,
         )
     }
@@ -165,7 +171,7 @@ class ChanponDiscoveryMenu(
                     action(
                         DiscoveryWorldAction.VISIT,
                         MenuGesture.PLAIN_LEFT,
-                        plugin.getMessage(player, "gui.discovery.world_item.warp_hint"),
+                        plugin.getMessage(player, MyworldGuiDiscoveryKeys.GUI_DISCOVERY_WORLD_ITEM_WARP_HINT),
                         payload,
                         MenuActionSafety.EXTERNAL_SIDE_EFFECT,
                     ),
@@ -176,7 +182,7 @@ class ChanponDiscoveryMenu(
                     action(
                         DiscoveryWorldAction.PREVIEW,
                         MenuGesture.PLAIN_RIGHT,
-                        plugin.getMessage(player, "gui.discovery.world_item.preview_hint"),
+                        plugin.getMessage(player, MyworldGuiDiscoveryKeys.GUI_DISCOVERY_WORLD_ITEM_PREVIEW_HINT),
                         payload,
                         MenuActionSafety.EXTERNAL_SIDE_EFFECT,
                     ),
@@ -187,7 +193,7 @@ class ChanponDiscoveryMenu(
                     action(
                         DiscoveryWorldAction.REQUEST_MEMBERSHIP,
                         MenuGesture.SHIFT_LEFT,
-                        plugin.getMessage(player, "gui.discovery.world_item.member_request_hint"),
+                        plugin.getMessage(player, MyworldGuiDiscoveryKeys.GUI_DISCOVERY_WORLD_ITEM_MEMBER_REQUEST_HINT),
                         payload,
                         MenuActionSafety.CONFIRM_ENTRY,
                     ),
@@ -199,9 +205,9 @@ class ChanponDiscoveryMenu(
                         plugin.getMessage(
                             player,
                             if (isFavorited) {
-                                "gui.discovery.world_item.favorite_hint_remove"
+                                MyworldGuiDiscoveryKeys.GUI_DISCOVERY_WORLD_ITEM_FAVORITE_HINT_REMOVE
                             } else {
-                                "gui.discovery.world_item.favorite_hint_add"
+                                MyworldGuiDiscoveryKeys.GUI_DISCOVERY_WORLD_ITEM_FAVORITE_HINT_ADD
                             },
                         ),
                         payload,
@@ -216,23 +222,23 @@ class ChanponDiscoveryMenu(
             MyWorldManagerApi.getWorldTagService()?.getDisplayName(player, tagId) ?: tagId
         }
         val ownerName = Bukkit.getOfflinePlayer(data.owner).name
-            ?: plugin.getMessage(player, "general.unknown")
+            ?: plugin.getMessage(player, CommonKeys.GENERAL_UNKNOWN)
         val dataLines = buildList {
-            add(GuiMenuEntryData(plugin.getMessage(player, "gui.common.world_item.owner"), ownerName))
-            add(GuiMenuEntryData(plugin.getMessage(player, "gui.common.world_item.favorite"), data.favorite, GuiValueTone.DANGER))
+            add(GuiMenuEntryData(plugin.getMessage(player, MyworldGuiCommonKeys.GUI_COMMON_WORLD_ITEM_OWNER), ownerName))
+            add(GuiMenuEntryData(plugin.getMessage(player, MyworldGuiCommonKeys.GUI_COMMON_WORLD_ITEM_FAVORITE), data.favorite, GuiValueTone.DANGER))
             add(
                 GuiMenuEntryData(
-                    plugin.getMessage(player, "gui.common.world_item.recent_visitors"),
+                    plugin.getMessage(player, MyworldGuiCommonKeys.GUI_COMMON_WORLD_ITEM_RECENT_VISITORS),
                     plugin.getMessage(
                         player,
-                        "gui.common.world_item.recent_visitors_value",
+                        MyworldGuiCommonKeys.GUI_COMMON_WORLD_ITEM_RECENT_VISITORS_VALUE,
                         "count" to data.recentVisitors.sum(),
                     ),
                     GuiValueTone.SUCCESS,
                 ),
             )
             tagNames?.let {
-                add(GuiMenuEntryData(plugin.getMessage(player, "gui.common.world_item.tags"), it, GuiValueTone.PRIMARY))
+                add(GuiMenuEntryData(plugin.getMessage(player, MyworldGuiCommonKeys.GUI_COMMON_WORLD_ITEM_TAGS), it, GuiValueTone.PRIMARY))
             }
         }
         return CCSystem.getAPI().getGuiElementService().menuEntry(
@@ -243,7 +249,7 @@ class ChanponDiscoveryMenu(
                 name = GuiNameSpec.TargetIdentity(
                     CCSystem.getAPI().getI18nComponent(
                         player,
-                        "gui.common.world_item_name",
+                        MyworldGuiCommonKeys.GUI_COMMON_WORLD_ITEM_NAME,
                         mapOf("world" to data.name),
                     ),
                 ),
@@ -279,10 +285,10 @@ class ChanponDiscoveryMenu(
                 slot,
                 GuiItemSpec(
                     material = Material.BOOK,
-                    name = GuiNameSpec.FixedLabel(i18nComponent(player, "info.name")),
+                    name = GuiNameSpec.FixedLabel(i18nComponent(player, ChanponDiscoveryKeys.CHANPON_DISCOVERY_INFO_NAME)),
                     lore = GuiLoreSpec.Blocks(
                         listOf(
-                            GuiLoreBlock(i18nList(player, "info.lore").map(GuiLoreLine::Text)),
+                            GuiLoreBlock(i18nList(player, ChanponDiscoveryKeys.CHANPON_DISCOVERY_INFO_LORE).map(GuiLoreLine::Text)),
                         ),
                     ),
                     role = GuiElementRole.CONTENT,
@@ -292,7 +298,7 @@ class ChanponDiscoveryMenu(
         )
 
     private fun navigationEntry(player: Player, slot: Int, next: Boolean, targetPage: Int): MenuElement {
-        val labelKey = if (next) "gui.common.next_page" else "gui.common.prev_page"
+        val labelKey = if (next) CommonKeys.GUI_COMMON_NEXT_PAGE else CommonKeys.GUI_COMMON_PREV_PAGE
         val iconKey = if (next) "next_page" else "prev_page"
         val label = plugin.getMessage(player, labelKey)
         return CCSystem.getAPI().getGuiElementService().menuEntry(
@@ -344,14 +350,14 @@ class ChanponDiscoveryMenu(
         }
     }
 
-    private fun i18n(player: Player, key: String): String =
-        CCSystem.getAPI().getI18nString(player, "chanpon.discovery.$key")
+    private fun i18n(player: Player, key: LocalizationKey<String>): String =
+        CCSystem.getAPI().getLocalized(player, key)
 
-    private fun i18nList(player: Player, key: String): List<String> =
-        CCSystem.getAPI().getI18nStringList(player, "chanpon.discovery.$key")
+    private fun i18nList(player: Player, key: LocalizationKey<List<String>>): List<String> =
+        CCSystem.getAPI().getLocalized(player, key)
 
-    private fun i18nComponent(player: Player, key: String): net.kyori.adventure.text.Component =
-        CCSystem.getAPI().getI18nComponent(player, "chanpon.discovery.$key")
+    private fun i18nComponent(player: Player, key: LocalizationKey<String>): net.kyori.adventure.text.Component =
+        CCSystem.getAPI().getI18nComponent(player, key)
 
     private data class CompletedWorld(
         val world: WorldData,
