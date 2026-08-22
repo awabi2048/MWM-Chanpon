@@ -62,8 +62,7 @@ class ChanponEnvironmentGui(
             storage,
             buildPermissionService,
         )
-        runtime.register(
-            InventoryMenuDefinition(
+        val environmentDefinition = InventoryMenuDefinition(
                 owner = RUNTIME_OWNER,
                 id = ROUTE_ENVIRONMENT,
                 renderer = { context -> render(context.player, world(context.route)) },
@@ -71,10 +70,10 @@ class ChanponEnvironmentGui(
                     ACTION_SETTING to MenuActionHandler(::setting),
                     ACTION_BACK to MenuActionHandler { MenuActionResult.Success(MenuUpdate.Back) },
                 ),
-                // 環境設定は同じワールドを他のプレイヤーが同時に操作すると内容が変わるため、開いている間は定期再描画する。
-                autoRefresh = com.awabi2048.ccsystem.api.gui.MenuAutoRefreshPolicy.EVERY_SECOND,
-            ),
-        )
+            )
+        // 環境設定は同じワールドを他のプレイヤーが同時に操作すると内容が変わるため、開いている間は定期再描画する。
+        environmentDefinition.autoRefresh = com.awabi2048.ccsystem.api.gui.MenuAutoRefreshPolicy.EVERY_SECOND
+        runtime.register(environmentDefinition)
     }
 
     fun open(player: Player, worldData: WorldData, replaceCurrent: Boolean = false) {
