@@ -198,6 +198,8 @@ internal class ChanponWorldDataMigrationParticipant(
                 } catch (_: AtomicMoveNotSupportedException) {
                     Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
                 }
+                // 移行成功後のバックアップは復元に不要なため削除する。失敗時は従来どおりリストア用に残す。
+                runCatching { backup.delete() }
             } catch (error: Exception) {
                 Files.deleteIfExists(temporary.toPath())
                 runCatching { Files.copy(backup.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING) }

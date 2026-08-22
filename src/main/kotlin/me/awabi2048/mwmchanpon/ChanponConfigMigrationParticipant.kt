@@ -219,6 +219,8 @@ internal class ChanponConfigMigrationParticipant(
             validateConfig(verified)
             moveAtomically(temporary, configFile.toPath())
             plugin.reloadConfig()
+            // 移行成功後のバックアップは復元に不要なため削除する。失敗時は従来どおりリストア用に残す。
+            runCatching { Files.deleteIfExists(backup) }
             ApiMigrationParticipantResult(
                 ApiMigrationParticipantResultState.MIGRATED,
                 "migrated: $ID config.yml ($detectedVersion->$CURRENT_VERSION)",
@@ -292,6 +294,8 @@ internal class ChanponConfigMigrationParticipant(
             check(verified.getBoolean("building_allowed") == buildingAllowed)
             check(parseCreationAvailability(verified) == creationAvailability)
             moveAtomically(temporary, settingsFile.toPath())
+            // 移行成功後のバックアップは復元に不要なため削除する。失敗時は従来どおりリストア用に残す。
+            runCatching { Files.deleteIfExists(backup) }
             ApiMigrationParticipantResult(
                 ApiMigrationParticipantResultState.MIGRATED,
                 "migrated: $ID settings.yml${phase?.let { " (phase=$it)" } ?: ""}",

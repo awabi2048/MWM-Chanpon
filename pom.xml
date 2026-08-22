@@ -1,11 +1,11 @@
-ï»¿<project xmlns="http://maven.apache.org/POM/4.0.0"
+<project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>me.awabi2048</groupId>
     <artifactId>MWM-Chanpon</artifactId>
-    <version>26.821.1</version>
+    <version>26.823.1</version>
     <packaging>jar</packaging>
 
     <name>MWM-Chanpon</name>
@@ -57,7 +57,7 @@
         <dependency>
             <groupId>com.awabi2048</groupId>
             <artifactId>CC-System</artifactId>
-            <version>26.821.1</version>
+            <version>26.823.1</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -69,7 +69,7 @@
         <dependency>
             <groupId>awabi2048</groupId>
             <artifactId>my-world-manager</artifactId>
-            <version>26.821.1</version>
+            <version>26.823.1</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -169,7 +169,7 @@
                             <createDependencyReducedPom>false</createDependencyReducedPom>
                             <artifactSet>
                                 <excludes>
-                                    <!-- MWMæœ¬ä½“ãŒå…¬é–‹APIã®Kotlinåž‹ã‚’æŒã¤ãŸã‚ã€Chanponå´ã¸Kotlin stdlibã‚’åŒæ¢±ã—ãªã„ã€‚ -->
+                                    <!-- MWM–{‘Ì‚ªŒöŠJAPI‚ÌKotlinŒ^‚ðŽ‚Â‚½‚ßAChanpon‘¤‚ÖKotlin stdlib‚ð“¯«‚µ‚È‚¢B -->
                                     <exclude>org.jetbrains.kotlin:kotlin-stdlib</exclude>
                                     <exclude>org.jetbrains:annotations</exclude>
                                 </excludes>

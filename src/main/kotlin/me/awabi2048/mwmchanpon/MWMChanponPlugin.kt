@@ -22,6 +22,7 @@ import me.awabi2048.mwmchanpon.extension.LinkedPortalCapability
 import me.awabi2048.mwmchanpon.extension.ProductionToggleExtension
 import me.awabi2048.mwmchanpon.extension.ProductionWorldGuard
 import me.awabi2048.mwmchanpon.extension.ToolPermissionCapability
+import me.awabi2048.mwmchanpon.extension.ChanponMemberManagementPasswordCapability
 import me.awabi2048.mwmchanpon.extension.WorldBackupCapability
 import me.awabi2048.mwmchanpon.listener.MemberPermissionSyncListener
 import me.awabi2048.mwmchanpon.listener.FreecamWorldPolicyListener
@@ -298,6 +299,8 @@ class MWMChanponPlugin : JavaPlugin() {
         val toolMenu = ToolPermissionMenu(this, toolController, toolDefinitions, chanponStorage)
         toolPermissionCapability =
             ToolPermissionCapability(toolMenu, toolController, toolDefinitions)
+        // 建築許可パスワード設定をメンバー管理メニューのフッター3マス目へ提供します。
+        ChanponMemberManagementPasswordCapability(chanponStorage, buildPermissionService)
         worldBackupCapability = WorldBackupCapability(
             this,
             chanponStorage,
