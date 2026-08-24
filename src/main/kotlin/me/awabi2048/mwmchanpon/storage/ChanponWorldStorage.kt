@@ -296,6 +296,17 @@ class ChanponWorldStorage(
         saveAtomic(worldUuid, config)
     }
 
+    /** メンバー参加パスワードを削除します。未設定の間は非メンバーのパスワード参加が機能しません。 */
+    @Synchronized
+    fun clearProtectionPassword(worldUuid: UUID) {
+        ensureWritable(worldUuid)
+        val config = loadOrCreate(worldUuid)
+        config.set("protection.password", null)
+        config.set("protection.password_hash", null)
+        config.set("protection.password_updated_at", null)
+        saveAtomic(worldUuid, config)
+    }
+
     fun matchesProtectionPassword(worldUuid: UUID, password: String): Boolean {
         return getProtectionPassword(worldUuid) == password
     }

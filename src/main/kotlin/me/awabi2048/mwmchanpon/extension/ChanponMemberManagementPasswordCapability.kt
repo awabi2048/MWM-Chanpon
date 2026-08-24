@@ -102,19 +102,31 @@ class ChanponMemberManagementPasswordCapability(
                         ),
                     )
                 },
-                actions = listOf(
-                    chanponCapabilityAction(
+                actions = buildList {
+                    // 左クリック: パスワード変更（設定ダイアログを開く）
+                    add(chanponCapabilityAction(
                         id = "change",
-                        // クリック受付は左右クリックに限定する。ANY（STANDARD）はSHIFT・中クリックも含むため、
-                        // メンバー管理画面の操作体系と干渉し、クリックが受け付けられない場合がある。
-                        trigger = MenuCapabilityTrigger.LEFT_RIGHT,
+                        trigger = MenuCapabilityTrigger.LEFT,
                         textProvider = MenuCapabilityActionTextProvider {
                             i18n(it.player, ChanponEnvironmentKeys.CHANPON_MEMBER_MANAGEMENT_PASSWORD_ACTION_CHANGE)
                         },
                         handler = MenuCapabilityActionHandler(::handleChange),
                         safety = MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE,
-                    ),
-                ),
+                    ))
+                    // 右クリック: パスワード削除（設定済みのときだけ。確認ダイアログを挟みます）
+                    add(chanponCapabilityAction(
+                        id = "remove",
+                        trigger = MenuCapabilityTrigger.RIGHT,
+                        availability = optionalAvailability { context ->
+                            worldData(context)?.let { storage.hasProtectionPassword(it.uuid) } == true
+                        },
+                        textProvider = MenuCapabilityActionTextProvider {
+                            i18n(it.player, ChanponEnvironmentKeys.CHANPON_MEMBER_MANAGEMENT_PASSWORD_ACTION_REMOVE)
+                        },
+                        handler = MenuCapabilityActionHandler(::handleRemove),
+                        safety = MenuActionSafety.CONFIRM_ENTRY,
+                    ))
+                },
             ),
         )
     }
@@ -167,6 +179,48 @@ class ChanponMemberManagementPasswordCapability(
                 ),
                 cancel = MenuDialogButton(
                     Component.text(i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_COMMON_BACK), NamedTextColor.GRAY),
+                    MenuDialogHandler { _, _ ->
+                        MenuActionResult.Success(MenuUpdate.Resume)
+                    },
+                ),
+            ),
+        )
+    }
+
+    /**
+     * 右クリックでのパスワード削除。確認ダイアログを経てから削除します。
+     * 削除後は未設定になるため、非メンバーのパスワード参加は機能しなくなります。
+     */
+    private fun handleRemove(context: MenuCapabilityActionContext): MenuActionResult {
+        val world = worldData(context) ?: return MenuActionResult.Ignored
+        if (context.player.uniqueId != world.owner && !context.player.hasPermission("myworldmanager.admin")) {
+            return MenuActionResult.Ignored
+        }
+        showRemoveConfirmDialog(context.player, world)
+        return MenuActionResult.Success(MenuUpdate.None)
+    }
+
+    private fun showRemoveConfirmDialog(player: Player, worldData: WorldData) {
+        CCSystem.getAPI().getMenuDialogService().show(
+            player,
+            MenuDialogRequest(
+                owner = CAPABILITY_OWNER,
+                id = "member-management-password-remove",
+                title = i18nComponent(player, ChanponEnvironmentKeys.CHANPON_MEMBER_MANAGEMENT_PASSWORD_REMOVE_CONFIRM_TITLE),
+                body = listOf(i18nComponent(player, ChanponEnvironmentKeys.CHANPON_MEMBER_MANAGEMENT_PASSWORD_REMOVE_CONFIRM_BODY)),
+                inputs = emptyList(),
+                confirm = MenuDialogButton(
+                    i18nComponent(player, ChanponEnvironmentKeys.CHANPON_MEMBER_MANAGEMENT_PASSWORD_REMOVE_CONFIRM_CONFIRM),
+                    MenuDialogHandler { target, _ ->
+                        storage.clearProtectionPassword(worldData.uuid)
+                        buildPermissionService.sync(worldData)
+                        target.sendMessage(i18n(target, ChanponEnvironmentKeys.CHANPON_MEMBER_MANAGEMENT_PASSWORD_REMOVED))
+                        // メンバー管理画面へ戻り、未設定表示へ更新します。
+                        MenuActionResult.Success(MenuUpdate.Resume)
+                    },
+                ),
+                cancel = MenuDialogButton(
+                    i18nComponent(player, ChanponEnvironmentKeys.CHANPON_MEMBER_MANAGEMENT_PASSWORD_REMOVE_CONFIRM_CANCEL),
                     MenuDialogHandler { _, _ ->
                         MenuActionResult.Success(MenuUpdate.Resume)
                     },
