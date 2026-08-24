@@ -45,7 +45,6 @@ enum class ChanponWorldVisibility(val storageValue: String) {
 enum class ChanponWorldProtectionMode(val storageValue: String, val i18nKey: String) {
     OWNER_ONLY("owner_only", "owner_only"),
     MEMBERS("members", "members"),
-    PASSWORD("password", "password"),
     PUBLIC("public", "public");
 
     companion object {

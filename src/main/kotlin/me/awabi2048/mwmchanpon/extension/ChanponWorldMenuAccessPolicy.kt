@@ -14,7 +14,6 @@ import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import com.awabi2048.ccsystem.api.gui.MenuTargetPolicy
 import com.awabi2048.ccsystem.api.gui.PublicMenuDefinition
 import com.awabi2048.ccsystem.api.gui.PublicMenuOpener
-import me.awabi2048.mwmchanpon.storage.ChanponWorldProtectionMode
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.event.MwmMemberAddSource
@@ -52,7 +51,9 @@ class ChanponWorldMenuAccessPolicy(
     override fun challenge(context: WorldMenuAccessContext): WorldMenuAccessChallenge? {
         val worldData = context.worldData
         if (!storage.hasCurrentWorldData(worldData.uuid)) return null
-        if (storage.getProtectionMode(worldData.uuid) != ChanponWorldProtectionMode.PASSWORD) {
+        // 建築許可（保護モード）とは完全に切り離し、パスワードが設定されているワールドでは
+        // 非メンバーがパスワードを入力してメンバー参加できます。
+        if (!storage.hasProtectionPassword(worldData.uuid)) {
             return null
         }
         return WorldMenuAccessChallenge(

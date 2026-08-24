@@ -379,11 +379,6 @@ class ChanponEnvironmentGui(
                 options = protectionOptions(player).map {
                     GuiMenuEntryOption(it.display, it.key == mode.storageValue)
                 },
-                warnings = if (mode == ChanponWorldProtectionMode.PASSWORD && storage.getProtectionPassword(worldData.uuid) == null) {
-                    listOf(i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_MISSING_WARNING))
-                } else {
-                    emptyList()
-                },
                 actions = actions,
                 interactionGuidance = GuiInteractionGuidance.LIST_SETTING,
             ),
@@ -507,7 +502,6 @@ class ChanponEnvironmentGui(
         i18n(player, when (mode) {
             ChanponWorldProtectionMode.OWNER_ONLY -> ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_OWNER_ONLY_DISPLAY
             ChanponWorldProtectionMode.MEMBERS -> ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_MEMBERS_DISPLAY
-            ChanponWorldProtectionMode.PASSWORD -> ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_DISPLAY
             ChanponWorldProtectionMode.PUBLIC -> ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PUBLIC_DISPLAY
         })
 
@@ -527,7 +521,6 @@ class ChanponEnvironmentGui(
         when (mode) {
             ChanponWorldProtectionMode.OWNER_ONLY -> "\u00A7c"
             ChanponWorldProtectionMode.MEMBERS -> "\u00A7e"
-            ChanponWorldProtectionMode.PASSWORD -> "\u00A7d"
             ChanponWorldProtectionMode.PUBLIC -> "\u00A7a"
         }
 
@@ -597,7 +590,6 @@ class ChanponEnvironmentGui(
         private const val NONE_KEY = "NONE"
         private const val DEFAULT_GRAVITY = 0.08
         private const val DEFAULT_SCALE = 1.0
-        private const val MIN_PROTECTION_PASSWORD_LENGTH = 4
         private val WEATHER_VALUES = listOf<String?>(null, "CLEAR", "RAIN", "THUNDER")
         private val TIME_VALUES = listOf<Long?>(null, 0L, 6000L, 12500L, 18000L)
         private val GRAVITY_VALUES = listOf(0.08, 0.02, 0.01)
@@ -605,7 +597,6 @@ class ChanponEnvironmentGui(
         private val PROTECTION_VALUES = listOf(
             ChanponWorldProtectionMode.OWNER_ONLY,
             ChanponWorldProtectionMode.MEMBERS,
-            ChanponWorldProtectionMode.PASSWORD,
             ChanponWorldProtectionMode.PUBLIC
         )
     }

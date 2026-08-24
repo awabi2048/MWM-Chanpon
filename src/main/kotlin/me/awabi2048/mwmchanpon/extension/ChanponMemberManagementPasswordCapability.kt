@@ -26,7 +26,6 @@ import com.awabi2048.ccsystem.api.gui.MenuDialogRequest
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.protection.WorldBuildPermissionService
-import me.awabi2048.mwmchanpon.storage.ChanponWorldProtectionMode
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.ui.chanponCapabilityAction
 import me.awabi2048.mwmchanpon.ui.optionalAvailability
@@ -40,10 +39,11 @@ import org.bukkit.entity.Player
 import java.util.UUID
 
 /**
- * 建築許可パスワードの設定ボタンを、メンバー管理メニューのフッター3マス目へ提供するcapability。
+ * メンバー参加パスワードの設定ボタンを、メンバー管理メニューのフッター3マス目へ提供するcapability。
  *
  * 環境メニューからパスワード設定をメンバー管理へ完全に移した後の設定入口です。
- * PASSWORDモードのときだけ表示し、設定済みパスワードは伏字（＊）で表示して平文を画面へ出しません。
+ * 建築許可（保護モード）とは完全に切り離し、モードに関係なく常に表示・設定できます。
+ * 設定済みパスワードは伏字（＊）で表示し、平文を画面へ出しません。
  * 非メンバーが /worldmenu でパスワードを入力するとメンバーへ自動追加される旨も説明に含めます。
  */
 class ChanponMemberManagementPasswordCapability(
@@ -58,13 +58,15 @@ class ChanponMemberManagementPasswordCapability(
                 id = CAPABILITY_ID,
                 placement = MemberManagementCapabilityContract.FOOTER_PLACEMENT,
                 availability = optionalAvailability { context ->
-                    val world = worldData(context) ?: return@optionalAvailability false
-                    // パスワード設定はワールドオーナー専用（管理者も許可）。
-                    if (context.player.uniqueId != world.owner && !context.player.hasPermission("myworldmanager.admin")) {
-                        return@optionalAvailability false
-                    }
-                    // PASSWORDモード以外ではパスワード設定自体が意味を持たないため非表示。
-                    storage.getProtectionMode(world.uuid) == ChanponWorldProtectionMode.PASSWORD
+                    val world = worldData(context)
+                    val allowed = world != null &&
+                        (context.player.uniqueId == world.owner || context.player.hasPermission("myworldmanager.admin"))
+                    // TODO: クリック反応なしの原因特定後、このデバッグログを除去する。
+                    plugin.logger.info(
+                        "[MWMChanpon-password] availability world=${world?.uuid} owner=${world?.owner} " +
+                            "player=${context.player.uniqueId} admin=${context.player.hasPermission("myworldmanager.admin")} allowed=$allowed",
+                    )
+                    allowed
                 },
                 presentationProvider = MenuCapabilityPresentationProvider { context ->
                     val world = requireNotNull(worldData(context))

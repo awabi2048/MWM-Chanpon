@@ -177,6 +177,11 @@ internal class ChanponWorldDataMigrationParticipant(
             }
             config.set("development", null)
             config.set("development_set_at", null)
+            // 建築許可モードからPASSWORDを廃止したため、既存の"password"は"members"へ置換します。
+            // パスワード機能（メンバー参加パスワード）はモードとは独立して常時有効です。
+            if (config.getString("protection.mode") == "password") {
+                config.set("protection.mode", "members")
+            }
             config.set("schema_version", CURRENT_SCHEMA_VERSION)
             validate(config, file)
 

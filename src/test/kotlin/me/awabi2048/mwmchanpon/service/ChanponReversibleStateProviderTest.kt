@@ -183,7 +183,7 @@ class ChanponReversibleStateProviderTest {
             arguments = mapOf("setting" to "protection"),
         )
         val environmentState = captured(environment, environmentContext)
-        storage.setProtectionMode(world.uuid, me.awabi2048.mwmchanpon.storage.ChanponWorldProtectionMode.PASSWORD)
+        storage.setProtectionMode(world.uuid, me.awabi2048.mwmchanpon.storage.ChanponWorldProtectionMode.PUBLIC)
         assertRestored(environment, player, environmentContext, environmentState)
         assertEquals(original, storage.worldFile(world.uuid).readText())
 
