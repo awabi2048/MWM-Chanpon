@@ -45,7 +45,6 @@ enum class ChanponWorldVisibility(val storageValue: String) {
 enum class ChanponWorldProtectionMode(val storageValue: String, val i18nKey: String) {
     OWNER_ONLY("owner_only", "owner_only"),
     MEMBERS("members", "members"),
-    PASSWORD("password", "password"),
     PUBLIC("public", "public");
 
     companion object {
@@ -294,6 +293,17 @@ class ChanponWorldStorage(
         config.set("protection.password", password)
         config.set("protection.password_hash", null)
         config.set("protection.password_updated_at", LocalDateTime.now().toString())
+        saveAtomic(worldUuid, config)
+    }
+
+    /** メンバー参加パスワードを削除します。未設定の間は非メンバーのパスワード参加が機能しません。 */
+    @Synchronized
+    fun clearProtectionPassword(worldUuid: UUID) {
+        ensureWritable(worldUuid)
+        val config = loadOrCreate(worldUuid)
+        config.set("protection.password", null)
+        config.set("protection.password_hash", null)
+        config.set("protection.password_updated_at", null)
         saveAtomic(worldUuid, config)
     }
 

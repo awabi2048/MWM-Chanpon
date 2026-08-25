@@ -44,8 +44,7 @@ class WorldBuildPermissionService(
                 region.setFlag(Flags.PASSTHROUGH, StateFlag.State.DENY)
                 region.setFlag(Flags.PASSTHROUGH.regionGroupFlag, RegionGroup.NON_OWNERS)
             }
-            ChanponWorldProtectionMode.MEMBERS,
-            ChanponWorldProtectionMode.PASSWORD -> {
+            ChanponWorldProtectionMode.MEMBERS -> {
                 region.setFlag(Flags.PASSTHROUGH, StateFlag.State.DENY)
                 region.setFlag(Flags.PASSTHROUGH.regionGroupFlag, RegionGroup.NON_MEMBERS)
             }

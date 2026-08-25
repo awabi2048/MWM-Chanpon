@@ -60,8 +60,10 @@ class MenuRuntimeNavigationContractTest {
         val source = uiRoot.resolve("ChanponEnvironmentGui.kt").readText()
         val body = functionBody(source, "setting")
         assertTrue("showCustomTimeDialog(context.player, worldData)" in body)
-        assertTrue("showProtectionPasswordDialog(" in body)
-        assertTrue(body.split("MenuUpdate.None").size >= 3)
+        // パスワードの設定・変更はメンバー管理メニュー（フッター3マス目）のcapabilityへ完全に移したため、
+        // 環境画面からはダイアログを開かず、モード循環だけを行います。
+        assertFalse("showProtectionPasswordDialog(" in body)
+        assertTrue(body.split("MenuUpdate.None").size >= 2)
         assertFalse("MenuUpdate.Close" in body)
         assertTrue("MenuUpdate.Replace(route(worldData.uuid))" in source)
     }

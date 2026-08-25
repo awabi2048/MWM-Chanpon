@@ -62,8 +62,7 @@ class ChanponEnvironmentGui(
             storage,
             buildPermissionService,
         )
-        runtime.register(
-            InventoryMenuDefinition(
+        val environmentDefinition = InventoryMenuDefinition(
                 owner = RUNTIME_OWNER,
                 id = ROUTE_ENVIRONMENT,
                 renderer = { context -> render(context.player, world(context.route)) },
@@ -71,8 +70,10 @@ class ChanponEnvironmentGui(
                     ACTION_SETTING to MenuActionHandler(::setting),
                     ACTION_BACK to MenuActionHandler { MenuActionResult.Success(MenuUpdate.Back) },
                 ),
-            ),
-        )
+            )
+        // 環境設定は同じワールドを他のプレイヤーが同時に操作すると内容が変わるため、開いている間は定期再描画する。
+        environmentDefinition.autoRefresh = com.awabi2048.ccsystem.api.gui.MenuAutoRefreshPolicy.EVERY_SECOND
+        runtime.register(environmentDefinition)
     }
 
     fun open(player: Player, worldData: WorldData, replaceCurrent: Boolean = false) {
@@ -141,20 +142,8 @@ class ChanponEnvironmentGui(
             ACTION_FLIGHT -> toggleFlight(worldData)
             ACTION_FREECAM -> toggleFreecam(worldData)
             ACTION_PROTECTION -> {
-                val mode = storage.getProtectionMode(worldData.uuid)
-                if (context.click.isShiftClick &&
-                    context.click.isLeftClick &&
-                    mode == ChanponWorldProtectionMode.PASSWORD
-                ) {
-                    showProtectionPasswordDialog(
-                        context.player,
-                        worldData,
-                        storage.getProtectionPassword(worldData.uuid).orEmpty(),
-                    )
-                    return MenuActionResult.Success(MenuUpdate.None)
-                } else {
-                    cycleProtection(worldData, direction ?: return MenuActionResult.Ignored)
-                }
+                // パスワードの設定・変更はメンバー管理メニュー（フッター3マス目）へ完全に移しました。
+                cycleProtection(worldData, direction ?: return MenuActionResult.Ignored)
             }
             else -> return MenuActionResult.Ignored
         }
@@ -234,47 +223,6 @@ class ChanponEnvironmentGui(
                         worldData.fixedTime = parsed
                         MyWorldManagerApi.getWorldRepository()?.save(worldData)
                         applyTime(worldData.uuid, parsed)
-                        MenuActionResult.Success(MenuUpdate.Replace(route(worldData.uuid)))
-                    },
-                ),
-                cancel = MenuDialogButton(
-                    Component.text(i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_COMMON_BACK), NamedTextColor.GRAY),
-                    MenuDialogHandler { target, _ ->
-                        MenuActionResult.Success(MenuUpdate.Replace(route(worldData.uuid)))
-                    },
-                ),
-            ),
-        )
-    }
-
-    private fun showProtectionPasswordDialog(player: Player, worldData: WorldData, initial: String = "") {
-        CCSystem.getAPI().getMenuDialogService().show(
-            player,
-            MenuDialogRequest(
-                owner = "mwmchanpon",
-                id = "environment-protection-password",
-                title = i18nComponent(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_SET_TITLE),
-                body = listOf(i18nComponent(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_SET_BODY)),
-                inputs = listOf(
-                    MenuDialogInput.Text(
-                        "protection_password",
-                        i18nComponent(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_LABEL),
-                        initial,
-                        maxLength = 64,
-                    ),
-                ),
-                confirm = MenuDialogButton(
-                    i18nComponent(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_APPLY),
-                    MenuDialogHandler { target, response ->
-                        val input = response.textValue("protection_password").trim()
-                        if (input.length < MIN_PROTECTION_PASSWORD_LENGTH) {
-                            return@MenuDialogHandler MenuActionResult.Rejected(
-                                Component.text(i18n(target, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_TOO_SHORT)),
-                            )
-                        }
-                        storage.setProtectionPassword(worldData.uuid, input)
-                        buildPermissionService.sync(worldData)
-                        target.sendMessage(i18n(target, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_UPDATED))
                         MenuActionResult.Success(MenuUpdate.Replace(route(worldData.uuid)))
                     },
                 ),
@@ -399,11 +347,6 @@ class ChanponEnvironmentGui(
         worldData: WorldData,
     ): MenuElement {
         val mode = storage.getProtectionMode(worldData.uuid)
-        val password = if (mode == ChanponWorldProtectionMode.PASSWORD) {
-            storage.getProtectionPassword(worldData.uuid)
-        } else {
-            null
-        }
         val payload = mapOf(
             PAYLOAD_WORLD_UUID to worldData.uuid.toString(),
             PAYLOAD_SETTING to ACTION_PROTECTION,
@@ -417,15 +360,6 @@ class ChanponEnvironmentGui(
                 reversibleContract = ChanponReversibleContracts.environment(worldData.uuid),
                 classification = ChanponReversibleActionClassification.Operation.ENVIRONMENT_PROTECTION_CYCLE,
             ))
-            if (mode == ChanponWorldProtectionMode.PASSWORD) {
-                add(chanponGestureAction(
-                    ACTION_SETTING,
-                    MenuGesture.SHIFT_LEFT,
-                    i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_CHANGE_ACTION),
-                    payload,
-                    safety = MenuActionSafety.INPUT_OR_EXTERNAL_SURFACE,
-                ))
-            }
         }
         return CCSystem.getAPI().getGuiElementService().menuEntry(
             player,
@@ -441,17 +375,9 @@ class ChanponEnvironmentGui(
                         protectionDisplay(player, mode),
                         GuiValueTone.PRIMARY,
                     ))
-                    if (password != null) {
-                        add(GuiMenuEntryData(i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_LABEL), password))
-                    }
                 },
                 options = protectionOptions(player).map {
                     GuiMenuEntryOption(it.display, it.key == mode.storageValue)
-                },
-                warnings = if (mode == ChanponWorldProtectionMode.PASSWORD && password == null) {
-                    listOf(i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_MISSING_WARNING))
-                } else {
-                    emptyList()
                 },
                 actions = actions,
                 interactionGuidance = GuiInteractionGuidance.LIST_SETTING,
@@ -576,7 +502,6 @@ class ChanponEnvironmentGui(
         i18n(player, when (mode) {
             ChanponWorldProtectionMode.OWNER_ONLY -> ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_OWNER_ONLY_DISPLAY
             ChanponWorldProtectionMode.MEMBERS -> ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_MEMBERS_DISPLAY
-            ChanponWorldProtectionMode.PASSWORD -> ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PASSWORD_DISPLAY
             ChanponWorldProtectionMode.PUBLIC -> ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PROTECTION_PUBLIC_DISPLAY
         })
 
@@ -596,7 +521,6 @@ class ChanponEnvironmentGui(
         when (mode) {
             ChanponWorldProtectionMode.OWNER_ONLY -> "\u00A7c"
             ChanponWorldProtectionMode.MEMBERS -> "\u00A7e"
-            ChanponWorldProtectionMode.PASSWORD -> "\u00A7d"
             ChanponWorldProtectionMode.PUBLIC -> "\u00A7a"
         }
 
@@ -666,7 +590,6 @@ class ChanponEnvironmentGui(
         private const val NONE_KEY = "NONE"
         private const val DEFAULT_GRAVITY = 0.08
         private const val DEFAULT_SCALE = 1.0
-        private const val MIN_PROTECTION_PASSWORD_LENGTH = 4
         private val WEATHER_VALUES = listOf<String?>(null, "CLEAR", "RAIN", "THUNDER")
         private val TIME_VALUES = listOf<Long?>(null, 0L, 6000L, 12500L, 18000L)
         private val GRAVITY_VALUES = listOf(0.08, 0.02, 0.01)
@@ -674,7 +597,6 @@ class ChanponEnvironmentGui(
         private val PROTECTION_VALUES = listOf(
             ChanponWorldProtectionMode.OWNER_ONLY,
             ChanponWorldProtectionMode.MEMBERS,
-            ChanponWorldProtectionMode.PASSWORD,
             ChanponWorldProtectionMode.PUBLIC
         )
     }

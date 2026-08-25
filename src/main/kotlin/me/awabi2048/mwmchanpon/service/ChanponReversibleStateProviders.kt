@@ -430,7 +430,6 @@ internal class EnvironmentProvider(
         val PROTECTION_VALUES = listOf(
             ChanponWorldProtectionMode.OWNER_ONLY,
             ChanponWorldProtectionMode.MEMBERS,
-            ChanponWorldProtectionMode.PASSWORD,
             ChanponWorldProtectionMode.PUBLIC,
         )
     }

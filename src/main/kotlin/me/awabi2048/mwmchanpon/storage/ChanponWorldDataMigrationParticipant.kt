@@ -177,6 +177,11 @@ internal class ChanponWorldDataMigrationParticipant(
             }
             config.set("development", null)
             config.set("development_set_at", null)
+            // 建築許可モードからPASSWORDを廃止したため、既存の"password"は"members"へ置換します。
+            // パスワード機能（メンバー参加パスワード）はモードとは独立して常時有効です。
+            if (config.getString("protection.mode") == "password") {
+                config.set("protection.mode", "members")
+            }
             config.set("schema_version", CURRENT_SCHEMA_VERSION)
             validate(config, file)
 
@@ -198,6 +203,8 @@ internal class ChanponWorldDataMigrationParticipant(
                 } catch (_: AtomicMoveNotSupportedException) {
                     Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
                 }
+                // 移行成功後のバックアップは復元に不要なため削除する。失敗時は従来どおりリストア用に残す。
+                runCatching { backup.delete() }
             } catch (error: Exception) {
                 Files.deleteIfExists(temporary.toPath())
                 runCatching { Files.copy(backup.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING) }
