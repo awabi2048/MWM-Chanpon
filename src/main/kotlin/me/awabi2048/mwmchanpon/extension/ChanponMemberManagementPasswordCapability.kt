@@ -24,7 +24,6 @@ import com.awabi2048.ccsystem.api.gui.MenuDialogHandler
 import com.awabi2048.ccsystem.api.gui.MenuDialogInput
 import com.awabi2048.ccsystem.api.gui.MenuDialogRequest
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
-import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.protection.WorldBuildPermissionService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.ui.chanponCapabilityAction
@@ -47,7 +46,6 @@ import java.util.UUID
  * 非メンバーが /worldmenu でパスワードを入力するとメンバーへ自動追加される旨も説明に含めます。
  */
 class ChanponMemberManagementPasswordCapability(
-    private val plugin: MWMChanponPlugin,
     private val storage: ChanponWorldStorage,
     private val buildPermissionService: WorldBuildPermissionService,
 ) {
@@ -58,15 +56,9 @@ class ChanponMemberManagementPasswordCapability(
                 id = CAPABILITY_ID,
                 placement = MemberManagementCapabilityContract.FOOTER_PLACEMENT,
                 availability = optionalAvailability { context ->
-                    val world = worldData(context)
-                    val allowed = world != null &&
-                        (context.player.uniqueId == world.owner || context.player.hasPermission("myworldmanager.admin"))
-                    // TODO: クリック反応なしの原因特定後、このデバッグログを除去する。
-                    plugin.logger.info(
-                        "[MWMChanpon-password] availability world=${world?.uuid} owner=${world?.owner} " +
-                            "player=${context.player.uniqueId} admin=${context.player.hasPermission("myworldmanager.admin")} allowed=$allowed",
-                    )
-                    allowed
+                    val world = worldData(context) ?: return@optionalAvailability false
+                    // パスワード設定はワールドオーナー専用（管理者も許可）。
+                    context.player.uniqueId == world.owner || context.player.hasPermission("myworldmanager.admin")
                 },
                 presentationProvider = MenuCapabilityPresentationProvider { context ->
                     val world = requireNotNull(worldData(context))
@@ -132,15 +124,10 @@ class ChanponMemberManagementPasswordCapability(
     }
 
     private fun handleChange(context: MenuCapabilityActionContext): MenuActionResult {
-        val world = worldData(context)
-        // TODO: クリック反応なしの原因特定後、このデバッグログを除去する。
-        plugin.logger.info("[MWMChanpon-password] handleChange world=${world?.uuid} args=${context.arguments} click=${context.click}")
-        if (world == null) return MenuActionResult.Ignored
+        val world = worldData(context) ?: return MenuActionResult.Ignored
         if (context.player.uniqueId != world.owner && !context.player.hasPermission("myworldmanager.admin")) {
-            plugin.logger.info("[MWMChanpon-password] rejected: not owner/admin")
             return MenuActionResult.Ignored
         }
-        plugin.logger.info("[MWMChanpon-password] opening dialog")
         showPasswordDialog(context.player, world)
         return MenuActionResult.Success(MenuUpdate.None)
     }

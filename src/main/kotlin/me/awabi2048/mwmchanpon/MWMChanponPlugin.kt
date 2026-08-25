@@ -299,8 +299,8 @@ class MWMChanponPlugin : JavaPlugin() {
         val toolMenu = ToolPermissionMenu(this, toolController, toolDefinitions, chanponStorage)
         toolPermissionCapability =
             ToolPermissionCapability(toolMenu, toolController, toolDefinitions)
-        // 建築許可パスワード設定をメンバー管理メニューのフッター3マス目へ提供します。
-        ChanponMemberManagementPasswordCapability(this, chanponStorage, buildPermissionService)
+        // メンバー参加パスワード設定をメンバー管理メニューのフッター3マス目へ提供します。
+        ChanponMemberManagementPasswordCapability(chanponStorage, buildPermissionService)
         worldBackupCapability = WorldBackupCapability(
             this,
             chanponStorage,
