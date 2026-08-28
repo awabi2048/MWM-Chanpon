@@ -9,9 +9,37 @@ import me.awabi2048.myworldmanager.model.WorldData
 import org.bukkit.Bukkit
 
 /**
+ * 完成設定マクロで使用する実行時引数です。
+ *
+ * マクロ種類ごとにこのような引数型を持たせ、汎用APIへ渡す文字列Mapへの変換を
+ * その種類の境界へ閉じ込めます。将来別のマクロを追加しても引数の意味が混ざりません。
+ */
+data class SubmissionCompletionMacroArguments(
+    val ownerName: String,
+    val ownerUuid: UUID,
+    val adminName: String,
+    val adminUuid: UUID,
+    val worldUuid: UUID,
+    val worldName: String,
+    val previousState: SubmissionState,
+) {
+    fun toMacroParameters(): Map<String, String> = linkedMapOf(
+        "owner" to ownerName,
+        "owner_uuid" to ownerUuid.toString(),
+        "admin" to adminName,
+        "admin_uuid" to adminUuid.toString(),
+        "world_uuid" to worldUuid.toString(),
+        "world_name" to worldName,
+        "previous_state" to previousState.storageValue,
+        "state" to SubmissionState.COMPLETED.storageValue,
+    )
+}
+
+/**
  * 管理者がワールドの完成フラグを設定した後に、Chanpon所有のマクロを実行します。
  *
- * コマンド展開・遅延・コンソール実行はMyWorldManagerの既存MacroManagerへ委譲し、
+ * コマンド展開とコンソール実行はMyWorldManagerの既存MacroManagerへ委譲し、
+ * 遅延が必要な場合はマクロ文字列からCC-Systemのdelayコマンドを利用します。
  * このクラスではChanpon固有のトリガーとプレースホルダーだけを管理します。
  */
 class SubmissionCompletionMacroService(
@@ -34,16 +62,15 @@ class SubmissionCompletionMacroService(
             val ownerName = ownerNameResolver(ownerUuid) ?: ownerUuid.toString()
             macroService.execute(
                 TRIGGER,
-                linkedMapOf(
-                    "owner" to ownerName,
-                    "owner_uuid" to ownerUuid.toString(),
-                    "admin" to adminName,
-                    "admin_uuid" to adminUuid.toString(),
-                    "world_uuid" to worldData.uuid.toString(),
-                    "world_name" to worldData.name,
-                    "previous_state" to previousState.storageValue,
-                    "state" to SubmissionState.COMPLETED.storageValue,
-                ),
+                SubmissionCompletionMacroArguments(
+                    ownerName = ownerName,
+                    ownerUuid = ownerUuid,
+                    adminName = adminName,
+                    adminUuid = adminUuid,
+                    worldUuid = worldData.uuid,
+                    worldName = worldData.name,
+                    previousState = previousState,
+                ).toMacroParameters(),
             )
         }.onFailure { error ->
             logger.log(

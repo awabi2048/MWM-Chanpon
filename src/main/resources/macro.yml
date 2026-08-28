@@ -3,21 +3,21 @@
 # 管理者が管理メニューからワールドの完成フラグを設定した後に、
 # MyWorldManager の既存マクロ実行基盤を使ってコンソールコマンドを実行します。
 # コマンドは先頭のスラッシュを付けずに記述してください。
-# [delay: 20] は20tick、[delay: 5s] は5秒の累積遅延です。
-#
-# 利用可能なプレースホルダー:
-#   %owner%: ワールド所有者のユーザー名（取得できない場合はUUID）
-#   %owner_uuid%: ワールド所有者のUUID
-#   %admin%: 完成フラグを設定した管理者のユーザー名
-#   %admin_uuid%: 完成フラグを設定した管理者のUUID
-#   %world_uuid%: 対象ワールドのUUID
-#   %world_name%: 対象ワールドの名前
-#   %previous_state%: 設定前の提出状態（unsubmitted または submitted）
-#   %state%: 設定後の提出状態（completed）
+# 遅延はMyWorldManagerの独自設定ではなく、CC-Systemのdelayコマンドを使用してください。
+# 例: "delay 5s say %world_name% が完成しました。"
 
 macros:
   # 管理者がワールドの完成フラグを設定したとき
   on_submission_complete:
+    # このマクロ種類の実行時引数:
+    #   %owner%: ワールド所有者のユーザー名（取得できない場合はUUID）
+    #   %owner_uuid%: ワールド所有者のUUID
+    #   %admin%: 完成フラグを設定した管理者のユーザー名
+    #   %admin_uuid%: 完成フラグを設定した管理者のUUID
+    #   %world_uuid%: 対象ワールドのUUID
+    #   %world_name%: 対象ワールドの名前
+    #   %previous_state%: 設定前の提出状態（unsubmitted または submitted）
+    #   %state%: 設定後の提出状態（completed）
     # - "say %world_name% が完成しました。管理者: %admin%"
 
 config_version: 1

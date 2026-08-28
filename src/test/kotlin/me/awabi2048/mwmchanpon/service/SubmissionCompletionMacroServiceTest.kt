@@ -13,6 +13,29 @@ import org.junit.jupiter.api.Test
 
 class SubmissionCompletionMacroServiceTest {
     @Test
+    fun `groups runtime values by completion macro argument type`() {
+        val ownerUuid = UUID.fromString("00000000-0000-0000-0000-000000000022")
+        val adminUuid = UUID.fromString("00000000-0000-0000-0000-000000000023")
+
+        val arguments = SubmissionCompletionMacroArguments(
+            ownerName = "owner-name",
+            ownerUuid = ownerUuid,
+            adminName = "admin-name",
+            adminUuid = adminUuid,
+            worldUuid = UUID.fromString("00000000-0000-0000-0000-000000000021"),
+            worldName = "sample-world",
+            previousState = SubmissionState.UNSUBMITTED,
+        )
+
+        assertEquals("owner-name", arguments.toMacroParameters()["owner"])
+        assertEquals(ownerUuid.toString(), arguments.toMacroParameters()["owner_uuid"])
+        assertEquals("admin-name", arguments.toMacroParameters()["admin"])
+        assertEquals(adminUuid.toString(), arguments.toMacroParameters()["admin_uuid"])
+        assertEquals("unsubmitted", arguments.toMacroParameters()["previous_state"])
+        assertEquals("completed", arguments.toMacroParameters()["state"])
+    }
+
+    @Test
     fun `passes completion context to the existing macro service`() {
         val worldUuid = UUID.fromString("00000000-0000-0000-0000-000000000001")
         val ownerUuid = UUID.fromString("00000000-0000-0000-0000-000000000002")
