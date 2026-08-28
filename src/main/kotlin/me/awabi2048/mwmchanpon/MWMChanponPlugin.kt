@@ -43,6 +43,7 @@ import me.awabi2048.mwmchanpon.service.ArchiveOperationGuard
 import me.awabi2048.mwmchanpon.service.ManualRollbackService
 import me.awabi2048.mwmchanpon.service.OfflineMemberInviteNotifier
 import me.awabi2048.mwmchanpon.service.PublishLevelSynchronizer
+import me.awabi2048.mwmchanpon.service.SubmissionCompletionMacroService
 import me.awabi2048.mwmchanpon.service.WorldDataExportService
 import me.awabi2048.mwmchanpon.service.ArchiveService
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
@@ -128,6 +129,7 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var publishLevelSynchronizer: PublishLevelSynchronizer
     private lateinit var configMigrationParticipant: ChanponConfigMigrationParticipant
     private lateinit var chanponStorage: ChanponWorldStorage
+    private lateinit var submissionCompletionMacroService: SubmissionCompletionMacroService
 
     override fun onEnable() {
         if (!verifyGuiRuntimeContract()) return
@@ -135,6 +137,7 @@ class MWMChanponPlugin : JavaPlugin() {
         configMigrationParticipant = ChanponConfigMigrationParticipant(this)
         MyWorldManagerApi.registerMigrationParticipant(configMigrationParticipant, configMigrationParticipant::executeMigration)
         reloadConfig()
+        submissionCompletionMacroService = createSubmissionCompletionMacroService()
         chanponStorage = ChanponWorldStorage(dataFolder)
         publishLevelSynchronizer = PublishLevelSynchronizer()
         publishLevelSynchronizer.setSynchronizationGate(chanponStorage::hasCurrentWorldData)
@@ -217,7 +220,8 @@ class MWMChanponPlugin : JavaPlugin() {
             chanponStorage,
             globalStorage,
             submittedProtectionService,
-            toolController
+            toolController,
+            submissionCompletionMacroService,
         )
         chanponAdminMenu = ChanponAdminMenu(this, globalStorage, spawnProtectionService, submissionAdminMenu, worldDataManagementMenu, automationSettingsMenu, worldDataExportMenu)
         CCSystem.getAPI().getMenuCommandService().unregisterOwner("mwm-chanpon")
@@ -488,6 +492,19 @@ class MWMChanponPlugin : JavaPlugin() {
 
     fun isConfigurationMigrationCurrent(): Boolean =
         configMigrationParticipant.status().state == ApiMigrationParticipantState.CURRENT
+
+    /**
+     * Chanpon専用の設定を配置したまま、MyWorldManagerの既存マクロ基盤を生成します。
+     * MyWorldManager本体のmacro.ymlとは別ファイルを使うため、両者の設定を混在させません。
+     */
+    private fun createSubmissionCompletionMacroService(): SubmissionCompletionMacroService {
+        val macroFile = File(dataFolder, "macro.yml")
+        if (!macroFile.exists()) {
+            saveResource("macro.yml", false)
+        }
+        val macroService = MyWorldManagerApi.createMacroService(this, macroFile)
+        return SubmissionCompletionMacroService(macroService, logger)
+    }
 
     fun getMessage(
         player: Player?,

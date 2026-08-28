@@ -42,6 +42,7 @@ import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.mwmchanpon.service.ChanponReversibleActionClassification
 import me.awabi2048.mwmchanpon.service.ChanponReversibleContracts
 import me.awabi2048.mwmchanpon.service.ChanponReversibleStateProviders
+import me.awabi2048.mwmchanpon.service.SubmissionCompletionMacroService
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.model.WorldData
 import net.kyori.adventure.text.Component
@@ -56,7 +57,8 @@ class SubmissionAdminMenu(
     private val storage: ChanponWorldStorage,
     private val globalStorage: ChanponGlobalStorage,
     private val protectionService: SubmittedWorldProtectionService,
-    private val toolPermissionController: ToolPermissionController
+    private val toolPermissionController: ToolPermissionController,
+    private val submissionCompletionMacroService: SubmissionCompletionMacroService,
 ) {
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
@@ -315,6 +317,13 @@ class SubmissionAdminMenu(
             player.uniqueId,
             player.name,
             "mark_completed"
+        )
+        // 完成状態が永続化された後をコミット点とし、外部コマンドの失敗で状態を戻さないようにします。
+        submissionCompletionMacroService.execute(
+            worldData,
+            current,
+            player.uniqueId,
+            player.name,
         )
         protectionService.sync(worldData)
         toolPermissionController.syncWorld(worldData)
