@@ -17,7 +17,8 @@ class ToolPermissionConfig(private val config: Configuration) {
                 displayName = config.getString("$base.display_name") ?: id,
                 material = material,
                 groupName = groupName,
-                color = config.getString("$base.color") ?: "§7"
+                color = config.getString("$base.color") ?: "§7",
+                permissionNode = config.getString("$base.permission")?.takeIf { it.isNotBlank() },
             )
         }
     }

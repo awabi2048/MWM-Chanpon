@@ -43,6 +43,7 @@ tool_permissions:
       material: COMMAND_BLOCK
       color: "§6"
       group: "commandblock"
+      permission: "kankoma.extended_command_block"
 
 backup:
   owner_manual:

@@ -23,6 +23,7 @@ class ToolPermissionConfigTest {
         assertEquals(Material.COMMAND_BLOCK, commandBlock.material)
         assertEquals("commandblock", commandBlock.groupName)
         assertEquals("§6", commandBlock.color)
+        assertEquals("kankoma.extended_command_block", commandBlock.permissionNode)
         assertTrue(definitions.map(ToolPermissionDefinition::id).contains("commandblock"))
     }
 }

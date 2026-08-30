@@ -5,7 +5,7 @@
 
     <groupId>me.awabi2048</groupId>
     <artifactId>MWM-Chanpon</artifactId>
-    <version>26.830.1</version>
+    <version>26.830.2</version>
     <packaging>jar</packaging>
 
     <name>MWM-Chanpon</name>
@@ -57,7 +57,7 @@
         <dependency>
             <groupId>com.awabi2048</groupId>
             <artifactId>CC-System</artifactId>
-            <version>26.823.4</version>
+            <version>26.830.13</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
