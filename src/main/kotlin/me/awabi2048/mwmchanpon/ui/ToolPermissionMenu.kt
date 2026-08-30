@@ -49,6 +49,10 @@ class ToolPermissionMenu(
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
     init {
+        // 手動で切り替えるツール権限は、この画面の4枠に収めます。
+        require(definitions.size <= TOOL_ITEM_SLOTS.size) {
+            "ToolPermissionMenu only supports ${TOOL_ITEM_SLOTS.size} manual tool slots, but ${definitions.size} definitions were loaded"
+        }
         ChanponReversibleStateProviders.registerToolPermission(
             CCSystem.getAPI().getMenuReversibleStateProviderRegistry(),
             storage,
@@ -97,7 +101,7 @@ class ToolPermissionMenu(
             )
         }
         if (worldData != null && targetUuid != null) {
-            listOf(19, 20, 21).zip(definitions).forEach { (slot, definition) ->
+            TOOL_ITEM_SLOTS.zip(definitions).forEach { (slot, definition) ->
                 elements += createToolItem(player, slot, worldData, targetUuid, definition)
             }
             if (targetUuid != worldData.owner) {
@@ -273,6 +277,7 @@ class ToolPermissionMenu(
         const val EXTENSION_ID = "chanpon.tool_permissions"
         private const val OWNER = "mwm-chanpon"
         private const val ROUTE = "mwm-chanpon:tool-permissions"
+        private val TOOL_ITEM_SLOTS = listOf(19, 20, 21, 22)
         private const val ACTION_BACK = "back"
         private const val ACTION_TOGGLE = "toggle"
         private const val ACTION_ROLE = "role"

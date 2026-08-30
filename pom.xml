@@ -5,7 +5,7 @@
 
     <groupId>me.awabi2048</groupId>
     <artifactId>MWM-Chanpon</artifactId>
-    <version>26.828.2</version>
+    <version>26.830.1</version>
     <packaging>jar</packaging>
 
     <name>MWM-Chanpon</name>
@@ -169,7 +169,7 @@
                             <createDependencyReducedPom>false</createDependencyReducedPom>
                             <artifactSet>
                                 <excludes>
-                                    <!-- MWM–{‘Ì‚ªŒöŠJAPI‚ÌKotlinŒ^‚ðŽ‚Â‚½‚ßAChanpon‘¤‚ÖKotlin stdlib‚ð“¯«‚µ‚È‚¢B -->
+                                    <!-- MWMï¿½{ï¿½Ì‚ï¿½ï¿½ï¿½ï¿½JAPIï¿½ï¿½Kotlinï¿½^ï¿½ï¿½ï¿½ï¿½ï¿½Â‚ï¿½ï¿½ßAChanponï¿½ï¿½ï¿½ï¿½Kotlin stdlibï¿½ð“¯ï¿½ï¿½ï¿½ï¿½È‚ï¿½ï¿½B -->
                                     <exclude>org.jetbrains.kotlin:kotlin-stdlib</exclude>
                                     <exclude>org.jetbrains:annotations</exclude>
                                 </excludes>
@@ -181,4 +181,7 @@
         </plugins>
     </build>
 </project>
+
+
+
 

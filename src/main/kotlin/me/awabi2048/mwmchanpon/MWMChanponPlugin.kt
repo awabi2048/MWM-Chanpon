@@ -154,7 +154,7 @@ class MWMChanponPlugin : JavaPlugin() {
         val luckPerms = LuckPermsProvider.get()
         spawnProtectionService = SpawnWorldProtectionService()
         worldSafetyDefaultsService = MyWorldSafetyDefaultsService(logger)
-        val toolDefinitions = ToolPermissionConfig(this).load()
+        val toolDefinitions = ToolPermissionConfig(config).load()
         val isAutoRollbackEnabled = {
             isConfigurationMigrationCurrent() && config.getBoolean("backup.auto_rollback.enabled", false)
         }

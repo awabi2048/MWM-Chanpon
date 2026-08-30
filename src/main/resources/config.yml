@@ -38,6 +38,11 @@ tool_permissions:
       material: ENDER_EYE
       color: "§b"
       group: "axiom"
+    commandblock:
+      display_name: "拡張コマンドブロック"
+      material: COMMAND_BLOCK
+      color: "§6"
+      group: "commandblock"
 
 backup:
   owner_manual:
