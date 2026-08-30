@@ -327,6 +327,19 @@ class ChanponWorldStorage(
             ?: error("Submission state is missing or invalid: $worldUuid")
     }
 
+    /**
+     * 提出状態を任意値として読み取ります。
+     *
+     * 現行スキーマでも、提出機能を使っていない既存ワールドには
+     * `submission.state` が存在しないことがあります。現行ファイルかどうかは
+     * hasCurrentWorldData() で先に検証し、ここでは未設定を nullable として
+     * 扱えるよう、厳密な getSubmissionState() とは別の読み取り口にします。
+     */
+    fun getSubmissionStateOrNull(worldUuid: UUID): SubmissionState? {
+        val config = load(worldUuid) ?: return null
+        return SubmissionState.fromStorageValue(config.getString("submission.state"))
+    }
+
     fun isFreecamAllowed(worldUuid: UUID): Boolean {
         return load(worldUuid)?.getBoolean("environment.freecam_allowed", true) ?: true
     }

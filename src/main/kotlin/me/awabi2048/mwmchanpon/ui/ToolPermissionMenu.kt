@@ -104,14 +104,19 @@ class ToolPermissionMenu(
             TOOL_ITEM_SLOTS.zip(definitions).forEach { (slot, definition) ->
                 elements += createToolItem(player, slot, worldData, targetUuid, definition)
             }
-            if (targetUuid != worldData.owner) {
-                elements += createRoleItem(player, 23, worldData, targetUuid)
-            } else {
-                elements += decorationEntry(23)
+            // 中央7枠は「ツール4・背景1・モデレータ切替2」で固定します。
+            // 右2枠は同じ状態を表示する二つの入口であり、どちらを押しても
+            // 一回だけ同じtoggleRoleへ到達します（別々の権限ではありません）。
+            // slot 23 は要素を置かず、InventoryMenuViewの共通背景（灰色板ガラス）を使います。
+            // 白い装飾枠を明示すると、背景と余白の視認性が変わってしまうためです。
+            ROLE_ITEM_SLOTS.forEach { slot ->
+                if (targetUuid != worldData.owner) {
+                    elements += createRoleItem(player, slot, worldData, targetUuid)
+                } else {
+                    elements += decorationEntry(slot)
+                }
             }
         }
-        elements += decorationEntry(24)
-        elements += decorationEntry(25)
         elements += CCSystem.getAPI().getGuiElementService().backEntry(player, 40)
         return InventoryMenuView(
             45,
@@ -278,6 +283,7 @@ class ToolPermissionMenu(
         private const val OWNER = "mwm-chanpon"
         private const val ROUTE = "mwm-chanpon:tool-permissions"
         private val TOOL_ITEM_SLOTS = listOf(19, 20, 21, 22)
+        private val ROLE_ITEM_SLOTS = listOf(24, 25)
         private const val ACTION_BACK = "back"
         private const val ACTION_TOGGLE = "toggle"
         private const val ACTION_ROLE = "role"
