@@ -1,12 +1,23 @@
 # MWM-Chanpon マクロ設定
 #
-# 管理者が管理メニューからワールドの完成フラグを設定した後に、
+# MWM-Chanpon固有のイベント発生後に、
 # MyWorldManager の既存マクロ実行基盤を使ってコンソールコマンドを実行します。
 # コマンドは先頭のスラッシュを付けずに記述してください。
 # 遅延はMyWorldManagerの独自設定ではなく、CC-Systemのdelayコマンドを使用してください。
 # 例: "delay 5s say %world_name% が完成しました。"
 
 macros:
+  # 既存ワールドを本番用ワールドへ切り替えたとき
+  on_honban_set:
+    # このマクロ種類の実行時引数:
+    #   %owner%: ワールド所有者のユーザー名（取得できない場合はUUID）
+    #   %owner_uuid%: ワールド所有者のUUID
+    #   %actor%: 本番用へ切り替えたプレイヤーのユーザー名
+    #   %actor_uuid%: 本番用へ切り替えたプレイヤーのUUID
+    #   %world_uuid%: 対象ワールドのUUID
+    #   %world_name%: 対象ワールドの名前
+    # - "say %world_name% が本番用ワールドに設定されました。設定者: %actor%"
+
   # 管理者がワールドの完成フラグを設定したとき
   on_submission_complete:
     # このマクロ種類の実行時引数:

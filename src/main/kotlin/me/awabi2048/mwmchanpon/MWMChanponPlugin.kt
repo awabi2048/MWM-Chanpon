@@ -39,6 +39,7 @@ import me.awabi2048.mwmchanpon.protection.MyWorldSafetyDefaultsService
 import me.awabi2048.mwmchanpon.service.BackupAutomationService
 import me.awabi2048.mwmchanpon.service.ChanponSpawnWorldService
 import me.awabi2048.mwmchanpon.service.EasyVoidWorldCreationService
+import me.awabi2048.mwmchanpon.service.HonbanSetMacroService
 import me.awabi2048.mwmchanpon.service.ArchiveOperationGuard
 import me.awabi2048.mwmchanpon.service.ManualRollbackService
 import me.awabi2048.mwmchanpon.service.OfflineMemberInviteNotifier
@@ -70,6 +71,7 @@ import me.awabi2048.mwmchanpon.ui.bedrock.AdminWizardForm
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.service.ApiMigrationParticipant
 import me.awabi2048.myworldmanager.api.service.ApiMigrationParticipantState
+import me.awabi2048.myworldmanager.api.service.ApiMacroService
 import net.luckperms.api.LuckPermsProvider
 import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
@@ -129,7 +131,9 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var publishLevelSynchronizer: PublishLevelSynchronizer
     private lateinit var configMigrationParticipant: ChanponConfigMigrationParticipant
     private lateinit var chanponStorage: ChanponWorldStorage
+    private lateinit var chanponMacroService: ApiMacroService
     private lateinit var submissionCompletionMacroService: SubmissionCompletionMacroService
+    private lateinit var honbanSetMacroService: HonbanSetMacroService
 
     override fun onEnable() {
         if (!verifyGuiRuntimeContract()) return
@@ -137,7 +141,9 @@ class MWMChanponPlugin : JavaPlugin() {
         configMigrationParticipant = ChanponConfigMigrationParticipant(this)
         MyWorldManagerApi.registerMigrationParticipant(configMigrationParticipant, configMigrationParticipant::executeMigration)
         reloadConfig()
-        submissionCompletionMacroService = createSubmissionCompletionMacroService()
+        chanponMacroService = createChanponMacroService()
+        submissionCompletionMacroService = SubmissionCompletionMacroService(chanponMacroService, logger)
+        honbanSetMacroService = HonbanSetMacroService(chanponMacroService, logger)
         chanponStorage = ChanponWorldStorage(dataFolder)
         publishLevelSynchronizer = PublishLevelSynchronizer()
         publishLevelSynchronizer.setSynchronizationGate(chanponStorage::hasCurrentWorldData)
@@ -213,7 +219,8 @@ class MWMChanponPlugin : JavaPlugin() {
             chanponStorage,
             globalStorage,
             submittedProtectionService,
-            toolController
+            toolController,
+            honbanSetMacroService,
         )
         submissionAdminMenu = SubmissionAdminMenu(
             this,
@@ -497,13 +504,12 @@ class MWMChanponPlugin : JavaPlugin() {
      * Chanpon専用の設定を配置したまま、MyWorldManagerの既存マクロ基盤を生成します。
      * MyWorldManager本体のmacro.ymlとは別ファイルを使うため、両者の設定を混在させません。
      */
-    private fun createSubmissionCompletionMacroService(): SubmissionCompletionMacroService {
+    private fun createChanponMacroService(): ApiMacroService {
         val macroFile = File(dataFolder, "macro.yml")
         if (!macroFile.exists()) {
             saveResource("macro.yml", false)
         }
-        val macroService = MyWorldManagerApi.createMacroService(this, macroFile)
-        return SubmissionCompletionMacroService(macroService, logger)
+        return MyWorldManagerApi.createMacroService(this, macroFile)
     }
 
     fun getMessage(
