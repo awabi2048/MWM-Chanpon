@@ -105,17 +105,15 @@ class ToolPermissionController(
     }
 
     private fun isSubmissionLocked(worldUuid: UUID): Boolean {
-        if (!storage.hasCurrentWorldData(worldUuid)) return true
-        if (storage.isProductionWorld(worldUuid) && autoRollbackLocked()) return true
-        return try {
-            when (storage.getSubmissionState(worldUuid)) {
-                SubmissionState.SUBMITTED, SubmissionState.COMPLETED -> true
-                SubmissionState.UNSUBMITTED -> false
-            }
-        } catch (ex: IllegalStateException) {
-            // 読み取り不能をロックなしとして扱うと、破損データから権限を付与できます。
-            true
-        }
+        val hasCurrentData = storage.hasCurrentWorldData(worldUuid)
+        val production = storage.isProductionWorld(worldUuid)
+        val submissionState = storage.getSubmissionStateOrNull(worldUuid)
+        return ToolPermissionSubmissionPolicy.isLocked(
+            hasCurrentData = hasCurrentData,
+            production = production,
+            autoRollbackLocked = production && autoRollbackLocked(),
+            submissionState = submissionState,
+        )
     }
 
     private fun removeLegacyScopedPermissions(worldData: WorldData, playerUuid: UUID) {
@@ -136,5 +134,28 @@ class ToolPermissionController(
 
     private companion object {
         const val LEGACY_BUILDER_GROUP = "mwmchanpon_builder"
+    }
+}
+
+/**
+ * ツール権限編集を提出状態から切り離すための純粋な判定です。
+ *
+ * 非本番の現行ワールドでは提出機能を一度も使っていない場合があり、
+ * `submission.state` の欠落は「未提出」と同じ意味として扱います。
+ * 一方、本番ワールドで状態が欠落している場合は、提出済みデータを
+ * 誤って編集しないよう安全側へ倒してロックします。
+ */
+internal object ToolPermissionSubmissionPolicy {
+    fun isLocked(
+        hasCurrentData: Boolean,
+        production: Boolean,
+        autoRollbackLocked: Boolean,
+        submissionState: SubmissionState?,
+    ): Boolean {
+        if (!hasCurrentData) return true
+        if (production && autoRollbackLocked) return true
+        if (production && submissionState == null) return true
+        return submissionState == SubmissionState.SUBMITTED ||
+            submissionState == SubmissionState.COMPLETED
     }
 }

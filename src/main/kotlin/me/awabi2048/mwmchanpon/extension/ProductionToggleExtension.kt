@@ -48,6 +48,7 @@ import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.storage.WorldCreationAvailability
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.service.ChanponReversibleOpaqueState
+import me.awabi2048.mwmchanpon.service.HonbanSetMacroService
 import me.awabi2048.mwmchanpon.service.decodeChanponOpaqueState
 import me.awabi2048.mwmchanpon.storage.SubmissionState
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
@@ -123,7 +124,8 @@ class ProductionToggleExtension(
     private val storage: ChanponWorldStorage,
     private val globalStorage: ChanponGlobalStorage,
     private val protectionService: SubmittedWorldProtectionService,
-    private val toolPermissionController: ToolPermissionController
+    private val toolPermissionController: ToolPermissionController,
+    private val honbanSetMacroService: HonbanSetMacroService,
 ) : Listener {
     private val creationSelectionState = CreationProductionSelectionState()
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
@@ -504,12 +506,15 @@ class ProductionToggleExtension(
         when (action) {
             ConfirmationAction.SET_PRODUCTION -> {
                 if (!canUseProduction(player)) return
-                val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
-                if (worldData != null && ownerHasProductionWorld(worldData.owner, worldUuid)) {
+                val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return
+                // 確認画面を開いた後に別経路で本番化された場合は、状態遷移もマクロも重複させません。
+                if (storage.isProductionWorld(worldUuid)) return
+                if (ownerHasProductionWorld(worldData.owner, worldUuid)) {
                     player.sendMessage(i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_MESSAGE_PRODUCTION_LIMIT))
                     return
                 }
                 storage.setProductionWorld(worldUuid, true)
+                honbanSetMacroService.execute(worldData, player.uniqueId, player.name)
                 applyForcedTags(worldUuid)
                 player.sendMessage(i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_MESSAGE_PRODUCTION_SET))
             }

@@ -70,6 +70,8 @@ class ToolPermissionCapability(
     }
 
     private fun handlePrimaryAction(context: MenuCapabilityActionContext): MenuActionResult {
+        // ここで公開するのは、メンバーが画面から手動で切り替える権限だけです。
+        // レッドストーンや自動実行の経路は、このcapabilityの責務外として扱います。
         val subject = subject(context) ?: return MenuActionResult.Ignored
         if (!canManage(context.player, subject.worldData)) return MenuActionResult.Ignored
         return MenuActionResult.Success(MenuUpdate.Navigate(menu.route(subject.worldData.uuid, subject.memberUuid)))

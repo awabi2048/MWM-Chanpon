@@ -163,6 +163,16 @@ class MenuRuntimeNavigationContractTest {
     }
 
     @Test
+    fun `tool permission menu reserves four manual tool slots`() {
+        val source = uiRoot.resolve("ToolPermissionMenu.kt").readText()
+        assertTrue("TOOL_ITEM_SLOTS = listOf(19, 20, 21, 22)" in source)
+        assertTrue("ROLE_ITEM_SLOTS = listOf(24, 25)" in source)
+        assertTrue("slot 23 は要素を置かず" in source)
+        assertFalse("elements += decorationEntry(23)" in source)
+        assertTrue("require(definitions.size <= TOOL_ITEM_SLOTS.size)" in source)
+    }
+
+    @Test
     fun `runtime action helpers do not use the item name as an implicit click label`() {
         listOf(
             "BackupListMenu.kt",
