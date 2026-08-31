@@ -430,10 +430,18 @@ class ChanponPlayerWorldCapability(
                 if (!canOpenSettings(player, worldData)) return MenuActionResult.Rejected()
                 return openWorldSettings(subject, worldData)
             }
-            MyWorldManagerApi.getWorldService()?.teleportToWorld(player, worldData.uuid)
-            player.sendMessage(
-                text(player, MyworldMessagesKeys.MESSAGES_WARP_SUCCESS, mapOf("world" to worldData.name)),
+            val worldService = MyWorldManagerApi.getWorldService() ?: return MenuActionResult.Rejected()
+            val accepted = worldService.teleportToWorldWithCompletion(
+                player,
+                worldData.uuid,
+                Runnable {
+                    // ワールドのロード待ちを含め、実際のPlayer.teleport成功後に一度だけ案内します。
+                    player.sendMessage(
+                        text(player, MyworldMessagesKeys.MESSAGES_WARP_SUCCESS, mapOf("world" to worldData.name)),
+                    )
+                },
             )
+            if (!accepted) return MenuActionResult.Rejected()
             return MenuActionResult.Success(MenuUpdate.Close)
         }
         if (context.click.isRightClick && !context.click.isShiftClick && canOpenSettings(player, worldData)) {
