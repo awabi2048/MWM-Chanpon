@@ -5,7 +5,6 @@ import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.api.extension.WorldPlayerStateDecision
 import me.awabi2048.myworldmanager.api.extension.WorldPlayerStatePolicy
 import me.awabi2048.myworldmanager.model.WorldData
-import org.bukkit.GameMode
 import org.bukkit.entity.Player
 
 class ChanponWorldPlayerStatePolicy(
@@ -22,9 +21,9 @@ class ChanponWorldPlayerStatePolicy(
     override fun getPriority(): Int = 100
 
     override fun evaluate(player: Player, worldData: WorldData): WorldPlayerStateDecision {
+        // MWM-Chanponは建築・飛行制約を提供しますが、ゲームモードは変更しません。
         if (!configurationAvailable() || !worldStorage.hasCurrentWorldData(worldData.uuid)) {
             return WorldPlayerStateDecision(
-                gameMode = GameMode.ADVENTURE,
                 buildAllowed = false,
                 flightAllowed = false,
             )
@@ -36,7 +35,6 @@ class ChanponWorldPlayerStatePolicy(
             return WorldPlayerStateDecision(buildAllowed = true)
         }
         return WorldPlayerStateDecision(
-            gameMode = GameMode.ADVENTURE,
             buildAllowed = false,
             flightAllowed = false
         )
