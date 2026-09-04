@@ -6,6 +6,7 @@ import me.awabi2048.myworldmanager.api.service.ApiMigrationParticipantResultStat
 import me.awabi2048.myworldmanager.api.service.ApiMigrationParticipantState
 import me.awabi2048.myworldmanager.api.service.ApiMigrationParticipantStatus
 import me.awabi2048.mwmchanpon.storage.WorldCreationAvailability
+import me.awabi2048.mwmchanpon.tool.ToolPermissionConfigSchema
 import org.bukkit.configuration.file.YamlConfiguration
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -207,6 +208,7 @@ internal class ChanponConfigMigrationParticipant(
                     3 -> if (!original.contains("creation.easy.platform_material")) {
                         original.set("creation.easy.platform_material", "OBSIDIAN")
                     }
+                    4 -> ToolPermissionConfigSchema.migrate(original)
                     else -> error("Missing Chanpon config migration: $next->${next + 1}")
                 }
                 next++
@@ -365,6 +367,7 @@ internal class ChanponConfigMigrationParticipant(
         ) {
             "creation.easy.platform_material must be a placeable solid block material"
         }
+        ToolPermissionConfigSchema.validate(config)
     }
 
     private fun moveAtomically(source: java.nio.file.Path, target: java.nio.file.Path) {
@@ -377,7 +380,7 @@ internal class ChanponConfigMigrationParticipant(
 
     private companion object {
         const val ID = "mwm-chanpon-data"
-        const val CURRENT_VERSION = 4
+        const val CURRENT_VERSION = 5
         val SUPPORTED_PHASES = setOf("BUILD_LOCKED", "CREATION_ALLOWED", "PRODUCTION")
         val BACKUP_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS")
     }

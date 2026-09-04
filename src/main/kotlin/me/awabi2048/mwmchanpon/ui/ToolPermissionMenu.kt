@@ -49,7 +49,7 @@ class ToolPermissionMenu(
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
     init {
-        // 手動で切り替えるツール権限は、この画面の4枠に収めます。
+        // 外部ツールの表示枠は3枠です。KantanCommanderは専用システムで管理するため含めません。
         require(definitions.size <= TOOL_ITEM_SLOTS.size) {
             "ToolPermissionMenu only supports ${TOOL_ITEM_SLOTS.size} manual tool slots, but ${definitions.size} definitions were loaded"
         }
@@ -101,10 +101,10 @@ class ToolPermissionMenu(
             )
         }
         if (worldData != null && targetUuid != null) {
-            TOOL_ITEM_SLOTS.zip(definitions).forEach { (slot, definition) ->
+            centeredToolSlots(definitions.size).zip(definitions).forEach { (slot, definition) ->
                 elements += createToolItem(player, slot, worldData, targetUuid, definition)
             }
-            // 中央7枠は「ツール4・背景1・モデレータ切替2」で固定します。
+            // 中央6枠は「外部ツール3・背景1・モデレータ切替2」で固定します。
             // 右2枠は同じ状態を表示する二つの入口であり、どちらを押しても
             // 一回だけ同じtoggleRoleへ到達します（別々の権限ではありません）。
             // slot 23 は要素を置かず、InventoryMenuViewの共通背景（灰色板ガラス）を使います。
@@ -275,6 +275,13 @@ class ToolPermissionMenu(
     private fun uuid(value: String?): UUID? =
         value?.let { runCatching { UUID.fromString(it) }.getOrNull() }
 
+    /** 設定されたツール数が減っても、残ったアイコンが左へ偏らないよう中央寄せします。 */
+    private fun centeredToolSlots(count: Int): List<Int> {
+        require(count in 0..TOOL_ITEM_SLOTS.size)
+        val first = (TOOL_ITEM_SLOTS.size - count) / 2
+        return TOOL_ITEM_SLOTS.drop(first).take(count)
+    }
+
     private fun i18n(key: LocalizationKey<String>): String =
         CCSystem.getAPI().getLocalized(null, key)
 
@@ -282,7 +289,7 @@ class ToolPermissionMenu(
         const val EXTENSION_ID = "chanpon.tool_permissions"
         private const val OWNER = "mwm-chanpon"
         private const val ROUTE = "mwm-chanpon:tool-permissions"
-        private val TOOL_ITEM_SLOTS = listOf(19, 20, 21, 22)
+        private val TOOL_ITEM_SLOTS = listOf(20, 21, 22)
         private val ROLE_ITEM_SLOTS = listOf(24, 25)
         private const val ACTION_BACK = "back"
         private const val ACTION_TOGGLE = "toggle"

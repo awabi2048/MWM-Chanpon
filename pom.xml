@@ -5,7 +5,7 @@
 
     <groupId>me.awabi2048</groupId>
     <artifactId>MWM-Chanpon</artifactId>
-    <version>26.904.2</version>
+    <version>26.904.3</version>
     <packaging>jar</packaging>
 
     <name>MWM-Chanpon</name>

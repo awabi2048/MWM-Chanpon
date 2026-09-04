@@ -5,7 +5,6 @@ import java.util.concurrent.CompletableFuture
 import java.util.logging.Logger
 import net.luckperms.api.LuckPerms
 import net.luckperms.api.node.types.InheritanceNode
-import net.luckperms.api.node.types.PermissionNode
 import net.luckperms.api.model.user.User
 
 class LuckPermsToolPermissionService(
@@ -110,14 +109,12 @@ class LuckPermsToolPermissionService(
             .filter { it.id in enabledToolIds }
             .forEach { definition ->
                 user.transientData().add(activeGroupNode(definition))
-                activePermissionNode(definition)?.let(user.transientData()::add)
             }
     }
 
     private fun clearActiveGroups(user: User, definitions: List<ToolPermissionDefinition>) {
         definitions.forEach { definition ->
             user.transientData().remove(activeGroupNode(definition))
-            activePermissionNode(definition)?.let(user.transientData()::remove)
         }
     }
 
@@ -126,11 +123,4 @@ class LuckPermsToolPermissionService(
             .value(true)
             .build()
     }
-
-    private fun activePermissionNode(definition: ToolPermissionDefinition): PermissionNode? =
-        definition.permissionNode?.let { permission ->
-            PermissionNode.builder(permission)
-                .value(true)
-                .build()
-        }
 }

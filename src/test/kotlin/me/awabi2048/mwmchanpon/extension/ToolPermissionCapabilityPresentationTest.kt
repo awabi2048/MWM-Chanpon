@@ -24,7 +24,7 @@ class ToolPermissionCapabilityPresentationTest {
             val block = toolPermissionLoreBlock("ツール権限", definitions, states)
 
             assertEquals(GuiLoreLine.Data("ツール権限", null, ""), block.lines.first())
-            assertEquals(5, block.lines.size)
+            assertEquals(4, block.lines.size)
             val checkboxes = block.lines.drop(1).map { it as GuiLoreLine.Checkbox }
             assertEquals(definitions.map(ToolPermissionDefinition::displayName), checkboxes.map { it.label })
             definitions.forEach { definition ->
@@ -60,6 +60,5 @@ class ToolPermissionCapabilityPresentationTest {
         ToolPermissionDefinition("worldedit", "WorldEdit", Material.WOODEN_AXE, "worldedit"),
         ToolPermissionDefinition("voxelsniper", "VoxelSniper", Material.ARROW, "voxelsniper"),
         ToolPermissionDefinition("axiom", "Axiom", Material.PAPER, "axiom"),
-        ToolPermissionDefinition("commandblock", "拡張コマンドブロック", Material.COMMAND_BLOCK, "commandblock"),
     )
 }
