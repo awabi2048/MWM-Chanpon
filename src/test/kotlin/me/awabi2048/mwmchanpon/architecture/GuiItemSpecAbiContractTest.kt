@@ -16,6 +16,6 @@ class GuiItemSpecAbiContractTest {
             "",
         )
 
-        assertTrue("<version>26.831.7</version>" in ccSystemDependency)
+        assertTrue("<version>26.904.10</version>" in ccSystemDependency)
     }
 }
