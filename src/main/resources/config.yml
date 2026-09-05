@@ -21,29 +21,11 @@ standalone_export:
   fiscal_year: 2026
 
 tool_permissions:
-  menu_slot: 5
   tools:
-    worldedit:
-      display_name: "WorldEdit"
-      material: WOODEN_AXE
-      color: "§a"
-      group: "worldeditor"
-    voxelsniper:
-      display_name: "VoxelSniper"
-      material: ARROW
-      color: "§d"
-      group: "voxelsniper"
-    axiom:
-      display_name: "Axiom"
-      material: ENDER_EYE
-      color: "§b"
-      group: "axiom"
-    commandblock:
-      display_name: "拡張コマンドブロック"
-      material: COMMAND_BLOCK
-      color: "§6"
-      group: "commandblock"
-      permission: "kankoma.extended_command_block"
+    worldedit: "worldeditor"
+    voxelsniper: "voxelsniper"
+    axiom: "axiom"
+    commandblock: "commandblock"
 
 backup:
   owner_manual:
@@ -70,4 +52,4 @@ backup:
       scheduled: 14
       restore_point: 5
       pre_rollback: 10
-config_version: 4
+config_version: 6

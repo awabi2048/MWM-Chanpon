@@ -477,7 +477,7 @@ class MWMChanponPlugin : JavaPlugin() {
             config.save(temporary)
             FileChannel.open(temporary.toPath(), StandardOpenOption.WRITE).use { it.force(true) }
             val verified = org.bukkit.configuration.file.YamlConfiguration().also { it.load(temporary) }
-            check((verified.get("config_version") as? Number)?.toInt() == 4) {
+            check((verified.get("config_version") as? Number)?.toInt() == ChanponConfigMigrationParticipant.CURRENT_VERSION) {
                 "Current Chanpon config was not verified after serialization"
             }
             try {

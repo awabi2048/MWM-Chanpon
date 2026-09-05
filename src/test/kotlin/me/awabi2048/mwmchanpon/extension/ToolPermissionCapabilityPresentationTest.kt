@@ -15,9 +15,9 @@ class ToolPermissionCapabilityPresentationTest {
     fun `four world-state fixtures render title and each tool exactly once in definition order`() {
         val fixtures = listOf(
             emptyMap(),
-            mapOf("worldedit" to true, "voxelsniper" to true, "axiom" to true),
-            mapOf("worldedit" to true, "voxelsniper" to false, "axiom" to true),
-            mapOf("worldedit" to false, "voxelsniper" to true, "axiom" to false),
+            mapOf("worldedit" to true, "voxelsniper" to true, "axiom" to true, "commandblock" to true),
+            mapOf("worldedit" to true, "voxelsniper" to false, "axiom" to true, "commandblock" to false),
+            mapOf("worldedit" to false, "voxelsniper" to true, "axiom" to false, "commandblock" to true),
         )
 
         fixtures.forEach { states ->
@@ -60,6 +60,12 @@ class ToolPermissionCapabilityPresentationTest {
         ToolPermissionDefinition("worldedit", "WorldEdit", Material.WOODEN_AXE, "worldedit"),
         ToolPermissionDefinition("voxelsniper", "VoxelSniper", Material.ARROW, "voxelsniper"),
         ToolPermissionDefinition("axiom", "Axiom", Material.PAPER, "axiom"),
-        ToolPermissionDefinition("commandblock", "拡張コマンドブロック", Material.COMMAND_BLOCK, "commandblock"),
+        ToolPermissionDefinition(
+            "commandblock",
+            "拡張コマンドブロック",
+            Material.COMMAND_BLOCK,
+            "commandblock",
+            "kankoma.extended_command_block",
+        ),
     )
 }

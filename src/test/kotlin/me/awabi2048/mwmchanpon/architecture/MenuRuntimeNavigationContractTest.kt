@@ -91,7 +91,7 @@ class MenuRuntimeNavigationContractTest {
         @Suppress("UNCHECKED_CAST")
         val easy = creation["easy"] as Map<String, Any>
 
-        assertTrue(config["config_version"] == 4)
+        assertTrue(config["config_version"] == 6)
         assertTrue(easy["platform_material"] == "OBSIDIAN")
     }
 
@@ -163,12 +163,13 @@ class MenuRuntimeNavigationContractTest {
     }
 
     @Test
-    fun `tool permission menu reserves four manual tool slots`() {
+    fun `tool permission menu reserves four centered tool slots`() {
         val source = uiRoot.resolve("ToolPermissionMenu.kt").readText()
         assertTrue("TOOL_ITEM_SLOTS = listOf(19, 20, 21, 22)" in source)
         assertTrue("ROLE_ITEM_SLOTS = listOf(24, 25)" in source)
         assertTrue("slot 23 は要素を置かず" in source)
         assertFalse("elements += decorationEntry(23)" in source)
+        assertTrue("centeredToolSlots(definitions.size)" in source)
         assertTrue("require(definitions.size <= TOOL_ITEM_SLOTS.size)" in source)
     }
 

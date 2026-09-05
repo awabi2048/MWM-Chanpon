@@ -127,6 +127,7 @@ class LuckPermsToolPermissionService(
             .build()
     }
 
+    /** グループ名の命名規則に依存しないKantan等の明示的な判定ノードを一時付与します。 */
     private fun activePermissionNode(definition: ToolPermissionDefinition): PermissionNode? =
         definition.permissionNode?.let { permission ->
             PermissionNode.builder(permission)
