@@ -134,8 +134,14 @@ internal class ChanponWorldDataMigrationParticipant(
             require(version <= CURRENT_SCHEMA_VERSION) {
                 "world data is newer than this plugin: ${file.name}=$version"
             }
-            validate(config, file)
-            val legacy = config.contains("development") || config.contains("development_set_at")
+            // PASSWORD は旧来の建築許可モードであり、現行の公開パスワード機能とは別物です。
+            // 現行 enum からは廃止済みですが、ここで先に拒否すると migrateFile() の
+            // "password" -> "members" 変換へ到達できず、既存ワールドが永久に FAILED になります。
+            // 移行前の検査に限って受け入れ、移行後の validate() では引き続き拒否します。
+            validate(config, file, allowLegacyPasswordMode = true)
+            val legacy = config.contains("development") ||
+                config.contains("development_set_at") ||
+                config.getString("protection.mode") == LEGACY_PASSWORD_MODE
             return ChanponWorldFileInspection(
                 file,
                 if (version < CURRENT_SCHEMA_VERSION || legacy) ChanponWorldFileState.PENDING
@@ -223,7 +229,11 @@ internal class ChanponWorldDataMigrationParticipant(
             return raw.toInt()
         }
 
-        private fun validate(config: YamlConfiguration, file: File) {
+        private fun validate(
+            config: YamlConfiguration,
+            file: File,
+            allowLegacyPasswordMode: Boolean = false,
+        ) {
             config.get("production")?.let { require(it is Boolean) { "production must be boolean: ${file.name}" } }
             config.getString("visibility")?.let {
                 require(ChanponWorldVisibility.fromStorageValue(it) != null) {
@@ -237,11 +247,16 @@ internal class ChanponWorldDataMigrationParticipant(
                 }
             }
             config.getString("protection.mode")?.let {
-                require(ChanponWorldProtectionMode.fromStorageValue(it) != null) {
+                require(
+                    ChanponWorldProtectionMode.fromStorageValue(it) != null ||
+                        (allowLegacyPasswordMode && it == LEGACY_PASSWORD_MODE),
+                ) {
                     "protection.mode is invalid: ${file.name}"
                 }
             }
         }
+
+        private const val LEGACY_PASSWORD_MODE = "password"
     }
 
     private data class Scan(

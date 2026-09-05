@@ -101,7 +101,7 @@ class ToolPermissionMenu(
             )
         }
         if (worldData != null && targetUuid != null) {
-            TOOL_ITEM_SLOTS.zip(definitions).forEach { (slot, definition) ->
+            centeredToolSlots(definitions.size).zip(definitions).forEach { (slot, definition) ->
                 elements += createToolItem(player, slot, worldData, targetUuid, definition)
             }
             // 中央7枠は「ツール4・背景1・モデレータ切替2」で固定します。
@@ -274,6 +274,13 @@ class ToolPermissionMenu(
 
     private fun uuid(value: String?): UUID? =
         value?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+
+    /** 設定されたツール数が減っても、残ったアイコンが左へ偏らないよう中央寄せします。 */
+    private fun centeredToolSlots(count: Int): List<Int> {
+        require(count in 0..TOOL_ITEM_SLOTS.size)
+        val first = (TOOL_ITEM_SLOTS.size - count) / 2
+        return TOOL_ITEM_SLOTS.drop(first).take(count)
+    }
 
     private fun i18n(key: LocalizationKey<String>): String =
         CCSystem.getAPI().getLocalized(null, key)
