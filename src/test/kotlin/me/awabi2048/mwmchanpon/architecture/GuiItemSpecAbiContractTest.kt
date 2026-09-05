@@ -17,6 +17,6 @@ class GuiItemSpecAbiContractTest {
         )
 
         // 実サーバーで稼働するCC-SystemのitemModel対応版へ追随します。
-        assertTrue("<version>26.904.11</version>" in ccSystemDependency)
+        assertTrue("<version>26.905.2</version>" in ccSystemDependency)
     }
 }
