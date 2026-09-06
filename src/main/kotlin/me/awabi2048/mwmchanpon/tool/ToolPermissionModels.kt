@@ -56,7 +56,9 @@ internal object ToolPermissionCatalog {
         ToolPermissionType("axiom", "Axiom", Material.ENDER_EYE, "axiom"),
         ToolPermissionType(
             KANTAN_COMMAND_BLOCK_ID,
-            "拡張コマンドブロック",
+            // ユーザー向け表示名は「かんたんコマンダー」で統一する。
+            // id=commandblock・グループ名・権限ノードは設定互換とKantan側判定のため維持する。
+            "かんたんコマンダー",
             Material.COMMAND_BLOCK,
             KANTAN_COMMAND_BLOCK_GROUP,
             KANTAN_EXTENDED_COMMAND_BLOCK_PERMISSION,

@@ -62,7 +62,7 @@ class ToolPermissionCapabilityPresentationTest {
         ToolPermissionDefinition("axiom", "Axiom", Material.PAPER, "axiom"),
         ToolPermissionDefinition(
             "commandblock",
-            "拡張コマンドブロック",
+            "かんたんコマンダー",
             Material.COMMAND_BLOCK,
             "commandblock",
             "kankoma.extended_command_block",
