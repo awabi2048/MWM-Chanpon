@@ -308,7 +308,7 @@ class ChanponWorldSettingsMenu(
         if (owner) {
             addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.FOOTER_ACTIONS, ChanponWorldSettingsLayout.productionSubmissionSlot(size), displayOnlyWhenUnavailable = true)
         }
-        addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.FOOTER_LEFT_ACTIONS, ChanponWorldSettingsLayout.linkedPortalSlot(size, owner, protected))
+        addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.FOOTER_LEFT_ACTIONS, ChanponWorldSettingsLayout.linkedPortalSlot(size, protected))
         if (owner) {
             addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.FOOTER_RIGHT_ACTIONS, ChanponWorldSettingsLayout.backupSlot(size), displayOnlyWhenUnavailable = true)
         }
