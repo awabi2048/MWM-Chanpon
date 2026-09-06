@@ -15,8 +15,10 @@ class ChanponWorldSettingsLayoutTest {
 
     @Test
     fun `ポータル取得は実際の画面サイズからフッター位置を決める`() {
-        assertEquals(46, ChanponWorldSettingsLayout.linkedPortalSlot(54, isOwner = true, isProtected = false))
-        assertEquals(47, ChanponWorldSettingsLayout.linkedPortalSlot(54, isOwner = false, isProtected = false))
-        assertEquals(23, ChanponWorldSettingsLayout.linkedPortalSlot(45, isOwner = true, isProtected = true))
+        // フッター左操作はオーナー判定によらず1マス目へ統一する。
+        // 非オーナーで 47 を返すとツアー項目（slot 47）と衝突する不具合があったため、46 へ統一した。
+        assertEquals(46, ChanponWorldSettingsLayout.linkedPortalSlot(54, isProtected = false))
+        assertEquals(23, ChanponWorldSettingsLayout.linkedPortalSlot(54, isProtected = true))
+        assertEquals(23, ChanponWorldSettingsLayout.linkedPortalSlot(45, isProtected = true))
     }
 }
