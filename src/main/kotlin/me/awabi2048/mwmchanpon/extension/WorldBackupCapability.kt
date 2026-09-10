@@ -458,20 +458,23 @@ class WorldBackupCapability(
     }
 
     private fun confirmOwnerBackup(context: MenuActionContext): MenuActionResult {
-        val source = source(context.payload)
-        val backupName = context.payload[BACKUP_NAME_KEY]
+        // 確認画面の状態は確認routeのpayloadに保持される。確認ボタンのaction payloadは空のため、
+        // context.payloadではなくcontext.route.payloadを参照する。
+        val confirmation = resolveOwnerBackupConfirmation(context.route.payload)
             ?: return MenuActionResult.Rejected()
-        executeOwnerBackup(context.player, source, backupName)
+        executeOwnerBackup(context.player, confirmation.source, confirmation.backupName)
         return MenuActionResult.Success(MenuUpdate.Close)
     }
 
     private fun confirmRestore(context: MenuActionContext): MenuActionResult {
-        val source = source(context.payload)
-        val backupId = context.payload[BACKUP_ID_KEY] ?: return MenuActionResult.Rejected()
-        val backup = backupService.listBackupsForWorld(source.worldUuid)
-            .firstOrNull { it.id == backupId }
+        // 確認画面の状態は確認routeのpayloadに保持される。確認ボタンのaction payloadは空のため、
+        // context.payloadではなくcontext.route.payloadを参照する。
+        val confirmation = resolveRestoreConfirmation(context.route.payload)
             ?: return MenuActionResult.Rejected()
-        executeRestore(context.player, backup, source)
+        val backup = backupService.listBackupsForWorld(confirmation.source.worldUuid)
+            .firstOrNull { it.id == confirmation.backupId }
+            ?: return MenuActionResult.Rejected()
+        executeRestore(context.player, backup, confirmation.source)
         return MenuActionResult.Success(MenuUpdate.Close)
     }
 
@@ -720,15 +723,7 @@ class WorldBackupCapability(
 
     private fun source(route: MenuRoute): Holder = source(route.payload)
 
-    private fun source(payload: Map<String, String>): Holder {
-        val worldUuid = payload[PAYLOAD_WORLD_UUID]
-            ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-            ?: UUID(0L, 0L)
-        return Holder(
-            worldUuid,
-            payload[PAYLOAD_PAGE]?.toIntOrNull() ?: 0,
-        )
-    }
+    private fun source(payload: Map<String, String>): Holder = parseSource(payload)
 
     private fun worldUuid(arguments: Map<String, String>): UUID? =
         arguments[PAYLOAD_WORLD_UUID]
@@ -756,7 +751,7 @@ class WorldBackupCapability(
         private const val CAPABILITY_ID = "world-backup"
         private const val TYPE_BACKUP_ITEM = "chanpon_owner_backup_item"
         private const val TYPE_CONTROL = "chanpon_owner_backup_control"
-        private const val BACKUP_ID_KEY = "chanpon_backup_id"
+        internal const val BACKUP_ID_KEY = "chanpon_backup_id"
         private const val ACTION_KEY = "chanpon_action"
         private const val ACTION_BACKUP = "backup"
         private const val MAX_BACKUP_NAME_LENGTH = 32
@@ -770,8 +765,34 @@ class WorldBackupCapability(
         private const val ACTION_RUNTIME_CREATE = "create"
         private const val ACTION_RUNTIME_CONFIRM = "confirm"
         private const val ACTION_RUNTIME_CANCEL = "cancel"
-        private const val PAYLOAD_WORLD_UUID = "world_uuid"
-        private const val PAYLOAD_PAGE = "page"
-        private const val BACKUP_NAME_KEY = "backup_name"
+        internal const val PAYLOAD_WORLD_UUID = "world_uuid"
+        internal const val PAYLOAD_PAGE = "page"
+        internal const val BACKUP_NAME_KEY = "backup_name"
+
+        /** 確認画面のroute payloadから手動バックアップ実行情報を解決する。action payloadは参照しない。 */
+        internal data class OwnerBackupConfirmation(val source: Holder, val backupName: String)
+
+        /** 確認画面のroute payloadから復元実行情報を解決する。action payloadは参照しない。 */
+        internal data class RestoreConfirmation(val source: Holder, val backupId: String)
+
+        internal fun resolveOwnerBackupConfirmation(routePayload: Map<String, String>): OwnerBackupConfirmation? {
+            val backupName = routePayload[BACKUP_NAME_KEY] ?: return null
+            return OwnerBackupConfirmation(parseSource(routePayload), backupName)
+        }
+
+        internal fun resolveRestoreConfirmation(routePayload: Map<String, String>): RestoreConfirmation? {
+            val backupId = routePayload[BACKUP_ID_KEY] ?: return null
+            return RestoreConfirmation(parseSource(routePayload), backupId)
+        }
+
+        private fun parseSource(payload: Map<String, String>): Holder {
+            val worldUuid = payload[PAYLOAD_WORLD_UUID]
+                ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                ?: UUID(0L, 0L)
+            return Holder(
+                worldUuid,
+                payload[PAYLOAD_PAGE]?.toIntOrNull() ?: 0,
+            )
+        }
     }
 }
