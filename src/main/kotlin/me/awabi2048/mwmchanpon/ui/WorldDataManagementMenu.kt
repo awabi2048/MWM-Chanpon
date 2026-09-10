@@ -280,6 +280,8 @@ class WorldDataManagementMenu(
             runCatching { UUID.fromString(it) }.getOrNull()
         }
         val player = context.player
+        // 作成処理は非同期で時間がかかるため、開始を先に通知する。
+        player.sendMessage(i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_BACKUP_STARTED))
         val future = if (worldUuid == null) {
             backupService.createAllBackup(
                 productionWorlds().map { it.uuid },

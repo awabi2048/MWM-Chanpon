@@ -150,13 +150,11 @@ internal class ChanponWorldDataMigrationParticipant(
         }
 
         /** 外部復元元はファイル名にUUIDを持たないため、対象UUIDを別引数で検証します。 */
-        fun validateCurrentExternalFile(file: File, expectedUuid: UUID) {
+        fun validateCurrentExternalFile(file: File, @Suppress("UNUSED_PARAMETER") expectedUuid: UUID) {
+            // バックアップ内は worlds/<uuid>/chanpon.yml、アーカイブ内は worlds/<uuid>/chanpon_data.yml と、
+            // 外部配置ではファイル名がUUIDではない。対象の特定は呼び出し元のディレクトリ経路で行い、
+            // ここでは内容が現行形式であることだけを検証する。
             require(file.isFile) { "world data source is not a regular file: ${file.name}" }
-            val filenameUuid = runCatching { UUID.fromString(file.nameWithoutExtension) }
-                .getOrElse { error("world data source filename is not a UUID: ${file.name}") }
-            require(filenameUuid == expectedUuid) {
-                "world data source filename does not match target UUID: ${file.name} != $expectedUuid"
-            }
             val config = YamlConfiguration().also { it.load(file) }
             val version = readVersion(config, file)
             require(version == CURRENT_SCHEMA_VERSION) {
