@@ -274,6 +274,8 @@ class WorldBackupCapability(
             open(player, source.worldUuid, source.page)
             return
         }
+        // 作成処理は非同期で時間がかかるため、開始を先に通知する。
+        player.sendMessage(i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_BACKUP_STARTED))
         backupService.createOwnerWorldBackup(
             source.worldUuid,
             player.uniqueId,
@@ -363,6 +365,7 @@ class WorldBackupCapability(
         "world is not a production world" -> "対象ワールドは本番用ワールドではありません。"
         "world data missing" -> "対象ワールドの管理データが見つかりません。"
         "backup world archive is missing or unreadable" -> "バックアップのワールドデータが存在しないか、読み取れません。"
+        "backup world metadata is missing or invalid" -> "バックアップのワールド情報が現在と一致しないか、読み取れません。"
         "world directory is not writable" -> "復元先のワールドディレクトリへ書き込めません。"
         "failed to unload worlds" -> "対象ワールドのアンロードに失敗しました。"
         "failed to create pre rollback backup" -> "ロールバック前の退避バックアップ作成に失敗しました。"

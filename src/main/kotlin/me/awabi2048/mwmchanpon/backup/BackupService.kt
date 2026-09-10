@@ -5,6 +5,7 @@ import me.awabi2048.mwmchanpon.service.PortalSnapshotCodec
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.service.ApiPortalSnapshot
+import me.awabi2048.myworldmanager.api.service.ApiWorldRepository
 import me.awabi2048.myworldmanager.api.service.ApiWorldService
 import me.awabi2048.myworldmanager.model.WorldData
 import org.bukkit.Bukkit
@@ -439,23 +440,12 @@ class BackupService(
             )
         }
         val backupMetadataFailure = repository?.let { worldRepository ->
-            distinctTargets.firstOrNull { worldUuid ->
-                val current = worldRepository.findByUuid(worldUuid) ?: return@firstOrNull true
-                val source = File(backupDir(entry.id), "worlds/$worldUuid/mwm.yml")
-                val sourceChanpon = File(backupDir(entry.id), "worlds/$worldUuid/chanpon.yml")
-                runCatching {
-                    val restored = worldRepository.readCurrentDataFile(source, worldUuid)
-                    check(restored.worldKey == current.worldKey) { "world_key does not match the target world" }
-                    check(restored.dimension == current.dimension) { "dimension does not match the target world" }
-                    if (sourceChanpon.exists()) {
-                        storage.validateExternalWorldFile(sourceChanpon, worldUuid)
-                    }
-                    PortalSnapshotCodec.read(
-                        File(backupDir(entry.id), "worlds/$worldUuid/portals.yml"),
-                        expectedWorldUuid = worldUuid,
-                        expectedWorldKey = current.worldKey,
+            distinctTargets.firstNotNullOfOrNull { worldUuid ->
+                diagnoseBackupMetadata(worldRepository, entry.id, worldUuid)?.also { detail ->
+                    plugin.logger.warning(
+                        "Rollback preflight: backup world metadata check failed: backup=${entry.id} world=$worldUuid detail=$detail"
                     )
-                }.isFailure
+                }
             }
         }
         val targetSet = distinctTargets.toSet()
@@ -470,6 +460,41 @@ class BackupService(
             evacuationRequired = evacuationRequired,
             evacuationAvailable = MyWorldManagerApi.getEvacuationLocationOverride() != null
         ) ?: backupMetadataFailure?.let { "backup world metadata is missing or invalid" }
+    }
+
+    /**
+     * バックアップ内メタデータの検証失敗理由を返す。正常時は null。
+     * 判定文言は変えず、詳細は呼び出し元のサーバーログで原因特定に使う。
+     */
+    private fun diagnoseBackupMetadata(
+        worldRepository: ApiWorldRepository,
+        backupId: String,
+        worldUuid: UUID,
+    ): String? {
+        val current = worldRepository.findByUuid(worldUuid) ?: return "target world data is missing"
+        val base = File(backupDir(backupId), "worlds/$worldUuid")
+        val restored = runCatching {
+            worldRepository.readCurrentDataFile(File(base, "mwm.yml"), worldUuid)
+        }.getOrElse { return "mwm.yml is missing or unreadable: ${it.message}" }
+        if (restored.worldKey != current.worldKey) {
+            return "world_key mismatch: backup=${restored.worldKey} current=${current.worldKey}"
+        }
+        if (restored.dimension != current.dimension) {
+            return "dimension mismatch: backup=${restored.dimension} current=${current.dimension}"
+        }
+        val sourceChanpon = File(base, "chanpon.yml")
+        if (sourceChanpon.exists()) {
+            runCatching { storage.validateExternalWorldFile(sourceChanpon, worldUuid) }
+                .onFailure { return "chanpon.yml is invalid: ${it.message}" }
+        }
+        runCatching {
+            PortalSnapshotCodec.read(
+                File(base, "portals.yml"),
+                expectedWorldUuid = worldUuid,
+                expectedWorldKey = current.worldKey,
+            )
+        }.onFailure { return "portals.yml is missing or invalid: ${it.message}" }
+        return null
     }
 
     fun restoreWorldBackup(entry: BackupEntry, worldUuid: UUID): CompletableFuture<RestoreOperationResult> {

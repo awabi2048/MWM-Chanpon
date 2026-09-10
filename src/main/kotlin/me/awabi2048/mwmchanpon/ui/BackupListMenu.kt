@@ -392,6 +392,7 @@ class BackupListMenu(
         "world is not a production world" -> "対象に本番用ワールドではないワールドが含まれています。"
         "world data missing" -> "対象ワールドの管理データが見つかりません。"
         "backup world archive is missing or unreadable" -> "バックアップのワールドデータが存在しないか、読み取れません。"
+        "backup world metadata is missing or invalid" -> "バックアップのワールド情報が現在と一致しないか、読み取れません。"
         "world directory is not writable" -> "復元先のワールドディレクトリへ書き込めません。"
         "failed to unload worlds" -> "対象ワールドのアンロードに失敗しました。"
         "failed to create pre rollback backup" -> "ロールバック前の退避バックアップ作成に失敗しました。"

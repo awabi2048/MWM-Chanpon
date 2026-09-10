@@ -258,6 +258,8 @@ class AutomationSettingsMenu(
 
     private fun confirmRestorePoint(context: MenuActionContext): MenuActionResult {
         val player = context.player
+        // 作成処理は非同期で時間がかかるため、開始を先に通知する。
+        player.sendMessage(i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_BACKUP_STARTED))
         backupService.createAllBackup(
             automationService.productionWorldUuids(),
             BackupKind.RESTORE_POINT,
