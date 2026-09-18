@@ -13,6 +13,7 @@ import com.awabi2048.ccsystem.api.gui.MenuCapabilityDefinition
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentationProvider
 import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import me.awabi2048.mwmchanpon.ui.ChanponWorldSettingsMenu
+import me.awabi2048.mwmchanpon.ui.ChanponWorldSettingsPlacements
 import me.awabi2048.mwmchanpon.ui.WorldSettingsFeature
 import me.awabi2048.mwmchanpon.ui.chanponCapabilityAction
 import me.awabi2048.mwmchanpon.service.ChanponReversibleContracts
@@ -20,7 +21,6 @@ import me.awabi2048.mwmchanpon.service.ChanponReversibleActionClassification
 import me.awabi2048.mwmchanpon.service.ChanponReversibleStateProviders
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
-import me.awabi2048.myworldmanager.api.extension.WorldSettingsCapabilityPlacements
 import me.awabi2048.myworldmanager.model.WorldData
 
 internal class ChanponWorldSettingsCapabilities(
@@ -37,23 +37,23 @@ internal class ChanponWorldSettingsCapabilities(
         )
         register(
             WorldSettingsFeature.EXPANSION,
-            WorldSettingsCapabilityPlacements.EXPANSION_ACTION,
+            ChanponWorldSettingsPlacements.EXPANSION_ACTION,
         )
         register(
             WorldSettingsFeature.PUBLISH,
-            WorldSettingsCapabilityPlacements.PUBLISH_ACTION,
+            ChanponWorldSettingsPlacements.PUBLISH_ACTION,
         )
         register(
             WorldSettingsFeature.NOTIFICATION,
-            WorldSettingsCapabilityPlacements.NOTIFICATION_ACTION,
+            ChanponWorldSettingsPlacements.NOTIFICATION_ACTION,
         )
         register(
             WorldSettingsFeature.ENVIRONMENT,
-            WorldSettingsCapabilityPlacements.ENVIRONMENT_ACTION,
+            ChanponWorldSettingsPlacements.ENVIRONMENT_ACTION,
         )
         register(
             WorldSettingsFeature.CRITICAL,
-            WorldSettingsCapabilityPlacements.CRITICAL_ACTION,
+            ChanponWorldSettingsPlacements.CRITICAL_ACTION,
         )
     }
 

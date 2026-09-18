@@ -24,8 +24,8 @@ class WorldSettingsAvailabilityContractTest {
     fun `設定画面の固定配置を維持する`() {
         val menu = source("ui/ChanponWorldSettingsMenu.kt")
 
-        assertTrue("WorldSettingsCapabilityPlacements.FOOTER_ACTIONS, ChanponWorldSettingsLayout.productionSubmissionSlot(size)" in menu)
-        assertTrue("WorldSettingsCapabilityPlacements.FOOTER_RIGHT_ACTIONS, ChanponWorldSettingsLayout.backupSlot(size)" in menu)
+        assertTrue("ChanponWorldSettingsPlacements.FOOTER_ACTIONS, ChanponWorldSettingsLayout.productionSubmissionSlot(size)" in menu)
+        assertTrue("ChanponWorldSettingsPlacements.FOOTER_RIGHT_ACTIONS, ChanponWorldSettingsLayout.backupSlot(size)" in menu)
         assertTrue("displayOnlyWhenUnavailable = true" in menu)
     }
 

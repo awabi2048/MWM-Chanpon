@@ -55,7 +55,7 @@ import me.awabi2048.mwmchanpon.ui.asConfirmation
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
-import me.awabi2048.myworldmanager.api.extension.WorldSettingsCapabilityPlacements
+import me.awabi2048.mwmchanpon.ui.ChanponWorldSettingsPlacements
 import me.awabi2048.myworldmanager.model.WorldData
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
@@ -116,7 +116,7 @@ class WorldBackupCapability(
             MenuCapabilityDefinition(
                 owner = RUNTIME_OWNER,
                 id = CAPABILITY_ID,
-                placement = WorldSettingsCapabilityPlacements.FOOTER_RIGHT_ACTIONS,
+                placement = ChanponWorldSettingsPlacements.FOOTER_RIGHT_ACTIONS,
                 // TODO: 非本番・非owner等でも項目を消さず、BARRIERと理由Loreを返すdecisionを導入する。
                 availability = me.awabi2048.mwmchanpon.ui.optionalAvailability { context ->
                     worldUuid(context.arguments)?.let {

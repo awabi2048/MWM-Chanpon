@@ -21,6 +21,6 @@ class ChanponWorldSettingsReplacementContractTest {
         assertTrue("Screen.MAIN -> renderMain(player, worldData)" in menu)
         assertTrue("private fun renderMain(" in menu)
         assertTrue("elements += worldInfoElement(player, worldData)" in menu)
-        assertTrue("WorldSettingsCapabilityPlacements.EXPANSION_ACTION" in menu)
+        assertTrue("ChanponWorldSettingsPlacements.EXPANSION_ACTION" in menu)
     }
 }
