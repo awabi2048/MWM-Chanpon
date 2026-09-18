@@ -34,6 +34,7 @@ import me.awabi2048.mwmchanpon.service.ChanponReversibleContracts
 import me.awabi2048.mwmchanpon.service.ChanponReversibleActionClassification
 import me.awabi2048.mwmchanpon.service.ChanponReversibleStateProviders
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
+import me.awabi2048.mwmchanpon.auth.AdminAccess
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.model.WorldData
 import org.bukkit.Bukkit
@@ -228,7 +229,11 @@ class ToolPermissionMenu(
         )
 
     private fun canManage(player: Player, worldData: WorldData): Boolean =
-        player.uniqueId == worldData.owner || player.hasPermission("myworldmanager.admin")
+        AdminAccess.isOwnerOrAdmin(
+            player.uniqueId == worldData.owner,
+            MyWorldManagerApi.hasWorldSettingsAdminAccess(player),
+            player.hasPermission("mwmchanpon.admin"),
+        )
 
     private fun createToolItem(
         player: Player,

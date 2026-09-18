@@ -15,7 +15,6 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
-import java.security.MessageDigest
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
@@ -391,11 +390,15 @@ class BackupService(
         return createBackup(worldUuids, BackupScope.ALL, kind, actorUuid, actorName, reason, name, acquireLocks = true)
     }
 
-    fun createChangedScheduledBackup(): CompletableFuture<BackupOperationResult> {
-        val worlds = productionWorlds().filter(::hasChangedSinceLastBackup)
+    /**
+     * 定時バックアップの対象は、前回バックアップ以降に誰かが入室した本番ワールドです。
+     * 未バックアップのワールドは初回確保のため対象に含めます。
+     */
+    fun createVisitedScheduledBackup(): CompletableFuture<BackupOperationResult> {
+        val worlds = productionWorlds().filter { storage.isVisitedSinceLastBackup(it.uuid) }
         if (worlds.isEmpty()) {
             return CompletableFuture.completedFuture(
-                BackupOperationResult(BackupOperationStatus.SUCCESS, null, "no changed production worlds")
+                BackupOperationResult(BackupOperationStatus.SUCCESS, null, "no visited production worlds")
             )
         }
         return createAllBackup(worlds.map { it.uuid }, BackupKind.SCHEDULED, null, "system", "scheduled", BackupDisplay.SCHEDULED_NAME)
@@ -733,7 +736,7 @@ class BackupService(
                 dir.mkdirs()
                 targets.forEach { copyWorldSnapshot(it, dir) }
                 val entry = writeManifest(dir, id, scope, kind, targets, actorUuid, actorName, reason, name)
-                writeWorldHashes(entry)
+                markWorldsBackedUp(entry)
                 if (kind != BackupKind.PRE_ROLLBACK) {
                     applyRetention()
                 }
@@ -751,7 +754,7 @@ class BackupService(
 
     /**
      * バックアップ作成は原本の読み取りだけに見えて、実際にはロード済みワールドの保存と
-     * last_backup_hashの更新を伴います。移行対象を含む状態で「正常なバックアップ」を
+     * バックアップ完了時刻の更新を伴います。移行対象を含む状態で「正常なバックアップ」を
      * 作らないよう、副作用開始前に対象集合を一括検査します。
      */
     private fun backupPreflightFailure(targets: List<UUID>, includeUnresolved: Boolean): String? {
@@ -984,16 +987,16 @@ class BackupService(
                     val distinctFailed = syncFailed.distinct()
                     if (distinctFailed.isEmpty()) {
                         // 操作マーカーを全ワールドの永続コミット点とします。
-                        // この点が保存されるまでバックアップハッシュを公開しません。
+                        // この点が保存されるまでバックアップ完了時刻を公開しません。
                         operationCommitAttempted = true
                         operationMarker.markCommitted()
                         operationCommitPersisted = true
                         restored.distinct().forEach { worldUuid ->
-                            runCatching { storage.setLastBackupHash(worldUuid, backupHash(entry, worldUuid)) }
+                            runCatching { storage.setLastBackedUpAt(worldUuid, System.currentTimeMillis()) }
                                 .onFailure { error ->
                                     plugin.logger.log(
                                         java.util.logging.Level.WARNING,
-                                        "Could not update restore hash for $worldUuid after committed restore",
+                                        "Could not update restore timestamp for $worldUuid after committed restore",
                                         error,
                                     )
                                 }
@@ -1276,55 +1279,15 @@ class BackupService(
         )
     }
 
-    private fun writeWorldHashes(entry: BackupEntry) {
+    /**
+     * 作成・復元に成功したワールドのバックアップ完了時刻を進め、次回定時の対象外にします。
+     * 手動バックアップ成功時も更新されるため、手動直後の定時重複を防げます。
+     */
+    private fun markWorldsBackedUp(entry: BackupEntry) {
+        val now = System.currentTimeMillis()
         entry.worldUuids.forEach { worldUuid ->
-            storage.setLastBackupHash(worldUuid, backupHash(entry, worldUuid))
+            storage.setLastBackedUpAt(worldUuid, now)
         }
-    }
-
-    private fun hasChangedSinceLastBackup(worldData: WorldData): Boolean {
-        val previous = storage.getLastBackupHash(worldData.uuid) ?: return true
-        return currentWorldHash(worldData) != previous
-    }
-
-    private fun currentWorldHash(worldData: WorldData): String {
-        val core = MyWorldManagerApi.getWorldService() ?: return ""
-        val digest = MessageDigest.getInstance("SHA-256")
-        fun updateFile(file: File, label: String) {
-            if (!file.exists()) return
-            digest.update(label.toByteArray(Charsets.UTF_8))
-            digest.update(Files.readAllBytes(file.toPath()))
-        }
-        val worldDir = core.getWorldDirectory(worldData)
-        digest.update(hashPath(worldDir.toPath()).toByteArray(Charsets.UTF_8))
-        updateFile(core.getWorldDataFile(worldData.uuid), "mwm")
-        updateChanponFile(digest, storage.worldFile(worldData.uuid))
-        digest.update(
-            PortalSnapshotCodec.writeToString(
-                core.getRelatedPortals(worldData.uuid).sortedBy { it.id.toString() },
-            ).toByteArray(Charsets.UTF_8),
-        )
-        return digest.digest().joinToString("") { "%02x".format(it) }
-    }
-
-    private fun backupHash(entry: BackupEntry, worldUuid: UUID): String {
-        val dir = File(backupDir(entry.id), "worlds/$worldUuid")
-        val digest = MessageDigest.getInstance("SHA-256")
-        digest.update(hashZip(File(dir, "world.zip").toPath()).toByteArray(Charsets.UTF_8))
-        fun updateFile(file: File, label: String) {
-            if (!file.exists()) return
-            digest.update(label.toByteArray(Charsets.UTF_8))
-            digest.update(Files.readAllBytes(file.toPath()))
-        }
-        updateFile(File(dir, "mwm.yml"), "mwm")
-        updateChanponFile(digest, File(dir, "chanpon.yml"))
-        digest.update(
-            PortalSnapshotCodec.writeToString(
-                PortalSnapshotCodec.read(File(dir, "portals.yml"), requireFile = false)
-                    .sortedBy { it.id.toString() },
-            ).toByteArray(Charsets.UTF_8),
-        )
-        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
     private fun productionWorlds(): List<WorldData> {
@@ -1370,15 +1333,6 @@ class BackupService(
         if (!source.exists()) return
         target.parentFile?.mkdirs()
         Files.copy(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES)
-    }
-
-    private fun updateChanponFile(digest: MessageDigest, file: File) {
-        if (!file.exists()) return
-        val config = YamlConfiguration.loadConfiguration(file)
-        config.set("backup.last_hash", null)
-        config.set("backup.owner_manual.last_created_at", null)
-        digest.update("chanpon".toByteArray(Charsets.UTF_8))
-        digest.update(config.saveToString().toByteArray(Charsets.UTF_8))
     }
 
     private fun restoreChanponFileForRestore(source: File, worldUuid: UUID) {
@@ -1492,42 +1446,6 @@ class BackupService(
         return Files.walk(file.toPath()).use { stream ->
             stream.filter { !it.isDirectory() }.mapToLong { Files.size(it) }.sum()
         }
-    }
-
-    private fun hashPath(path: Path): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        if (!Files.exists(path)) return ""
-        Files.walk(path).use { stream ->
-            stream.filter { !it.isDirectory() }
-                .sorted(Comparator.comparing { path.relativize(it).toString() })
-                .forEach {
-                    if (it.fileName?.toString() == "session.lock") return@forEach
-                    digest.update(path.relativize(it).toString().replace(File.separatorChar, '/').toByteArray(Charsets.UTF_8))
-                    digest.update(Files.readAllBytes(it))
-                }
-        }
-        return digest.digest().joinToString("") { "%02x".format(it) }
-    }
-
-    private fun hashZip(path: Path): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        if (!Files.exists(path)) return ""
-        ZipInputStream(Files.newInputStream(path)).use { zip ->
-            while (true) {
-                val entry = zip.nextEntry ?: break
-                if (!entry.isDirectory) {
-                    digest.update(entry.name.toByteArray(Charsets.UTF_8))
-                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                    while (true) {
-                        val read = zip.read(buffer)
-                        if (read < 0) break
-                        digest.update(buffer, 0, read)
-                    }
-                }
-                zip.closeEntry()
-            }
-        }
-        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
     private data class EvacuatedPlayer(

@@ -25,6 +25,7 @@ import me.awabi2048.mwmchanpon.extension.ToolPermissionCapability
 import me.awabi2048.mwmchanpon.extension.ChanponMemberManagementPasswordCapability
 import me.awabi2048.mwmchanpon.extension.WorldBackupCapability
 import me.awabi2048.mwmchanpon.listener.MemberPermissionSyncListener
+import me.awabi2048.mwmchanpon.listener.WorldVisitListener
 import me.awabi2048.mwmchanpon.listener.FreecamWorldPolicyListener
 import me.awabi2048.mwmchanpon.listener.MyWorldSafetyDefaultsListener
 import me.awabi2048.mwmchanpon.listener.PlayerJoinListener
@@ -327,6 +328,7 @@ class MWMChanponPlugin : JavaPlugin() {
             logger.warning("Production forced tags are paused until /mwm migration completes.")
         }
         server.pluginManager.registerEvents(MemberPermissionSyncListener(toolController, chanponStorage), this)
+        server.pluginManager.registerEvents(WorldVisitListener(chanponStorage), this)
         server.pluginManager.registerEvents(
             PlayerJoinListener(toolController, spawnWorldService, offlineMemberInviteNotifier),
             this,
