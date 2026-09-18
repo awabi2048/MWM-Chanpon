@@ -119,7 +119,19 @@ class ChanponWorldStorage(
         validateExternalWorldFile(source, worldUuid)
         val restored = YamlConfiguration().also { it.load(source) }
         val current = worldFile(worldUuid).takeIf(File::isFile)?.let { YamlConfiguration().also { config -> config.load(it) } }
+        // 旧ハッシュ方式の残存キーは除去し、訪問・完了時刻は現行ファイル側の値を温存する。
+        // バックアップ内の古い時刻で上書きすると、復元直後に再バックアップ対象になってしまう。
         restored.set("backup.last_hash", null)
+        restored.set(
+            "backup.last_visit_at",
+            current?.getLong("backup.last_visit_at", 0L)
+                ?.takeIf { it > 0L },
+        )
+        restored.set(
+            "backup.last_backed_up_at",
+            current?.getLong("backup.last_backed_up_at", 0L)
+                ?.takeIf { it > 0L },
+        )
         restored.set(
             "backup.owner_manual.last_created_at",
             current?.getLong("backup.owner_manual.last_created_at", 0L)
@@ -460,15 +472,38 @@ class ChanponWorldStorage(
         saveAtomic(worldUuid, config)
     }
 
-    fun getLastBackupHash(worldUuid: UUID): String? {
-        return load(worldUuid)?.getString("backup.last_hash")
+    /**
+     * 定時バックアップの対象判定に使う、前回バックアップ以降の入室記録です。
+     * 未バックアップのワールドは初回確保のため対象として扱います。
+     */
+    fun isVisitedSinceLastBackup(worldUuid: UUID): Boolean {
+        if (getLastBackedUpAt(worldUuid) <= 0L) return true
+        return getLastVisitAt(worldUuid) > getLastBackedUpAt(worldUuid)
+    }
+
+    fun getLastVisitAt(worldUuid: UUID): Long {
+        return load(worldUuid)?.getLong("backup.last_visit_at", 0L) ?: 0L
     }
 
     @Synchronized
-    fun setLastBackupHash(worldUuid: UUID, hash: String) {
+    fun setLastVisitAt(worldUuid: UUID, value: Long) {
         ensureWritable(worldUuid)
         val config = loadOrCreate(worldUuid)
-        config.set("backup.last_hash", hash)
+        config.set("backup.last_visit_at", value.takeIf { it > 0L })
+        config.set("backup.last_hash", null)
+        saveAtomic(worldUuid, config)
+    }
+
+    fun getLastBackedUpAt(worldUuid: UUID): Long {
+        return load(worldUuid)?.getLong("backup.last_backed_up_at", 0L) ?: 0L
+    }
+
+    @Synchronized
+    fun setLastBackedUpAt(worldUuid: UUID, value: Long) {
+        ensureWritable(worldUuid)
+        val config = loadOrCreate(worldUuid)
+        config.set("backup.last_backed_up_at", value.takeIf { it > 0L })
+        config.set("backup.last_hash", null)
         saveAtomic(worldUuid, config)
     }
 

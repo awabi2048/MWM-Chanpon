@@ -76,7 +76,7 @@ class BackupAutomationService(
         val targetTime = parseTime(plugin.config.getString("backup.auto_backup.time", "04:00")) ?: return
         val worldUuids = productionWorldUuids()
         handleRun(AutomationType.BACKUP, today, targetTime, worldUuids) {
-            backupService.createChangedScheduledBackup().thenApply { it.status == BackupOperationStatus.SUCCESS }
+            backupService.createVisitedScheduledBackup().thenApply { it.status == BackupOperationStatus.SUCCESS }
         }
     }
 
