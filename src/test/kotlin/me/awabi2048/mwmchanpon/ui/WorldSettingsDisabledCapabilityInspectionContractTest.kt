@@ -6,7 +6,7 @@ import com.awabi2048.ccsystem.api.gui.MenuInteraction
 import com.awabi2048.ccsystem.api.gui.MenuRuntimeInspectionInteractionSnapshot
 import com.awabi2048.ccsystem.api.gui.MenuRuntimeInteractionKind
 import java.util.UUID
-import me.awabi2048.myworldmanager.api.extension.WorldSettingsCapabilityPlacements
+import me.awabi2048.mwmchanpon.ui.ChanponWorldSettingsPlacements
 import net.kyori.adventure.text.Component
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
@@ -22,7 +22,7 @@ class WorldSettingsDisabledCapabilityInspectionContractTest {
         )
         val source = MenuCapabilitySource(
             capabilityId = "mwm-chanpon:world-settings-environment",
-            placement = WorldSettingsCapabilityPlacements.ENVIRONMENT_ACTION,
+            placement = ChanponWorldSettingsPlacements.ENVIRONMENT_ACTION,
             arguments = mapOf("world_uuid" to worldUuid),
             attributes = emptyMap(),
         )

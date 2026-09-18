@@ -23,8 +23,8 @@ import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentation
 import com.awabi2048.ccsystem.api.gui.MenuCapabilityPresentationProvider
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
+import me.awabi2048.mwmchanpon.ui.ChanponWorldSettingsPlacements
 import me.awabi2048.mwmchanpon.ui.chanponCapabilityAction
-import me.awabi2048.myworldmanager.api.extension.WorldSettingsCapabilityPlacements
 import me.awabi2048.myworldmanager.model.WorldData
 import org.bukkit.Material
 import org.bukkit.entity.Player
@@ -36,7 +36,7 @@ class LinkedPortalCapability {
             MenuCapabilityDefinition(
                 owner = OWNER,
                 id = CAPABILITY_ID,
-                placement = WorldSettingsCapabilityPlacements.FOOTER_LEFT_ACTIONS,
+                placement = ChanponWorldSettingsPlacements.FOOTER_LEFT_ACTIONS,
                 availability = me.awabi2048.mwmchanpon.ui.optionalAvailability { context ->
                     val world = worldData(context.arguments) ?: return@optionalAvailability false
                     context.player.uniqueId == world.owner ||

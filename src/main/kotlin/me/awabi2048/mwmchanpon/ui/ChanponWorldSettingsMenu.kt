@@ -45,7 +45,6 @@ import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsAction
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsActionRequest
-import me.awabi2048.myworldmanager.api.extension.WorldSettingsCapabilityPlacements
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsNavigationRequest
 import me.awabi2048.myworldmanager.api.extension.WorldSettingsRouteCapability
 import me.awabi2048.myworldmanager.api.service.ExpansionExecutionMode
@@ -237,8 +236,8 @@ class ChanponWorldSettingsMenu(
         val elements = mutableListOf<MenuElement>()
 
         if (protected && owner) {
-            addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.PUBLISH_ACTION, 21)
-            addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.NOTIFICATION_ACTION, 22)
+            addCapability(elements, player, worldData, ChanponWorldSettingsPlacements.PUBLISH_ACTION, 21)
+            addCapability(elements, player, worldData, ChanponWorldSettingsPlacements.NOTIFICATION_ACTION, 22)
         } else if (canInspectSettings) {
             elements += mwmActionEntry(player, 19, worldData, WorldSettingsAction.EDIT_INFO, "info", MyworldGuiSettingsKeys.GUI_SETTINGS_INFO_DISPLAY, Material.NAME_TAG, OPERATION_EDIT_INFO, listOf(i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_MWM_ACTION_ACTION)))
             elements += mwmActionEntry(player, 20, worldData, WorldSettingsAction.SELECT_ICON, "icon", MyworldGuiSettingsKeys.GUI_SETTINGS_ICON_DISPLAY, Material.ANVIL, OPERATION_SELECT_ICON, listOf(i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_MWM_ACTION_ACTION)))
@@ -253,7 +252,7 @@ class ChanponWorldSettingsMenu(
                 elements,
                 player,
                 worldData,
-                WorldSettingsCapabilityPlacements.NOTIFICATION_ACTION,
+                ChanponWorldSettingsPlacements.NOTIFICATION_ACTION,
                 29,
                 displayOnlyWhenUnavailable = !isFeatureRoleActionable(player, worldData, WorldSettingsFeature.NOTIFICATION),
             )
@@ -265,7 +264,7 @@ class ChanponWorldSettingsMenu(
                 elements,
                 player,
                 worldData,
-                WorldSettingsCapabilityPlacements.EXPANSION_ACTION,
+                ChanponWorldSettingsPlacements.EXPANSION_ACTION,
                 23,
                 displayOnlyWhenUnavailable = !isCurrentWorld(player, worldData) ||
                     !isFeatureRoleActionable(player, worldData, WorldSettingsFeature.EXPANSION),
@@ -274,7 +273,7 @@ class ChanponWorldSettingsMenu(
                 elements,
                 player,
                 worldData,
-                WorldSettingsCapabilityPlacements.PUBLISH_ACTION,
+                ChanponWorldSettingsPlacements.PUBLISH_ACTION,
                 24,
                 displayOnlyWhenUnavailable = !isFeatureRoleActionable(player, worldData, WorldSettingsFeature.PUBLISH),
             )
@@ -283,7 +282,7 @@ class ChanponWorldSettingsMenu(
                 elements,
                 player,
                 worldData,
-                WorldSettingsCapabilityPlacements.ENVIRONMENT_ACTION,
+                ChanponWorldSettingsPlacements.ENVIRONMENT_ACTION,
                 32,
                 displayOnlyWhenUnavailable = !isCurrentWorld(player, worldData) ||
                     !isFeatureRoleActionable(player, worldData, WorldSettingsFeature.ENVIRONMENT),
@@ -292,7 +291,7 @@ class ChanponWorldSettingsMenu(
                 elements,
                 player,
                 worldData,
-                WorldSettingsCapabilityPlacements.CRITICAL_ACTION,
+                ChanponWorldSettingsPlacements.CRITICAL_ACTION,
                 33,
                 displayOnlyWhenUnavailable = !isCurrentWorld(player, worldData) ||
                     !isFeatureRoleActionable(player, worldData, WorldSettingsFeature.CRITICAL),
@@ -306,11 +305,11 @@ class ChanponWorldSettingsMenu(
             elements += actionElement(player, ChanponGuiElements.backSlot(size), null, i18n(player, ChanponSystemKeys.CHANPON_SETTINGS_COMMON_BACK), OPERATION_BACK, GuiElementRole.BACK)
         }
         if (owner) {
-            addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.FOOTER_ACTIONS, ChanponWorldSettingsLayout.productionSubmissionSlot(size), displayOnlyWhenUnavailable = true)
+            addCapability(elements, player, worldData, ChanponWorldSettingsPlacements.FOOTER_ACTIONS, ChanponWorldSettingsLayout.productionSubmissionSlot(size), displayOnlyWhenUnavailable = true)
         }
-        addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.FOOTER_LEFT_ACTIONS, ChanponWorldSettingsLayout.linkedPortalSlot(size, protected))
+        addCapability(elements, player, worldData, ChanponWorldSettingsPlacements.FOOTER_LEFT_ACTIONS, ChanponWorldSettingsLayout.linkedPortalSlot(size, protected))
         if (owner) {
-            addCapability(elements, player, worldData, WorldSettingsCapabilityPlacements.FOOTER_RIGHT_ACTIONS, ChanponWorldSettingsLayout.backupSlot(size), displayOnlyWhenUnavailable = true)
+            addCapability(elements, player, worldData, ChanponWorldSettingsPlacements.FOOTER_RIGHT_ACTIONS, ChanponWorldSettingsLayout.backupSlot(size), displayOnlyWhenUnavailable = true)
         }
         return InventoryMenuView(
             size,
