@@ -25,6 +25,7 @@ import com.awabi2048.ccsystem.api.gui.MenuDialogInput
 import com.awabi2048.ccsystem.api.gui.MenuDialogRequest
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import me.awabi2048.mwmchanpon.protection.WorldBuildPermissionService
+import me.awabi2048.mwmchanpon.auth.AdminAccess
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.ui.chanponCapabilityAction
 import me.awabi2048.mwmchanpon.ui.optionalAvailability
@@ -58,7 +59,11 @@ class ChanponMemberManagementPasswordCapability(
                 availability = optionalAvailability { context ->
                     val world = worldData(context) ?: return@optionalAvailability false
                     // パスワード設定はワールドオーナー専用（管理者も許可）。
-                    context.player.uniqueId == world.owner || context.player.hasPermission("myworldmanager.admin")
+                    AdminAccess.isOwnerOrAdmin(
+                        context.player.uniqueId == world.owner,
+                        MyWorldManagerApi.hasWorldSettingsAdminAccess(context.player),
+                        context.player.hasPermission("mwmchanpon.admin"),
+                    )
                 },
                 presentationProvider = MenuCapabilityPresentationProvider { context ->
                     val world = requireNotNull(worldData(context))
@@ -125,7 +130,7 @@ class ChanponMemberManagementPasswordCapability(
 
     private fun handleChange(context: MenuCapabilityActionContext): MenuActionResult {
         val world = worldData(context) ?: return MenuActionResult.Ignored
-        if (context.player.uniqueId != world.owner && !context.player.hasPermission("myworldmanager.admin")) {
+        if (!isOwnerOrAdmin(context.player, world)) {
             return MenuActionResult.Ignored
         }
         showPasswordDialog(context.player, world)
@@ -180,7 +185,7 @@ class ChanponMemberManagementPasswordCapability(
      */
     private fun handleRemove(context: MenuCapabilityActionContext): MenuActionResult {
         val world = worldData(context) ?: return MenuActionResult.Ignored
-        if (context.player.uniqueId != world.owner && !context.player.hasPermission("myworldmanager.admin")) {
+        if (!isOwnerOrAdmin(context.player, world)) {
             return MenuActionResult.Ignored
         }
         showRemoveConfirmDialog(context.player, world)
@@ -229,6 +234,13 @@ class ChanponMemberManagementPasswordCapability(
             ?: return null
         return MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
     }
+
+    private fun isOwnerOrAdmin(player: Player, world: WorldData): Boolean =
+        AdminAccess.isOwnerOrAdmin(
+            player.uniqueId == world.owner,
+            MyWorldManagerApi.hasWorldSettingsAdminAccess(player),
+            player.hasPermission("mwmchanpon.admin"),
+        )
 
     private fun i18n(player: Player?, key: LocalizationKey<String>): String =
         CCSystem.getAPI().getLocalized(player, key)

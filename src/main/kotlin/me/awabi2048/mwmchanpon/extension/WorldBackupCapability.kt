@@ -43,6 +43,7 @@ import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import me.awabi2048.mwmchanpon.backup.BackupEntry
 import me.awabi2048.mwmchanpon.backup.BackupDisplay
+import me.awabi2048.mwmchanpon.backup.BackupKind
 import me.awabi2048.mwmchanpon.backup.BackupOperationStatus
 import me.awabi2048.mwmchanpon.backup.BackupService
 import me.awabi2048.mwmchanpon.backup.RestoreOperationResult
@@ -53,6 +54,7 @@ import me.awabi2048.mwmchanpon.ui.chanponGestureAction
 import me.awabi2048.mwmchanpon.ui.reasonedAvailability
 import me.awabi2048.mwmchanpon.ui.asConfirmation
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
+import me.awabi2048.mwmchanpon.auth.AdminAccess
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.mwmchanpon.ui.ChanponWorldSettingsPlacements
@@ -203,6 +205,8 @@ class WorldBackupCapability(
             47,
             source.worldUuid,
             payload(source.copy(page = safePage)),
+            // 管理者の代行作成にはオーナーのクールダウンを表示しない。
+            adminBypassCooldown = isAdminActing(player, world),
         )
         return InventoryMenuView(
             layout.size,
@@ -240,49 +244,68 @@ class WorldBackupCapability(
             context.player.sendMessage(i18nComponent(context.player, ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_MANUAL_OPERATION_BLOCKED))
             return MenuActionResult.Rejected()
         }
-        val remaining = backupService.ownerBackupCooldownRemainingSeconds(source.worldUuid)
-        if (remaining > 0) {
-            context.player.sendMessage(
-                i18nComponent(
-                    context.player,
-                    ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_OWNER_BACKUP_COOLDOWN,
-                    mapOf("remaining" to BackupDisplay.formatDuration(remaining)),
-                ),
-            )
-            return MenuActionResult.Rejected()
+        // 管理者による代行作成はオーナーのクールダウンを消費しない。
+        if (!isAdminActingFor(context.player, source.worldUuid)) {
+            val remaining = backupService.ownerBackupCooldownRemainingSeconds(source.worldUuid)
+            if (remaining > 0) {
+                context.player.sendMessage(
+                    i18nComponent(
+                        context.player,
+                        ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_OWNER_BACKUP_COOLDOWN,
+                        mapOf("remaining" to BackupDisplay.formatDuration(remaining)),
+                    ),
+                )
+                return MenuActionResult.Rejected()
+            }
         }
         openBackupNameInput(context.player, source)
         return MenuActionResult.Success(MenuUpdate.None)
     }
 
     private fun executeOwnerBackup(player: Player, source: Holder, backupName: String) {
-        if (ownedProductionWorld(player, source.worldUuid) == null) return
+        val world = ownedProductionWorld(player, source.worldUuid) ?: return
         if (automationService.isManualOperationBlocked(player)) {
             player.sendMessage(i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_MANUAL_OPERATION_BLOCKED))
             open(player, source.worldUuid, source.page)
             return
         }
-        val remaining = backupService.ownerBackupCooldownRemainingSeconds(source.worldUuid)
-        if (remaining > 0) {
-            player.sendMessage(
-                i18nComponent(
-                    player,
-                    ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_OWNER_BACKUP_COOLDOWN,
-                    mapOf("remaining" to BackupDisplay.formatDuration(remaining)),
-                ),
-            )
-            open(player, source.worldUuid, source.page)
-            return
+        // 管理者による代行作成はオーナーのクールダウンを確認・消費しない。
+        val adminActing = isAdminActing(player, world)
+        if (!adminActing) {
+            val remaining = backupService.ownerBackupCooldownRemainingSeconds(source.worldUuid)
+            if (remaining > 0) {
+                player.sendMessage(
+                    i18nComponent(
+                        player,
+                        ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_OWNER_BACKUP_COOLDOWN,
+                        mapOf("remaining" to BackupDisplay.formatDuration(remaining)),
+                    ),
+                )
+                open(player, source.worldUuid, source.page)
+                return
+            }
         }
         // 作成処理は非同期で時間がかかるため、開始を先に通知する。
         player.sendMessage(i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_BACKUP_STARTED))
-        backupService.createOwnerWorldBackup(
-            source.worldUuid,
-            player.uniqueId,
-            player.name,
-            "owner_manual",
-            backupName,
-        ).thenAccept { result ->
+        val future = if (adminActing) {
+            backupService.createWorldBackup(
+                source.worldUuid,
+                BackupKind.ADMIN_MANUAL,
+                player.uniqueId,
+                player.name,
+                "admin_worldmenu",
+                backupName,
+            )
+        } else {
+            backupService.createOwnerWorldBackup(
+                source.worldUuid,
+                player.uniqueId,
+                player.name,
+                "owner_manual",
+                backupName,
+            )
+        }
+        future.thenAccept { result ->
             Bukkit.getScheduler().runTask(plugin, Runnable {
                 if (result.status == BackupOperationStatus.SUCCESS) {
                     player.sendMessage(i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_BACKUP_SUCCESS))
@@ -516,13 +539,15 @@ class WorldBackupCapability(
     private fun backupDecision(player: Player, worldUuid: UUID?): BackupDecision {
         val world = worldUuid?.let { MyWorldManagerApi.getWorldRepository()?.findByUuid(it) }
             ?: return BackupDecision(false, ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_UNAVAILABLE_WORLD_MISSING)
-        if (world.owner != player.uniqueId) {
-            return BackupDecision(false, ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_UNAVAILABLE_OWNER_ONLY)
-        }
         if (!storage.isProductionWorld(world.uuid)) {
             return BackupDecision(false, ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_UNAVAILABLE_NOT_PRODUCTION)
         }
-        if (protectionService.isProtected(world)) {
+        val admin = isAdmin(player)
+        if (!admin && world.owner != player.uniqueId) {
+            return BackupDecision(false, ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_UNAVAILABLE_OWNER_ONLY)
+        }
+        // 管理者は保護中ワールドも貫通する。管理メニュー経路と同一の管理者意味論にする。
+        if (!admin && protectionService.isProtected(world)) {
             return BackupDecision(false, ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_UNAVAILABLE_PROTECTED)
         }
         return BackupDecision(true, ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_UNAVAILABLE_WORLD_MISSING)
@@ -571,8 +596,9 @@ class WorldBackupCapability(
         slot: Int,
         worldUuid: UUID,
         payload: Map<String, String>,
+        adminBypassCooldown: Boolean = false,
     ): MenuElement {
-        val remaining = backupService.ownerBackupCooldownRemainingSeconds(worldUuid)
+        val remaining = if (adminBypassCooldown) 0L else backupService.ownerBackupCooldownRemainingSeconds(worldUuid)
         val presentation = if (remaining > 0) {
             BackupControlPresentation(
                 ChanponBackupKeys.CHANPON_BACKUP_OWNER_BACKUP_COOLDOWN_DISPLAY,
@@ -686,8 +712,28 @@ class WorldBackupCapability(
     }
 
     private fun canManage(player: Player, world: WorldData): Boolean {
-        return storage.isProductionWorld(world.uuid) && world.owner == player.uniqueId
+        if (!storage.isProductionWorld(world.uuid)) return false
+        return AdminAccess.isOwnerOrAdmin(
+            world.owner == player.uniqueId,
+            MyWorldManagerApi.hasWorldSettingsAdminAccess(player),
+            player.hasPermission("mwmchanpon.admin"),
+        )
     }
+
+    /** 管理者として他人のワールドを操作する場合は真。オーナー自身の操作は含まない。 */
+    private fun isAdminActing(player: Player, world: WorldData): Boolean =
+        world.owner != player.uniqueId && isAdmin(player)
+
+    private fun isAdminActingFor(player: Player, worldUuid: UUID): Boolean {
+        val world = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid) ?: return false
+        return isAdminActing(player, world)
+    }
+
+    private fun isAdmin(player: Player): Boolean =
+        AdminAccess.isAdmin(
+            MyWorldManagerApi.hasWorldSettingsAdminAccess(player),
+            player.hasPermission("mwmchanpon.admin"),
+        )
 
     private fun materialFor(backup: BackupEntry): Material = when (backup.kind.storageValue) {
         "user_manual" -> Material.PLAYER_HEAD

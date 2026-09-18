@@ -20,6 +20,7 @@ import com.awabi2048.ccsystem.api.gui.MenuCapabilityTrigger
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.mwmchanpon.tool.ToolPermissionDefinition
+import me.awabi2048.mwmchanpon.auth.AdminAccess
 import me.awabi2048.mwmchanpon.ui.ToolPermissionMenu
 import me.awabi2048.mwmchanpon.ui.chanponCapabilityAction
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
@@ -78,7 +79,11 @@ class ToolPermissionCapability(
     }
 
     private fun canManage(player: Player, worldData: WorldData): Boolean =
-        player.uniqueId == worldData.owner || player.hasPermission("myworldmanager.admin")
+        AdminAccess.isOwnerOrAdmin(
+            player.uniqueId == worldData.owner,
+            MyWorldManagerApi.hasWorldSettingsAdminAccess(player),
+            player.hasPermission("mwmchanpon.admin"),
+        )
 
     private fun subject(context: MenuCapabilityContext): ToolPermissionSubject? =
         subject(context.arguments)

@@ -39,6 +39,7 @@ import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import java.util.UUID
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
+import me.awabi2048.mwmchanpon.auth.AdminAccess
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
@@ -1133,8 +1134,12 @@ class ChanponWorldSettingsMenu(
         feature: WorldSettingsFeature,
     ): Boolean {
         if (storage.isImportedArchive(worldData.uuid)) return false
-        val owner = worldData.owner == player.uniqueId ||
-            player.hasPermission("myworldmanager.admin")
+        // 実行可否（isFeatureRoleActionable）と同一の管理者定義を使い、見えるのに触れない状態を作らない。
+        val owner = AdminAccess.isOwnerOrAdmin(
+            worldData.owner == player.uniqueId,
+            MyWorldManagerApi.hasWorldSettingsAdminAccess(player),
+            player.hasPermission("mwmchanpon.admin"),
+        )
         val moderator = worldData.moderators.contains(player.uniqueId)
         if (protectionService.isProtected(worldData)) {
             return owner && feature in setOf(
@@ -1153,7 +1158,11 @@ class ChanponWorldSettingsMenu(
         worldData: WorldData,
         feature: WorldSettingsFeature,
     ): Boolean {
-        val owner = worldData.owner == player.uniqueId || MyWorldManagerApi.hasWorldSettingsAdminAccess(player)
+        val owner = AdminAccess.isOwnerOrAdmin(
+            worldData.owner == player.uniqueId,
+            MyWorldManagerApi.hasWorldSettingsAdminAccess(player),
+            player.hasPermission("mwmchanpon.admin"),
+        )
         val moderator = player.uniqueId in worldData.moderators
         return when (feature) {
             WorldSettingsFeature.NOTIFICATION -> owner || moderator
