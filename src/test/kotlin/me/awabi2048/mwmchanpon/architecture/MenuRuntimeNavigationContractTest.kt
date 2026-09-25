@@ -166,7 +166,9 @@ class MenuRuntimeNavigationContractTest {
     fun `tool permission menu reserves four centered tool slots`() {
         val source = uiRoot.resolve("ToolPermissionMenu.kt").readText()
         assertTrue("TOOL_ITEM_SLOTS = listOf(19, 20, 21, 22)" in source)
-        assertTrue("ROLE_ITEM_SLOTS = listOf(24, 25)" in source)
+        assertTrue("ROLE_SLOT = 24" in source)
+        assertTrue("BYPASS_SLOT = 25" in source)
+        assertTrue("ACTION_BYPASS" in source)
         assertTrue("slot 23 は要素を置かず" in source)
         assertFalse("elements += decorationEntry(23)" in source)
         assertTrue("centeredToolSlots(definitions.size)" in source)

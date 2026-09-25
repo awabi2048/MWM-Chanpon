@@ -375,7 +375,7 @@ class ChanponReversibleStateProviderTest {
     private class RecordingToolGateway : ToolPermissionGateway {
         val syncedWorlds = mutableListOf<UUID>()
         override fun isEnabled(worldData: WorldData, playerUuid: UUID, toolId: String): Boolean = false
-        override fun storedEnabledAfterSet(worldData: WorldData, enabled: Boolean): Boolean = enabled
+        override fun storedEnabledAfterSet(worldData: WorldData, playerUuid: UUID, enabled: Boolean): Boolean = enabled
         override fun syncWorld(worldData: WorldData) {
             syncedWorlds += worldData.uuid
         }

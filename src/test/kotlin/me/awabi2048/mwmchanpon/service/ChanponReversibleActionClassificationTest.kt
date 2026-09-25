@@ -136,6 +136,8 @@ class ChanponReversibleActionClassificationTest {
                 ChanponReversibleContracts.toolPermission(world, player, "toggle")
             ChanponReversibleActionClassification.Operation.MEMBER_ROLE_TOGGLE ->
                 ChanponReversibleContracts.toolPermission(world, player, "role")
+            ChanponReversibleActionClassification.Operation.GLOBAL_BYPASS_TOGGLE ->
+                ChanponReversibleContracts.toolPermission(world, player, "bypass")
             ChanponReversibleActionClassification.Operation.CREATION_PRODUCTION_SELECTION ->
                 ChanponReversibleContracts.creationProductionSelection()
             ChanponReversibleActionClassification.Operation.CURRENT_PLAYER_WORLD_DISPLAY_ORDER,

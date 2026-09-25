@@ -165,14 +165,16 @@ class MWMChanponPlugin : JavaPlugin() {
         val isAutoRollbackEnabled = {
             isConfigurationMigrationCurrent() && config.getBoolean("backup.auto_rollback.enabled", false)
         }
-        worldWorkPermissionPolicy = ChanponWorldWorkPermissionPolicy(chanponStorage, isAutoRollbackEnabled).also {
+        worldWorkPermissionPolicy = ChanponWorldWorkPermissionPolicy(chanponStorage, globalStorage, isAutoRollbackEnabled).also {
             it.setConfigurationAvailability(::isConfigurationMigrationCurrent)
         }
         toolController = ToolPermissionController(
             chanponStorage,
             LuckPermsToolPermissionService(luckPerms, logger),
             toolDefinitions,
-            isAutoRollbackEnabled
+            isAutoRollbackEnabled,
+            globalStorage::isBuildingAllowed,
+            chanponStorage::isGlobalBypassAllowed,
         )
 
         backupService = BackupService(this, chanponStorage)
@@ -462,6 +464,11 @@ class MWMChanponPlugin : JavaPlugin() {
     fun setBuildingAllowed(allowed: Boolean) {
         globalStorage.setBuildingAllowed(allowed)
         MyWorldManagerApi.syncOnlineWorldPlayerStates()
+        // 全体の建築許可はツール活動と作業グループ付与の可否でもあるため、切替時に再同期します。
+        toolController.syncOnlinePlayers()
+        MyWorldManagerApi.getWorldRepository()?.findAll()?.forEach { worldData ->
+            MyWorldManagerApi.syncWorldWorkPermissions(worldData.uuid)
+        }
     }
 
     /**

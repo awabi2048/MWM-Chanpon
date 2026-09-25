@@ -31,6 +31,10 @@ class ChanponWorldPlayerStatePolicy(
         if (isAdmin(player)) {
             return WorldPlayerStateDecision(buildAllowed = true)
         }
+        // 個人バイパスはグローバル停止の迂回であり、管理者判定と個別制限はそのまま残ります。
+        if (worldStorage.isGlobalBypassAllowed(worldData.uuid, player.uniqueId)) {
+            return WorldPlayerStateDecision(buildAllowed = true)
+        }
         if (globalStorage.isBuildingAllowed()) {
             return WorldPlayerStateDecision(buildAllowed = true)
         }

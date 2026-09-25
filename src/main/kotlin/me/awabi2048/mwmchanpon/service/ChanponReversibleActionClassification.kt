@@ -33,6 +33,7 @@ internal object ChanponReversibleActionClassification {
         SUBMISSION_COMPLETION("submission-completion", Kind.STATE_AGGREGATE, "submission", "mwm-chanpon:submission"),
         TOOL_ENABLE_TOGGLE("tool-enable-toggle", Kind.STATE_AGGREGATE, "tool-permission", "mwm-chanpon:tool-permission"),
         MEMBER_ROLE_TOGGLE("member-role-toggle", Kind.STATE_AGGREGATE, "tool-permission", "mwm-chanpon:tool-permission"),
+        GLOBAL_BYPASS_TOGGLE("global-bypass-toggle", Kind.STATE_AGGREGATE, "tool-permission", "mwm-chanpon:tool-permission"),
         CREATION_PRODUCTION_SELECTION("creation-production-selection", Kind.STATE_AGGREGATE, "creation-production-selection", "mwm-chanpon:creation-production-selection"),
         CURRENT_PLAYER_WORLD_DISPLAY_ORDER("current-player-world-display-order", Kind.STATE_AGGREGATE, "world-display-order", "myworldmanager:world-display-order"),
         AWAY_PLAYER_WORLD_DISPLAY_ORDER("away-player-world-display-order", Kind.STATE_AGGREGATE, "world-display-order", "myworldmanager:world-display-order"),

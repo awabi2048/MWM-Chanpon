@@ -12,23 +12,31 @@ class ToolPermissionController(
     private val storage: ChanponWorldStorage,
     private val luckPermsService: LuckPermsToolPermissionService,
     private val definitions: List<ToolPermissionDefinition>,
-    private val autoRollbackLocked: () -> Boolean = { false }
+    private val autoRollbackLocked: () -> Boolean = { false },
+    // 全体の建築許可はブロック建築だけでなくツール活動の許可としても扱います。
+    // 迂回するのはグローバル設定だけであり、提出ロック等の個別判定は残ります。
+    private val globalBuildingAllowed: () -> Boolean = { true },
+    private val isGlobalBypassAllowed: (worldUuid: UUID, playerUuid: UUID) -> Boolean = { _, _ -> false },
 ) {
     fun isEnabled(worldData: WorldData, playerUuid: UUID, toolId: String): Boolean {
         if (!storage.hasCurrentWorldData(worldData.uuid)) return false
         if (isSubmissionLocked(worldData.uuid)) return false
+        if (isGloballySuspended(worldData.uuid, playerUuid)) return false
         return storage.getToolEnabledState(worldData.uuid, playerUuid, toolId)
             ?: (playerUuid == worldData.owner)
     }
 
     fun setEnabled(worldData: WorldData, playerUuid: UUID, toolId: String, enabled: Boolean) {
-        storage.setToolEnabled(worldData.uuid, playerUuid, toolId, storedEnabledAfterSet(worldData, enabled))
+        storage.setToolEnabled(worldData.uuid, playerUuid, toolId, storedEnabledAfterSet(worldData, playerUuid, enabled))
         Bukkit.getPlayer(playerUuid)?.let(::syncPlayerLocation)
     }
 
     /** 実際に保存される値を公開し、可逆操作のCAS期待値と通常操作を一致させます。 */
-    fun storedEnabledAfterSet(worldData: WorldData, enabled: Boolean): Boolean =
-        if (isSubmissionLocked(worldData.uuid)) false else enabled
+    fun storedEnabledAfterSet(worldData: WorldData, playerUuid: UUID, enabled: Boolean): Boolean {
+        if (isSubmissionLocked(worldData.uuid)) return false
+        if (isGloballySuspended(worldData.uuid, playerUuid)) return false
+        return enabled
+    }
 
     fun syncWorld(worldData: WorldData) {
         val participants = linkedSetOf<UUID>()
@@ -90,6 +98,9 @@ class ToolPermissionController(
         if (isSubmissionLocked(worldData.uuid)) {
             return definitions.associate { it.id to false }
         }
+        if (isGloballySuspended(worldData.uuid, playerUuid)) {
+            return definitions.associate { it.id to false }
+        }
         val stored = storage.getMemberToolStates(worldData.uuid, playerUuid)
         return definitions.associate { definition ->
             definition.id to (stored[definition.id] ?: (playerUuid == worldData.owner))
@@ -98,11 +109,16 @@ class ToolPermissionController(
 
     private fun getEffectiveEnabledTools(worldData: WorldData, playerUuid: UUID): Set<String> {
         if (isSubmissionLocked(worldData.uuid)) return emptySet()
+        if (isGloballySuspended(worldData.uuid, playerUuid)) return emptySet()
         return definitions
             .filter { isEnabled(worldData, playerUuid, it.id) }
             .map { it.id }
             .toSet()
     }
+
+    /** グローバル停止中かつ個人バイパスなしの場合に真となります。 */
+    private fun isGloballySuspended(worldUuid: UUID, playerUuid: UUID): Boolean =
+        !globalBuildingAllowed() && !isGlobalBypassAllowed(worldUuid, playerUuid)
 
     private fun isSubmissionLocked(worldUuid: UUID): Boolean {
         val hasCurrentData = storage.hasCurrentWorldData(worldUuid)

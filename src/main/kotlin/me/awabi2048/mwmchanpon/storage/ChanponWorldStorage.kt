@@ -464,11 +464,44 @@ class ChanponWorldStorage(
         return section.getKeys(false).associateWith { section.getBoolean(it, false) }
     }
 
+    /**
+     * 全体の建築停止を個人単位で迂回する許可です。
+     * 迂回するのはグローバル設定だけであり、提出ロック等の個別判定は残ります。
+     * 既定は無効（false）であり、未設定と明示的な無効を区別しません。
+     */
+    fun isGlobalBypassAllowed(worldUuid: UUID, playerUuid: UUID): Boolean {
+        val config = load(worldUuid) ?: return false
+        return config.getBoolean("global_bypass.${playerUuid}", false)
+    }
+
+    fun getGlobalBypassState(worldUuid: UUID, playerUuid: UUID): Boolean? {
+        val config = load(worldUuid) ?: return null
+        val path = "global_bypass.${playerUuid}"
+        return if (config.contains(path)) config.getBoolean(path, false) else null
+    }
+
+    @Synchronized
+    fun setGlobalBypassAllowed(worldUuid: UUID, playerUuid: UUID, allowed: Boolean) {
+        ensureWritable(worldUuid)
+        val config = loadOrCreate(worldUuid)
+        config.set("global_bypass.${playerUuid}", allowed)
+        saveAtomic(worldUuid, config)
+    }
+
+    @Synchronized
+    fun restoreGlobalBypassState(worldUuid: UUID, playerUuid: UUID, allowed: Boolean?) {
+        ensureWritable(worldUuid)
+        val config = loadOrCreate(worldUuid)
+        config.set("global_bypass.${playerUuid}", allowed)
+        saveAtomic(worldUuid, config)
+    }
+
     @Synchronized
     fun removeMember(worldUuid: UUID, playerUuid: UUID) {
         ensureWritable(worldUuid)
         val config = load(worldUuid) ?: return
         config.set("tool_permissions.${playerUuid}", null)
+        config.set("global_bypass.${playerUuid}", null)
         saveAtomic(worldUuid, config)
     }
 

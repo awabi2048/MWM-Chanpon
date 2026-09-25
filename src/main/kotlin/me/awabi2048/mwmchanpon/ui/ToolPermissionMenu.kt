@@ -68,6 +68,7 @@ class ToolPermissionMenu(
                     ACTION_BACK to MenuActionHandler(::back),
                     ACTION_TOGGLE to MenuActionHandler(::toggle),
                     ACTION_ROLE to MenuActionHandler(::toggleRole),
+                    ACTION_BYPASS to MenuActionHandler(::toggleBypass),
                 ),
             ),
         )
@@ -105,17 +106,20 @@ class ToolPermissionMenu(
             centeredToolSlots(definitions.size).zip(definitions).forEach { (slot, definition) ->
                 elements += createToolItem(player, slot, worldData, targetUuid, definition)
             }
-            // 中央7枠は「ツール4・背景1・モデレータ切替2」で固定します。
-            // 右2枠は同じ状態を表示する二つの入口であり、どちらを押しても
-            // 一回だけ同じtoggleRoleへ到達します（別々の権限ではありません）。
+            // 中央7枠は「ツール4・背景1・役割切替1・バイパス切替1」で固定します。
+            // 役割切替はオーナーと管理者が操作でき、バイパス切替は管理者のみが操作できます。
+            // バイパス枠は非管理者には白の板ガラス装飾として表示し、操作入口を作りません。
             // slot 23 は要素を置かず、InventoryMenuViewの共通背景（灰色板ガラス）を使います。
             // 白い装飾枠を明示すると、背景と余白の視認性が変わってしまうためです。
-            ROLE_ITEM_SLOTS.forEach { slot ->
-                if (targetUuid != worldData.owner) {
-                    elements += createRoleItem(player, slot, worldData, targetUuid)
-                } else {
-                    elements += decorationEntry(slot)
-                }
+            if (targetUuid != worldData.owner) {
+                elements += createRoleItem(player, ROLE_SLOT, worldData, targetUuid)
+            } else {
+                elements += decorationEntry(ROLE_SLOT)
+            }
+            if (isAdminOnly(player)) {
+                elements += createBypassItem(player, BYPASS_SLOT, worldData, targetUuid)
+            } else {
+                elements += decorationEntry(BYPASS_SLOT)
             }
         }
         elements += CCSystem.getAPI().getGuiElementService().backEntry(player, 40)
@@ -161,6 +165,21 @@ class ToolPermissionMenu(
         }
         MyWorldManagerApi.getWorldRepository()?.save(worldData)
         controller.syncWorld(worldData)
+        return MenuActionResult.Success(MenuUpdate.Refresh)
+    }
+
+    private fun toggleBypass(context: MenuActionContext): MenuActionResult {
+        val worldData = world(context.route) ?: return MenuActionResult.Rejected()
+        val targetUuid = uuid(context.route.payload[TARGET_UUID])
+            ?: return MenuActionResult.Rejected()
+        // グローバル権限のバイパスは管理者のみが設定できます。オーナー判定は含めません。
+        if (!isAdminOnly(context.player)) {
+            return MenuActionResult.Rejected()
+        }
+        val next = !storage.isGlobalBypassAllowed(worldData.uuid, targetUuid)
+        storage.setGlobalBypassAllowed(worldData.uuid, targetUuid, next)
+        controller.syncWorld(worldData)
+        MyWorldManagerApi.syncOnlineWorldPlayerStates()
         return MenuActionResult.Success(MenuUpdate.Refresh)
     }
 
@@ -235,6 +254,54 @@ class ToolPermissionMenu(
             player.hasPermission("mwmchanpon.admin"),
         )
 
+    /** グローバル権限のバイパスは管理者のみが設定できます。 */
+    private fun isAdminOnly(player: Player): Boolean =
+        AdminAccess.isAdmin(
+            MyWorldManagerApi.hasWorldSettingsAdminAccess(player),
+            player.hasPermission("mwmchanpon.admin"),
+        )
+
+    /**
+     * 全体停止の個人バイパス切替です。
+     * 迂回するのはグローバル設定だけであり、ツール個別の有効状態はそのまま残ります。
+     */
+    private fun createBypassItem(
+        player: Player,
+        slot: Int,
+        worldData: WorldData,
+        targetUuid: UUID,
+    ): MenuElement {
+        val bypassed = storage.isGlobalBypassAllowed(worldData.uuid, targetUuid)
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = slot,
+                material = Material.BEACON,
+                name = fixedName(i18n(ChanponMemberLoreKeys.CHANPON_MEMBER_LORE_PERMISSION_MENU_BYPASS_DISPLAY), GuiNameStyle.DEFAULT),
+                role = GuiElementRole.ACTION,
+                description = listOf(i18n(ChanponMemberLoreKeys.CHANPON_MEMBER_LORE_PERMISSION_MENU_BYPASS_DESCRIPTION)),
+                data = listOf(GuiMenuEntryData(
+                    i18n(ChanponMemberLoreKeys.CHANPON_MEMBER_LORE_PERMISSION_MENU_STATE_LABEL),
+                    i18n(if (bypassed) ChanponMemberLoreKeys.CHANPON_MEMBER_LORE_PERMISSION_MENU_ENABLED else ChanponMemberLoreKeys.CHANPON_MEMBER_LORE_PERMISSION_MENU_DISABLED),
+                    if (bypassed) GuiValueTone.SUCCESS else GuiValueTone.DANGER,
+                )),
+                actions = listOf(chanponGestureAction(
+                    ACTION_BYPASS,
+                    MenuGesture.ANY,
+                    i18n(ChanponMemberLoreKeys.CHANPON_MEMBER_LORE_PERMISSION_MENU_BYPASS_ACTION),
+                    safety = MenuActionSafety.REVERSIBLE,
+                    reversibleContract = ChanponReversibleContracts.toolPermission(
+                        worldData.uuid,
+                        targetUuid,
+                        "bypass",
+                    ),
+                    classification = ChanponReversibleActionClassification.Operation.GLOBAL_BYPASS_TOGGLE,
+                )),
+                glint = bypassed,
+            ),
+        )
+    }
+
     private fun createToolItem(
         player: Player,
         slot: Int,
@@ -295,10 +362,12 @@ class ToolPermissionMenu(
         private const val OWNER = "mwm-chanpon"
         private const val ROUTE = "mwm-chanpon:tool-permissions"
         private val TOOL_ITEM_SLOTS = listOf(19, 20, 21, 22)
-        private val ROLE_ITEM_SLOTS = listOf(24, 25)
+        private const val ROLE_SLOT = 24
+        private const val BYPASS_SLOT = 25
         private const val ACTION_BACK = "back"
         private const val ACTION_TOGGLE = "toggle"
         private const val ACTION_ROLE = "role"
+        private const val ACTION_BYPASS = "bypass"
         private const val WORLD_UUID = "world_uuid"
         private const val TARGET_UUID = "target_uuid"
         private const val TOOL_ID = "tool_id"

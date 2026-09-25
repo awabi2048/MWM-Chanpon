@@ -817,11 +817,55 @@ private sealed interface ToolPermissionState : MenuReversibleOpaqueState {
             }
         }
     }
+
+    /**
+     * 全体停止の個人バイパスの可逆状態です。
+     * ツール個別有効状態とは独立したキーとして復元します。
+     */
+    data class Bypass(
+        val worldUuid: UUID,
+        val targetPlayerUuid: UUID,
+        val before: Boolean?,
+        val expectedAfter: Boolean,
+        val worldFileBefore: ChanponWorldStorage.WorldFileSnapshot,
+    ) : ToolPermissionState {
+        override fun snapshot(): Any = ChanponReversibleOpaqueState.of(
+            TOOL_PROVIDER_ID,
+            TYPE,
+            mapOf(
+                "worldUuid" to worldUuid,
+                "targetPlayerUuid" to targetPlayerUuid,
+                "before" to before,
+                "expectedAfter" to expectedAfter,
+                "worldFileBefore" to worldFileBefore.toOpaqueMap(),
+            ),
+        ).snapshot()
+
+        companion object {
+            private const val TYPE = "tool-permission-bypass"
+            fun decode(value: Any?): Bypass? {
+                val payload = decodeChanponOpaqueState(
+                    value,
+                    TOOL_PROVIDER_ID,
+                    TYPE,
+                    setOf("worldUuid", "targetPlayerUuid", "before", "expectedAfter", "worldFileBefore"),
+                )?.payload ?: return null
+                val before = decodeNullableBoolean(payload["before"]) ?: return null
+                return Bypass(
+                    payload.strictUuid("worldUuid") ?: return null,
+                    payload.strictUuid("targetPlayerUuid") ?: return null,
+                    before.value,
+                    payload.strictBoolean("expectedAfter") ?: return null,
+                    decodeWorldFileSnapshot(payload["worldFileBefore"]) ?: return null,
+                )
+            }
+        }
+    }
 }
 
 internal interface ToolPermissionGateway {
     fun isEnabled(worldData: WorldData, playerUuid: UUID, toolId: String): Boolean
-    fun storedEnabledAfterSet(worldData: WorldData, enabled: Boolean): Boolean
+    fun storedEnabledAfterSet(worldData: WorldData, playerUuid: UUID, enabled: Boolean): Boolean
     fun syncWorld(worldData: WorldData)
 }
 
@@ -831,8 +875,8 @@ private class ControllerToolPermissionGateway(
     override fun isEnabled(worldData: WorldData, playerUuid: UUID, toolId: String): Boolean =
         controller.isEnabled(worldData, playerUuid, toolId)
 
-    override fun storedEnabledAfterSet(worldData: WorldData, enabled: Boolean): Boolean =
-        controller.storedEnabledAfterSet(worldData, enabled)
+    override fun storedEnabledAfterSet(worldData: WorldData, playerUuid: UUID, enabled: Boolean): Boolean =
+        controller.storedEnabledAfterSet(worldData, playerUuid, enabled)
 
     override fun syncWorld(worldData: WorldData) = controller.syncWorld(worldData)
 }
@@ -858,7 +902,7 @@ internal class ToolPermissionProvider(
                         targetPlayerUuid,
                         toolId,
                         before,
-                        gateway.storedEnabledAfterSet(worldData, requested),
+                        gateway.storedEnabledAfterSet(worldData, targetPlayerUuid, requested),
                         storage.captureWorldFileSnapshot(worldUuid),
                     ),
                 )
@@ -886,6 +930,19 @@ internal class ToolPermissionProvider(
                     ),
                 )
             }
+            "bypass" -> {
+                val before = storage.getGlobalBypassState(worldUuid, targetPlayerUuid)
+                val requested = !(before ?: false)
+                MenuReversibleProviderCaptureResult.Captured(
+                    ToolPermissionState.Bypass(
+                        worldUuid,
+                        targetPlayerUuid,
+                        before,
+                        requested,
+                        storage.captureWorldFileSnapshot(worldUuid),
+                    ),
+                )
+            }
             else -> rejectCapture("unsupported tool permission operation")
         }
     }
@@ -893,6 +950,7 @@ internal class ToolPermissionProvider(
     override fun restore(context: MenuReversibleStateRestoreContext): MenuReversibleProviderRestoreResult {
         ToolPermissionState.Toggle.decode(context.stateSnapshot.value)?.let { return restoreToggle(it) }
         ToolPermissionState.Role.decode(context.stateSnapshot.value)?.let { return restoreRole(it) }
+        ToolPermissionState.Bypass.decode(context.stateSnapshot.value)?.let { return restoreBypass(it) }
         return rejectRestore("invalid tool permission state type")
     }
 
@@ -933,6 +991,25 @@ internal class ToolPermissionProvider(
         MyWorldManagerApi.getWorldRepository()?.save(worldData)
         gateway.syncWorld(worldData)
         return MenuReversibleProviderRestoreResult.Restored
+    }
+
+    private fun restoreBypass(state: ToolPermissionState.Bypass): MenuReversibleProviderRestoreResult {
+        return try {
+            val restored = storage.restoreWorldFileSnapshot(state.worldUuid, state.worldFileBefore) {
+                storage.getGlobalBypassState(state.worldUuid, state.targetPlayerUuid) == state.expectedAfter
+            }
+            if (restored == ChanponWorldStorage.WorldFileRestoreResult.CONCURRENT_CHANGE) {
+                return concurrent(
+                    "tool bypass ${state.worldUuid}/${state.targetPlayerUuid}", state.expectedAfter,
+                    storage.getGlobalBypassState(state.worldUuid, state.targetPlayerUuid),
+                )
+            }
+            MyWorldManagerApi.getWorldRepository()?.findByUuid(state.worldUuid)?.let(gateway::syncWorld)
+            MyWorldManagerApi.syncOnlineWorldPlayerStates()
+            MenuReversibleProviderRestoreResult.Restored
+        } catch (exception: RuntimeException) {
+            rejectRestore("failed to restore tool bypass: ${exception.message ?: exception.javaClass.simpleName}")
+        }
     }
 }
 
