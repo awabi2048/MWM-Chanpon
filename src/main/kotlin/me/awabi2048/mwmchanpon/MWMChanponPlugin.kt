@@ -336,7 +336,7 @@ class MWMChanponPlugin : JavaPlugin() {
             this,
         )
         server.pluginManager.registerEvents(ToolPermissionWorldListener(toolController), this)
-        server.pluginManager.registerEvents(WorldCleanupListener(chanponStorage, toolController), this)
+        server.pluginManager.registerEvents(WorldCleanupListener(chanponStorage), this)
 
         server.scheduler.runTask(this, Runnable {
             if (!isConfigurationMigrationCurrent()) {
