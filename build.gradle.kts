@@ -64,6 +64,7 @@ tasks.test {
 // pom.xml の resources filtering 相当（${project.version} を展開）
 tasks.processResources {
     val versionString = project.version.toString()
+    inputs.property("projectVersion", versionString)
     filesMatching("plugin.yml") {
         expand(mapOf("project" to mapOf("version" to versionString)))
     }
