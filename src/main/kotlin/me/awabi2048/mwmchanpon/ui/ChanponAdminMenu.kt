@@ -4,6 +4,7 @@ import com.awabi2048.ccsystem.api.localization.LocalizationKey
 
 import com.awabi2048.ccsystem.api.localization.generated.ChanponBackupKeys
 import com.awabi2048.ccsystem.api.localization.generated.ChanponPhaseKeys
+import com.awabi2048.ccsystem.api.localization.generated.ChanponPreviewTourKeys
 
 import com.awabi2048.ccsystem.api.localization.generated.MyworldGuiAdminKeys
 import com.awabi2048.ccsystem.CCSystem
@@ -60,7 +61,8 @@ class ChanponAdminMenu(
     private val submissionAdminMenu: SubmissionAdminMenu,
     private val worldDataManagementMenu: WorldDataManagementMenu,
     private val automationSettingsMenu: AutomationSettingsMenu,
-    private val worldDataExportMenu: WorldDataExportMenu
+    private val worldDataExportMenu: WorldDataExportMenu,
+    private val previewTourAdminMenu: PreviewTourAdminMenu,
 ) {
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
@@ -87,6 +89,9 @@ class ChanponAdminMenu(
                     },
                     ACTION_EXPORT to MenuActionHandler { context ->
                         MenuActionResult.Success(MenuUpdate.Navigate(worldDataExportMenu.route()))
+                    },
+                    ACTION_PREVIEW_TOUR to MenuActionHandler { context ->
+                        MenuActionResult.Success(MenuUpdate.Navigate(previewTourAdminMenu.route()))
                     },
                     ACTION_SWITCH_MWM to MenuActionHandler { context ->
                         MyWorldManagerApi.prepareAdminMenuRoute(context.player)
@@ -161,6 +166,7 @@ class ChanponAdminMenu(
             actionEntry(player, 21, Material.CHEST, adminPresentation(ACTION_WORLD_DATA), ACTION_WORLD_DATA),
             actionEntry(player, 23, Material.CLOCK, adminPresentation(ACTION_AUTOMATION), ACTION_AUTOMATION),
             actionEntry(player, 25, Material.DISPENSER, adminPresentation(ACTION_EXPORT), ACTION_EXPORT),
+            actionEntry(player, 13, Material.MAP, adminPresentation(ACTION_PREVIEW_TOUR), ACTION_PREVIEW_TOUR),
             buildingPermissionItem(player),
             worldCreationAvailabilityItem(player),
             switchToMwmItem(player),
@@ -418,6 +424,7 @@ class ChanponAdminMenu(
         ACTION_WORLD_DATA,
         ACTION_AUTOMATION,
         ACTION_EXPORT,
+        ACTION_PREVIEW_TOUR,
         ACTION_SWITCH_MWM,
         ACTION_CANCEL_SPAWN -> MenuActionSafety.NAVIGATION_ONLY
         ACTION_SET_SPAWN_WORLD -> MenuActionSafety.CONFIRM_ENTRY
@@ -499,6 +506,7 @@ class ChanponAdminMenu(
         ACTION_WORLD_DATA -> AdminPresentation(ChanponBackupKeys.CHANPON_BACKUP_ADMIN_WORLD_DATA_DISPLAY, ChanponBackupKeys.CHANPON_BACKUP_ADMIN_WORLD_DATA_LORE, ChanponBackupKeys.CHANPON_BACKUP_ADMIN_WORLD_DATA_ACTION)
         ACTION_AUTOMATION -> AdminPresentation(ChanponBackupKeys.CHANPON_BACKUP_ADMIN_AUTOMATION_DISPLAY, ChanponBackupKeys.CHANPON_BACKUP_ADMIN_AUTOMATION_LORE, ChanponBackupKeys.CHANPON_BACKUP_ADMIN_AUTOMATION_ACTION)
         ACTION_EXPORT -> AdminPresentation(ChanponBackupKeys.CHANPON_BACKUP_ADMIN_EXPORT_DISPLAY, ChanponBackupKeys.CHANPON_BACKUP_ADMIN_EXPORT_LORE, ChanponBackupKeys.CHANPON_BACKUP_ADMIN_EXPORT_ACTION)
+        ACTION_PREVIEW_TOUR -> AdminPresentation(ChanponPreviewTourKeys.CHANPON_PREVIEW_TOUR_ADMIN_ENTRY_NAME, ChanponPreviewTourKeys.CHANPON_PREVIEW_TOUR_ADMIN_ENTRY_LORE, ChanponPreviewTourKeys.CHANPON_PREVIEW_TOUR_ADMIN_ENTRY_ACTION)
         else -> error("未定義の管理操作IDです: $actionId")
     }
 
@@ -530,6 +538,7 @@ class ChanponAdminMenu(
         private const val ACTION_WORLD_DATA = "world_data"
         private const val ACTION_AUTOMATION = "automation"
         private const val ACTION_EXPORT = "export"
+        private const val ACTION_PREVIEW_TOUR = "preview_tour"
         private const val ACTION_SWITCH_MWM = "switch_mwm"
         private const val ACTION_BUILDING_ALLOWED = "building_allowed"
         private const val ACTION_WORLD_CREATION = "world_creation"
