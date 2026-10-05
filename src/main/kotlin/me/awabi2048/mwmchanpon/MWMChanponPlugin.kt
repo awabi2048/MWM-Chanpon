@@ -51,6 +51,10 @@ import me.awabi2048.mwmchanpon.service.ArchiveService
 import me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
 import me.awabi2048.mwmchanpon.command.ChanponAdminCommand
+import me.awabi2048.mwmchanpon.tour.PreviewTourCommand
+import me.awabi2048.mwmchanpon.tour.PreviewTourListener
+import me.awabi2048.mwmchanpon.tour.PreviewTourService
+import me.awabi2048.mwmchanpon.tour.PreviewTourStorage
 import me.awabi2048.mwmchanpon.tool.LuckPermsToolPermissionService
 import me.awabi2048.mwmchanpon.tool.ToolPermissionConfig
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
@@ -64,6 +68,7 @@ import me.awabi2048.mwmchanpon.ui.ChanponDiscoveryMenu
 import me.awabi2048.mwmchanpon.ui.ChanponFavoriteListMenu
 import me.awabi2048.mwmchanpon.ui.ChanponPlayerWorldCapability
 import me.awabi2048.mwmchanpon.ui.ChanponWorldSettingsMenu
+import me.awabi2048.mwmchanpon.ui.PreviewTourAdminMenu
 import me.awabi2048.mwmchanpon.ui.SubmissionAdminMenu
 import me.awabi2048.mwmchanpon.ui.ToolPermissionMenu
 import me.awabi2048.mwmchanpon.ui.WorldDataExportMenu
@@ -135,6 +140,9 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var chanponMacroService: ApiMacroService
     private lateinit var submissionCompletionMacroService: SubmissionCompletionMacroService
     private lateinit var honbanSetMacroService: HonbanSetMacroService
+    private lateinit var previewTourStorage: PreviewTourStorage
+    private lateinit var previewTourService: PreviewTourService
+    private lateinit var previewTourAdminMenu: PreviewTourAdminMenu
 
     override fun onEnable() {
         if (!verifyGuiRuntimeContract()) return
@@ -157,6 +165,11 @@ class MWMChanponPlugin : JavaPlugin() {
             isConfigurationMigrationCurrent()
         }
         offlineMemberInviteNotifier = OfflineMemberInviteNotifier(globalStorage, logger)
+        previewTourStorage = PreviewTourStorage(dataFolder)
+        previewTourStorage.setCurrentWriteGate { isConfigurationMigrationCurrent() }
+        previewTourService = PreviewTourService(this)
+        previewTourAdminMenu = PreviewTourAdminMenu(this, previewTourStorage, previewTourService)
+        PreviewTourListener.initKeys(this)
         spawnWorldService = ChanponSpawnWorldService(this, globalStorage)
         val luckPerms = LuckPermsProvider.get()
         spawnProtectionService = SpawnWorldProtectionService()
@@ -233,7 +246,7 @@ class MWMChanponPlugin : JavaPlugin() {
             toolController,
             submissionCompletionMacroService,
         )
-        chanponAdminMenu = ChanponAdminMenu(this, globalStorage, spawnProtectionService, submissionAdminMenu, worldDataManagementMenu, automationSettingsMenu, worldDataExportMenu)
+        chanponAdminMenu = ChanponAdminMenu(this, globalStorage, spawnProtectionService, submissionAdminMenu, worldDataManagementMenu, automationSettingsMenu, worldDataExportMenu, previewTourAdminMenu)
         CCSystem.getAPI().getMenuCommandService().unregisterOwner("mwm-chanpon")
         CCSystem.getAPI().getMenuCommandService().register(
             PublicMenuDefinition(
@@ -337,6 +350,12 @@ class MWMChanponPlugin : JavaPlugin() {
         )
         server.pluginManager.registerEvents(ToolPermissionWorldListener(toolController), this)
         server.pluginManager.registerEvents(WorldCleanupListener(chanponStorage), this)
+        server.pluginManager.registerEvents(PreviewTourListener(this, previewTourStorage, previewTourService), this)
+        getCommand("preview-tour")?.let { command ->
+            val executor = PreviewTourCommand(previewTourService)
+            command.setExecutor(executor)
+            command.tabCompleter = executor
+        }
 
         server.scheduler.runTask(this, Runnable {
             if (!isConfigurationMigrationCurrent()) {
@@ -363,6 +382,7 @@ class MWMChanponPlugin : JavaPlugin() {
             toolController.syncOnlinePlayers()
         })
         automationService.start()
+        previewTourService.start()
 
         logger.info("MWM-Chanpon addon has been enabled.")
     }
@@ -452,6 +472,9 @@ class MWMChanponPlugin : JavaPlugin() {
                 worldSettingsStatePolicy,
             )
         }
+        if (::previewTourService.isInitialized) {
+            previewTourService.shutdownAll()
+        }
         if (::automationService.isInitialized) {
             automationService.stop()
         }
@@ -530,6 +553,10 @@ class MWMChanponPlugin : JavaPlugin() {
     fun getCoreApiBridge(): CoreApiBridge = coreApiBridge
 
     fun isSubmissionClosed(): Boolean = config.getBoolean("submission.closed", false)
+
+    /** プレビューツアー等がワールドの提出・完成状態を参照するための公開窓口です。 */
+    val chanponWorldStorage: ChanponWorldStorage
+        get() = chanponStorage
 
     private companion object {
         private const val MENU_OWNER = "mwm-chanpon"

@@ -210,6 +210,9 @@ internal class ChanponConfigMigrationParticipant(
                     }
                     4 -> ToolPermissionConfigSchema.migrate(original)
                     5 -> ToolPermissionConfigSchema.ensureKantanCommandBlock(original)
+                    6 -> if (!original.contains("preview_tour.join_radius")) {
+                        original.set("preview_tour.join_radius", 10.0)
+                    }
                     else -> error("Missing Chanpon config migration: $next->${next + 1}")
                 }
                 next++
@@ -381,7 +384,7 @@ internal class ChanponConfigMigrationParticipant(
 
     companion object {
         const val ID = "mwm-chanpon-data"
-        const val CURRENT_VERSION = 6
+        const val CURRENT_VERSION = 7
         val SUPPORTED_PHASES = setOf("BUILD_LOCKED", "CREATION_ALLOWED", "PRODUCTION")
         val BACKUP_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS")
     }

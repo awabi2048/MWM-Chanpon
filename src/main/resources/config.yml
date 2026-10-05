@@ -17,6 +17,10 @@ world_expansion:
 submission:
   closed: false
 
+preview_tour:
+  # 看板からツアーを開始したとき、開始者の周囲何ブロックまでのプレイヤーを参加者に含めるか
+  join_radius: 10.0
+
 standalone_export:
   fiscal_year: 2026
 
@@ -52,4 +56,4 @@ backup:
       scheduled: 14
       restore_point: 5
       pre_rollback: 10
-config_version: 6
+config_version: 7

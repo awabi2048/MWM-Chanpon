@@ -15,6 +15,9 @@ commands:
   chanpon-mwm:
     description: Chanponの管理メニューを開く
     usage: /chanpon-mwm
+  preview-tour:
+    description: プレビューツアーの状態確認・離脱
+    usage: /preview-tour [leave]
 
 permissions:
   mwmchanpon.admin:

@@ -91,7 +91,7 @@ class MenuRuntimeNavigationContractTest {
         @Suppress("UNCHECKED_CAST")
         val easy = creation["easy"] as Map<String, Any>
 
-        assertTrue(config["config_version"] == 6)
+        assertTrue(config["config_version"] == 7)
         assertTrue(easy["platform_material"] == "OBSIDIAN")
     }
 
