@@ -30,6 +30,7 @@ import me.awabi2048.mwmchanpon.listener.FreecamWorldPolicyListener
 import me.awabi2048.mwmchanpon.listener.MyWorldSafetyDefaultsListener
 import me.awabi2048.mwmchanpon.listener.PlayerJoinListener
 import me.awabi2048.mwmchanpon.listener.SubmittedWorldProtectionListener
+import me.awabi2048.mwmchanpon.listener.WorldBuildPermissionListener
 import me.awabi2048.mwmchanpon.listener.SpawnWorldProtectionListener
 import me.awabi2048.mwmchanpon.listener.ToolPermissionWorldListener
 import me.awabi2048.mwmchanpon.listener.WorldCleanupListener
@@ -174,11 +175,24 @@ class MWMChanponPlugin : JavaPlugin() {
         val luckPerms = LuckPermsProvider.get()
         spawnProtectionService = SpawnWorldProtectionService()
         worldSafetyDefaultsService = MyWorldSafetyDefaultsService(logger)
+        buildPermissionService = WorldBuildPermissionService(
+            chanponStorage,
+            logger,
+            isSpawnWorld = { worldUuid -> globalStorage.getSpawnWorldUuid() == worldUuid },
+        ).also {
+            it.setConfigurationAvailability(::isConfigurationMigrationCurrent)
+        }
         val toolDefinitions = ToolPermissionConfig(config).load()
         val isAutoRollbackEnabled = {
             isConfigurationMigrationCurrent() && config.getBoolean("backup.auto_rollback.enabled", false)
         }
-        worldWorkPermissionPolicy = ChanponWorldWorkPermissionPolicy(chanponStorage, globalStorage, isAutoRollbackEnabled).also {
+        // 建築許可の実効モード（未記録のスポーンワールドはオーナー限定）を作業権限判定にも使います。
+        worldWorkPermissionPolicy = ChanponWorldWorkPermissionPolicy(
+            chanponStorage,
+            globalStorage,
+            isAutoRollbackEnabled,
+            buildPermissionService::effectiveProtectionMode,
+        ).also {
             it.setConfigurationAvailability(::isConfigurationMigrationCurrent)
         }
         toolController = ToolPermissionController(
@@ -212,12 +226,10 @@ class MWMChanponPlugin : JavaPlugin() {
         submittedProtectionService = SubmittedWorldProtectionService(chanponStorage, logger, isAutoRollbackEnabled).also {
             it.setConfigurationAvailability(::isConfigurationMigrationCurrent)
         }
-        buildPermissionService = WorldBuildPermissionService(chanponStorage, logger).also {
-            it.setConfigurationAvailability(::isConfigurationMigrationCurrent)
-        }
         automationSettingsMenu = AutomationSettingsMenu(this, backupService, automationService) {
             MyWorldManagerApi.getWorldRepository()?.findAll()?.let { worlds ->
                 submittedProtectionService.syncAll(worlds)
+                worlds.forEach(buildPermissionService::sync)
                 worlds.forEach(toolController::syncWorld)
             }
         }
@@ -227,6 +239,7 @@ class MWMChanponPlugin : JavaPlugin() {
                 worldSafetyDefaultsService.sync(worldData)
                 publishLevelSynchronizer.sync(worldData.uuid)
                 submittedProtectionService.sync(worldData)
+                buildPermissionService.sync(worldData)
                 toolController.syncWorld(worldData)
             }
         }
@@ -320,6 +333,7 @@ class MWMChanponPlugin : JavaPlugin() {
         }
         server.pluginManager.registerEvents(publishLevelSynchronizer, this)
         server.pluginManager.registerEvents(SubmittedWorldProtectionListener(this, submittedProtectionService), this)
+        server.pluginManager.registerEvents(WorldBuildPermissionListener(this, buildPermissionService), this)
         server.pluginManager.registerEvents(SpawnWorldProtectionListener(this, globalStorage, spawnProtectionService), this)
         server.pluginManager.registerEvents(MyWorldSafetyDefaultsListener(this, worldSafetyDefaultsService), this)
 
@@ -366,6 +380,7 @@ class MWMChanponPlugin : JavaPlugin() {
                 worldSafetyDefaultsService.syncAll(it)
                 publishLevelSynchronizer.syncAll()
                 submittedProtectionService.syncAll(it)
+                it.forEach(buildPermissionService::sync)
                 it.forEach(toolController::syncWorld)
             }
             globalStorage.getSpawnWorldUuid()

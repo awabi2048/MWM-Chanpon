@@ -191,7 +191,7 @@ class ChanponEnvironmentGui(
     }
 
     private fun cycleProtection(worldData: WorldData, direction: GuiCycleDirection) {
-        val current = storage.getProtectionMode(worldData.uuid)
+        val current = buildPermissionService.effectiveProtectionMode(worldData)
         val next = GuiCycle.select(current, PROTECTION_VALUES, direction)
         storage.setProtectionMode(worldData.uuid, next)
         buildPermissionService.sync(worldData)
@@ -346,7 +346,7 @@ class ChanponEnvironmentGui(
         slot: Int,
         worldData: WorldData,
     ): MenuElement {
-        val mode = storage.getProtectionMode(worldData.uuid)
+        val mode = buildPermissionService.effectiveProtectionMode(worldData)
         val payload = mapOf(
             PAYLOAD_WORLD_UUID to worldData.uuid.toString(),
             PAYLOAD_SETTING to ACTION_PROTECTION,

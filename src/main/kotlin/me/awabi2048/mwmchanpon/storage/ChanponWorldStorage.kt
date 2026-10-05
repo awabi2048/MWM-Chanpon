@@ -274,9 +274,15 @@ class ChanponWorldStorage(
         visibilitySyncHandler?.invoke(worldUuid)
     }
 
-    fun getProtectionMode(worldUuid: UUID): ChanponWorldProtectionMode {
-        val config = load(worldUuid) ?: return ChanponWorldProtectionMode.MEMBERS
-        val value = config.getString("protection.mode") ?: return ChanponWorldProtectionMode.MEMBERS
+    fun getProtectionMode(worldUuid: UUID): ChanponWorldProtectionMode =
+        getProtectionModeOrNull(worldUuid) ?: ChanponWorldProtectionMode.MEMBERS
+
+    /**
+     * protection.mode の記録値をそのまま返します。ファイルまたはキーが無い未設定状態は null です。
+     * 既定値に潰さないことで、呼び出し側は「利用者が明示した値」と「未設定」を区別できます。
+     */
+    fun getProtectionModeOrNull(worldUuid: UUID): ChanponWorldProtectionMode? {
+        val value = load(worldUuid)?.getString("protection.mode") ?: return null
         return ChanponWorldProtectionMode.fromStorageValue(value)
             ?: error("Protection mode is invalid: $worldUuid mode=$value")
     }

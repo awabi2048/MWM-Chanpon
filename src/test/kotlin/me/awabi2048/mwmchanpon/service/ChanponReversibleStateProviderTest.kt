@@ -89,7 +89,7 @@ class ChanponReversibleStateProviderTest {
         registerRepository(world)
         val player = player()
         val applied = mutableListOf<UUID>()
-        val environment = EnvironmentProvider(storage) { applied += it.uuid }
+        val environment = EnvironmentProvider(storage, { storage.getProtectionMode(it.uuid) }) { applied += it.uuid }
         val environmentContext = captureContext(
             player,
             ChanponReversibleContracts.environment(world.uuid),
@@ -177,7 +177,7 @@ class ChanponReversibleStateProviderTest {
         assertRestored(publication, player, publicationContext, publicationState)
         assertEquals(original, storage.worldFile(world.uuid).readText())
 
-        val environment = EnvironmentProvider(storage) { }
+        val environment = EnvironmentProvider(storage, { storage.getProtectionMode(it.uuid) }) { }
         val environmentContext = captureContext(
             player, ChanponReversibleContracts.environment(world.uuid),
             arguments = mapOf("setting" to "protection"),

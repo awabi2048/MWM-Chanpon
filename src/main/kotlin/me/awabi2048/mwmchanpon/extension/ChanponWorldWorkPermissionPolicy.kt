@@ -12,7 +12,8 @@ import me.awabi2048.myworldmanager.model.WorldData
 class ChanponWorldWorkPermissionPolicy(
     private val storage: ChanponWorldStorage,
     private val globalStorage: ChanponGlobalStorage,
-    private val autoRollbackLocked: () -> Boolean
+    private val autoRollbackLocked: () -> Boolean,
+    private val protectionMode: (WorldData) -> ChanponWorldProtectionMode,
 ) : WorldWorkPermissionPolicy {
     private var configurationAvailable: () -> Boolean = { true }
 
@@ -33,7 +34,7 @@ class ChanponWorldWorkPermissionPolicy(
         }
         if (storage.isImportedArchive(worldData.uuid)) return false
         if (storage.isProductionWorld(worldData.uuid) && autoRollbackLocked()) return false
-        if (storage.getProtectionMode(worldData.uuid) == ChanponWorldProtectionMode.OWNER_ONLY &&
+        if (protectionMode(worldData) == ChanponWorldProtectionMode.OWNER_ONLY &&
             playerUuid != worldData.owner
         ) {
             return false

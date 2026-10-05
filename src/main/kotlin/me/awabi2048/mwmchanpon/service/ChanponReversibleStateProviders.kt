@@ -62,7 +62,7 @@ internal object ChanponReversibleStateProviders {
         MenuReversibleStateProviderDefinition(
             OWNER,
             "world-environment",
-            EnvironmentProvider(storage) { worldData ->
+            EnvironmentProvider(storage, buildPermissionService::effectiveProtectionMode) { worldData ->
                 MyWorldManagerApi.getWorldEnvironmentService()?.applyWeather(worldData.uuid)
                 MyWorldManagerApi.getWorldEnvironmentService()?.applyTime(worldData.uuid)
                 MyWorldManagerApi.getWorldEnvironmentService()?.applyAttributes(worldData.uuid)
@@ -331,6 +331,7 @@ private data class EnvironmentState(
 
 internal class EnvironmentProvider(
     private val storage: ChanponWorldStorage,
+    private val protectionMode: (WorldData) -> ChanponWorldProtectionMode,
     private val onApplied: (WorldData) -> Unit,
 ) : MenuReversibleStateProvider {
     override fun capture(context: MenuReversibleStateCaptureContext): MenuReversibleProviderCaptureResult {
@@ -370,7 +371,7 @@ internal class EnvironmentProvider(
         scale = worldData.fixedScale,
         allowFlight = worldData.allowFlight,
         freecamAllowed = storage.isFreecamAllowed(worldData.uuid),
-        protectionMode = storage.getProtectionMode(worldData.uuid),
+        protectionMode = protectionMode(worldData),
     )
 
     private fun nextSnapshot(
