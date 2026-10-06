@@ -24,6 +24,7 @@ import me.awabi2048.mwmchanpon.extension.ProductionWorldGuard
 import me.awabi2048.mwmchanpon.extension.ToolPermissionCapability
 import me.awabi2048.mwmchanpon.extension.ChanponMemberManagementPasswordCapability
 import me.awabi2048.mwmchanpon.extension.WorldBackupCapability
+import me.awabi2048.mwmchanpon.listener.BuildDenialReasonListener
 import me.awabi2048.mwmchanpon.listener.MemberPermissionSyncListener
 import me.awabi2048.mwmchanpon.listener.WorldVisitListener
 import me.awabi2048.mwmchanpon.listener.FreecamWorldPolicyListener
@@ -34,6 +35,7 @@ import me.awabi2048.mwmchanpon.listener.WorldBuildPermissionListener
 import me.awabi2048.mwmchanpon.listener.SpawnWorldProtectionListener
 import me.awabi2048.mwmchanpon.listener.ToolPermissionWorldListener
 import me.awabi2048.mwmchanpon.listener.WorldCleanupListener
+import me.awabi2048.mwmchanpon.protection.BuildDenialReasonResolver
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
 import me.awabi2048.mwmchanpon.protection.SpawnWorldProtectionService
 import me.awabi2048.mwmchanpon.protection.WorldBuildPermissionService
@@ -336,6 +338,21 @@ class MWMChanponPlugin : JavaPlugin() {
         server.pluginManager.registerEvents(WorldBuildPermissionListener(this, buildPermissionService), this)
         server.pluginManager.registerEvents(SpawnWorldProtectionListener(this, globalStorage, spawnProtectionService), this)
         server.pluginManager.registerEvents(MyWorldSafetyDefaultsListener(this, worldSafetyDefaultsService), this)
+        // 建築拒否の理由通知は、拒否実施側（WorldGuard・外部ポリシー）の結果だけを
+        // 観測するため、全リスナー完了後のMONITORでキャンセル済みイベントを拾います。
+        server.pluginManager.registerEvents(
+            BuildDenialReasonListener(
+                this,
+                BuildDenialReasonResolver(
+                    chanponStorage,
+                    globalStorage,
+                    submittedProtectionService,
+                    buildPermissionService,
+                    ::isConfigurationMigrationCurrent,
+                ),
+            ),
+            this,
+        )
 
         val toolMenu = ToolPermissionMenu(this, toolController, toolDefinitions, chanponStorage)
         toolPermissionCapability =
