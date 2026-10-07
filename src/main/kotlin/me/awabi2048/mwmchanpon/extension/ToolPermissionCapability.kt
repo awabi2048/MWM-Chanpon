@@ -78,12 +78,13 @@ class ToolPermissionCapability(
         return MenuActionResult.Success(MenuUpdate.Navigate(menu.route(subject.worldData.uuid, subject.memberUuid)))
     }
 
+    /** メンバーのツール権限は、MWMのメンバー管理と同じくオーナー・モデレータ・管理者が扱います。 */
     private fun canManage(player: Player, worldData: WorldData): Boolean =
         AdminAccess.isOwnerOrAdmin(
             player.uniqueId == worldData.owner,
             MyWorldManagerApi.hasWorldSettingsAdminAccess(player),
             player.hasPermission("mwmchanpon.admin"),
-        )
+        ) || player.uniqueId in worldData.moderators
 
     private fun subject(context: MenuCapabilityContext): ToolPermissionSubject? =
         subject(context.arguments)

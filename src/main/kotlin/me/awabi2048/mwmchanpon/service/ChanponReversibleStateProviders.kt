@@ -20,11 +20,15 @@ import me.awabi2048.mwmchanpon.storage.SubmissionState
 import me.awabi2048.mwmchanpon.storage.WorldCreationAvailability
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
+import me.awabi2048.myworldmanager.api.event.MwmMemberRole
+import me.awabi2048.myworldmanager.api.event.MwmMemberRoleChangeSource
+import me.awabi2048.myworldmanager.api.event.MwmMemberRoleChangedEvent
 import me.awabi2048.myworldmanager.model.WorldData
 import com.sk89q.worldguard.protection.flags.RegionGroup
 import com.sk89q.worldguard.protection.flags.StateFlag
 import java.util.UUID
 import java.util.Base64
+import org.bukkit.Bukkit
 
 /** Chanponの実状態を扱う可逆provider群です。各providerは一つのaggregateだけを復元します。 */
 internal object ChanponReversibleStateProviders {
@@ -868,6 +872,7 @@ internal interface ToolPermissionGateway {
     fun isEnabled(worldData: WorldData, playerUuid: UUID, toolId: String): Boolean
     fun storedEnabledAfterSet(worldData: WorldData, playerUuid: UUID, enabled: Boolean): Boolean
     fun syncWorld(worldData: WorldData)
+    fun notifyMemberRoleChanged(worldUuid: UUID, memberUuid: UUID, newRole: MwmMemberRole)
 }
 
 private class ControllerToolPermissionGateway(
@@ -880,6 +885,22 @@ private class ControllerToolPermissionGateway(
         controller.storedEnabledAfterSet(worldData, playerUuid, enabled)
 
     override fun syncWorld(worldData: WorldData) = controller.syncWorld(worldData)
+
+    /**
+     * 全リスト復元はMWMの単一経路を通れないため、ここで役割変更イベントを発行し、
+     * MWM側のWorldGuard・LuckPerms同期とツール状態同期を通常の役割変更と同じ経路へ戻します。
+     */
+    override fun notifyMemberRoleChanged(worldUuid: UUID, memberUuid: UUID, newRole: MwmMemberRole) {
+        Bukkit.getPluginManager().callEvent(
+            MwmMemberRoleChangedEvent(
+                worldUuid = worldUuid,
+                memberUuid = memberUuid,
+                newRole = newRole,
+                changedByUuid = null,
+                source = MwmMemberRoleChangeSource.RESTORE,
+            )
+        )
+    }
 }
 
 internal class ToolPermissionProvider(
@@ -990,7 +1011,18 @@ internal class ToolPermissionProvider(
         worldData.moderators.clear()
         worldData.moderators.addAll(state.moderators)
         MyWorldManagerApi.getWorldRepository()?.save(worldData)
-        gateway.syncWorld(worldData)
+        // 役割変更はイベント経由でMWM側のWorldGuard・LuckPerms同期とツール状態同期を再適用します。
+        // 参加者へ戻れない復元（対象が役割を持たない）はイベントを発行できないため直接同期します。
+        val restoredRole = when {
+            state.targetPlayerUuid in state.moderators -> MwmMemberRole.MODERATOR
+            state.targetPlayerUuid in state.members -> MwmMemberRole.MEMBER
+            else -> null
+        }
+        if (restoredRole != null) {
+            gateway.notifyMemberRoleChanged(state.worldUuid, state.targetPlayerUuid, restoredRole)
+        } else {
+            gateway.syncWorld(worldData)
+        }
         return MenuReversibleProviderRestoreResult.Restored
     }
 

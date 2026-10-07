@@ -5,6 +5,7 @@ import me.awabi2048.mwmchanpon.tool.ToolPermissionController
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import me.awabi2048.myworldmanager.api.event.MwmMemberAddedEvent
 import me.awabi2048.myworldmanager.api.event.MwmMemberRemovedEvent
+import me.awabi2048.myworldmanager.api.event.MwmMemberRoleChangedEvent
 import me.awabi2048.myworldmanager.api.event.MwmOwnerTransferredEvent
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
@@ -25,6 +26,13 @@ class MemberPermissionSyncListener(
         if (storage.isImportedArchive(event.worldUuid)) return
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(event.worldUuid) ?: return
         controller.cleanupPlayer(worldData, event.memberUuid)
+        controller.syncWorld(worldData)
+    }
+
+    @EventHandler
+    fun onMemberRoleChanged(event: MwmMemberRoleChangedEvent) {
+        if (storage.isImportedArchive(event.worldUuid)) return
+        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(event.worldUuid) ?: return
         controller.syncWorld(worldData)
     }
 

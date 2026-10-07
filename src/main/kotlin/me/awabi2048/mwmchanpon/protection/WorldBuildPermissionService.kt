@@ -64,9 +64,12 @@ class WorldBuildPermissionService(
                 region.setFlag(Flags.PASSTHROUGH, StateFlag.State.DENY)
                 region.setFlag(Flags.PASSTHROUGH.regionGroupFlag, RegionGroup.NON_MEMBERS)
             }
+            // 「誰でも」は明示的な ALLOW で表現します。未設定(null)もWorldGuard上は非保護ですが、
+            // 未設定値をDENYへ補完する他の既定適用と区別が付かず、regions.ymlからも意図が読めません。
+            // グループはALLで固定し、他サービスがグループだけを補完しても全員へ適用される状態を保ちます。
             ChanponWorldProtectionMode.PUBLIC -> {
-                region.setFlag(Flags.PASSTHROUGH, null)
-                region.setFlag(Flags.PASSTHROUGH.regionGroupFlag, null)
+                region.setFlag(Flags.PASSTHROUGH, StateFlag.State.ALLOW)
+                region.setFlag(Flags.PASSTHROUGH.regionGroupFlag, RegionGroup.ALL)
             }
         }
 

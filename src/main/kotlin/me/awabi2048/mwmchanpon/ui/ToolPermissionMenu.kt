@@ -107,11 +107,11 @@ class ToolPermissionMenu(
                 elements += createToolItem(player, slot, worldData, targetUuid, definition)
             }
             // 中央7枠は「ツール4・背景1・役割切替1・バイパス切替1」で固定します。
-            // 役割切替はオーナーと管理者が操作でき、バイパス切替は管理者のみが操作できます。
-            // バイパス枠は非管理者には白の板ガラス装飾として表示し、操作入口を作りません。
+            // 役割切替はオーナーと管理者、バイパス切替は管理者のみが操作できます。
+            // 操作できない利用者には白の板ガラス装飾として表示し、操作入口を作りません。
             // slot 23 は要素を置かず、InventoryMenuViewの共通背景（灰色板ガラス）を使います。
             // 白い装飾枠を明示すると、背景と余白の視認性が変わってしまうためです。
-            if (targetUuid != worldData.owner) {
+            if (targetUuid != worldData.owner && canManageRoles(player, worldData)) {
                 elements += createRoleItem(player, ROLE_SLOT, worldData, targetUuid)
             } else {
                 elements += decorationEntry(ROLE_SLOT)
@@ -139,7 +139,7 @@ class ToolPermissionMenu(
         val targetUuid = uuid(context.route.payload[TARGET_UUID])
             ?: return MenuActionResult.Rejected()
         if (!canManage(context.player, worldData)) {
-            context.player.sendMessage("§cオーナーのみ操作できます")
+            context.player.sendMessage("§cオーナー・モデレータのみ操作できます")
             return MenuActionResult.Rejected()
         }
         val definition = context.payload[TOOL_ID]
@@ -154,17 +154,14 @@ class ToolPermissionMenu(
         val worldData = world(context.route) ?: return MenuActionResult.Rejected()
         val targetUuid = uuid(context.route.payload[TARGET_UUID])
             ?: return MenuActionResult.Rejected()
-        if (!canManage(context.player, worldData) || targetUuid == worldData.owner) {
+        if (!canManageRoles(context.player, worldData) || targetUuid == worldData.owner) {
             return MenuActionResult.Rejected()
         }
-        if (worldData.moderators.remove(targetUuid)) {
-            if (!worldData.members.contains(targetUuid)) worldData.members.add(targetUuid)
-        } else {
-            worldData.members.remove(targetUuid)
-            if (!worldData.moderators.contains(targetUuid)) worldData.moderators.add(targetUuid)
+        // 役割変更はMWM側の単一経路で永続化します。MwmMemberRoleChangedEventを経由して
+        // MWM側のWorldGuard・LuckPerms同期とこのプラグイン側のツール状態同期の双方が再適用されます。
+        if (!MyWorldManagerApi.toggleMemberRole(worldData.uuid, targetUuid, context.player.uniqueId)) {
+            return MenuActionResult.Rejected()
         }
-        MyWorldManagerApi.getWorldRepository()?.save(worldData)
-        controller.syncWorld(worldData)
         return MenuActionResult.Success(MenuUpdate.Refresh)
     }
 
@@ -247,7 +244,12 @@ class ToolPermissionMenu(
             ),
         )
 
+    /** メンバーのツール権限は、MWMのメンバー管理と同じくオーナー・モデレータ・管理者が扱います。 */
     private fun canManage(player: Player, worldData: WorldData): Boolean =
+        canManageRoles(player, worldData) || player.uniqueId in worldData.moderators
+
+    /** 役割（メンバー⇔モデレータ）の変更はオーナーと管理者のみが扱います。 */
+    private fun canManageRoles(player: Player, worldData: WorldData): Boolean =
         AdminAccess.isOwnerOrAdmin(
             player.uniqueId == worldData.owner,
             MyWorldManagerApi.hasWorldSettingsAdminAccess(player),

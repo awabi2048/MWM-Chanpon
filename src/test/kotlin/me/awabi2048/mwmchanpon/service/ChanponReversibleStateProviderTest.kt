@@ -20,6 +20,7 @@ import me.awabi2048.mwmchanpon.storage.ChanponWorldVisibility
 import me.awabi2048.mwmchanpon.storage.SubmissionState
 import me.awabi2048.mwmchanpon.storage.WorldCreationAvailability
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
+import me.awabi2048.myworldmanager.api.event.MwmMemberRole
 import me.awabi2048.myworldmanager.api.service.ApiWorldRepository
 import me.awabi2048.myworldmanager.model.WorldData
 import me.awabi2048.myworldmanager.model.ManagedDimension
@@ -247,6 +248,8 @@ class ChanponReversibleStateProviderTest {
         assertRestored(tool, player, roleContext, roleState)
         assertEquals(listOf(target), world.moderators)
         assertEquals(emptyList<UUID>(), world.members)
+        // 役割の復元はMWM側の役割変更イベント通知として記録されます。
+        assertEquals(listOf(target to MwmMemberRole.MODERATOR), toolGateway.roleNotifications)
         assertRejected(tool, player, roleContext, captured(tool, roleContext))
     }
 
@@ -374,10 +377,14 @@ class ChanponReversibleStateProviderTest {
 
     private class RecordingToolGateway : ToolPermissionGateway {
         val syncedWorlds = mutableListOf<UUID>()
+        val roleNotifications = mutableListOf<Pair<UUID, MwmMemberRole>>()
         override fun isEnabled(worldData: WorldData, playerUuid: UUID, toolId: String): Boolean = false
         override fun storedEnabledAfterSet(worldData: WorldData, playerUuid: UUID, enabled: Boolean): Boolean = enabled
         override fun syncWorld(worldData: WorldData) {
             syncedWorlds += worldData.uuid
+        }
+        override fun notifyMemberRoleChanged(worldUuid: UUID, memberUuid: UUID, newRole: MwmMemberRole) {
+            roleNotifications += memberUuid to newRole
         }
     }
 
