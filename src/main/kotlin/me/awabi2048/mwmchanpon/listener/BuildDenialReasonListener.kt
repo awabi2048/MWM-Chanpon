@@ -1,6 +1,7 @@
 package me.awabi2048.mwmchanpon.listener
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.localization.generated.ChanponProtectionKeys
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.protection.BuildDenialReasonResolver
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
@@ -38,10 +39,15 @@ class BuildDenialReasonListener(
     }
 
     private fun notify(player: Player, block: Block, placing: Boolean) {
+        // 管理対象のMyWorldだけを対象にし、それ以外のワールドでのキャンセルは
+        // 他プラグインの責務として通知しません。
         val worldData = MyWorldManagerApi.getWorldRepository()
             ?.findByWorldName(block.world.name)
             ?: return
-        val reason = resolver.resolve(player, worldData, block, placing) ?: return
-        player.sendActionBar(Component.text(CCSystem.getAPI().getLocalized(player, reason.messageKey)))
+        // Chanpon側の条件で説明できないキャンセル（手動作成のWorldGuardリージョンや
+        // 外部保護プラグイン等）にも、原因を断定しない中立的な通知だけは行います。
+        val key = resolver.resolve(player, worldData, block, placing)?.messageKey
+            ?: ChanponProtectionKeys.CHANPON_PROTECTION_BUILD_DENIED_EXTERNAL
+        player.sendActionBar(Component.text(CCSystem.getAPI().getLocalized(player, key)))
     }
 }
