@@ -20,6 +20,7 @@ class MyWorldSafetyDefaultsPolicyTest {
         assertEquals("0", values["randomTickSpeed"])
         assertEquals("false", values["doVinesSpread"])
         assertEquals("false", values["tntExplodes"])
+        assertEquals("0", values["fire_spread_radius_around_player"])
     }
 
     @Test

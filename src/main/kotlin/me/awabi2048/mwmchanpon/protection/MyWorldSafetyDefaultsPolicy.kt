@@ -19,6 +19,7 @@ internal object MyWorldSafetyDefaultsPolicy {
         GameRuleAssignment("randomTickSpeed", "0"),
         GameRuleAssignment("doVinesSpread", "false"),
         GameRuleAssignment("tntExplodes", "false"),
+        GameRuleAssignment("fire_spread_radius_around_player", "0"),
     )
 
     /** WorldGuard 7.0.14 で利用できる爆発・破壊・成長抑制フラグです。 */
@@ -42,6 +43,9 @@ internal object MyWorldSafetyDefaultsPolicy {
         world.setGameRule(GameRules.RANDOM_TICK_SPEED, 0)
         world.setGameRule(GameRules.SPREAD_VINES, false)
         world.setGameRule(GameRules.TNT_EXPLODES, false)
+        // 1.21.11 以降 doFireTick は削除済みで、延焼はプレイヤー周辺の半径指定へ置き換わっている。
+        // 0 は延焼・燃え尽き双方を停止する（点火済みの炎は消えずに残る）。
+        world.setGameRule(GameRules.FIRE_SPREAD_RADIUS_AROUND_PLAYER, 0)
     }
 
     /**
