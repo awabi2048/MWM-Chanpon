@@ -17,6 +17,7 @@ import org.bukkit.World
  */
 class MyWorldSafetyDefaultsService(
     private val logger: Logger,
+    private val randomTickStopped: (java.util.UUID) -> Boolean,
 ) {
     fun syncAll(worlds: Iterable<WorldData>): Int = worlds.count(::sync)
 
@@ -32,7 +33,11 @@ class MyWorldSafetyDefaultsService(
 
         return try {
             // ゲームルールは既存値を管理者設定として判別できないため、MWM-Chanponの不変条件へ収束させます。
-            MyWorldSafetyDefaultsPolicy.applyGameRules(world)
+            // randomTickSpeed だけはワールド単位の環境設定として扱い、停止=ONで0・OFFで通常値3へ収束します。
+            MyWorldSafetyDefaultsPolicy.applyGameRules(
+                world,
+                MyWorldSafetyDefaultsPolicy.randomTickSpeedFor(randomTickStopped(worldData.uuid)),
+            )
             syncWorldGuard(world)
         } catch (exception: Exception) {
             // 作成イベントのトランザクションへ例外を返さず、次回ロード・起動走査で再試行できる状態を保ちます。

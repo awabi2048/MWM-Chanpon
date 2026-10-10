@@ -62,6 +62,7 @@ internal object ChanponReversibleStateProviders {
         registry: MenuReversibleStateProviderRegistry,
         storage: ChanponWorldStorage,
         buildPermissionService: WorldBuildPermissionService,
+        applySafetyDefaults: (WorldData) -> Unit,
     ) = registry.register(
         MenuReversibleStateProviderDefinition(
             OWNER,
@@ -72,6 +73,8 @@ internal object ChanponReversibleStateProviders {
                 MyWorldManagerApi.getWorldEnvironmentService()?.applyAttributes(worldData.uuid)
                 MyWorldManagerApi.getWorldEnvironmentService()?.applyFlight(worldData.uuid)
                 buildPermissionService.sync(worldData)
+                // ランダムティック停止はChanponファイル復元後の値でゲームルールへ反映します。
+                applySafetyDefaults(worldData)
             },
         ),
     )
@@ -297,6 +300,7 @@ private data class EnvironmentSnapshot(
     val scale: Double?,
     val allowFlight: Boolean,
     val freecamAllowed: Boolean,
+    val randomTickStopped: Boolean,
     val protectionMode: ChanponWorldProtectionMode,
 )
 
@@ -375,6 +379,7 @@ internal class EnvironmentProvider(
         scale = worldData.fixedScale,
         allowFlight = worldData.allowFlight,
         freecamAllowed = storage.isFreecamAllowed(worldData.uuid),
+        randomTickStopped = storage.isRandomTickStopped(worldData.uuid),
         protectionMode = protectionMode(worldData),
     )
 
@@ -391,6 +396,7 @@ internal class EnvironmentProvider(
             "scale" -> before.copy(scale = cycle(before.scale ?: DEFAULT_SCALE, SCALE_VALUES, next))
             "flight" -> before.copy(allowFlight = !before.allowFlight)
             "freecam" -> before.copy(freecamAllowed = !before.freecamAllowed)
+            "random_tick" -> before.copy(randomTickStopped = !before.randomTickStopped)
             "protection" -> before.copy(protectionMode = cycle(before.protectionMode, PROTECTION_VALUES, next))
             else -> null
         }
@@ -1154,13 +1160,14 @@ private fun EnvironmentSnapshot.toOpaqueMap(): Map<String, Any?> = mapOf(
     "scale" to scale,
     "allowFlight" to allowFlight,
     "freecamAllowed" to freecamAllowed,
+    "randomTickStopped" to randomTickStopped,
     "protectionMode" to protectionMode.name,
 )
 
 private fun decodeEnvironmentSnapshot(value: Any?): EnvironmentSnapshot? {
     val map = strictMap(
         value,
-        setOf("fixedWeather", "fixedTime", "gravity", "scale", "allowFlight", "freecamAllowed", "protectionMode"),
+        setOf("fixedWeather", "fixedTime", "gravity", "scale", "allowFlight", "freecamAllowed", "randomTickStopped", "protectionMode"),
     ) ?: return null
     val weather = decodeNullableTyped<String>(map["fixedWeather"]) ?: return null
     val time = decodeNullableTyped<Long>(map["fixedTime"]) ?: return null
@@ -1173,6 +1180,7 @@ private fun decodeEnvironmentSnapshot(value: Any?): EnvironmentSnapshot? {
         scale.value,
         map.strictBoolean("allowFlight") ?: return null,
         map.strictBoolean("freecamAllowed") ?: return null,
+        map.strictBoolean("randomTickStopped") ?: return null,
         map.strictString("protectionMode")?.let(::protectionModeOrNull) ?: return null,
     )
 }

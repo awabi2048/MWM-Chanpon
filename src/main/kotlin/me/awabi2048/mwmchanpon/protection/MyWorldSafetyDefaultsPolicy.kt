@@ -13,10 +13,20 @@ import org.bukkit.World
  * WorldGuard は既存の明示値を尊重し、未設定の対象だけを DENY で補完します。
  */
 internal object MyWorldSafetyDefaultsPolicy {
+    /**
+     * ランダムティック停止がオンのときに適用するティック速度です。
+     * 環境設定でオフにした場合は vanilla 既定値へ戻します。
+     */
+    const val RANDOM_TICK_SPEED_STOPPED = 0
+    const val RANDOM_TICK_SPEED_RUNNING = 3
+
+    /** 停止設定から適用するティック速度を導出します。 */
+    fun randomTickSpeedFor(stopped: Boolean): Int =
+        if (stopped) RANDOM_TICK_SPEED_STOPPED else RANDOM_TICK_SPEED_RUNNING
+
     /** テスト可能なゲームルール契約です。実適用時は Paper の型付き API を使います。 */
     val gameRuleAssignments: List<GameRuleAssignment> = listOf(
         GameRuleAssignment("keepInventory", "true"),
-        GameRuleAssignment("randomTickSpeed", "0"),
         GameRuleAssignment("doVinesSpread", "false"),
         GameRuleAssignment("tntExplodes", "false"),
         GameRuleAssignment("fire_spread_radius_around_player", "0"),
@@ -37,10 +47,14 @@ internal object MyWorldSafetyDefaultsPolicy {
         Flags.CORAL_FADE,
     )
 
-    fun applyGameRules(world: World) {
+    /**
+     * @param randomTickSpeed ワールド単位の設定から導出したティック速度。
+     *        固定の不変条件ではなくワールド環境設定として扱います。
+     */
+    fun applyGameRules(world: World, randomTickSpeed: Int) {
         // ゲームルールは管理対象の不変条件として、同期時に必ず指定値へ戻します。
         world.setGameRule(GameRules.KEEP_INVENTORY, true)
-        world.setGameRule(GameRules.RANDOM_TICK_SPEED, 0)
+        world.setGameRule(GameRules.RANDOM_TICK_SPEED, randomTickSpeed)
         world.setGameRule(GameRules.SPREAD_VINES, false)
         world.setGameRule(GameRules.TNT_EXPLODES, false)
         // 1.21.11 以降 doFireTick は削除済みで、延焼はプレイヤー周辺の半径指定へ置き換わっている。

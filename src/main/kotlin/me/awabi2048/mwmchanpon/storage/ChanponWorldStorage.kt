@@ -370,6 +370,21 @@ class ChanponWorldStorage(
         saveAtomic(worldUuid, config)
     }
 
+    /**
+     * ランダムティック停止の既定値はオンです。未設定の既存ワールドも停止（旧挙動と同値）として扱います。
+     */
+    fun isRandomTickStopped(worldUuid: UUID): Boolean {
+        return load(worldUuid)?.getBoolean("environment.random_tick_stopped", true) ?: true
+    }
+
+    @Synchronized
+    fun setRandomTickStopped(worldUuid: UUID, stopped: Boolean) {
+        ensureWritable(worldUuid)
+        val config = loadOrCreate(worldUuid)
+        config.set("environment.random_tick_stopped", stopped)
+        saveAtomic(worldUuid, config)
+    }
+
     fun isSubmissionCompleted(worldUuid: UUID): Boolean {
         val config = load(worldUuid) ?: return false
         return SubmissionState.fromStorageValue(config.getString("submission.state")) == SubmissionState.COMPLETED

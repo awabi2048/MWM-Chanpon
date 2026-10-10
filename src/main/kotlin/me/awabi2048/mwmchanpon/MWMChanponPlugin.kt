@@ -176,7 +176,7 @@ class MWMChanponPlugin : JavaPlugin() {
         spawnWorldService = ChanponSpawnWorldService(this, globalStorage)
         val luckPerms = LuckPermsProvider.get()
         spawnProtectionService = SpawnWorldProtectionService()
-        worldSafetyDefaultsService = MyWorldSafetyDefaultsService(logger)
+        worldSafetyDefaultsService = MyWorldSafetyDefaultsService(logger, chanponStorage::isRandomTickStopped)
         buildPermissionService = WorldBuildPermissionService(
             chanponStorage,
             logger,
@@ -277,7 +277,7 @@ class MWMChanponPlugin : JavaPlugin() {
             )
         )
         chanponAdminWorldListMenu = ChanponAdminWorldListMenu(this, chanponStorage)
-        environmentGui = ChanponEnvironmentGui(this, chanponStorage, submittedProtectionService, buildPermissionService)
+        environmentGui = ChanponEnvironmentGui(this, chanponStorage, submittedProtectionService, buildPermissionService, worldSafetyDefaultsService)
         chanponWorldSettingsMenu = ChanponWorldSettingsMenu(this, chanponStorage, submittedProtectionService, environmentGui)
         MyWorldManagerApi.registerWorldSettingsRouteCapability(chanponWorldSettingsMenu)
         worldSettingsCapabilities = ChanponWorldSettingsCapabilities(

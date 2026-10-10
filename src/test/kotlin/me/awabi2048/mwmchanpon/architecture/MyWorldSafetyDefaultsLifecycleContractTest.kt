@@ -11,7 +11,7 @@ class MyWorldSafetyDefaultsLifecycleContractTest {
     fun `startup and restore paths invoke the safety defaults service`() {
         val source = source("MWMChanponPlugin.kt")
 
-        assertTrue("worldSafetyDefaultsService = MyWorldSafetyDefaultsService(logger)" in source)
+        assertTrue("worldSafetyDefaultsService = MyWorldSafetyDefaultsService(logger, chanponStorage::isRandomTickStopped)" in source)
         assertTrue("worldSafetyDefaultsService.syncAll(it)" in source)
         assertTrue("worldSafetyDefaultsService.sync(worldData)" in source)
         assertTrue("MyWorldSafetyDefaultsListener(this, worldSafetyDefaultsService)" in source)

@@ -17,10 +17,17 @@ class MyWorldSafetyDefaultsPolicyTest {
             .associate { it.key to it.value }
 
         assertEquals("true", values["keepInventory"])
-        assertEquals("0", values["randomTickSpeed"])
+        // randomTickSpeed は固定の不変条件ではなく、ワールド環境設定から導出する。
+        assertFalse(values.containsKey("randomTickSpeed"))
         assertEquals("false", values["doVinesSpread"])
         assertEquals("false", values["tntExplodes"])
         assertEquals("0", values["fire_spread_radius_around_player"])
+    }
+
+    @Test
+    fun `random tick speed derives from the world setting`() {
+        assertEquals(0, MyWorldSafetyDefaultsPolicy.randomTickSpeedFor(stopped = true))
+        assertEquals(3, MyWorldSafetyDefaultsPolicy.randomTickSpeedFor(stopped = false))
     }
 
     @Test

@@ -42,6 +42,8 @@ import java.util.UUID
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.storage.ChanponWorldProtectionMode
 import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
+import me.awabi2048.mwmchanpon.protection.MyWorldSafetyDefaultsPolicy
+import me.awabi2048.mwmchanpon.protection.MyWorldSafetyDefaultsService
 import me.awabi2048.mwmchanpon.protection.WorldBuildPermissionService
 import me.awabi2048.mwmchanpon.service.ChanponReversibleContracts
 import me.awabi2048.mwmchanpon.service.ChanponReversibleActionClassification
@@ -52,6 +54,7 @@ class ChanponEnvironmentGui(
     private val storage: ChanponWorldStorage,
     protectionService: me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService,
     private val buildPermissionService: WorldBuildPermissionService,
+    private val worldSafetyDefaultsService: MyWorldSafetyDefaultsService,
 ) {
     private val accessGuard = WorldSettingsAccessGuard(storage, protectionService)
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
@@ -61,6 +64,7 @@ class ChanponEnvironmentGui(
             CCSystem.getAPI().getMenuReversibleStateProviderRegistry(),
             storage,
             buildPermissionService,
+            worldSafetyDefaultsService::sync,
         )
         val environmentDefinition = InventoryMenuDefinition(
                 owner = RUNTIME_OWNER,
@@ -97,6 +101,7 @@ class ChanponEnvironmentGui(
         val scale = worldData.fixedScale
         val allowFlight = worldData.allowFlight
         val allowFreecam = storage.isFreecamAllowed(worldData.uuid)
+        val randomTickStopped = storage.isRandomTickStopped(worldData.uuid)
         val outsideTargetWorld = !isInTargetWorld(player, worldData)
 
         return InventoryMenuView(
@@ -107,6 +112,7 @@ class ChanponEnvironmentGui(
                 directSettingEntry(player, 20, worldData.uuid, ACTION_TIME, Material.CLOCK, timeDisplay(player, time), timeOptions(player, time), timeOptionKey(time), outsideTargetWorld, customTimeAction = true),
                 directSettingEntry(player, 21, worldData.uuid, ACTION_GRAVITY, Material.FEATHER, gravityDisplay(player, gravity), gravityOptions(player), (gravity ?: DEFAULT_GRAVITY).toString(), outsideTargetWorld),
                 directSettingEntry(player, 22, worldData.uuid, ACTION_FREECAM, Material.ENDER_EYE, freecamDisplay(player, allowFreecam), freecamOptions(player), allowFreecam.toString(), outsideTargetWorld),
+                directSettingEntry(player, 26, worldData.uuid, ACTION_RANDOM_TICK, Material.WHEAT, randomTickDisplay(player, randomTickStopped), randomTickOptions(player), randomTickStopped.toString(), outsideTargetWorld),
                 directSettingEntry(player, 23, worldData.uuid, ACTION_SCALE, Material.PLAYER_HEAD, scaleDisplay(player, scale), scaleOptions(player), scale?.toString(), outsideTargetWorld),
                 directSettingEntry(player, 24, worldData.uuid, ACTION_FLIGHT, Material.ELYTRA, flightDisplay(player, allowFlight), flightOptions(player), allowFlight.toString(), outsideTargetWorld),
                 protectionSettingEntry(player, 25, worldData),
@@ -141,6 +147,7 @@ class ChanponEnvironmentGui(
             ACTION_SCALE -> cycleScale(worldData, direction ?: return MenuActionResult.Ignored)
             ACTION_FLIGHT -> toggleFlight(worldData)
             ACTION_FREECAM -> toggleFreecam(worldData)
+            ACTION_RANDOM_TICK -> toggleRandomTick(worldData)
             ACTION_PROTECTION -> {
                 // パスワードの設定・変更はメンバー管理メニュー（フッター3マス目）へ完全に移しました。
                 cycleProtection(worldData, direction ?: return MenuActionResult.Ignored)
@@ -188,6 +195,12 @@ class ChanponEnvironmentGui(
 
     private fun toggleFreecam(worldData: WorldData) {
         storage.setFreecamAllowed(worldData.uuid, !storage.isFreecamAllowed(worldData.uuid))
+    }
+
+    private fun toggleRandomTick(worldData: WorldData) {
+        storage.setRandomTickStopped(worldData.uuid, !storage.isRandomTickStopped(worldData.uuid))
+        // ゲームルールはロード済みワールドへ即時反映し、次回ロード時の安全既定値同期とも一致させます。
+        worldSafetyDefaultsService.sync(worldData)
     }
 
     private fun cycleProtection(worldData: WorldData, direction: GuiCycleDirection) {
@@ -289,6 +302,7 @@ class ChanponEnvironmentGui(
             ACTION_TIME -> SettingPresentation(ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_TIME_DISPLAY, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_TIME_DESCRIPTION)
             ACTION_GRAVITY -> SettingPresentation(ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_GRAVITY_DISPLAY, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_GRAVITY_DESCRIPTION)
             ACTION_FREECAM -> SettingPresentation(ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_FREECAM_DISPLAY, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_FREECAM_DESCRIPTION)
+            ACTION_RANDOM_TICK -> SettingPresentation(ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_RANDOM_TICK_DISPLAY, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_RANDOM_TICK_DESCRIPTION)
             ACTION_SCALE -> SettingPresentation(ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_SCALE_DISPLAY, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_SCALE_DESCRIPTION)
             ACTION_FLIGHT -> SettingPresentation(ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_FLIGHT_DISPLAY, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_FLIGHT_DESCRIPTION)
             else -> error("未定義の環境設定IDです: $key")
@@ -457,6 +471,17 @@ class ChanponEnvironmentGui(
         )
     }
 
+    private fun randomTickDisplay(player: Player, stopped: Boolean): String {
+        return i18n(player, if (stopped) ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_RANDOM_TICK_ENABLED else ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_RANDOM_TICK_DISABLED)
+    }
+
+    private fun randomTickOptions(player: Player): List<SettingOption> {
+        return listOf(
+            SettingOption("true", i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_RANDOM_TICK_ENABLED), "\u00A7a"),
+            SettingOption("false", i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_RANDOM_TICK_DISABLED), "\u00A7c")
+        )
+    }
+
     private fun gravityDisplay(player: Player, gravity: Double?): String {
         return when (gravity) {
             null -> i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_GRAVITY_EARTH_DISPLAY)
@@ -580,6 +605,7 @@ class ChanponEnvironmentGui(
         private const val ACTION_SCALE = "scale"
         private const val ACTION_FLIGHT = "flight"
         private const val ACTION_FREECAM = "freecam"
+        private const val ACTION_RANDOM_TICK = "random_tick"
         private const val ACTION_PROTECTION = "protection"
         private const val RUNTIME_OWNER = "mwm-chanpon"
         private const val ROUTE_ENVIRONMENT = "environment"
