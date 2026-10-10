@@ -28,6 +28,7 @@ import me.awabi2048.mwmchanpon.listener.BuildDenialReasonListener
 import me.awabi2048.mwmchanpon.listener.MemberPermissionSyncListener
 import me.awabi2048.mwmchanpon.listener.WorldVisitListener
 import me.awabi2048.mwmchanpon.listener.FreecamWorldPolicyListener
+import me.awabi2048.mwmchanpon.listener.MyWorldNaturalEntityCleanupListener
 import me.awabi2048.mwmchanpon.listener.MyWorldSafetyDefaultsListener
 import me.awabi2048.mwmchanpon.listener.PlayerJoinListener
 import me.awabi2048.mwmchanpon.listener.SubmittedWorldProtectionListener
@@ -338,6 +339,7 @@ class MWMChanponPlugin : JavaPlugin() {
         server.pluginManager.registerEvents(WorldBuildPermissionListener(this, buildPermissionService), this)
         server.pluginManager.registerEvents(SpawnWorldProtectionListener(this, globalStorage, spawnProtectionService), this)
         server.pluginManager.registerEvents(MyWorldSafetyDefaultsListener(this, worldSafetyDefaultsService), this)
+        server.pluginManager.registerEvents(MyWorldNaturalEntityCleanupListener(this), this)
         // 建築拒否の理由通知は、拒否実施側（WorldGuard・外部ポリシー）の結果だけを
         // 観測するため、全リスナー完了後のMONITORでキャンセル済みイベントを拾います。
         server.pluginManager.registerEvents(
