@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "me.awabi2048"
-version = "26.1010.1"
+version = "26.1022.2"
 
 repositories {
     mavenLocal()
@@ -33,7 +33,7 @@ val providedDeps = listOf(
     "org.jetbrains.kotlin:kotlin-stdlib:2.3.20",
     "com.awabi2048:CC-System:26.1010.1",
     "me.awabi2048:chanpon-utilities:26.905.2",
-    "awabi2048:my-world-manager:26.1007.1",
+    "awabi2048:my-world-manager:26.1022.2",
     "net.luckperms:api:5.4",
     "com.sk89q.worldedit:worldedit-bukkit:7.3.16",
     "com.sk89q.worldguard:worldguard-bukkit:7.0.14",

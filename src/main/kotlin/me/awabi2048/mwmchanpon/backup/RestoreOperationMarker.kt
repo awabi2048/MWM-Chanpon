@@ -66,6 +66,10 @@ internal class RestoreOperationMarker private constructor(
         val target = File(directory, "operation.yml")
         try {
             config.save(temporary)
+            // 名前変更だけが永続化され中身が欠ける状態を防ぐため、先に内容を
+            // ディスクへ出し切ります。
+            java.nio.channels.FileChannel.open(temporary.toPath(), java.nio.file.StandardOpenOption.WRITE)
+                .use { it.force(true) }
             try {
                 Files.move(
                     temporary.toPath(),
