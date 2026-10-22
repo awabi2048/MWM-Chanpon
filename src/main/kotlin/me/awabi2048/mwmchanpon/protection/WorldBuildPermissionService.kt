@@ -55,23 +55,32 @@ class WorldBuildPermissionService(
         val region = regionManager.getRegion(GLOBAL_REGION_ID)
             ?: GlobalProtectedRegion(GLOBAL_REGION_ID).also(regionManager::addRegion)
 
+        // __global__ では PASSTHROUGH の評価が早期終了するため passthrough-group は
+        // WorldGuard に評価されません。建築可否は build フラグ＋グループで表現します。
+        // __global__ では ALLOW 系フラグが無効化される一方、DENY とグループ指定は
+        // 通常通り有効なため、「拒否したい側」を DENY ＋対象グループで書きます。
         when (effectiveProtectionMode(worldData)) {
             ChanponWorldProtectionMode.OWNER_ONLY -> {
                 region.setFlag(Flags.PASSTHROUGH, StateFlag.State.DENY)
-                region.setFlag(Flags.PASSTHROUGH.regionGroupFlag, RegionGroup.NON_OWNERS)
+                region.setFlag(Flags.BUILD, StateFlag.State.DENY)
+                region.setFlag(Flags.BUILD.regionGroupFlag, RegionGroup.NON_OWNERS)
             }
             ChanponWorldProtectionMode.MEMBERS -> {
                 region.setFlag(Flags.PASSTHROUGH, StateFlag.State.DENY)
-                region.setFlag(Flags.PASSTHROUGH.regionGroupFlag, RegionGroup.NON_MEMBERS)
+                region.setFlag(Flags.BUILD, StateFlag.State.DENY)
+                region.setFlag(Flags.BUILD.regionGroupFlag, RegionGroup.NON_MEMBERS)
             }
-            // 「誰でも」は明示的な ALLOW で表現します。未設定(null)もWorldGuard上は非保護ですが、
-            // 未設定値をDENYへ補完する他の既定適用と区別が付かず、regions.ymlからも意図が読めません。
-            // グループはALLで固定し、他サービスがグループだけを補完しても全員へ適用される状態を保ちます。
+            // 「誰でも」は明示的な passthrough=ALLOW で表現します。
+            // 建築は全員へ開放するため build フラグとそのグループ指定をクリアします。
             ChanponWorldProtectionMode.PUBLIC -> {
                 region.setFlag(Flags.PASSTHROUGH, StateFlag.State.ALLOW)
-                region.setFlag(Flags.PASSTHROUGH.regionGroupFlag, RegionGroup.ALL)
+                region.setFlag(Flags.BUILD, null)
+                region.setFlag(Flags.BUILD.regionGroupFlag, null)
             }
         }
+        // 全モードで passthrough-group をクリアします。
+        // __global__ では評価されない死んだ設定であり、残すと regions.yml の意図を誤読させます。
+        region.setFlag(Flags.PASSTHROUGH.regionGroupFlag, null)
 
         regionManager.saveChanges()
         recordSpawnProtectionMode(worldData)
