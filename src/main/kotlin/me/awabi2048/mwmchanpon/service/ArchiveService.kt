@@ -122,15 +122,37 @@ class ArchiveService(
                 leases.forEach(WorldOperationLease::close)
                 return CompletableFuture.completedFuture(ArchiveResult(false, "spawn_world_not_available"))
             }
+        // ZIP化の間は書き込みを静止します。退避後の無人ワールドはスナップショットが
+        // アンロードし、退避先の在室ワールドは自動保存停止＋同期flushで書き出し切ります。
+        // world.save() 単体では書き込みキューが残り、ZIP化中の .mca と複製が競合し得ます。
+        val snapshots = mutableListOf<me.awabi2048.myworldmanager.api.service.ApiWorldSnapshot>()
+        var evacuationWorldSavePaused = false
         try {
             affectedWorlds.forEach { worldData ->
                 Bukkit.getWorld(worldService.getWorldFolderName(worldData))?.let { world ->
                     world.players.forEach { it.teleport(evacuateLocation) }
-                    world.save()
                 }
             }
-            evacuateLocation.world.save()
+            affectedWorlds.forEach { worldData ->
+                val snapshot = worldService.beginWorldSnapshot(
+                    worldData.uuid,
+                    leases.firstOrNull { it.worldUuid == worldData.uuid },
+                )
+                snapshots += snapshot
+                check(snapshot.quiescent) {
+                    "world snapshot failed: ${snapshot.worldUuid} (${snapshot.failureReason})"
+                }
+            }
+            if (affectedWorlds.none { worldService.getWorldFolderName(it) == evacuateLocation.world.name }) {
+                evacuateLocation.world.isAutoSave = false
+                evacuateLocation.world.save(true)
+                evacuationWorldSavePaused = true
+            }
         } catch (error: Exception) {
+            snapshots.forEach { runCatching { it.close() } }
+            if (evacuationWorldSavePaused) {
+                runCatching { evacuateLocation.world.isAutoSave = true }
+            }
             leases.forEach(WorldOperationLease::close)
             return CompletableFuture.completedFuture(
                 ArchiveResult(false, error.message ?: "failed to prepare archive")
@@ -149,33 +171,50 @@ class ArchiveService(
             bossBar,
             executor,
             affectedWorlds.size + 1
-        ).thenCompose {
-            createZipAsync(
-                safetyBackup,
-                tempSafetyBackup,
-                "$archiveName-full",
-                affectedWorlds,
-                worldService,
-                bossBar,
-                executor,
-                affectedWorlds.size + worldsToArchive.size + 2
-            )
-        }.thenCompose {
-            deleteWorldsSequential(
-                worldsToDelete,
-                worldService,
-                bossBar,
-                executor,
-                affectedWorlds.size + worldsToArchive.size + 2,
-                leases.associateBy { it.worldUuid },
-            )
-        }.thenApply { deleted ->
-            if (!deleted) {
-                ArchiveResult(false, "world_delete_failed")
+        ).thenCompose<Any?> {
+            // 複製中に書き込みが再開されたスナップショットは世代不整合を含み得るため中止します。
+            if (snapshots.any { !it.isStillQuiescent() }) {
+                CompletableFuture.completedFuture<Any?>(ArchiveResult(false, "world_snapshot_dirty"))
             } else {
-                ArchiveResult(true, "archive_created")
+                createZipAsync(
+                    safetyBackup,
+                    tempSafetyBackup,
+                    "$archiveName-full",
+                    affectedWorlds,
+                    worldService,
+                    bossBar,
+                    executor,
+                    affectedWorlds.size + worldsToArchive.size + 2
+                ).thenApply<Any?> { Unit }
+            }
+        }.thenCompose { intermediate ->
+            when {
+                intermediate is ArchiveResult -> CompletableFuture.completedFuture(intermediate)
+                snapshots.any { !it.isStillQuiescent() } -> {
+                    CompletableFuture.completedFuture(ArchiveResult(false, "world_snapshot_dirty"))
+                }
+                else -> deleteWorldsSequential(
+                    worldsToDelete,
+                    worldService,
+                    bossBar,
+                    executor,
+                    affectedWorlds.size + worldsToArchive.size + 2,
+                    leases.associateBy { it.worldUuid },
+                ).thenApply { deleted ->
+                    if (!deleted) {
+                        ArchiveResult(false, "world_delete_failed")
+                    } else {
+                        ArchiveResult(true, "archive_created")
+                    }
+                }
             }
         }.whenComplete { _, _ ->
+            snapshots.forEach { runCatching { it.close() } }
+            if (evacuationWorldSavePaused) {
+                Bukkit.getScheduler().runTask(plugin, Runnable {
+                    evacuateLocation.world.isAutoSave = true
+                })
+            }
             leases.forEach(WorldOperationLease::close)
         }
     }

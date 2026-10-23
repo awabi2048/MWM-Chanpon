@@ -33,13 +33,87 @@ class BackupService(
 ) {
     private val rootDir = File(plugin.dataFolder, "backups")
     private val activeBackupIds = ConcurrentHashMap.newKeySet<String>()
+    private val restoreBlockedWorldIds = ConcurrentHashMap.newKeySet<UUID>()
     private val createdFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
     @Volatile private var restoreRecoveryFailure: String? = null
     private var postRestoreHandler: (List<UUID>) -> Unit = {}
 
     init {
         rootDir.mkdirs()
-        recoverInterruptedRestoreTransactions()
+        // 起動順の都合で、MWMが前回終了時のロード済みワールドをジャーナル復旧より
+        // 先にロードします。半分置換された世代を編集できないよう、残存ジャーナルの
+        // 対象は先にロード拒否へ登録し、既にロード済みなら退避させてから復旧します。
+        blockPendingRestoreWorlds()
+        val unloadFutures = pendingRestoreWorlds().mapNotNull { worldUuid ->
+            runCatching {
+                val core = MyWorldManagerApi.getWorldService() ?: return@runCatching null
+                val repository = MyWorldManagerApi.getWorldRepository() ?: return@runCatching null
+                val worldData = repository.findByUuid(worldUuid) ?: return@runCatching null
+                if (Bukkit.getWorld(core.getWorldFolderName(worldData)) == null) {
+                    return@runCatching null
+                }
+                // 退避後のディレクトリはジャーナル復旧で置き換えられるため保存は不要です。
+                core.unloadWorldForMaintenance(worldUuid, false)
+            }.getOrNull()
+        }
+        if (unloadFutures.isEmpty()) {
+            recoverInterruptedRestoreTransactions()
+            syncRestoreWorldBlocks()
+        } else {
+            CompletableFuture.allOf(*unloadFutures.toTypedArray()).thenRun {
+                Bukkit.getScheduler().runTask(plugin, Runnable {
+                    recoverInterruptedRestoreTransactions()
+                    syncRestoreWorldBlocks()
+                })
+            }
+        }
+    }
+
+    /**
+     * 復元失敗を記録し、残存ジャーナル対象のロード拒否も同期します。
+     * ジャーナルそのものが読めない場合は対象を特定できないため、既存の拒否登録だけが残ります。
+     */
+    private fun markRestoreRecoveryFailure(reason: String) {
+        restoreRecoveryFailure = reason
+        blockPendingRestoreWorlds()
+    }
+
+    /** 残存する復元ジャーナル・操作マーカーの対象ワールドUUIDです。 */
+    private fun pendingRestoreWorlds(): Set<UUID> {
+        val worlds = mutableSetOf<UUID>()
+        val journalWorlds: (File) -> Unit = { directory ->
+            runCatching { RestoreTransactionJournal.load(directory) }.getOrNull()
+                ?.worlds()
+                ?.forEach { worlds += it.worldUuid }
+        }
+        RestoreOperationMarker.directories(rootDir).forEach { directory ->
+            runCatching { RestoreOperationMarker.load(directory) }.getOrNull()
+                ?.journals()
+                ?.forEach(journalWorlds)
+        }
+        RestoreTransactionJournal.directories(rootDir).forEach(journalWorlds)
+        return worlds
+    }
+
+    /** 残存ジャーナルの対象ワールドをMWMのロード拒否へ登録します。 */
+    private fun blockPendingRestoreWorlds() {
+        pendingRestoreWorlds().forEach { worldUuid ->
+            restoreBlockedWorldIds += worldUuid
+            MyWorldManagerApi.blockWorldLoad(worldUuid, "restore recovery pending")
+        }
+    }
+
+    /**
+     * 復旧が終わったワールドの拒否登録を解除し、残存ジャーナルの対象だけを
+     * 拒否し続ける状態へ合わせます。
+     */
+    private fun syncRestoreWorldBlocks() {
+        blockPendingRestoreWorlds()
+        val pending = pendingRestoreWorlds()
+        (restoreBlockedWorldIds - pending).forEach { worldUuid ->
+            restoreBlockedWorldIds -= worldUuid
+            MyWorldManagerApi.unblockWorldLoad(worldUuid)
+        }
     }
 
     fun listBackups(): List<BackupEntry> {
@@ -74,7 +148,7 @@ class BackupService(
                     directory.delete()
                     return@forEach
                 }
-                restoreRecoveryFailure = "restore operation marker is unreadable: ${directory.absolutePath}"
+                markRestoreRecoveryFailure("restore operation marker is unreadable: ${directory.absolutePath}")
                 plugin.logger.severe("Could not read interrupted restore operation marker: $directory")
                 return@forEach
             }
@@ -107,7 +181,7 @@ class BackupService(
                     marker.delete()
                 }
             }.onFailure { error ->
-                restoreRecoveryFailure = "restore operation recovery failed: ${error.message ?: error.javaClass.simpleName}"
+                markRestoreRecoveryFailure("restore operation recovery failed: ${error.message ?: error.javaClass.simpleName}")
                 plugin.logger.log(
                     java.util.logging.Level.SEVERE,
                     "Could not recover interrupted restore operation marker: $directory",
@@ -121,7 +195,7 @@ class BackupService(
                     directory.delete()
                     return@forEach
                 }
-                restoreRecoveryFailure = "restore recovery journal is unreadable: ${directory.absolutePath}"
+                markRestoreRecoveryFailure("restore recovery journal is unreadable: ${directory.absolutePath}")
                 plugin.logger.severe("Could not read interrupted backup restore journal: $directory")
                 return@forEach
             }
@@ -134,7 +208,7 @@ class BackupService(
                 rollbackRestoreJournal(journal, MyWorldManagerApi.getWorldService())
                 plugin.logger.warning("Recovered interrupted backup restore transaction: ${journal.backupId}")
             }.onFailure { error ->
-                restoreRecoveryFailure = "restore recovery failed: ${error.message ?: error.javaClass.simpleName}"
+                markRestoreRecoveryFailure("restore recovery failed: ${error.message ?: error.javaClass.simpleName}")
                 plugin.logger.log(
                     java.util.logging.Level.SEVERE,
                     "Could not recover interrupted backup restore transaction: ${journal.directory}",
@@ -575,6 +649,10 @@ class BackupService(
                                 RestoreOperationResult(BackupOperationStatus.FAILED, emptyList(), targets, preBackup, "failed to create pre rollback backup")
                             )
                         } else {
+                            // 立て直しに使う直前バックアップを、復元が終わるまで保持数整理の
+                            // 対象外にします。バックアップ側のロックとは別系統のため、ここで
+                            // 使用中として登録して完了時に解除します。
+                            activeBackupIds.add(preBackup.id)
                             restoreFilesAsync(entry, targets).thenCompose { restoreResult ->
                                 if (restoreResult.status == BackupOperationStatus.SUCCESS) {
                                     CompletableFuture.completedFuture(restoreResult.copy(preRollbackBackup = preBackup))
@@ -599,6 +677,8 @@ class BackupService(
                                         }
                                     }
                                 }
+                            }.whenComplete { _, _ ->
+                                activeBackupIds.remove(preBackup.id)
                             }
                         }
                     }
@@ -606,6 +686,9 @@ class BackupService(
         }.whenComplete { result, throwable ->
             leases.forEach(WorldOperationLease::close)
             activeBackupIds.remove(entry.id)
+            // 実行中に残った復元ジャーナルの対象はロードを拒否し、
+            // 解決済みの対象は解除します。
+            syncRestoreWorldBlocks()
             if (throwable != null) {
                 val failedResult =
                     RestoreOperationResult(BackupOperationStatus.FAILED, emptyList(), targets, null, throwable.message ?: "restore failed")
@@ -722,10 +805,30 @@ class BackupService(
                 BackupOperationResult(BackupOperationStatus.FAILED, null, reason)
             )
         }
-        runCatching { saveLoadedWorlds(targets) }.getOrElse { ex ->
+        // ロード中ワールドは world.save() だけでは書き込みキューが残り、ZIP化中も
+        // リージョンファイルへの書き込みが続きます。スナップショットリースで書き込みを
+        // 静止してから複製し、複製中の新規書き込みは世代不整合として失敗にします。
+        val core = MyWorldManagerApi.getWorldService()
+        if (core == null) {
             leases.forEach(WorldOperationLease::close)
             return CompletableFuture.completedFuture(
-                BackupOperationResult(BackupOperationStatus.FAILED, null, ex.message ?: "failed to save worlds")
+                BackupOperationResult(BackupOperationStatus.FAILED, null, "core api unavailable")
+            )
+        }
+        val snapshots = targets.map { worldUuid ->
+            val lease = leases.firstOrNull { it.worldUuid == worldUuid }
+            core.beginWorldSnapshot(worldUuid, lease)
+        }
+        val failedSnapshot = snapshots.firstOrNull { !it.quiescent }
+        if (failedSnapshot != null) {
+            snapshots.forEach { runCatching { it.close() } }
+            leases.forEach(WorldOperationLease::close)
+            return CompletableFuture.completedFuture(
+                BackupOperationResult(
+                    BackupOperationStatus.FAILED,
+                    null,
+                    "world snapshot failed: ${failedSnapshot.worldUuid} (${failedSnapshot.failureReason})"
+                )
             )
         }
         val id = "${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))}-${UUID.randomUUID()}"
@@ -735,6 +838,10 @@ class BackupService(
             try {
                 dir.mkdirs()
                 targets.forEach { copyWorldSnapshot(it, dir) }
+                // 複製中に書き込みが再開されたスナップショットは世代不整合を含み得るため破棄します。
+                snapshots.firstOrNull { !it.isStillQuiescent() }?.let { dirty ->
+                    error("world snapshot was written during copy: ${dirty.worldUuid}")
+                }
                 val entry = writeManifest(dir, id, scope, kind, targets, actorUuid, actorName, reason, name)
                 markWorldsBackedUp(entry)
                 if (kind != BackupKind.PRE_ROLLBACK) {
@@ -746,6 +853,7 @@ class BackupService(
                 dir.deleteRecursively()
                 future.complete(BackupOperationResult(BackupOperationStatus.FAILED, null, ex.message ?: "backup failed"))
             } finally {
+                snapshots.forEach { runCatching { it.close() } }
                 leases.forEach(WorldOperationLease::close)
             }
         })
@@ -944,7 +1052,7 @@ class BackupService(
                 val syncRestored = restored.toMutableList()
                 val syncCore = MyWorldManagerApi.getWorldService()
                 if (syncCore == null) {
-                    restoreRecoveryFailure = "core api became unavailable during restore rollback"
+                    markRestoreRecoveryFailure("core api became unavailable during restore rollback")
                     plugin.logger.severe(
                         "Restore rollback was deferred because the MyWorld API became unavailable; " +
                             "the restore journal was retained for startup recovery",
@@ -969,9 +1077,10 @@ class BackupService(
                                         journalsByWorld.remove(worldUuid)
                                     }
                                     .onFailure { rollbackError ->
-                                        restoreRecoveryFailure =
+                                        markRestoreRecoveryFailure(
                                             "portal synchronization rollback failed for $worldUuid: " +
                                                 (rollbackError.message ?: rollbackError.javaClass.simpleName)
+                                        )
                                         plugin.logger.log(
                                             java.util.logging.Level.SEVERE,
                                             "Could not roll back failed portal synchronization: $worldUuid",
@@ -1023,9 +1132,10 @@ class BackupService(
                                 }
                                 .onFailure { rollbackError ->
                                     rollbackSucceeded = false
-                                    restoreRecoveryFailure =
+                                    markRestoreRecoveryFailure(
                                         "partial restore rollback failed: " +
                                             (rollbackError.message ?: rollbackError.javaClass.simpleName)
+                                    )
                                     plugin.logger.log(
                                         java.util.logging.Level.SEVERE,
                                         "Could not roll back partial multi-world restore",
@@ -1051,7 +1161,7 @@ class BackupService(
                 } catch (ex: Exception) {
                     plugin.logger.warning("Restore repository reload failed: ${ex.message}")
                     if (operationCommitAttempted && !operationCommitPersisted) {
-                        restoreRecoveryFailure = "restore commit marker persistence is uncertain"
+                        markRestoreRecoveryFailure("restore commit marker persistence is uncertain")
                         plugin.logger.log(
                             java.util.logging.Level.SEVERE,
                             "Restore commit marker persistence was uncertain; retaining journals for startup recovery",
@@ -1105,9 +1215,10 @@ class BackupService(
                     journalsByWorld.values.toList().forEach { journal ->
                         runCatching { rollbackRestoreJournal(journal, syncCore) }
                             .onFailure { rollbackError ->
-                                restoreRecoveryFailure =
+                                markRestoreRecoveryFailure(
                                     "restore rollback after repository reload failed: " +
                                         (rollbackError.message ?: rollbackError.javaClass.simpleName)
+                                )
                                 plugin.logger.log(
                                     java.util.logging.Level.SEVERE,
                                     "Could not roll back failed restore repository reload",
@@ -1133,7 +1244,7 @@ class BackupService(
             } catch (fatal: Exception) {
                 val committed = operationMarker.isCommitted()
                 if (!committed) {
-                    restoreRecoveryFailure = "restore transaction failed before completion: ${fatal.message ?: fatal.javaClass.simpleName}"
+                    markRestoreRecoveryFailure("restore transaction failed before completion: ${fatal.message ?: fatal.javaClass.simpleName}")
                 }
                 plugin.logger.log(
                     java.util.logging.Level.SEVERE,
@@ -1248,7 +1359,9 @@ class BackupService(
         config.set("reason", reason)
         config.set("name", name?.takeIf { it.isNotBlank() })
         config.set("size_bytes", size)
-        config.save(File(dir, "manifest.yml"))
+        val manifestFile = File(dir, "manifest.yml")
+        config.save(manifestFile)
+        java.nio.channels.FileChannel.open(manifestFile.toPath(), java.nio.file.StandardOpenOption.WRITE).use { it.force(true) }
         return BackupEntry(id, scope, kind, created, worldUuids, actorUuid, actorName, reason, name?.takeIf { it.isNotBlank() }, size)
     }
 
@@ -1312,15 +1425,6 @@ class BackupService(
         val lastExecutedAt = storage.getManualRollbackLastExecutedAt(worldUuid)
         if (lastExecutedAt <= 0L) return 0L
         return (cooldownMillis - (System.currentTimeMillis() - lastExecutedAt)).coerceAtLeast(0L)
-    }
-
-    private fun saveLoadedWorlds(worldUuids: List<UUID>) {
-        val core = MyWorldManagerApi.getWorldService() ?: return
-        val repository = MyWorldManagerApi.getWorldRepository() ?: return
-        worldUuids.mapNotNull(repository::findByUuid).forEach { worldData ->
-            val world = Bukkit.getWorld(core.getWorldFolderName(worldData)) ?: return@forEach
-            world.save()
-        }
     }
 
     private fun writePortalSnapshots(file: File, snapshots: List<ApiPortalSnapshot>) {
@@ -1412,6 +1516,9 @@ class BackupService(
                     }
                 }
             }
+            // 一時ファイルへ内容を永続化してから名前変更します。名前変更だけが残り
+            // 中身が欠ける状態を防ぎます。
+            java.nio.channels.FileChannel.open(temp, java.nio.file.StandardOpenOption.WRITE).use { it.force(true) }
             Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING)
         } catch (ex: Exception) {
             Files.deleteIfExists(temp)
