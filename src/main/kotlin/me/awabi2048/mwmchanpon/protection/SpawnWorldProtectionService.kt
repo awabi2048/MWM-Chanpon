@@ -3,7 +3,6 @@ package me.awabi2048.mwmchanpon.protection
 import com.sk89q.worldedit.bukkit.BukkitAdapter
 import com.sk89q.worldguard.WorldGuard
 import com.sk89q.worldguard.protection.flags.Flags
-import com.sk89q.worldguard.protection.flags.RegionGroup
 import com.sk89q.worldguard.protection.flags.StateFlag
 import com.sk89q.worldguard.protection.regions.GlobalProtectedRegion
 import me.awabi2048.myworldmanager.model.WorldData
@@ -19,8 +18,6 @@ class SpawnWorldProtectionService {
         val pistons: StateFlag.State?,
         val potionSplash: StateFlag.State?,
         val use: StateFlag.State?,
-        val passthrough: StateFlag.State?,
-        val passthroughGroup: RegionGroup?,
         val creeperExplosion: StateFlag.State?,
         val destroyVehicle: StateFlag.State?,
         val interact: StateFlag.State?,
@@ -40,8 +37,6 @@ class SpawnWorldProtectionService {
             region?.getFlag(Flags.PISTONS),
             region?.getFlag(Flags.POTION_SPLASH),
             region?.getFlag(Flags.USE),
-            region?.getFlag(Flags.PASSTHROUGH),
-            region?.getFlag(Flags.PASSTHROUGH.regionGroupFlag),
             region?.getFlag(Flags.CREEPER_EXPLOSION),
             region?.getFlag(Flags.DESTROY_VEHICLE),
             region?.getFlag(Flags.INTERACT),
@@ -57,8 +52,6 @@ class SpawnWorldProtectionService {
         pistons = snapshot.pistons ?: StateFlag.State.ALLOW,
         potionSplash = snapshot.potionSplash ?: StateFlag.State.DENY,
         use = snapshot.use ?: StateFlag.State.ALLOW,
-        passthrough = snapshot.passthrough ?: StateFlag.State.DENY,
-        passthroughGroup = snapshot.passthroughGroup ?: RegionGroup.NON_OWNERS,
         creeperExplosion = snapshot.creeperExplosion ?: StateFlag.State.DENY,
         destroyVehicle = snapshot.destroyVehicle ?: StateFlag.State.ALLOW,
         interact = snapshot.interact ?: StateFlag.State.ALLOW,
@@ -80,8 +73,6 @@ class SpawnWorldProtectionService {
         region.setFlag(Flags.PISTONS, snapshot.pistons)
         region.setFlag(Flags.POTION_SPLASH, snapshot.potionSplash)
         region.setFlag(Flags.USE, snapshot.use)
-        region.setFlag(Flags.PASSTHROUGH, snapshot.passthrough)
-        region.setFlag(Flags.PASSTHROUGH.regionGroupFlag, snapshot.passthroughGroup)
         region.setFlag(Flags.CREEPER_EXPLOSION, snapshot.creeperExplosion)
         region.setFlag(Flags.DESTROY_VEHICLE, snapshot.destroyVehicle)
         region.setFlag(Flags.INTERACT, snapshot.interact)
@@ -108,11 +99,7 @@ class SpawnWorldProtectionService {
         setDefault(Flags.PISTONS, StateFlag.State.ALLOW)
         setDefault(Flags.POTION_SPLASH, StateFlag.State.DENY)
         setDefault(Flags.USE, StateFlag.State.ALLOW)
-        setDefault(Flags.PASSTHROUGH, StateFlag.State.DENY)
-        if (region.getFlag(Flags.PASSTHROUGH.regionGroupFlag) == null) {
-            region.setFlag(Flags.PASSTHROUGH.regionGroupFlag, RegionGroup.NON_OWNERS)
-            changed = true
-        }
+        // 建築許可はWorldBuildPermissionServiceが専用リージョンで管理します。
         setDefault(Flags.CREEPER_EXPLOSION, StateFlag.State.DENY)
         setDefault(Flags.DESTROY_VEHICLE, StateFlag.State.ALLOW)
         setDefault(Flags.INTERACT, StateFlag.State.ALLOW)

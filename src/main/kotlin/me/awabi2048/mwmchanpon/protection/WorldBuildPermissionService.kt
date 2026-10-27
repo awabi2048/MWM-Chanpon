@@ -2,9 +2,6 @@ package me.awabi2048.mwmchanpon.protection
 
 import com.sk89q.worldedit.bukkit.BukkitAdapter
 import com.sk89q.worldguard.WorldGuard
-import com.sk89q.worldguard.protection.flags.Flags
-import com.sk89q.worldguard.protection.flags.RegionGroup
-import com.sk89q.worldguard.protection.flags.StateFlag
 import com.sk89q.worldguard.protection.regions.GlobalProtectedRegion
 import java.util.UUID
 import java.util.logging.Logger
@@ -55,32 +52,18 @@ class WorldBuildPermissionService(
         val region = regionManager.getRegion(GLOBAL_REGION_ID)
             ?: GlobalProtectedRegion(GLOBAL_REGION_ID).also(regionManager::addRegion)
 
-        // __global__ では PASSTHROUGH の評価が早期終了するため passthrough-group は
-        // WorldGuard に評価されません。建築可否は build フラグ＋グループで表現します。
-        // __global__ では ALLOW 系フラグが無効化される一方、DENY とグループ指定は
-        // 通常通り有効なため、「拒否したい側」を DENY ＋対象グループで書きます。
-        when (effectiveProtectionMode(worldData)) {
-            ChanponWorldProtectionMode.OWNER_ONLY -> {
-                region.setFlag(Flags.PASSTHROUGH, StateFlag.State.DENY)
-                region.setFlag(Flags.BUILD, StateFlag.State.DENY)
-                region.setFlag(Flags.BUILD.regionGroupFlag, RegionGroup.NON_OWNERS)
-            }
-            ChanponWorldProtectionMode.MEMBERS -> {
-                region.setFlag(Flags.PASSTHROUGH, StateFlag.State.DENY)
-                region.setFlag(Flags.BUILD, StateFlag.State.DENY)
-                region.setFlag(Flags.BUILD.regionGroupFlag, RegionGroup.NON_MEMBERS)
-            }
-            // 「誰でも」は明示的な passthrough=ALLOW で表現します。
-            // 建築は全員へ開放するため build フラグとそのグループ指定をクリアします。
-            ChanponWorldProtectionMode.PUBLIC -> {
-                region.setFlag(Flags.PASSTHROUGH, StateFlag.State.ALLOW)
-                region.setFlag(Flags.BUILD, null)
-                region.setFlag(Flags.BUILD.regionGroupFlag, null)
-            }
+        val accessRegion = WorldBuildRegionPolicy.configure(
+            region, worldData, effectiveProtectionMode(worldData), bukkitWorld.minHeight, bukkitWorld.maxHeight,
+        )
+        if (accessRegion == null) {
+            regionManager.removeRegion(
+                WorldBuildRegionPolicy.REGION_ID,
+                com.sk89q.worldguard.protection.managers.RemovalStrategy.UNSET_PARENT_IN_CHILDREN,
+            )
+        } else {
+            // 所属は追加だけでなく完全置換し、脱退・降格・所有権移譲の残留権限を除去します。
+            regionManager.addRegion(accessRegion)
         }
-        // 全モードで passthrough-group をクリアします。
-        // __global__ では評価されない死んだ設定であり、残すと regions.yml の意図を誤読させます。
-        region.setFlag(Flags.PASSTHROUGH.regionGroupFlag, null)
 
         regionManager.saveChanges()
         recordSpawnProtectionMode(worldData)

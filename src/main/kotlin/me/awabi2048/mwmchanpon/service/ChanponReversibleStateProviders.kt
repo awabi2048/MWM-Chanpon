@@ -24,7 +24,6 @@ import me.awabi2048.myworldmanager.api.event.MwmMemberRole
 import me.awabi2048.myworldmanager.api.event.MwmMemberRoleChangeSource
 import me.awabi2048.myworldmanager.api.event.MwmMemberRoleChangedEvent
 import me.awabi2048.myworldmanager.model.WorldData
-import com.sk89q.worldguard.protection.flags.RegionGroup
 import com.sk89q.worldguard.protection.flags.StateFlag
 import java.util.UUID
 import java.util.Base64
@@ -50,11 +49,15 @@ internal object ChanponReversibleStateProviders {
         registry: MenuReversibleStateProviderRegistry,
         storage: ChanponGlobalStorage,
         spawnProtection: SpawnWorldProtectionService,
+        syncBuildPermissions: () -> Unit,
     ) = registry.register(
         MenuReversibleStateProviderDefinition(
             OWNER,
             "admin-world-controls",
-            AdminWorldControlsProvider(storage, spawnProtection, MyWorldManagerApi::syncOnlineWorldPlayerStates),
+            AdminWorldControlsProvider(storage, spawnProtection) {
+                MyWorldManagerApi.syncOnlineWorldPlayerStates()
+                syncBuildPermissions()
+            },
         ),
     )
 
@@ -1110,8 +1113,6 @@ private fun SpawnWorldProtectionService.DefaultsSnapshot.toOpaqueMap(): Map<Stri
     "pistons" to pistons?.name,
     "potionSplash" to potionSplash?.name,
     "use" to use?.name,
-    "passthrough" to passthrough?.name,
-    "passthroughGroup" to passthroughGroup?.name,
     "creeperExplosion" to creeperExplosion?.name,
     "destroyVehicle" to destroyVehicle?.name,
     "interact" to interact?.name,
@@ -1123,7 +1124,7 @@ private fun decodeNullableSpawnDefaults(value: Any?): NullableDecoded<SpawnWorld
     if (value == null) return NullableDecoded(null)
     val keys = setOf(
         "worldUuid", "regionExisted", "otherExplosion", "chestAccess", "pistons", "potionSplash", "use",
-        "passthrough", "passthroughGroup", "creeperExplosion", "destroyVehicle", "interact", "ride", "placeVehicle",
+        "creeperExplosion", "destroyVehicle", "interact", "ride", "placeVehicle",
     )
     val map = strictMap(value, keys) ?: return null
     fun flag(key: String): NullableDecoded<StateFlag.State>? = decodeNullableEnum(map[key], StateFlag.State::valueOf)
@@ -1132,8 +1133,6 @@ private fun decodeNullableSpawnDefaults(value: Any?): NullableDecoded<SpawnWorld
     val pistons = flag("pistons") ?: return null
     val potionSplash = flag("potionSplash") ?: return null
     val use = flag("use") ?: return null
-    val passthrough = flag("passthrough") ?: return null
-    val passthroughGroup = decodeNullableEnum(map["passthroughGroup"], RegionGroup::valueOf) ?: return null
     val creeperExplosion = flag("creeperExplosion") ?: return null
     val destroyVehicle = flag("destroyVehicle") ?: return null
     val interact = flag("interact") ?: return null
@@ -1148,8 +1147,6 @@ private fun decodeNullableSpawnDefaults(value: Any?): NullableDecoded<SpawnWorld
             pistons.value,
             potionSplash.value,
             use.value,
-            passthrough.value,
-            passthroughGroup.value,
             creeperExplosion.value,
             destroyVehicle.value,
             interact.value,

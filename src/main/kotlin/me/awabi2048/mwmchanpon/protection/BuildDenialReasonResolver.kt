@@ -77,7 +77,7 @@ class BuildDenialReasonResolver(
         ) {
             return BuildDenialReason.GLOBAL_BUILD_DISABLED
         }
-        // WorldGuard __global__ のpassthrough拒否と同じ実効モード・メンバー範囲で評価します。
+        // WorldGuardの建築許可用通常リージョンと同じ実効モード・メンバー範囲で評価します。
         // リージョンのオーナーはworldData.owner、メンバーはmembers+moderatorsです。
         when (buildPermissionService.effectiveProtectionMode(worldData)) {
             ChanponWorldProtectionMode.OWNER_ONLY -> {

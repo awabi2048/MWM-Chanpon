@@ -219,7 +219,6 @@ class ChanponEnvironmentGui(
         val current = buildPermissionService.effectiveProtectionMode(worldData)
         val next = GuiCycle.select(current, PROTECTION_VALUES, direction)
         storage.setProtectionMode(worldData.uuid, next)
-        buildPermissionService.sync(worldData)
         toolController.syncWorld(worldData)
     }
 

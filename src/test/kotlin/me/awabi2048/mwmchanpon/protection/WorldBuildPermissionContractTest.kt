@@ -1,57 +1,126 @@
 package me.awabi2048.mwmchanpon.protection
 
-import java.nio.file.Path
-import kotlin.io.path.readText
+import com.sk89q.worldedit.math.BlockVector3
+import com.sk89q.worldguard.LocalPlayer
+import com.sk89q.worldguard.protection.RegionResultSet
+import com.sk89q.worldguard.protection.flags.Flags
+import com.sk89q.worldguard.protection.flags.RegionGroup
+import com.sk89q.worldguard.protection.flags.StateFlag
+import com.sk89q.worldguard.protection.regions.GlobalProtectedRegion
+import com.sk89q.worldguard.protection.regions.ProtectedCuboidRegion
+import com.sk89q.worldguard.protection.regions.ProtectedRegion
+import java.lang.reflect.InvocationHandler
+import java.lang.reflect.Proxy
+import java.util.UUID
+import me.awabi2048.mwmchanpon.storage.ChanponWorldProtectionMode
+import me.awabi2048.myworldmanager.model.ManagedDimension
+import me.awabi2048.myworldmanager.model.WorldData
+import org.bukkit.Material
 import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 
-/**
- * 保護モード→WorldGuardフラグ変換の契約テスト。
- *
- * __global__ では passthrough-group が評価されないため、建築可否は
- * build フラグ＋グループで表現します。「誰でも」は明示的な
- * passthrough=ALLOW として書き込み、build はクリアして全員へ開きます。
- */
+/** WorldGuardの実際のフラグ評価で、モード・役割・提出ロックを検証します。 */
 class WorldBuildPermissionContractTest {
-    private val source = Path.of(
-        "src/main/kotlin/me/awabi2048/mwmchanpon/protection/WorldBuildPermissionService.kt",
-    ).readText()
+    private enum class Role { OWNER, MODERATOR, MEMBER, GUEST }
 
     @Test
-    fun `PUBLICはpassthroughをALLOWとしbuildをクリアする`() {
-        val publicBranch = source
-            .substringAfter("ChanponWorldProtectionMode.PUBLIC ->")
-            .substringBefore("}")
+    fun allModesMatchWorldGuardBuildDecisionsAndSubmissionLock() {
+        val owner = UUID.randomUUID()
+        val moderator = UUID.randomUUID()
+        val member = UUID.randomUUID()
+        val world = WorldData(
+            UUID.randomUUID(), ManagedDimension.OVERWORLD, "test", "", Material.STONE, "test", "", owner,
+        ).also {
+            it.moderators.add(moderator)
+            it.members.add(member)
+        }
+        val players = mapOf(
+            Role.OWNER to owner,
+            Role.MODERATOR to moderator,
+            Role.MEMBER to member,
+            Role.GUEST to UUID.randomUUID(),
+        )
 
-        assertTrue("Flags.PASSTHROUGH, StateFlag.State.ALLOW" in publicBranch)
-        assertTrue("Flags.BUILD, null" in publicBranch)
-        assertTrue("Flags.BUILD.regionGroupFlag, null" in publicBranch)
-        assertFalse("Flags.BUILD, StateFlag.State.DENY" in publicBranch)
+        for (mode in ChanponWorldProtectionMode.entries) {
+            // 旧設定を模した__global__の明示DENYを含め、同期後の実評価を確認します。
+            val global = GlobalProtectedRegion("__global__").apply {
+                owners.addPlayer(owner)
+                members.addPlayer(moderator)
+                members.addPlayer(member)
+                setFlag(Flags.PASSTHROUGH, StateFlag.State.DENY)
+                setFlag(Flags.PASSTHROUGH.regionGroupFlag, RegionGroup.NON_OWNERS)
+                setFlag(Flags.BUILD, StateFlag.State.DENY)
+                setFlag(Flags.BUILD.regionGroupFlag, RegionGroup.NON_MEMBERS)
+                setFlag(Flags.PVP, StateFlag.State.DENY)
+            }
+            val access = WorldBuildRegionPolicy.configure(global, world, mode, -64, 320)
+            assertNull(global.getFlag(Flags.BUILD))
+            assertNull(global.getFlag(Flags.BUILD.regionGroupFlag))
+            assertEquals(StateFlag.State.ALLOW, global.getFlag(Flags.PASSTHROUGH))
+            assertNull(global.getFlag(Flags.PASSTHROUGH.regionGroupFlag))
+            assertEquals(StateFlag.State.DENY, global.getFlag(Flags.PVP))
+
+            if (mode == ChanponWorldProtectionMode.PUBLIC) {
+                assertNull(access)
+            } else {
+                requireNotNull(access)
+                assertEquals(WorldBuildRegionPolicy.PRIORITY, access.priority)
+                assertEquals(setOf(owner), access.owners.uniqueIds)
+                assertEquals(setOf(moderator, member), access.members.uniqueIds)
+                assertEquals(StateFlag.State.DENY, access.getFlag(Flags.PASSTHROUGH))
+                assertEquals(
+                    if (mode == ChanponWorldProtectionMode.OWNER_ONLY) RegionGroup.NON_OWNERS
+                    else RegionGroup.NON_MEMBERS,
+                    access.getFlag(Flags.BUILD.regionGroupFlag),
+                )
+            }
+
+            for (locked in listOf(false, true)) {
+                val lock = if (locked) ProtectedCuboidRegion(
+                    "__submission_lock__",
+                    BlockVector3.at(-30_000_000, -64, -30_000_000),
+                    BlockVector3.at(30_000_000, 319, 30_000_000),
+                ).apply {
+                    priority = 1_000_000
+                    setFlag(Flags.BUILD, StateFlag.State.DENY)
+                } else null
+                val regions = buildList<ProtectedRegion> {
+                    access?.let { add(it) }
+                    lock?.let { add(it) }
+                }.toMutableList()
+                val result = RegionResultSet(regions, global)
+                players.forEach { (role, uuid) ->
+                    val expected = !locked && when (mode) {
+                        ChanponWorldProtectionMode.OWNER_ONLY -> role == Role.OWNER
+                        ChanponWorldProtectionMode.MEMBERS -> role != Role.GUEST
+                        ChanponWorldProtectionMode.PUBLIC -> true
+                    }
+                    assertEquals(expected, result.testState(localPlayer(uuid), Flags.BUILD),
+                        "$mode locked=$locked role=$role")
+                    assertFalse(result.testState(localPlayer(uuid), Flags.PVP),
+                        "$mode locked=$locked role=$role must retain the unrelated global PVP denial")
+                }
+            }
+        }
     }
 
-    @Test
-    fun `DENY側はbuildフラグと拒否対象グループを設定する`() {
-        val ownerOnlyBranch = source
-            .substringAfter("ChanponWorldProtectionMode.OWNER_ONLY ->")
-            .substringBefore("}")
-        val membersBranch = source
-            .substringAfter("ChanponWorldProtectionMode.MEMBERS ->")
-            .substringBefore("}")
-
-        assertTrue("Flags.PASSTHROUGH, StateFlag.State.DENY" in ownerOnlyBranch)
-        assertTrue("Flags.BUILD, StateFlag.State.DENY" in ownerOnlyBranch)
-        assertTrue("Flags.BUILD.regionGroupFlag, RegionGroup.NON_OWNERS" in ownerOnlyBranch)
-
-        assertTrue("Flags.PASSTHROUGH, StateFlag.State.DENY" in membersBranch)
-        assertTrue("Flags.BUILD, StateFlag.State.DENY" in membersBranch)
-        assertTrue("Flags.BUILD.regionGroupFlag, RegionGroup.NON_MEMBERS" in membersBranch)
-    }
-
-    @Test
-    fun `評価されないpassthrough-groupは常にクリアする`() {
-        assertTrue("Flags.PASSTHROUGH.regionGroupFlag, null" in source)
-        // __global__ で評価されないグループ指定を書き戻さない
-        assertFalse("Flags.PASSTHROUGH.regionGroupFlag, RegionGroup" in source)
-    }
+    private fun localPlayer(uuid: UUID): LocalPlayer =
+        Proxy.newProxyInstance(
+            LocalPlayer::class.java.classLoader,
+            arrayOf(LocalPlayer::class.java),
+        ) { proxy, method, args ->
+            if (method.isDefault) {
+                InvocationHandler.invokeDefault(proxy, method, *(args ?: emptyArray()))
+            } else {
+                when (method.name) {
+                    "getUniqueId" -> uuid
+                    "getName" -> uuid.toString()
+                    "hasGroup", "hasPermission", "isPlayer" -> false
+                    "getGroups" -> emptyArray<String>()
+                    else -> error("Unexpected WorldGuard LocalPlayer method: $method")
+                }
+            }
+        } as LocalPlayer
 }

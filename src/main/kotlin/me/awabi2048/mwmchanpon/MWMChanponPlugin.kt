@@ -206,6 +206,7 @@ class MWMChanponPlugin : JavaPlugin() {
             globalStorage::isBuildingAllowed,
             chanponStorage::isGlobalBypassAllowed,
             buildPermissionService::effectiveProtectionMode,
+            buildPermissionService::sync,
         )
 
         backupService = BackupService(this, chanponStorage)
@@ -233,7 +234,6 @@ class MWMChanponPlugin : JavaPlugin() {
         automationSettingsMenu = AutomationSettingsMenu(this, backupService, automationService) {
             MyWorldManagerApi.getWorldRepository()?.findAll()?.let { worlds ->
                 submittedProtectionService.syncAll(worlds)
-                worlds.forEach(buildPermissionService::sync)
                 worlds.forEach(toolController::syncWorld)
             }
         }
@@ -243,7 +243,6 @@ class MWMChanponPlugin : JavaPlugin() {
                 worldSafetyDefaultsService.sync(worldData)
                 publishLevelSynchronizer.sync(worldData.uuid)
                 submittedProtectionService.sync(worldData)
-                buildPermissionService.sync(worldData)
                 toolController.syncWorld(worldData)
             }
         }
@@ -263,7 +262,17 @@ class MWMChanponPlugin : JavaPlugin() {
             toolController,
             submissionCompletionMacroService,
         )
-        chanponAdminMenu = ChanponAdminMenu(this, globalStorage, spawnProtectionService, submissionAdminMenu, worldDataManagementMenu, automationSettingsMenu, worldDataExportMenu, previewTourAdminMenu)
+        chanponAdminMenu = ChanponAdminMenu(
+            this,
+            globalStorage,
+            spawnProtectionService,
+            ::syncBuildPermissions,
+            submissionAdminMenu,
+            worldDataManagementMenu,
+            automationSettingsMenu,
+            worldDataExportMenu,
+            previewTourAdminMenu,
+        )
         CCSystem.getAPI().getMenuCommandService().unregisterOwner("mwm-chanpon")
         CCSystem.getAPI().getMenuCommandService().register(
             PublicMenuDefinition(
@@ -400,7 +409,6 @@ class MWMChanponPlugin : JavaPlugin() {
                 worldSafetyDefaultsService.syncAll(it)
                 publishLevelSynchronizer.syncAll()
                 submittedProtectionService.syncAll(it)
-                it.forEach(buildPermissionService::sync)
                 it.forEach(toolController::syncWorld)
             }
             globalStorage.getSpawnWorldUuid()
@@ -517,6 +525,11 @@ class MWMChanponPlugin : JavaPlugin() {
             toolController.clearOnlineActivePermissions()
         }
         logger.info("MWM-Chanpon addon has been disabled.")
+    }
+
+    private fun syncBuildPermissions() {
+        if (!::buildPermissionService.isInitialized) return
+        MyWorldManagerApi.getWorldRepository()?.findAll()?.forEach(buildPermissionService::sync)
     }
 
     fun setBuildingAllowed(allowed: Boolean) {

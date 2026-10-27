@@ -20,6 +20,8 @@ class ToolPermissionController(
     private val protectionMode: (WorldData) -> me.awabi2048.mwmchanpon.storage.ChanponWorldProtectionMode = {
         storage.getProtectionModeOrNull(it.uuid) ?: me.awabi2048.mwmchanpon.storage.ChanponWorldProtectionMode.MEMBERS
     },
+    // メンバー変更と取り消しを含む既存の全ワールド同期経路で、建築側の所属も更新します。
+    private val syncBuildPermissions: (WorldData) -> Unit = {},
 ) {
     fun isEnabled(worldData: WorldData, playerUuid: UUID, toolId: String): Boolean {
         if (!storage.hasCurrentWorldData(worldData.uuid)) return false
@@ -47,6 +49,7 @@ class ToolPermissionController(
     }
 
     fun syncWorld(worldData: WorldData) {
+        syncBuildPermissions(worldData)
         val participants = linkedSetOf<UUID>()
         participants.add(worldData.owner)
         participants.addAll(worldData.members)

@@ -58,6 +58,7 @@ class ChanponAdminMenu(
     private val plugin: MWMChanponPlugin,
     private val globalStorage: ChanponGlobalStorage,
     private val spawnProtection: SpawnWorldProtectionService,
+    private val syncBuildPermissions: () -> Unit,
     private val submissionAdminMenu: SubmissionAdminMenu,
     private val worldDataManagementMenu: WorldDataManagementMenu,
     private val automationSettingsMenu: AutomationSettingsMenu,
@@ -71,6 +72,7 @@ class ChanponAdminMenu(
             CCSystem.getAPI().getMenuReversibleStateProviderRegistry(),
             globalStorage,
             spawnProtection,
+            syncBuildPermissions,
         )
         runtime.register(
             InventoryMenuDefinition(
@@ -278,6 +280,8 @@ class ChanponAdminMenu(
                 globalStorage.setSpawnPolicyInitialized(worldUuid)
             }
         }
+        // スポーン既定値が未記録なら実効モードも変わるため、全MyWorldの建築所属を再適用します。
+        syncBuildPermissions()
         context.player.sendMessage(i18nComponent(context.player, ChanponBackupKeys.CHANPON_BACKUP_SPAWN_WORLD_SET_SUCCESS))
         return MenuActionResult.Success(MenuUpdate.Back)
     }
