@@ -7,17 +7,17 @@ import net.luckperms.api.LuckPerms
 import net.luckperms.api.node.types.PermissionNode
 
 /**
- * FAWE's region gate is independent from WorldGuard's build mode. A public MyWorld has no member
- * region for FAWE to authorize, so mirror the world-level PUBLIC policy into LuckPerms using the
- * same world-context group-node pattern as other per-world permissions.
+ * Mirrors each MyWorld build mode into FAWE's independent WorldGuard-region permission check.
+ * FAWE checks region owner/member identity rather than WorldGuard's BUILD flag unless its
+ * separate flag permission is granted, so syncing only the Bukkit build region is insufficient.
  */
 class PublicWorldFawePermissionService(
     private val luckPerms: LuckPerms,
     private val logger: Logger,
-    private val permissionNodeFactory: (String, String) -> PermissionNode = { permission, worldName ->
+    private val permissionNodeFactory: (String, String, Boolean) -> PermissionNode = { permission, worldName, value ->
         PermissionNode.builder(permission)
             .withContext("world", worldName)
-            .value(true)
+            .value(value)
             .build()
     },
 ) {
@@ -26,21 +26,21 @@ class PublicWorldFawePermissionService(
     private var pendingMutation: CompletableFuture<Void> = CompletableFuture.completedFuture(null)
 
     fun sync(worldName: String, mode: ChanponWorldProtectionMode): CompletableFuture<Void> =
-        enqueueMutation(worldName, mode == ChanponWorldProtectionMode.PUBLIC)
+        enqueueMutation(worldName, mode)
 
-    /** Remove only this world's managed node when its MyWorld is deleted. */
-    fun clear(worldName: String): CompletableFuture<Void> = enqueueMutation(worldName, grant = false)
+    /** Remove only this world's managed nodes when its MyWorld is deleted. */
+    fun clear(worldName: String): CompletableFuture<Void> = enqueueMutation(worldName, mode = null)
 
     @Synchronized
-    private fun enqueueMutation(worldName: String, grant: Boolean): CompletableFuture<Void> {
+    private fun enqueueMutation(worldName: String, mode: ChanponWorldProtectionMode?): CompletableFuture<Void> {
         val next = pendingMutation
             .handle { _, _ -> null }
-            .thenCompose { mutateDefaultGroup(worldName, grant) }
+            .thenCompose { mutateDefaultGroup(worldName, mode) }
         pendingMutation = next
         return next
     }
 
-    private fun mutateDefaultGroup(worldName: String, grant: Boolean): CompletableFuture<Void> =
+    private fun mutateDefaultGroup(worldName: String, mode: ChanponWorldProtectionMode?): CompletableFuture<Void> =
         luckPerms.groupManager.loadGroup(DEFAULT_GROUP)
             .thenCompose { optionalGroup ->
                 val group = optionalGroup.orElse(null)
@@ -49,22 +49,38 @@ class PublicWorldFawePermissionService(
                     return@thenCompose CompletableFuture.completedFuture(null)
                 }
 
-                val node = permissionNodeFactory(FAWE_REGION_BYPASS_PERMISSION, worldName)
-                if (grant) {
-                    group.data().add(node)
-                } else {
-                    group.data().remove(node)
+                // Remove both values because a mode transition replaces the contextual grant
+                // with a negation. Preserve every permission node for other worlds.
+                FAWE_WORLDGUARD_MEMBER_PERMISSION_VALUES.forEach { value ->
+                    group.data().remove(permissionNodeFactory(FAWE_WORLDGUARD_MEMBER_PERMISSION, worldName, value))
+                }
+                group.data().remove(permissionNodeFactory(FAWE_REGION_BYPASS_PERMISSION, worldName, true))
+
+                // FAWE authorizes members through this separate node, independently of the
+                // WorldGuard BUILD flag. OWNER_ONLY must negate inherited member access; MEMBERS
+                // explicitly allows it; PUBLIC needs the narrower region bypass because it has
+                // no MyWorld access region for FAWE to accept.
+                when (mode) {
+                    ChanponWorldProtectionMode.OWNER_ONLY ->
+                        group.data().add(permissionNodeFactory(FAWE_WORLDGUARD_MEMBER_PERMISSION, worldName, false))
+                    ChanponWorldProtectionMode.MEMBERS ->
+                        group.data().add(permissionNodeFactory(FAWE_WORLDGUARD_MEMBER_PERMISSION, worldName, true))
+                    ChanponWorldProtectionMode.PUBLIC ->
+                        group.data().add(permissionNodeFactory(FAWE_REGION_BYPASS_PERMISSION, worldName, true))
+                    null -> Unit
                 }
                 luckPerms.groupManager.saveGroup(group)
             }
             .whenComplete { _, error ->
                 if (error != null) {
-                    logger.warning("Failed to ${if (grant) "grant" else "remove"} FAWE region bypass for $worldName: ${error.message}")
+                    logger.warning("Failed to sync FAWE region permissions for $worldName: ${error.message}")
                 }
             }
 
     companion object {
         const val FAWE_REGION_BYPASS_PERMISSION = "fawe.bypass.regions"
+        const val FAWE_WORLDGUARD_MEMBER_PERMISSION = "fawe.worldguard.member"
+        private val FAWE_WORLDGUARD_MEMBER_PERMISSION_VALUES = listOf(false, true)
         private const val DEFAULT_GROUP = "default"
     }
 }

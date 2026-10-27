@@ -8,6 +8,7 @@ import java.util.logging.Logger
 import me.awabi2048.mwmchanpon.storage.ChanponWorldProtectionMode
 import net.luckperms.api.LuckPerms
 import net.luckperms.api.context.ImmutableContextSet
+import net.luckperms.api.model.data.DataMutateResult
 import net.luckperms.api.model.data.NodeMap
 import net.luckperms.api.model.group.Group
 import net.luckperms.api.model.group.GroupManager
@@ -20,41 +21,99 @@ import org.junit.jupiter.api.Test
 
 class PublicWorldFawePermissionServiceTest {
     @Test
-    fun `PUBLIC adds a region-only permission in that world and other modes remove it`() {
+    fun `FAWE owner and member checks match the expected build matrix`() {
+        val nodes = linkedSetOf<NodeSnapshot>()
+        val service = service(nodes)
+        val worldName = "my_world.matrix"
+        val expectedByMode = mapOf(
+            ChanponWorldProtectionMode.OWNER_ONLY to mapOf("owner" to true, "member" to false, "guest" to false),
+            ChanponWorldProtectionMode.MEMBERS to mapOf("owner" to true, "member" to true, "guest" to false),
+            ChanponWorldProtectionMode.PUBLIC to mapOf("owner" to true, "member" to true, "guest" to true),
+        )
+
+        for (mode in ChanponWorldProtectionMode.entries) {
+            service.sync(worldName, mode).join()
+            val memberPermission = nodes.singleOrNull {
+                it.worldName == worldName &&
+                    it.permission == PublicWorldFawePermissionService.FAWE_WORLDGUARD_MEMBER_PERMISSION
+            }?.value == true
+            val regionBypass = nodes.any {
+                it.worldName == worldName &&
+                    it.permission == PublicWorldFawePermissionService.FAWE_REGION_BYPASS_PERMISSION && it.value
+            }
+            val actual = mapOf(
+                // FAWE's WorldGuard adapter accepts region owners without the member permission.
+                "owner" to true,
+                "member" to (regionBypass || memberPermission),
+                "guest" to regionBypass,
+            )
+
+            assertEquals(expectedByMode.getValue(mode), actual, "FAWE $mode")
+        }
+    }
+
+    @Test
+    fun `each build mode aligns FAWE region permissions in its own world`() {
         val nodes = linkedSetOf<NodeSnapshot>()
         val service = service(nodes)
         val firstWorld = "my_world.first"
         val secondWorld = "my_world.second"
 
         service.sync(firstWorld, ChanponWorldProtectionMode.PUBLIC).join()
-        service.sync(secondWorld, ChanponWorldProtectionMode.PUBLIC).join()
+        service.sync(secondWorld, ChanponWorldProtectionMode.MEMBERS).join()
 
-        assertEquals(2, nodes.size)
-        assertTrue(nodes.all { it.permission == PublicWorldFawePermissionService.FAWE_REGION_BYPASS_PERMISSION })
-        assertTrue(nodes.all { it.value })
-        assertTrue(nodes.any { it.worldName == firstWorld })
-        assertTrue(nodes.any { it.worldName == secondWorld })
+        assertEquals(
+            setOf(
+                NodeSnapshot(PublicWorldFawePermissionService.FAWE_REGION_BYPASS_PERMISSION, true, firstWorld),
+                NodeSnapshot(PublicWorldFawePermissionService.FAWE_WORLDGUARD_MEMBER_PERMISSION, true, secondWorld),
+            ),
+            nodes,
+        )
         assertFalse(nodes.any { it.permission == "fawe.bypass" })
 
-        service.sync(firstWorld, ChanponWorldProtectionMode.MEMBERS).join()
-        assertEquals(1, nodes.size)
-        assertEquals(secondWorld, nodes.single().worldName)
+        // OWNER_ONLY must replace a member grant with a contextual denial so a broad
+        // fawe.worldguard.member grant inherited from the tool group cannot widen access.
+        service.sync(firstWorld, ChanponWorldProtectionMode.OWNER_ONLY).join()
+        assertEquals(
+            setOf(
+                NodeSnapshot(PublicWorldFawePermissionService.FAWE_WORLDGUARD_MEMBER_PERMISSION, false, firstWorld),
+                NodeSnapshot(PublicWorldFawePermissionService.FAWE_WORLDGUARD_MEMBER_PERMISSION, true, secondWorld),
+            ),
+            nodes,
+        )
 
         service.sync(secondWorld, ChanponWorldProtectionMode.OWNER_ONLY).join()
-        assertTrue(nodes.isEmpty())
+        assertTrue(nodes.contains(
+            NodeSnapshot(PublicWorldFawePermissionService.FAWE_WORLDGUARD_MEMBER_PERMISSION, false, secondWorld),
+        ))
+        assertFalse(nodes.any { it.worldName == secondWorld && it.value })
+
+        service.sync(firstWorld, ChanponWorldProtectionMode.MEMBERS).join()
+        assertTrue(nodes.contains(
+            NodeSnapshot(PublicWorldFawePermissionService.FAWE_WORLDGUARD_MEMBER_PERMISSION, true, firstWorld),
+        ))
+        assertFalse(nodes.any { it.worldName == firstWorld && !it.value })
     }
 
     @Test
-    fun `deleting a public world removes only its contextual node`() {
+    fun `deleting a world removes only its contextual FAWE nodes`() {
         val nodes = linkedSetOf<NodeSnapshot>()
         val service = service(nodes)
         service.sync("my_world.first", ChanponWorldProtectionMode.PUBLIC).join()
-        service.sync("my_world.second", ChanponWorldProtectionMode.PUBLIC).join()
+        service.sync("my_world.second", ChanponWorldProtectionMode.OWNER_ONLY).join()
 
         service.clear("my_world.first").join()
 
-        assertEquals(1, nodes.size)
-        assertEquals("my_world.second", nodes.single().worldName)
+        assertEquals(
+            setOf(
+                NodeSnapshot(
+                    PublicWorldFawePermissionService.FAWE_WORLDGUARD_MEMBER_PERMISSION,
+                    false,
+                    "my_world.second",
+                ),
+            ),
+            nodes,
+        )
     }
 
     private fun service(nodes: MutableSet<NodeSnapshot>): PublicWorldFawePermissionService {
@@ -64,8 +123,16 @@ class PublicWorldFawePermissionServiceTest {
         ) { _, method, arguments ->
             val node = arguments?.firstOrNull() as? Node
             when (method.name) {
-                "add" -> { nodes.add(snapshot(requireNotNull(node))); null }
-                "remove" -> { nodes.remove(snapshot(requireNotNull(node))); null }
+                "add" -> if (nodes.add(snapshot(requireNotNull(node)))) {
+                    DataMutateResult.SUCCESS
+                } else {
+                    DataMutateResult.FAIL_ALREADY_HAS
+                }
+                "remove" -> if (nodes.remove(snapshot(requireNotNull(node)))) {
+                    DataMutateResult.SUCCESS
+                } else {
+                    DataMutateResult.FAIL_LACKS
+                }
                 else -> error("Unexpected LuckPerms NodeMap call: ${method.name}")
             }
         } as NodeMap
@@ -101,14 +168,14 @@ class PublicWorldFawePermissionServiceTest {
             }
         } as LuckPerms
 
-        return PublicWorldFawePermissionService(luckPerms, Logger.getAnonymousLogger()) { permission, worldName ->
+        return PublicWorldFawePermissionService(luckPerms, Logger.getAnonymousLogger()) { permission, worldName, value ->
             Proxy.newProxyInstance(
                 PermissionNode::class.java.classLoader,
                 arrayOf(PermissionNode::class.java),
             ) { _, method, _ ->
                 when (method.name) {
                     "getKey", "getPermission" -> permission
-                    "getValue" -> true
+                    "getValue" -> value
                     "getContexts" -> Proxy.newProxyInstance(
                         ImmutableContextSet::class.java.classLoader,
                         arrayOf(ImmutableContextSet::class.java),
