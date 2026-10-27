@@ -32,7 +32,7 @@ class MemberBuildVerification {
             System.out.println(entry.getKey()+" association="+player(entry.getValue()).getAssociation(List.of(region))); boolean actual=result.testState(player(entry.getValue()),Flags.BUILD);
             boolean expected=!entry.getKey().equals("guest");
             System.out.println(entry.getKey()+" BUILD="+actual+" expected="+expected);
-            
+
         }
         region.setFlag(Flags.BUILD,null);
         for(var entry:Map.of("owner",owner,"member",member,"moderator",moderator,"guest",guest).entrySet()) {
@@ -59,8 +59,3 @@ class MemberBuildVerification {
         System.out.println("removed member BUILD=false");
     }
 }
-
-
-
-
-
