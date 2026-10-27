@@ -1,0 +1,10 @@
+name: chanpon-public-tools
+steps:
+  - assertPluginEnabled: CC-System
+  - assertPluginEnabled: MWMChanpon
+  - assertPluginEnabled: MyWorldManager
+  - assertPluginEnabled: LuckPerms
+  - assertPluginEnabled: WorldGuard
+  - assertCommandRegistered: settings
+  - assertFileExists: plugins/MWMChanpon/config.yml
+  - command: mwm migration status
