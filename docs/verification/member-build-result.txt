@@ -1,0 +1,21 @@
+moderator association=MEMBER
+moderator BUILD=false expected=true
+owner association=OWNER
+owner BUILD=false expected=true
+member association=MEMBER
+member BUILD=false expected=true
+guest association=NON_MEMBER
+guest BUILD=false expected=false
+CONTROL without explicit BUILD: moderator BUILD=true
+CONTROL without explicit BUILD: owner BUILD=true
+CONTROL without explicit BUILD: member BUILD=true
+CONTROL without explicit BUILD: guest BUILD=false
+OWNER_ONLY: moderator BUILD=false
+OWNER_ONLY: owner BUILD=false
+OWNER_ONLY: member BUILD=false
+OWNER_ONLY: guest BUILD=false
+PUBLIC: moderator BUILD=true
+PUBLIC: owner BUILD=true
+PUBLIC: member BUILD=true
+PUBLIC: guest BUILD=true
+removed member BUILD=false
