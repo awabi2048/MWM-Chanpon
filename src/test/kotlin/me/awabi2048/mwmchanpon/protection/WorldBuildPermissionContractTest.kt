@@ -99,6 +99,11 @@ class WorldBuildPermissionContractTest {
                     }
                     assertEquals(expected, result.testState(localPlayer(uuid), Flags.BUILD),
                         "$mode locked=$locked role=$role")
+                    // Axiom Paper 6.0.1 asks WorldGuard to test BUILD together with
+                    // BLOCK_BREAK/BLOCK_PLACE. Keep that independent integration aligned with
+                    // the same world-level policy used by ordinary block edits.
+                    assertEquals(expected, axiomWorldGuardBuildAllowed(result, localPlayer(uuid)),
+                        "Axiom $mode locked=$locked role=$role")
                     assertFalse(result.testState(localPlayer(uuid), Flags.PVP),
                         "$mode locked=$locked role=$role must retain the unrelated global PVP denial")
                 }
@@ -123,4 +128,11 @@ class WorldBuildPermissionContractTest {
                 }
             }
         } as LocalPlayer
+
+    /** Mirrors AxiomPaperPlugin's RegionQuery.testBuild(location, player, breakFlag, placeFlag). */
+    private fun axiomWorldGuardBuildAllowed(result: RegionResultSet, player: LocalPlayer): Boolean {
+        val build = StateFlag.denyToNone(result.queryState(player, Flags.BUILD))
+        val operation = result.queryState(player, Flags.BLOCK_BREAK, Flags.BLOCK_PLACE)
+        return StateFlag.test(StateFlag.combine(build, operation))
+    }
 }

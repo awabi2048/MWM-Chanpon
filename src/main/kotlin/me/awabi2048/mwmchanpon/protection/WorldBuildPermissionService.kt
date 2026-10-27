@@ -14,6 +14,7 @@ class WorldBuildPermissionService(
     private val storage: ChanponWorldStorage,
     private val logger: Logger,
     private val isSpawnWorld: (UUID) -> Boolean = { false },
+    private val publicWorldFawePermissionService: PublicWorldFawePermissionService? = null,
 ) {
     private var configurationAvailable: () -> Boolean = { true }
 
@@ -38,7 +39,13 @@ class WorldBuildPermissionService(
     fun sync(worldData: WorldData) {
         if (!configurationAvailable()) return
         if (!storage.hasCurrentWorldData(worldData.uuid)) return
-        val bukkitWorld = Bukkit.getWorld(worldData.customWorldName ?: "my_world.${worldData.uuid}") ?: return
+        val worldName = worldData.customWorldName ?: "my_world.${worldData.uuid}"
+        val mode = effectiveProtectionMode(worldData)
+        // Sync the world-context permission even when its chunks are not loaded. LuckPerms is
+        // independent from WorldGuard's RegionManager availability and must converge on the same
+        // persisted protection mode during startup, mode changes, and restore.
+        publicWorldFawePermissionService?.sync(worldName, mode)
+        val bukkitWorld = Bukkit.getWorld(worldName) ?: return
         val regionManager = WorldGuard.getInstance()
             .platform
             .regionContainer
@@ -53,7 +60,7 @@ class WorldBuildPermissionService(
             ?: GlobalProtectedRegion(GLOBAL_REGION_ID).also(regionManager::addRegion)
 
         val accessRegion = WorldBuildRegionPolicy.configure(
-            region, worldData, effectiveProtectionMode(worldData), bukkitWorld.minHeight, bukkitWorld.maxHeight,
+            region, worldData, mode, bukkitWorld.minHeight, bukkitWorld.maxHeight,
         )
         if (accessRegion == null) {
             regionManager.removeRegion(

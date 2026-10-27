@@ -40,6 +40,7 @@ import me.awabi2048.mwmchanpon.protection.BuildDenialReasonResolver
 import me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService
 import me.awabi2048.mwmchanpon.protection.SpawnWorldProtectionService
 import me.awabi2048.mwmchanpon.protection.WorldBuildPermissionService
+import me.awabi2048.mwmchanpon.protection.PublicWorldFawePermissionService
 import me.awabi2048.mwmchanpon.protection.MyWorldSafetyDefaultsService
 import me.awabi2048.mwmchanpon.service.BackupAutomationService
 import me.awabi2048.mwmchanpon.service.ChanponSpawnWorldService
@@ -178,10 +179,12 @@ class MWMChanponPlugin : JavaPlugin() {
         val luckPerms = LuckPermsProvider.get()
         spawnProtectionService = SpawnWorldProtectionService()
         worldSafetyDefaultsService = MyWorldSafetyDefaultsService(logger, chanponStorage::isRandomTickStopped)
+        val publicWorldFawePermissionService = PublicWorldFawePermissionService(luckPerms, logger)
         buildPermissionService = WorldBuildPermissionService(
             chanponStorage,
             logger,
             isSpawnWorld = { worldUuid -> globalStorage.getSpawnWorldUuid() == worldUuid },
+            publicWorldFawePermissionService = publicWorldFawePermissionService,
         ).also {
             it.setConfigurationAvailability(::isConfigurationMigrationCurrent)
         }
@@ -392,7 +395,7 @@ class MWMChanponPlugin : JavaPlugin() {
             this,
         )
         server.pluginManager.registerEvents(ToolPermissionWorldListener(toolController), this)
-        server.pluginManager.registerEvents(WorldCleanupListener(chanponStorage), this)
+        server.pluginManager.registerEvents(WorldCleanupListener(chanponStorage, publicWorldFawePermissionService), this)
         server.pluginManager.registerEvents(PreviewTourListener(this, previewTourStorage, previewTourService), this)
         getCommand("preview-tour")?.let { command ->
             val executor = PreviewTourCommand(previewTourService)
