@@ -55,6 +55,8 @@ class ChanponEnvironmentGui(
     protectionService: me.awabi2048.mwmchanpon.protection.SubmittedWorldProtectionService,
     private val buildPermissionService: WorldBuildPermissionService,
     private val worldSafetyDefaultsService: MyWorldSafetyDefaultsService,
+    private val toolController: me.awabi2048.mwmchanpon.tool.ToolPermissionController,
+    private val toolDefinitions: List<me.awabi2048.mwmchanpon.tool.ToolPermissionDefinition>,
 ) {
     private val accessGuard = WorldSettingsAccessGuard(storage, protectionService)
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
@@ -64,7 +66,10 @@ class ChanponEnvironmentGui(
             CCSystem.getAPI().getMenuReversibleStateProviderRegistry(),
             storage,
             buildPermissionService,
-            worldSafetyDefaultsService::sync,
+            { worldData ->
+                worldSafetyDefaultsService.sync(worldData)
+                toolController.syncWorld(worldData)
+            },
         )
         val environmentDefinition = InventoryMenuDefinition(
                 owner = RUNTIME_OWNER,
@@ -117,7 +122,9 @@ class ChanponEnvironmentGui(
                 directSettingEntry(player, 24, worldData.uuid, ACTION_FLIGHT, Material.ELYTRA, flightDisplay(player, allowFlight), flightOptions(player), allowFlight.toString(), outsideTargetWorld),
                 protectionSettingEntry(player, 25, worldData),
                 CCSystem.getAPI().getGuiElementService().backEntry(player, 40),
-            ),
+            ) + toolDefinitions.zip(listOf(28, 30, 32, 34)).map { (definition, slot) ->
+                publicToolEntry(player, slot, worldData, definition)
+            },
         )
     }
 
@@ -152,7 +159,12 @@ class ChanponEnvironmentGui(
                 // パスワードの設定・変更はメンバー管理メニュー（フッター3マス目）へ完全に移しました。
                 cycleProtection(worldData, direction ?: return MenuActionResult.Ignored)
             }
-            else -> return MenuActionResult.Ignored
+            else -> {
+                val tool = toolDefinitions.firstOrNull { "public_tool:${it.id}" == context.payload[PAYLOAD_SETTING] }
+                    ?: return MenuActionResult.Ignored
+                storage.setPublicToolEnabled(worldData.uuid, tool.id, storage.getPublicToolStates(worldData.uuid)[tool.id] != true)
+                toolController.syncWorld(worldData)
+            }
         }
         return MenuActionResult.Success(MenuUpdate.Refresh)
     }
@@ -208,6 +220,7 @@ class ChanponEnvironmentGui(
         val next = GuiCycle.select(current, PROTECTION_VALUES, direction)
         storage.setProtectionMode(worldData.uuid, next)
         buildPermissionService.sync(worldData)
+        toolController.syncWorld(worldData)
     }
 
     private fun showCustomTimeDialog(player: Player, worldData: WorldData, initial: String = worldData.fixedTime?.toString() ?: "") {
@@ -397,6 +410,40 @@ class ChanponEnvironmentGui(
                 interactionGuidance = GuiInteractionGuidance.LIST_SETTING,
             ),
         )
+    }
+
+    /** 個人権限と混同しないよう、適用対象と公開時だけ有効であることを各項目へ表示します。 */
+    private fun publicToolEntry(
+        player: Player,
+        slot: Int,
+        worldData: WorldData,
+        definition: me.awabi2048.mwmchanpon.tool.ToolPermissionDefinition,
+    ): MenuElement {
+        val enabled = storage.getPublicToolStates(worldData.uuid)[definition.id] == true
+        val keys = com.awabi2048.ccsystem.api.localization.generated.ChanponMemberLoreKeys
+        return CCSystem.getAPI().getGuiElementService().menuEntry(player, GuiMenuEntrySpec(
+            slot = slot,
+            material = definition.material,
+            name = fixedName(definition.displayName, com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT),
+            role = GuiElementRole.ACTION,
+            description = listOf(i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PUBLIC_TOOLS_DESCRIPTION)),
+            data = listOf(GuiMenuEntryData(
+                i18n(player, keys.CHANPON_MEMBER_LORE_PERMISSION_MENU_STATE_LABEL),
+                i18n(player, if (enabled) keys.CHANPON_MEMBER_LORE_PERMISSION_MENU_ENABLED else keys.CHANPON_MEMBER_LORE_PERMISSION_MENU_DISABLED),
+                if (enabled) GuiValueTone.SUCCESS else GuiValueTone.DANGER,
+            )),
+            warnings = if (buildPermissionService.effectiveProtectionMode(worldData) != ChanponWorldProtectionMode.PUBLIC)
+                listOf(i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_PUBLIC_TOOLS_INACTIVE)) else emptyList(),
+            actions = listOf(chanponCycleAction(
+                ACTION_SETTING,
+                i18n(player, keys.CHANPON_MEMBER_LORE_PERMISSION_MENU_TOGGLE_ACTION),
+                mapOf(PAYLOAD_SETTING to "public_tool:${definition.id}"),
+                safety = MenuActionSafety.REVERSIBLE,
+                reversibleContract = ChanponReversibleContracts.environment(worldData.uuid),
+                classification = ChanponReversibleActionClassification.Operation.ENVIRONMENT_PUBLIC_TOOL_TOGGLE,
+            )),
+            glint = enabled,
+        ))
     }
 
     // ---- Display helpers ----

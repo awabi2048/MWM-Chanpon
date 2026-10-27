@@ -232,6 +232,17 @@ internal class ChanponWorldDataMigrationParticipant(
             file: File,
             allowLegacyPasswordMode: Boolean = false,
         ) {
+            config.get("public_tool_permissions")?.let {
+                require(config.isConfigurationSection("public_tool_permissions")) {
+                    "非メンバー用ツール権限はセクションで指定してください: ${file.name}"
+                }
+                config.getConfigurationSection("public_tool_permissions")!!.getKeys(false).forEach { id ->
+                    require(me.awabi2048.mwmchanpon.tool.ToolPermissionCatalog.types.any { it.id == id } &&
+                        config.isBoolean("public_tool_permissions.$id")) {
+                        "非メンバー用ツール権限が不正です: ${file.name}/$id"
+                    }
+                }
+            }
             config.get("production")?.let { require(it is Boolean) { "production must be boolean: ${file.name}" } }
             config.getString("visibility")?.let {
                 require(ChanponWorldVisibility.fromStorageValue(it) != null) {

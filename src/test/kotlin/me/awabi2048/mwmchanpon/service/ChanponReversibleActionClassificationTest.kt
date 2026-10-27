@@ -124,6 +124,7 @@ class ChanponReversibleActionClassificationTest {
             ChanponReversibleActionClassification.Operation.SPAWN_WORLD_SET ->
                 ChanponReversibleContracts.adminWorldControls("spawn", world.toString())
             ChanponReversibleActionClassification.Operation.ENVIRONMENT_DIRECT_SETTING_CYCLE,
+            ChanponReversibleActionClassification.Operation.ENVIRONMENT_PUBLIC_TOOL_TOGGLE,
             ChanponReversibleActionClassification.Operation.ENVIRONMENT_PROTECTION_CYCLE ->
                 ChanponReversibleContracts.environment(world)
             ChanponReversibleActionClassification.Operation.PUBLICATION_CYCLE -> ChanponReversibleContracts.publication()

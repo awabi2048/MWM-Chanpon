@@ -7,11 +7,11 @@ plugins {
 }
 
 group = "me.awabi2048"
-version = "26.1022.2"
+version = "26.1027.1"
 
 repositories {
     mavenLocal()
-    maven { url = uri("../.m2-paper26-kotlin2320") }
+    maven { url = uri(providers.gradleProperty("workspaceMavenRepository").getOrElse("../.m2-paper26-kotlin2320")) }
     maven("https://jitpack.io")
     maven("https://repo.papermc.io/repository/maven-public/")
     maven("https://repo.opencollab.dev/maven-snapshots/")
@@ -31,7 +31,7 @@ kotlin {
 val providedDeps = listOf(
     "io.papermc.paper:paper-api:26.2.build.129-stable",
     "org.jetbrains.kotlin:kotlin-stdlib:2.3.20",
-    "com.awabi2048:CC-System:26.1010.1",
+    "com.awabi2048:CC-System:26.1027.2",
     "me.awabi2048:chanpon-utilities:26.905.2",
     "awabi2048:my-world-manager:26.1022.2",
     "net.luckperms:api:5.4",
@@ -72,6 +72,10 @@ tasks.processResources {
 
 tasks.shadowJar {
     archiveClassifier.set("")
+    // KotlinメタデータはShadowの変換器へ渡し、変換前の重複除外を避けます。
+    filesMatching("META-INF/*.kotlin_module") {
+        duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    }
 }
 
 publishing {
@@ -84,7 +88,7 @@ publishing {
     repositories {
         maven {
             name = "workspace"
-            url = uri("../.m2-paper26-kotlin2320")
+            url = uri(providers.gradleProperty("workspaceMavenRepository").getOrElse("../.m2-paper26-kotlin2320"))
         }
     }
 }

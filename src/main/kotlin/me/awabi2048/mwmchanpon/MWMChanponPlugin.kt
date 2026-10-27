@@ -205,6 +205,7 @@ class MWMChanponPlugin : JavaPlugin() {
             isAutoRollbackEnabled,
             globalStorage::isBuildingAllowed,
             chanponStorage::isGlobalBypassAllowed,
+            buildPermissionService::effectiveProtectionMode,
         )
 
         backupService = BackupService(this, chanponStorage)
@@ -278,7 +279,7 @@ class MWMChanponPlugin : JavaPlugin() {
             )
         )
         chanponAdminWorldListMenu = ChanponAdminWorldListMenu(this, chanponStorage)
-        environmentGui = ChanponEnvironmentGui(this, chanponStorage, submittedProtectionService, buildPermissionService, worldSafetyDefaultsService)
+        environmentGui = ChanponEnvironmentGui(this, chanponStorage, submittedProtectionService, buildPermissionService, worldSafetyDefaultsService, toolController, toolDefinitions)
         chanponWorldSettingsMenu = ChanponWorldSettingsMenu(this, chanponStorage, submittedProtectionService, environmentGui)
         MyWorldManagerApi.registerWorldSettingsRouteCapability(chanponWorldSettingsMenu)
         worldSettingsCapabilities = ChanponWorldSettingsCapabilities(

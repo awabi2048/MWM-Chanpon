@@ -27,6 +27,7 @@ internal object ChanponReversibleActionClassification {
         SPAWN_WORLD_SET("spawn-world-set", Kind.STATE_AGGREGATE, "admin-world-controls", "mwm-chanpon:admin-world-controls"),
         ENVIRONMENT_DIRECT_SETTING_CYCLE("environment-direct-setting-cycle", Kind.STATE_AGGREGATE, "world-environment", "mwm-chanpon:world-environment"),
         ENVIRONMENT_PROTECTION_CYCLE("environment-protection-cycle", Kind.STATE_AGGREGATE, "world-environment", "mwm-chanpon:world-environment"),
+        ENVIRONMENT_PUBLIC_TOOL_TOGGLE("environment-public-tool-toggle", Kind.STATE_AGGREGATE, "world-environment", "mwm-chanpon:world-environment"),
         PUBLICATION_CYCLE("publication-cycle", Kind.STATE_AGGREGATE, "world-publication", "mwm-chanpon:world-publication"),
         WORLD_NOTIFICATION_TOGGLE("world-notification-toggle", Kind.STATE_AGGREGATE, "world-notification", "mwm-chanpon:world-notification"),
         SUBMISSION_CLOSURE("submission-closure", Kind.STATE_AGGREGATE, "submission", "mwm-chanpon:submission"),

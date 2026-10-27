@@ -128,6 +128,31 @@ class ChanponReversibleStateProviderTest {
     }
 
     @Test
+    fun `非メンバー用ツール設定の取り消しは保存前の状態を復元し競合時には拒否する`() = withWorldStorage { storage, _ ->
+        val world = world()
+        registerRepository(world)
+        storage.setProtectionMode(world.uuid, me.awabi2048.mwmchanpon.storage.ChanponWorldProtectionMode.PUBLIC)
+        val before = storage.worldFile(world.uuid).readBytes().toList()
+        var syncCount = 0
+        val provider = EnvironmentProvider(storage, { storage.getProtectionMode(it.uuid) }) { syncCount++ }
+        val player = player()
+        val context = captureContext(player, ChanponReversibleContracts.environment(world.uuid),
+            arguments = mapOf("setting" to "public_tool:worldedit"))
+        val state = captured(provider, context)
+        storage.setPublicToolEnabled(world.uuid, "worldedit", true)
+        assertRestored(provider, player, context, state)
+        assertEquals(false, storage.getPublicToolStates(world.uuid)["worldedit"])
+        assertEquals(before, storage.worldFile(world.uuid).readBytes().toList())
+        assertEquals(1, syncCount)
+        val concurrent = captured(provider, context)
+        storage.setPublicToolEnabled(world.uuid, "worldedit", true)
+        storage.setPublicToolEnabled(world.uuid, "axiom", true)
+        assertRejected(provider, player, context, concurrent)
+        assertEquals(true, storage.getPublicToolStates(world.uuid)["axiom"])
+        assertEquals(1, syncCount)
+    }
+
+    @Test
     fun `publication restore rejects a deleted target explicitly`() = withWorldStorage { storage, _ ->
         val world = world()
         registerRepository(world)

@@ -452,6 +452,27 @@ class ChanponWorldStorage(
         saveAtomic(worldUuid, config)
     }
 
+    /** 非メンバー向けの権限は個人設定と分離し、未設定は付与しません。 */
+    fun getPublicToolStates(worldUuid: UUID): Map<String, Boolean> {
+        val config = load(worldUuid)
+        return me.awabi2048.mwmchanpon.tool.ToolPermissionCatalog.types.associate { type ->
+            val path = "public_tool_permissions.${type.id}"
+            require(config == null || !config.contains(path) || config.isBoolean(path)) {
+                "非メンバー用ツール権限は真偽値で指定してください: $path"
+            }
+            type.id to (config?.getBoolean(path, false) ?: false)
+        }
+    }
+
+    @Synchronized
+    fun setPublicToolEnabled(worldUuid: UUID, toolId: String, enabled: Boolean) {
+        require(me.awabi2048.mwmchanpon.tool.ToolPermissionCatalog.types.any { it.id == toolId })
+        ensureWritable(worldUuid)
+        val config = loadOrCreate(worldUuid)
+        config.set("public_tool_permissions.$toolId", enabled)
+        saveAtomic(worldUuid, config)
+    }
+
     fun isToolEnabled(worldUuid: UUID, playerUuid: UUID, toolId: String): Boolean {
         val config = load(worldUuid) ?: return false
         return config.getBoolean("tool_permissions.${playerUuid}.${toolId}", false)

@@ -17,11 +17,19 @@ class ToolPermissionController(
     // 迂回するのはグローバル設定だけであり、提出ロック等の個別判定は残ります。
     private val globalBuildingAllowed: () -> Boolean = { true },
     private val isGlobalBypassAllowed: (worldUuid: UUID, playerUuid: UUID) -> Boolean = { _, _ -> false },
+    private val protectionMode: (WorldData) -> me.awabi2048.mwmchanpon.storage.ChanponWorldProtectionMode = {
+        storage.getProtectionModeOrNull(it.uuid) ?: me.awabi2048.mwmchanpon.storage.ChanponWorldProtectionMode.MEMBERS
+    },
 ) {
     fun isEnabled(worldData: WorldData, playerUuid: UUID, toolId: String): Boolean {
         if (!storage.hasCurrentWorldData(worldData.uuid)) return false
         if (isSubmissionLocked(worldData.uuid)) return false
         if (isGloballySuspended(worldData.uuid, playerUuid)) return false
+        // 非メンバーには過去の個人設定を適用せず、公開中の共通設定だけを参照します。
+        if (!isParticipant(worldData, playerUuid)) {
+            return protectionMode(worldData) == me.awabi2048.mwmchanpon.storage.ChanponWorldProtectionMode.PUBLIC &&
+                storage.getPublicToolStates(worldData.uuid)[toolId] == true
+        }
         return storage.getToolEnabledState(worldData.uuid, playerUuid, toolId)
             ?: (playerUuid == worldData.owner)
     }
@@ -47,6 +55,10 @@ class ToolPermissionController(
             removeLegacyScopedPermissions(worldData, playerUuid)
             Bukkit.getPlayer(playerUuid)?.let(::syncPlayerLocation)
         }
+        // 公開設定の変更・解除は、その場にいる非メンバーにも即時反映します。
+        Bukkit.getOnlinePlayers().filter { player ->
+            player.world.name == worldName(worldData) && player.uniqueId !in participants
+        }.forEach(::syncPlayerLocation)
         // MWM owns persistent work-group nodes; Chanpon only changes the policy decision.
         MyWorldManagerApi.syncWorldWorkPermissions(worldData.uuid)
     }
@@ -63,7 +75,7 @@ class ToolPermissionController(
 
     fun syncPlayerLocation(player: Player) {
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByWorldName(player.world.name)
-        if (worldData == null || !isParticipant(worldData, player.uniqueId) || storage.isImportedArchive(worldData.uuid)) {
+        if (worldData == null || storage.isImportedArchive(worldData.uuid)) {
             clearActivePermissions(player.uniqueId)
             return
         }
@@ -87,16 +99,7 @@ class ToolPermissionController(
     }
 
     fun getMemberToolStates(worldData: WorldData, playerUuid: UUID): Map<String, Boolean> {
-        if (isSubmissionLocked(worldData.uuid)) {
-            return definitions.associate { it.id to false }
-        }
-        if (isGloballySuspended(worldData.uuid, playerUuid)) {
-            return definitions.associate { it.id to false }
-        }
-        val stored = storage.getMemberToolStates(worldData.uuid, playerUuid)
-        return definitions.associate { definition ->
-            definition.id to (stored[definition.id] ?: (playerUuid == worldData.owner))
-        }
+        return definitions.associate { it.id to isEnabled(worldData, playerUuid, it.id) }
     }
 
     private fun getEffectiveEnabledTools(worldData: WorldData, playerUuid: UUID): Set<String> {

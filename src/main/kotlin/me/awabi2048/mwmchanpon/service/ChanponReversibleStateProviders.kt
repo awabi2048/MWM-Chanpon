@@ -302,6 +302,7 @@ private data class EnvironmentSnapshot(
     val freecamAllowed: Boolean,
     val randomTickStopped: Boolean,
     val protectionMode: ChanponWorldProtectionMode,
+    val publicTools: Map<String, Boolean>,
 )
 
 private data class EnvironmentState(
@@ -381,6 +382,7 @@ internal class EnvironmentProvider(
         freecamAllowed = storage.isFreecamAllowed(worldData.uuid),
         randomTickStopped = storage.isRandomTickStopped(worldData.uuid),
         protectionMode = protectionMode(worldData),
+        publicTools = storage.getPublicToolStates(worldData.uuid),
     )
 
     private fun nextSnapshot(
@@ -398,7 +400,11 @@ internal class EnvironmentProvider(
             "freecam" -> before.copy(freecamAllowed = !before.freecamAllowed)
             "random_tick" -> before.copy(randomTickStopped = !before.randomTickStopped)
             "protection" -> before.copy(protectionMode = cycle(before.protectionMode, PROTECTION_VALUES, next))
-            else -> null
+            else -> {
+                val id = setting.removePrefix("public_tool:")
+                if (!setting.startsWith("public_tool:") || id !in before.publicTools) null
+                else before.copy(publicTools = before.publicTools + (id to (before.publicTools[id] != true)))
+            }
         }
     }
 
@@ -1162,12 +1168,13 @@ private fun EnvironmentSnapshot.toOpaqueMap(): Map<String, Any?> = mapOf(
     "freecamAllowed" to freecamAllowed,
     "randomTickStopped" to randomTickStopped,
     "protectionMode" to protectionMode.name,
+    "publicTools" to publicTools,
 )
 
 private fun decodeEnvironmentSnapshot(value: Any?): EnvironmentSnapshot? {
     val map = strictMap(
         value,
-        setOf("fixedWeather", "fixedTime", "gravity", "scale", "allowFlight", "freecamAllowed", "randomTickStopped", "protectionMode"),
+        setOf("fixedWeather", "fixedTime", "gravity", "scale", "allowFlight", "freecamAllowed", "randomTickStopped", "protectionMode", "publicTools"),
     ) ?: return null
     val weather = decodeNullableTyped<String>(map["fixedWeather"]) ?: return null
     val time = decodeNullableTyped<Long>(map["fixedTime"]) ?: return null
@@ -1182,6 +1189,11 @@ private fun decodeEnvironmentSnapshot(value: Any?): EnvironmentSnapshot? {
         map.strictBoolean("freecamAllowed") ?: return null,
         map.strictBoolean("randomTickStopped") ?: return null,
         map.strictString("protectionMode")?.let(::protectionModeOrNull) ?: return null,
+        (map["publicTools"] as? Map<*, *>)?.let { tools ->
+            val ids = me.awabi2048.mwmchanpon.tool.ToolPermissionCatalog.types.map { it.id }.toSet()
+            if (tools.keys != ids || tools.values.any { it !is Boolean }) return null
+            ids.associateWith { tools[it] as Boolean }
+        } ?: return null,
     )
 }
 
