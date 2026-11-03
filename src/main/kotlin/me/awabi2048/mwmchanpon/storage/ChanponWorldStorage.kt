@@ -419,6 +419,59 @@ class ChanponWorldStorage(
         saveAtomic(worldUuid, config)
     }
 
+    /** 提出前の公開範囲と状態・履歴を一度に保存します。 */
+    @Synchronized
+    fun submitWorld(worldUuid: UUID, actorUuid: UUID, actorName: String): Boolean {
+        ensureWritable(worldUuid)
+        val config = load(worldUuid) ?: error("MWM-Chanpon world data is missing: $worldUuid")
+        if (!config.getBoolean("production", false) ||
+            SubmissionState.fromStorageValue(config.getString("submission.state")) != SubmissionState.UNSUBMITTED) return false
+        val visibility = ChanponWorldVisibility.fromStorageValue(config.getString("visibility"))
+            ?: if (config.getBoolean("development", false)) ChanponWorldVisibility.DEVELOPMENT else ChanponWorldVisibility.PRIVATE
+        config.set("submission.previous_visibility", visibility.storageValue)
+        config.set("submission.state", SubmissionState.SUBMITTED.storageValue)
+        appendSubmissionHistory(config, actorUuid, actorName, "submit", SubmissionState.SUBMITTED)
+        config.set("visibility", ChanponWorldVisibility.PUBLIC.storageValue)
+        config.set("development", null)
+        config.set("development_set_at", null)
+        config.set("visibility_set_at", LocalDateTime.now().toString())
+        saveAtomic(worldUuid, config)
+        visibilitySyncHandler?.invoke(worldUuid)
+        return true
+    }
+
+    /** 公開中だけ提出前の公開範囲へ戻し、それ以外の提出後の変更は維持します。 */
+    @Synchronized
+    fun withdrawWorld(worldUuid: UUID, actorUuid: UUID, actorName: String): Boolean {
+        ensureWritable(worldUuid)
+        val config = load(worldUuid) ?: error("MWM-Chanpon world data is missing: $worldUuid")
+        if (!config.getBoolean("production", false) ||
+            SubmissionState.fromStorageValue(config.getString("submission.state")) != SubmissionState.SUBMITTED) return false
+        val current = ChanponWorldVisibility.fromStorageValue(config.getString("visibility"))
+            ?: if (config.getBoolean("development", false)) ChanponWorldVisibility.DEVELOPMENT else ChanponWorldVisibility.PRIVATE
+        if (current == ChanponWorldVisibility.PUBLIC) {
+            val previous = ChanponWorldVisibility.fromStorageValue(config.getString("submission.previous_visibility"))
+                ?: ChanponWorldVisibility.PRIVATE
+            config.set("visibility", previous.storageValue)
+            config.set("development", null)
+            config.set("development_set_at", null)
+            config.set("visibility_set_at", LocalDateTime.now().toString())
+        }
+        config.set("submission.state", SubmissionState.UNSUBMITTED.storageValue)
+        config.set("submission.previous_visibility", null)
+        appendSubmissionHistory(config, actorUuid, actorName, "withdraw", SubmissionState.UNSUBMITTED)
+        saveAtomic(worldUuid, config)
+        visibilitySyncHandler?.invoke(worldUuid)
+        return true
+    }
+
+    private fun appendSubmissionHistory(config: YamlConfiguration, actorUuid: UUID, actorName: String, action: String, state: SubmissionState) {
+        val history = config.getMapList("submission.history").toMutableList()
+        history.add(linkedMapOf("at" to LocalDateTime.now().toString(), "action" to action,
+            "state" to state.storageValue, "actor_uuid" to actorUuid.toString(), "actor_name" to actorName))
+        config.set("submission.history", history)
+    }
+
     /** 提出状態と履歴件数をCASに利用する、提出aggregateの不変スナップショットです。 */
     data class SubmissionSnapshot(
         val state: SubmissionState,
