@@ -85,6 +85,25 @@ class WorldBuildPermissionContractTest {
                 ).apply {
                     priority = 1_000_000
                     setFlag(Flags.BUILD, StateFlag.State.DENY)
+                    setFlag(Flags.PVP, StateFlag.State.DENY)
+                    owners.addPlayer(owner)
+                    configureSubmittedLock(this)
+                    assertNull(getFlag(Flags.BUILD))
+                    assertEquals(emptySet<UUID>(), owners.uniqueIds)
+                    assertEquals(mapOf(
+                        Flags.PASSTHROUGH to StateFlag.State.DENY,
+                        Flags.PASSTHROUGH.regionGroupFlag to RegionGroup.NON_OWNERS,
+                        Flags.OTHER_EXPLOSION to StateFlag.State.DENY,
+                        Flags.CREEPER_EXPLOSION to StateFlag.State.DENY,
+                        Flags.POTION_SPLASH to StateFlag.State.DENY,
+                        Flags.PLACE_VEHICLE to StateFlag.State.ALLOW,
+                        Flags.USE to StateFlag.State.ALLOW,
+                        Flags.INTERACT to StateFlag.State.ALLOW,
+                        Flags.DESTROY_VEHICLE to StateFlag.State.ALLOW,
+                        Flags.CHEST_ACCESS to StateFlag.State.ALLOW,
+                        Flags.PISTONS to StateFlag.State.ALLOW,
+                        Flags.RIDE to StateFlag.State.ALLOW,
+                    ), flags)
                 } else null
                 val regions = buildList<ProtectedRegion> {
                     access?.let { add(it) }

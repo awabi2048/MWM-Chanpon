@@ -4,7 +4,9 @@ import com.sk89q.worldedit.bukkit.BukkitAdapter
 import com.sk89q.worldedit.math.BlockVector3
 import com.sk89q.worldguard.WorldGuard
 import com.sk89q.worldguard.protection.flags.Flags
+import com.sk89q.worldguard.protection.flags.RegionGroup
 import com.sk89q.worldguard.protection.flags.StateFlag
+import com.sk89q.worldguard.domains.DefaultDomain
 import com.sk89q.worldguard.protection.managers.RemovalStrategy
 import com.sk89q.worldguard.protection.regions.ProtectedCuboidRegion
 import java.util.logging.Logger
@@ -88,7 +90,7 @@ class SubmittedWorldProtectionService(
         if (protected) {
             val region = regionManager.getRegion(REGION_ID) ?: createWorldRegion(bukkitWorld)
             region.priority = PRIORITY
-            region.setFlag(Flags.BUILD, StateFlag.State.DENY)
+            configureSubmittedLock(region)
             regionManager.addRegion(region)
         } else if (regionManager.hasRegion(REGION_ID)) {
             regionManager.removeRegion(REGION_ID, RemovalStrategy.UNSET_PARENT_IN_CHILDREN)
@@ -108,6 +110,23 @@ class SubmittedWorldProtectionService(
         private const val PRIORITY = 1_000_000
         private const val WORLD_MIN = -30_000_000
         private const val WORLD_MAX = 30_000_000
+    }
+}
+
+/** 提出・完成・自動復元の共通ロックを、同期のたびに同じ構成へ収束させます。 */
+internal fun configureSubmittedLock(region: com.sk89q.worldguard.protection.regions.ProtectedRegion) {
+    // 旧 BUILD deny や手動設定が残ると、許可した装置も再び停止するため全フラグを置換します。
+    region.flags = emptyMap()
+    // NON_OWNERS の例外を作らず、ワールドオーナーを含む全員の建築を制限します。
+    region.owners = DefaultDomain()
+    region.setFlag(Flags.PASSTHROUGH, StateFlag.State.DENY)
+    region.setFlag(Flags.PASSTHROUGH.regionGroupFlag, RegionGroup.NON_OWNERS)
+    listOf(Flags.OTHER_EXPLOSION, Flags.CREEPER_EXPLOSION, Flags.POTION_SPLASH).forEach {
+        region.setFlag(it, StateFlag.State.DENY)
+    }
+    listOf(Flags.PLACE_VEHICLE, Flags.USE, Flags.INTERACT, Flags.DESTROY_VEHICLE,
+        Flags.CHEST_ACCESS, Flags.PISTONS, Flags.RIDE).forEach {
+        region.setFlag(it, StateFlag.State.ALLOW)
     }
 }
 
