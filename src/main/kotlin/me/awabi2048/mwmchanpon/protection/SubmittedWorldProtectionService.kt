@@ -117,8 +117,9 @@ class SubmittedWorldProtectionService(
 internal fun configureSubmittedLock(region: com.sk89q.worldguard.protection.regions.ProtectedRegion) {
     // 旧 BUILD deny や手動設定が残ると、許可した装置も再び停止するため全フラグを置換します。
     region.flags = emptyMap()
-    // NON_OWNERS の例外を作らず、ワールドオーナーを含む全員の建築を制限します。
+    // リージョン所属による建築許可の例外を作らず、全員の建築を制限します。
     region.owners = DefaultDomain()
+    region.members = DefaultDomain()
     region.setFlag(Flags.PASSTHROUGH, StateFlag.State.DENY)
     region.setFlag(Flags.PASSTHROUGH.regionGroupFlag, RegionGroup.NON_OWNERS)
     listOf(Flags.OTHER_EXPLOSION, Flags.CREEPER_EXPLOSION, Flags.POTION_SPLASH).forEach {

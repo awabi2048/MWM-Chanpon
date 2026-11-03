@@ -87,9 +87,11 @@ class WorldBuildPermissionContractTest {
                     setFlag(Flags.BUILD, StateFlag.State.DENY)
                     setFlag(Flags.PVP, StateFlag.State.DENY)
                     owners.addPlayer(owner)
+                    members.addPlayer(member)
                     configureSubmittedLock(this)
                     assertNull(getFlag(Flags.BUILD))
                     assertEquals(emptySet<UUID>(), owners.uniqueIds)
+                    assertEquals(emptySet<UUID>(), members.uniqueIds)
                     assertEquals(mapOf(
                         Flags.PASSTHROUGH to StateFlag.State.DENY,
                         Flags.PASSTHROUGH.regionGroupFlag to RegionGroup.NON_OWNERS,
