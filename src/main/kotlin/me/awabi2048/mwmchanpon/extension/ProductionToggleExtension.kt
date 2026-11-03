@@ -316,6 +316,15 @@ class ProductionToggleExtension(
         if (plugin.isSubmissionClosed()) {
             return ProductionDecision(false, ChanponSubmissionKeys.CHANPON_SUBMISSION_PRODUCTION_UNAVAILABLE_SUBMISSION_CLOSED)
         }
+        // 提出ロック自体は取り下げの理由なので、通常の保護判定より先に判定します。
+        if (storage.isProductionWorld(worldData.uuid) &&
+            runCatching { storage.getSubmissionState(worldData.uuid) }.getOrNull() == SubmissionState.SUBMITTED) {
+            return if (worldData.owner == context.player.uniqueId) {
+                ProductionDecision(true, ChanponSubmissionKeys.CHANPON_SUBMISSION_PRODUCTION_UNAVAILABLE_WORLD_MISSING)
+            } else {
+                ProductionDecision(false, ChanponSubmissionKeys.CHANPON_SUBMISSION_PRODUCTION_UNAVAILABLE_OWNER_ONLY)
+            }
+        }
         if (globalStorage.getWorldCreationAvailability() != WorldCreationAvailability.PRODUCTION) {
             return ProductionDecision(false, ChanponSubmissionKeys.CHANPON_SUBMISSION_PRODUCTION_UNAVAILABLE_PHASE)
         }
@@ -352,7 +361,7 @@ class ProductionToggleExtension(
         val action = if (storage.isProductionWorld(worldData.uuid)) {
             when (runCatching { storage.getSubmissionState(worldData.uuid) }.getOrNull()) {
                 SubmissionState.UNSUBMITTED -> ConfirmationAction.SUBMIT
-                SubmissionState.SUBMITTED,
+                SubmissionState.SUBMITTED -> ConfirmationAction.WITHDRAW
                 SubmissionState.COMPLETED,
                 null -> return null
             }
@@ -385,7 +394,10 @@ class ProductionToggleExtension(
         context: com.awabi2048.ccsystem.api.gui.MenuCapabilityContext,
     ): String {
         val worldData = requireNotNull(worldData(context.arguments))
-        return if (storage.isProductionWorld(worldData.uuid)) {
+        return if (storage.isProductionWorld(worldData.uuid) &&
+            runCatching { storage.getSubmissionState(worldData.uuid) }.getOrNull() == SubmissionState.SUBMITTED) {
+            i18n(context.player, ChanponSubmissionKeys.CHANPON_SUBMISSION_WITHDRAW_ACTION)
+        } else if (storage.isProductionWorld(worldData.uuid)) {
             i18n(context.player, ChanponSubmissionKeys.CHANPON_SUBMISSION_SUBMISSION_LORE_UNSUBMITTED_ACTION)
         } else {
             i18n(context.player, ChanponSubmissionKeys.CHANPON_SUBMISSION_PRODUCTION_LORE_ACTION)
@@ -533,19 +545,23 @@ class ProductionToggleExtension(
                     return
                 }
                 if (!ensureSubmissionState(player, worldUuid, SubmissionState.UNSUBMITTED)) return
-                storage.setSubmissionState(
-                    worldUuid,
-                    SubmissionState.SUBMITTED,
-                    player.uniqueId,
-                    player.name,
-                    "submit"
-                )
-                storage.setVisibility(worldUuid, ChanponWorldVisibility.PUBLIC)
+                if (plugin.isSubmissionClosed() || !storage.submitWorld(worldUuid, player.uniqueId, player.name)) return
                 MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)?.let {
                     protectionService.sync(it)
                     toolPermissionController.syncWorld(it)
                 }
                 player.sendMessage(i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_MESSAGE_SUBMITTED))
+            }
+            ConfirmationAction.WITHDRAW -> {
+                val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
+                if (worldData == null || worldData.owner != player.uniqueId || plugin.isSubmissionClosed() ||
+                    !storage.withdrawWorld(worldUuid, player.uniqueId, player.name)) {
+                    player.sendMessage(i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_WITHDRAW_REJECTED))
+                    return
+                }
+                protectionService.sync(worldData)
+                toolPermissionController.syncWorld(worldData)
+                player.sendMessage(i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_WITHDRAW_SUCCESS))
             }
         }
     }
@@ -660,7 +676,7 @@ class ProductionToggleExtension(
             material,
             i18nComponent(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_SUBMISSION_DISPLAY),
             createSubmissionLore(player, state),
-            if (state == SubmissionState.UNSUBMITTED) {
+            if (state == SubmissionState.UNSUBMITTED || state == SubmissionState.SUBMITTED) {
                 GuiElementRole.ACTION
             } else {
                 GuiElementRole.CONTENT
@@ -770,6 +786,7 @@ class ProductionToggleExtension(
         SET_PRODUCTION("set_production", ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_SET_PRODUCTION_TITLE, ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_SET_PRODUCTION_LORE),
         UNSET_PRODUCTION("unset_production", ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_UNSET_PRODUCTION_TITLE, ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_UNSET_PRODUCTION_LORE),
         SUBMIT("submit", ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_SUBMIT_TITLE, ChanponSubmissionKeys.CHANPON_SUBMISSION_CONFIRM_SUBMIT_LORE),
+        WITHDRAW("withdraw", ChanponSubmissionKeys.CHANPON_SUBMISSION_WITHDRAW_TITLE, ChanponSubmissionKeys.CHANPON_SUBMISSION_WITHDRAW_LORE),
     }
 
 }

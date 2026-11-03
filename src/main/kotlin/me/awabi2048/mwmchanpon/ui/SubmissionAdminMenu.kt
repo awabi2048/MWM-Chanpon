@@ -82,6 +82,7 @@ class SubmissionAdminMenu(
                     ACTION_SORT to MenuActionHandler(::cycleSort),
                     ACTION_CLOSE_SUBMISSIONS to MenuActionHandler(::toggleSubmissionClosure),
                     ACTION_WORLD to MenuActionHandler(::handleWorldAction),
+                    ACTION_WITHDRAW to MenuActionHandler(::navigateToWithdrawal),
                 ),
             ),
         )
@@ -109,6 +110,18 @@ class SubmissionAdminMenu(
                 id = ROUTE_COMPLETE_CONFIRM,
                 renderer = { context -> renderCompleteConfirmation(context.player, context.route) },
                 actions = confirmationActions(ACTION_CONFIRM_COMPLETE, ::confirmCompleteUnsubmitted),
+            ),
+        )
+        runtime.register(
+            InventoryMenuDefinition(
+                owner = OWNER,
+                id = ROUTE_WITHDRAW_CONFIRM,
+                renderer = { context -> confirmationView(context.player, ConfirmationPresentation(
+                    ChanponSubmissionKeys.CHANPON_SUBMISSION_WITHDRAW_TITLE,
+                    ChanponSubmissionKeys.CHANPON_SUBMISSION_WITHDRAW_ACTION,
+                    ChanponSubmissionKeys.CHANPON_SUBMISSION_WITHDRAW_LORE,
+                ), Material.PAPER, ACTION_CONFIRM_WITHDRAW) },
+                actions = confirmationActions(ACTION_CONFIRM_WITHDRAW, ::confirmWithdrawal),
             ),
         )
     }
@@ -253,6 +266,30 @@ class SubmissionAdminMenu(
         )
     }
 
+    private fun navigateToWithdrawal(context: MenuActionContext): MenuActionResult {
+        if (!context.player.hasPermission("mwmchanpon.admin") || plugin.isSubmissionClosed()) return MenuActionResult.Rejected()
+        val uuid = context.payload[WORLD_UUID]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+            ?: return MenuActionResult.Rejected()
+        if (!storage.isProductionWorld(uuid) || storage.getSubmissionStateOrNull(uuid) != SubmissionState.SUBMITTED) return MenuActionResult.Rejected()
+        return MenuActionResult.Success(MenuUpdate.Navigate(MenuRoute(OWNER, ROUTE_WITHDRAW_CONFIRM,
+            statePayload(state(context.route)) + (WORLD_UUID to uuid.toString()))))
+    }
+
+    private fun confirmWithdrawal(context: MenuActionContext): MenuActionResult {
+        val player = context.player
+        val uuid = context.route.payload[WORLD_UUID]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+        val world = uuid?.let { MyWorldManagerApi.getWorldRepository()?.findByUuid(it) }
+        if (!player.hasPermission("mwmchanpon.admin") || !plugin.isConfigurationMigrationCurrent() ||
+            plugin.isSubmissionClosed() || world == null || !storage.withdrawWorld(world.uuid, player.uniqueId, player.name)) {
+            player.sendMessage(i18nComponent(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_WITHDRAW_REJECTED))
+            return MenuActionResult.Rejected()
+        }
+        protectionService.sync(world)
+        toolPermissionController.syncWorld(world)
+        player.sendMessage(i18nComponent(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_WITHDRAW_SUCCESS))
+        return MenuActionResult.Success(MenuUpdate.Replace(listRoute(state(context.route))))
+    }
+
     private fun handleWorldAction(context: MenuActionContext): MenuActionResult {
         val worldUuid = context.payload[WORLD_UUID]
             ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
@@ -295,6 +332,27 @@ class SubmissionAdminMenu(
             }
         }
         if (!context.click.isLeftClick) return MenuActionResult.Ignored
+        // 統合版ではシフトクリックを使えないため、同じワールド項目から操作を選択します。
+        val forms = MyWorldManagerApi.getBedrockFormService()
+        if (forms?.isBedrock(context.player) == true && stateFor(worldData) == SubmissionState.SUBMITTED && !plugin.isSubmissionClosed()) {
+            val routeState = statePayload(current) + (WORLD_UUID to worldUuid.toString())
+            val shown = forms.sendSimpleForm(
+                context.player,
+                worldData.name,
+                i18n(context.player, ChanponSubmissionKeys.CHANPON_SUBMISSION_WITHDRAW_TITLE),
+                listOf(i18n(context.player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_WORLD_ACTION_WARP),
+                    i18n(context.player, ChanponSubmissionKeys.CHANPON_SUBMISSION_WITHDRAW_ACTION)),
+                { index ->
+                    if (index == 0) {
+                        MyWorldManagerApi.getWorldService()?.teleportToWorld(context.player, worldUuid)
+                        MenuActionResult.Success(MenuUpdate.Close)
+                    } else {
+                        MenuActionResult.Success(MenuUpdate.Navigate(MenuRoute(OWNER, ROUTE_WITHDRAW_CONFIRM, routeState)))
+                    }
+                },
+            )
+            if (shown) return MenuActionResult.Success(MenuUpdate.None)
+        }
         MyWorldManagerApi.getWorldService()?.teleportToWorld(context.player, worldUuid)
         return MenuActionResult.Success(MenuUpdate.Close)
     }
@@ -568,7 +626,10 @@ class SubmissionAdminMenu(
             .let { if (it.isEmpty()) i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_WORLD_NO_MEMBERS) else it.joinToString(", ") }
         val production = storage.isProductionWorld(worldData.uuid)
         val actions = buildList {
-            add(chanponGestureAction(ACTION_WORLD, MenuGesture.LEFT, i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_WORLD_ACTION_WARP), payload, safety = MenuActionSafety.EXTERNAL_SIDE_EFFECT))
+            add(chanponGestureAction(ACTION_WORLD, MenuGesture.PLAIN_LEFT, i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_ADMIN_MENU_WORLD_ACTION_WARP), payload, safety = MenuActionSafety.EXTERNAL_SIDE_EFFECT))
+            if (state == SubmissionState.SUBMITTED && !plugin.isSubmissionClosed()) {
+                add(chanponGestureAction(ACTION_WITHDRAW, MenuGesture.SHIFT_LEFT, i18n(player, ChanponSubmissionKeys.CHANPON_SUBMISSION_WITHDRAW_ACTION), payload, safety = MenuActionSafety.CONFIRM_ENTRY))
+            }
             if (player.gameMode == GameMode.CREATIVE) {
                 add(chanponGestureAction(
                     ACTION_WORLD,
@@ -812,7 +873,7 @@ class SubmissionAdminMenu(
         ACTION_BACK, ACTION_PAGE, ACTION_CANCEL, ACTION_PROGRESS_FILTER, ACTION_SORT -> MenuActionSafety.NAVIGATION_ONLY
         ACTION_CLOSE_SUBMISSIONS -> MenuActionSafety.CONFIRM_ENTRY
         ACTION_CONFIRM_CLOSE, ACTION_CONFIRM_COMPLETE -> MenuActionSafety.REVERSIBLE
-        ACTION_CONFIRM_PRODUCTION -> MenuActionSafety.IRREVERSIBLE
+        ACTION_CONFIRM_PRODUCTION, ACTION_CONFIRM_WITHDRAW -> MenuActionSafety.IRREVERSIBLE
         else -> error("Submission action must declare a dedicated safety mapping: $actionId")
     }
 
@@ -902,6 +963,7 @@ class SubmissionAdminMenu(
         private const val ROUTE_CLOSE_CONFIRM = "submission-close-confirm"
         private const val ROUTE_PRODUCTION_CONFIRM = "submission-production-confirm"
         private const val ROUTE_COMPLETE_CONFIRM = "submission-complete-confirm"
+        private const val ROUTE_WITHDRAW_CONFIRM = "submission-withdraw-confirm"
         private const val ITEMS_PER_PAGE = 36
         private const val ACTION_PROGRESS_FILTER = "progress_filter"
         private const val ACTION_SORT = "sort"
@@ -909,6 +971,8 @@ class SubmissionAdminMenu(
         private const val ACTION_BACK = "back"
         private const val ACTION_PAGE = "page"
         private const val ACTION_WORLD = "world"
+        private const val ACTION_WITHDRAW = "withdraw"
+        private const val ACTION_CONFIRM_WITHDRAW = "confirm-withdraw"
         private const val ACTION_CANCEL = "cancel"
         private const val ACTION_CONFIRM_CLOSE = "confirm-close"
         private const val ACTION_CONFIRM_PRODUCTION = "confirm-production"
