@@ -122,11 +122,11 @@ internal fun configureSubmittedLock(region: com.sk89q.worldguard.protection.regi
     region.members = DefaultDomain()
     region.setFlag(Flags.PASSTHROUGH, StateFlag.State.DENY)
     region.setFlag(Flags.PASSTHROUGH.regionGroupFlag, RegionGroup.NON_OWNERS)
-    listOf(Flags.OTHER_EXPLOSION, Flags.CREEPER_EXPLOSION, Flags.POTION_SPLASH).forEach {
+    listOf(Flags.OTHER_EXPLOSION, Flags.CREEPER_EXPLOSION, Flags.POTION_SPLASH,
+        Flags.PLACE_VEHICLE, Flags.DESTROY_VEHICLE, Flags.RESPAWN_ANCHORS).forEach {
         region.setFlag(it, StateFlag.State.DENY)
     }
-    listOf(Flags.PLACE_VEHICLE, Flags.USE, Flags.INTERACT, Flags.DESTROY_VEHICLE,
-        Flags.CHEST_ACCESS, Flags.PISTONS, Flags.RIDE).forEach {
+    listOf(Flags.USE, Flags.INTERACT, Flags.CHEST_ACCESS, Flags.PISTONS, Flags.RIDE).forEach {
         region.setFlag(it, StateFlag.State.ALLOW)
     }
 }
