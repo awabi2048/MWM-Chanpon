@@ -15,11 +15,21 @@ import org.bukkit.block.DoubleChest
 import org.bukkit.entity.Entity
 import org.bukkit.entity.Player
 import org.bukkit.event.world.WorldLoadEvent
+import org.bukkit.event.player.PlayerInteractEntityEvent
+import me.awabi2048.mwmchanpon.api.ProtectedEntityClickEvent
 
 class SubmittedWorldProtectionListener(
     private val plugin: MWMChanponPlugin,
     private val protectionService: SubmittedWorldProtectionService
 ) : Listener {
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    fun onEntityInteract(event: PlayerInteractEntityEvent) {
+        val data = MyWorldManagerApi.getWorldRepository()?.findByWorldName(event.player.world.name) ?: return
+        if (!protectionService.isProtected(data)) return
+        // 他の保護が先に拒否した操作は通知せず、バニラ操作をキャンセルしたままクリックだけを渡します。
+        event.isCancelled = true
+        plugin.server.pluginManager.callEvent(ProtectedEntityClickEvent(event.player, event.rightClicked, event.hand))
+    }
     /** プレイヤーの収納操作だけを止め、ホッパーやドロッパーの搬送には干渉しません。 */
     private fun isLockedStorage(player: Player, inventory: Inventory): Boolean {
         val holder = inventory.holder
