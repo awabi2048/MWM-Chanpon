@@ -30,31 +30,31 @@ class SubmittedWorldProtectionListener(
         event.isCancelled = true
         plugin.server.pluginManager.callEvent(ProtectedEntityClickEvent(event.player, event.rightClicked, event.hand))
     }
-    /** プレイヤーの収納操作だけを止め、ホッパーやドロッパーの搬送には干渉しません。 */
-    private fun isLockedStorage(player: Player, inventory: Inventory): Boolean {
+    /** ワールドや提出状態に依存せず、プレイヤーの収納操作だけを止めます。 */
+    private fun isLockedStorage(inventory: Inventory): Boolean {
         val holder = inventory.holder
         if (holder !is BlockState && holder !is DoubleChest && (holder !is Entity || holder is Player)) return false
-        val data = MyWorldManagerApi.getWorldRepository()?.findByWorldName(player.world.name) ?: return false
-        return protectionService.isProtected(data)
+        // ホッパー等の自動搬送イベントは監視しないため、装置側の搬送は維持されます。
+        return true
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     fun onInventoryOpen(event: InventoryOpenEvent) {
-        val player = event.player as? Player ?: return
-        if (isLockedStorage(player, event.inventory)) event.isCancelled = true
+        if (event.player !is Player) return
+        if (isLockedStorage(event.inventory)) event.isCancelled = true
     }
 
     // 保護の有効化より前に開いた収納や、シフトクリック・ドラッグも変更できないようにします。
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     fun onInventoryClick(event: InventoryClickEvent) {
-        val player = event.whoClicked as? Player ?: return
-        if (isLockedStorage(player, event.view.topInventory)) event.isCancelled = true
+        if (event.whoClicked !is Player) return
+        if (isLockedStorage(event.view.topInventory)) event.isCancelled = true
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     fun onInventoryDrag(event: InventoryDragEvent) {
-        val player = event.whoClicked as? Player ?: return
-        if (isLockedStorage(player, event.view.topInventory)) event.isCancelled = true
+        if (event.whoClicked !is Player) return
+        if (isLockedStorage(event.view.topInventory)) event.isCancelled = true
     }
 
     @EventHandler
