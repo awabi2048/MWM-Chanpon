@@ -33,6 +33,7 @@ import me.awabi2048.mwmchanpon.listener.MyWorldSafetyDefaultsListener
 import me.awabi2048.mwmchanpon.listener.PlayerJoinListener
 import me.awabi2048.mwmchanpon.listener.SubmittedWorldProtectionListener
 import me.awabi2048.mwmchanpon.listener.WorldBuildPermissionListener
+import me.awabi2048.mwmchanpon.listener.PortalSettingsAccessListener
 import me.awabi2048.mwmchanpon.listener.SpawnWorldProtectionListener
 import me.awabi2048.mwmchanpon.listener.ToolPermissionWorldListener
 import me.awabi2048.mwmchanpon.listener.WorldCleanupListener
@@ -350,6 +351,7 @@ class MWMChanponPlugin : JavaPlugin() {
         server.pluginManager.registerEvents(publishLevelSynchronizer, this)
         server.pluginManager.registerEvents(SubmittedWorldProtectionListener(this, submittedProtectionService), this)
         server.pluginManager.registerEvents(WorldBuildPermissionListener(this, buildPermissionService), this)
+        server.pluginManager.registerEvents(PortalSettingsAccessListener(globalStorage::isBuildingAllowed), this)
         server.pluginManager.registerEvents(SpawnWorldProtectionListener(this, globalStorage, spawnProtectionService), this)
         server.pluginManager.registerEvents(MyWorldSafetyDefaultsListener(this, worldSafetyDefaultsService), this)
         server.pluginManager.registerEvents(MyWorldNaturalEntityCleanupListener(this), this)
