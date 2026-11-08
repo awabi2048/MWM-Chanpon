@@ -168,7 +168,6 @@ class BackupAutomationService(
 
         // ロールバックの退避は BackupService がロック取得後に担当します。
         // ここで先に退避させると失敗時の復帰と通知先が失われます。
-        run.audience.addAll(run.players().map { it.uniqueId })
         if (run.type == AutomationType.BACKUP) {
             val evacuated = evacuatePlayers(run.worldUuids)
             if (evacuated == null) {
@@ -271,8 +270,9 @@ class BackupAutomationService(
         }
     }
 
-    private fun AutomationRun.players(): List<Player> = (playersInWorlds(worldUuids) +
-        audience.mapNotNull { Bukkit.getPlayer(it) }.filter { it.isOnline }).distinctBy { it.uniqueId }
+    // 処理による影響は対象ワールドの外にも及ぶため、案内はオンライン全員へ届けます。
+    // 対象ワールドからの退避は playersInWorlds を別途使用します。
+    private fun AutomationRun.players(): List<Player> = Bukkit.getOnlinePlayers().toList()
 
     private fun playersInWorlds(worldUuids: List<UUID>): List<Player> {
         val targetSet = worldUuids.toSet()
@@ -348,7 +348,6 @@ class BackupAutomationService(
         val worldUuids: List<UUID>,
         val notifiedWarnings: MutableSet<Long> = mutableSetOf(),
         var bossBar: BossBar? = null,
-        val audience: MutableSet<UUID> = mutableSetOf(),
         var evacuatedPlayers: List<EvacuatedPlayer> = emptyList(),
         var started: Boolean = false
     )
