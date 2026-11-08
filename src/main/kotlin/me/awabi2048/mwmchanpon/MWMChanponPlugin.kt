@@ -565,6 +565,7 @@ class MWMChanponPlugin : JavaPlugin() {
         check(status.state == ApiMigrationParticipantState.CURRENT) {
             status.message ?: "MWM-Chanpon の設定を検証できませんでした"
         }
+        chanponMacroService.reload()
         reloadConfig()
         val definitions = ToolPermissionConfig(config).load()
         // 旧グループを先に外し、既存画面が保持するリストの参照を維持します。
