@@ -118,9 +118,11 @@ class BackupAutomationService(
         val restorePoint = backupService.latestRestorePoint()
         if (restorePoint == null) {
             if (decision == ScheduledExecutionGate.Decision.EXECUTE) {
-                plugin.config.set("backup.auto_rollback.last_run_date", today)
-                plugin.saveConfigIfCurrent()
                 plugin.logger.warning("Auto rollback skipped because restore point is missing.")
+                Bukkit.getOnlinePlayers().forEach {
+                    it.sendMessage(i18nComponentFor(it, ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_RESTORE_FAILED))
+                }
+                finishRun(AutomationType.ROLLBACK)
             }
             return
         }
@@ -143,7 +145,13 @@ class BackupAutomationService(
         execute: Boolean,
         operation: () -> CompletableFuture<BackupOperationStatus>
     ) {
-        if (worldUuids.isEmpty()) return
+        if (worldUuids.isEmpty()) {
+            if (execute) {
+                plugin.logger.warning("${type.logName}: 対象ワールドがないためスキップしました。")
+                finishRun(type)
+            }
+            return
+        }
         val remaining = secondsUntil(targetTime)
         if (remaining > PREPARE_SECONDS) return
 
@@ -163,8 +171,17 @@ class BackupAutomationService(
     private fun startOperation(run: AutomationRun, operation: () -> CompletableFuture<BackupOperationStatus>) {
         run.started = true
         val configPath = if (run.type == AutomationType.BACKUP) "backup.auto_backup.last_run_date" else "backup.auto_rollback.last_run_date"
-        plugin.config.set(configPath, run.date)
-        plugin.saveConfigIfCurrent()
+        try {
+            plugin.config.set(configPath, run.date)
+            plugin.saveConfigIfCurrent()
+        } catch (error: Exception) {
+            plugin.logger.log(java.util.logging.Level.SEVERE, "${run.type.logName}: 実行日を保存できませんでした。", error)
+            val key = if (run.type == AutomationType.BACKUP) ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_BACKUP_FAILED
+                else ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_RESTORE_FAILED
+            run.players().forEach { it.sendMessage(i18nComponentFor(it, key)) }
+            finishRun(run.type)
+            return
+        }
 
         // ロールバックの退避は BackupService がロック取得後に担当します。
         // ここで先に退避させると失敗時の復帰と通知先が失われます。
