@@ -105,6 +105,34 @@ class ChanponGlobalStorage(dataFolder: File) {
         return true
     }
 
+    /** 修正期間と建築停止を同じ保存操作で切り替えます。 */
+    fun isRepairBypassEnabled(): Boolean = settings().getBoolean("repair_period.enabled", false)
+
+    fun isTourSimulationEnabled(worldUuid: UUID): Boolean {
+        val config = settings()
+        return config.getBoolean("repair_period.enabled", false) &&
+            worldUuid.toString() in config.getStringList("repair_period.simulated_worlds")
+    }
+
+    fun setRepairBypassEnabled(enabled: Boolean) {
+        ensureCurrentForWrite()
+        val config = settings()
+        config.set("repair_period.enabled", enabled)
+        config.set("building_allowed", enabled)
+        if (!enabled) config.set("repair_period.simulated_worlds", emptyList<String>())
+        saveSettings(config)
+    }
+
+    fun setTourSimulationEnabled(worldUuid: UUID, enabled: Boolean) {
+        ensureCurrentForWrite()
+        val config = settings()
+        check(config.getBoolean("repair_period.enabled", false)) { "修正期間中のみ変更できます" }
+        val worlds = config.getStringList("repair_period.simulated_worlds").toMutableSet()
+        if (enabled) worlds.add(worldUuid.toString()) else worlds.remove(worldUuid.toString())
+        config.set("repair_period.simulated_worlds", worlds.sorted())
+        saveSettings(config)
+    }
+
     fun isArchiveLocked(): Boolean =
         settings().getBoolean("archive_locked", false)
 

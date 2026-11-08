@@ -22,6 +22,7 @@ class ToolPermissionController(
     },
     // メンバー変更と取り消しを含む既存の全ワールド同期経路で、建築側の所属も更新します。
     private val syncBuildPermissions: (WorldData) -> Unit = {},
+    private val effectiveProtection: ((WorldData) -> Boolean)? = null,
 ) {
     fun isEnabled(worldData: WorldData, playerUuid: UUID, toolId: String): Boolean {
         if (!storage.hasCurrentWorldData(worldData.uuid)) return false
@@ -119,6 +120,8 @@ class ToolPermissionController(
         !globalBuildingAllowed() && !isGlobalBypassAllowed(worldUuid, playerUuid)
 
     private fun isSubmissionLocked(worldUuid: UUID): Boolean {
+        val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
+        if (effectiveProtection != null) return worldData == null || effectiveProtection.invoke(worldData)
         val hasCurrentData = storage.hasCurrentWorldData(worldUuid)
         val production = storage.isProductionWorld(worldUuid)
         val submissionState = storage.getSubmissionStateOrNull(worldUuid)

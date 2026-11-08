@@ -4,7 +4,9 @@ import com.sk89q.worldedit.bukkit.BukkitAdapter
 import com.sk89q.worldedit.math.BlockVector3
 import com.sk89q.worldguard.WorldGuard
 import com.sk89q.worldguard.protection.flags.Flags
+import com.sk89q.worldguard.protection.flags.RegionGroup
 import com.sk89q.worldguard.protection.flags.StateFlag
+import com.sk89q.worldguard.domains.DefaultDomain
 import com.sk89q.worldguard.protection.managers.RemovalStrategy
 import com.sk89q.worldguard.protection.regions.ProtectedCuboidRegion
 import java.util.logging.Logger
@@ -16,7 +18,9 @@ import org.bukkit.Bukkit
 class SubmittedWorldProtectionService(
     private val storage: ChanponWorldStorage,
     private val logger: Logger,
-    private val autoRollbackEnabled: () -> Boolean = { false }
+    private val autoRollbackEnabled: () -> Boolean = { false },
+    private val repairBypassEnabled: () -> Boolean = { false },
+    private val tourSimulationEnabled: (java.util.UUID) -> Boolean = { false },
 ) {
     private var configurationAvailable: () -> Boolean = { true }
 
@@ -32,11 +36,6 @@ class SubmittedWorldProtectionService(
         if (!configurationAvailable()) return
         // 破損・旧形式をproduction=falseとして扱い、保護を解除しないようにします。
         if (!storage.hasCurrentWorldData(worldData.uuid)) return
-        if (!storage.isProductionWorld(worldData.uuid)) {
-            setProtected(worldData, false)
-            return
-        }
-
         val reasons = protectionReasons(worldData)
         setProtected(worldData, reasons.isNotEmpty())
     }
@@ -52,8 +51,10 @@ class SubmittedWorldProtectionService(
 
     fun protectionReasons(worldData: WorldData): Set<ProtectionReason> {
         if (!storage.hasCurrentWorldData(worldData.uuid)) return emptySet()
-        if (!storage.isProductionWorld(worldData.uuid)) return emptySet()
         val reasons = linkedSetOf<ProtectionReason>()
+        // シミュレーションは非本番ワールドでも提出後と同じ保護を適用します。
+        if (tourSimulationEnabled(worldData.uuid)) reasons.add(ProtectionReason.SIMULATION)
+        if (!storage.isProductionWorld(worldData.uuid)) return reasons
         if (autoRollbackEnabled()) {
             reasons.add(ProtectionReason.AUTO_ROLLBACK)
         }
@@ -63,11 +64,12 @@ class SubmittedWorldProtectionService(
             if (reasons.isEmpty()) {
                 logger.warning("Cannot sync submitted protection because submission state is invalid: ${worldData.uuid}")
             }
+            reasons.add(ProtectionReason.INVALID_STATE)
             return reasons
         }
         when (state) {
-            SubmissionState.SUBMITTED -> reasons.add(ProtectionReason.SUBMITTED)
-            SubmissionState.COMPLETED -> reasons.add(ProtectionReason.COMPLETED)
+            SubmissionState.SUBMITTED -> if (!repairBypassEnabled()) reasons.add(ProtectionReason.SUBMITTED)
+            SubmissionState.COMPLETED -> if (!repairBypassEnabled()) reasons.add(ProtectionReason.COMPLETED)
             SubmissionState.UNSUBMITTED -> Unit
         }
         return reasons
@@ -88,7 +90,7 @@ class SubmittedWorldProtectionService(
         if (protected) {
             val region = regionManager.getRegion(REGION_ID) ?: createWorldRegion(bukkitWorld)
             region.priority = PRIORITY
-            region.setFlag(Flags.BUILD, StateFlag.State.DENY)
+            configureSubmittedLock(region)
             regionManager.addRegion(region)
         } else if (regionManager.hasRegion(REGION_ID)) {
             regionManager.removeRegion(REGION_ID, RemovalStrategy.UNSET_PARENT_IN_CHILDREN)
@@ -111,8 +113,28 @@ class SubmittedWorldProtectionService(
     }
 }
 
+/** 提出・完成・自動復元の共通ロックを、同期のたびに同じ構成へ収束させます。 */
+internal fun configureSubmittedLock(region: com.sk89q.worldguard.protection.regions.ProtectedRegion) {
+    // 旧 BUILD deny や手動設定が残ると、許可した装置も再び停止するため全フラグを置換します。
+    region.flags = emptyMap()
+    // リージョン所属による建築許可の例外を作らず、全員の建築を制限します。
+    region.owners = DefaultDomain()
+    region.members = DefaultDomain()
+    region.setFlag(Flags.PASSTHROUGH, StateFlag.State.DENY)
+    region.setFlag(Flags.PASSTHROUGH.regionGroupFlag, RegionGroup.NON_OWNERS)
+    listOf(Flags.OTHER_EXPLOSION, Flags.CREEPER_EXPLOSION, Flags.POTION_SPLASH,
+        Flags.PLACE_VEHICLE, Flags.DESTROY_VEHICLE, Flags.RESPAWN_ANCHORS).forEach {
+        region.setFlag(it, StateFlag.State.DENY)
+    }
+    listOf(Flags.USE, Flags.INTERACT, Flags.CHEST_ACCESS, Flags.PISTONS, Flags.RIDE).forEach {
+        region.setFlag(it, StateFlag.State.ALLOW)
+    }
+}
+
 enum class ProtectionReason {
     SUBMITTED,
     COMPLETED,
-    AUTO_ROLLBACK
+    AUTO_ROLLBACK,
+    INVALID_STATE,
+    SIMULATION
 }

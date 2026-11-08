@@ -65,6 +65,8 @@ class BuildDenialReasonResolver(
         }
         // protectionReasonsは本番ワールドのみ非空を返すため、提出保護の適用範囲と一致します。
         val lockReasons = submittedProtectionService.protectionReasons(worldData)
+        if (ProtectionReason.INVALID_STATE in lockReasons) return BuildDenialReason.CONFIG_UNAVAILABLE
+        if (ProtectionReason.SIMULATION in lockReasons) return BuildDenialReason.SUBMITTED
         if (ProtectionReason.COMPLETED in lockReasons) return BuildDenialReason.COMPLETED
         if (ProtectionReason.SUBMITTED in lockReasons) return BuildDenialReason.SUBMITTED
         if (worldStorage.isImportedArchive(worldData.uuid)) return BuildDenialReason.IMPORTED_ARCHIVE

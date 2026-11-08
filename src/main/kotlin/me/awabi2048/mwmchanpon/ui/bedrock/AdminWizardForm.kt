@@ -295,6 +295,6 @@ class AdminWizardForm(
     private fun noUpdate(): MenuActionResult = MenuActionResult.Success(MenuUpdate.None)
 
     companion object {
-        fun normalizeName(raw: String): String? = raw.trim().takeIf { it.isNotEmpty() && it.length <= 32 }
+        fun normalizeName(raw: String): String? = raw.trim().takeIf { it.isNotEmpty() && it.length <= 50 }
     }
 }

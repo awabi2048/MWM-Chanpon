@@ -33,6 +33,7 @@ import me.awabi2048.mwmchanpon.listener.MyWorldSafetyDefaultsListener
 import me.awabi2048.mwmchanpon.listener.PlayerJoinListener
 import me.awabi2048.mwmchanpon.listener.SubmittedWorldProtectionListener
 import me.awabi2048.mwmchanpon.listener.WorldBuildPermissionListener
+import me.awabi2048.mwmchanpon.listener.PortalSettingsAccessListener
 import me.awabi2048.mwmchanpon.listener.SpawnWorldProtectionListener
 import me.awabi2048.mwmchanpon.listener.ToolPermissionWorldListener
 import me.awabi2048.mwmchanpon.listener.WorldCleanupListener
@@ -198,6 +199,7 @@ class MWMChanponPlugin : JavaPlugin() {
             globalStorage,
             isAutoRollbackEnabled,
             buildPermissionService::effectiveProtectionMode,
+            { submittedProtectionService.isProtected(it) },
         ).also {
             it.setConfigurationAvailability(::isConfigurationMigrationCurrent)
         }
@@ -210,6 +212,7 @@ class MWMChanponPlugin : JavaPlugin() {
             chanponStorage::isGlobalBypassAllowed,
             buildPermissionService::effectiveProtectionMode,
             buildPermissionService::sync,
+            { submittedProtectionService.isProtected(it) },
         )
 
         backupService = BackupService(this, chanponStorage)
@@ -231,7 +234,10 @@ class MWMChanponPlugin : JavaPlugin() {
         backupListMenu.setManualRollbackService(manualRollbackService)
 
         productionWorldGuard = ProductionWorldGuard(chanponStorage)
-        submittedProtectionService = SubmittedWorldProtectionService(chanponStorage, logger, isAutoRollbackEnabled).also {
+        submittedProtectionService = SubmittedWorldProtectionService(
+            chanponStorage, logger, isAutoRollbackEnabled,
+            globalStorage::isRepairBypassEnabled, globalStorage::isTourSimulationEnabled,
+        ).also {
             it.setConfigurationAvailability(::isConfigurationMigrationCurrent)
         }
         automationSettingsMenu = AutomationSettingsMenu(this, backupService, automationService) {
@@ -350,6 +356,7 @@ class MWMChanponPlugin : JavaPlugin() {
         server.pluginManager.registerEvents(publishLevelSynchronizer, this)
         server.pluginManager.registerEvents(SubmittedWorldProtectionListener(this, submittedProtectionService), this)
         server.pluginManager.registerEvents(WorldBuildPermissionListener(this, buildPermissionService), this)
+        server.pluginManager.registerEvents(PortalSettingsAccessListener(globalStorage::isBuildingAllowed), this)
         server.pluginManager.registerEvents(SpawnWorldProtectionListener(this, globalStorage, spawnProtectionService), this)
         server.pluginManager.registerEvents(MyWorldSafetyDefaultsListener(this, worldSafetyDefaultsService), this)
         server.pluginManager.registerEvents(MyWorldNaturalEntityCleanupListener(this), this)
@@ -535,8 +542,36 @@ class MWMChanponPlugin : JavaPlugin() {
         MyWorldManagerApi.getWorldRepository()?.findAll()?.forEach(buildPermissionService::sync)
     }
 
+    /** 保存後に保護・作業権限を同じ実効状態へ収束させます。 */
+    fun setRepairBypassEnabled(enabled: Boolean) {
+        globalStorage.setRepairBypassEnabled(enabled)
+        syncRepairProtection()
+    }
+
+    fun setTourSimulationEnabled(worldData: me.awabi2048.myworldmanager.model.WorldData, enabled: Boolean) {
+        globalStorage.setTourSimulationEnabled(worldData.uuid, enabled)
+        submittedProtectionService.sync(worldData)
+        toolController.syncWorld(worldData)
+        MyWorldManagerApi.syncOnlineWorldPlayerStates()
+    }
+
+    fun isRepairBypassEnabled(): Boolean = globalStorage.isRepairBypassEnabled()
+    fun isTourSimulationEnabled(worldUuid: java.util.UUID): Boolean = globalStorage.isTourSimulationEnabled(worldUuid)
+
+    private fun syncRepairProtection() {
+        MyWorldManagerApi.getWorldRepository()?.findAll()?.forEach { world ->
+            submittedProtectionService.sync(world)
+            toolController.syncWorld(world)
+        }
+        syncBuildingState()
+    }
+
     fun setBuildingAllowed(allowed: Boolean) {
         globalStorage.setBuildingAllowed(allowed)
+        syncBuildingState()
+    }
+
+    private fun syncBuildingState() {
         MyWorldManagerApi.syncOnlineWorldPlayerStates()
         // 全体の建築許可はツール活動と作業グループ付与の可否でもあるため、切替時に再同期します。
         toolController.syncOnlinePlayers()

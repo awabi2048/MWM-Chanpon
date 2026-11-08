@@ -1,6 +1,7 @@
 package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.api.localization.generated.ChanponSystemKeys
+import com.awabi2048.ccsystem.api.localization.generated.ChanponPhaseKeys
 
 import com.awabi2048.ccsystem.api.localization.generated.MyworldGuiBedrockKeys
 import com.awabi2048.ccsystem.api.localization.generated.MyworldGuiCommonKeys
@@ -112,6 +113,15 @@ class ChanponWorldSettingsMenu(
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(source.worldUuid)
             ?: return MenuActionResult.Rejected()
         return when (context.payload[OPERATION]) {
+            OPERATION_SIMULATION -> {
+                val authorized = player.uniqueId == worldData.owner || player.uniqueId in worldData.members ||
+                    player.uniqueId in worldData.moderators || MyWorldManagerApi.hasWorldSettingsAdminAccess(player)
+                if (!authorized || !plugin.isRepairBypassEnabled()) MenuActionResult.Rejected()
+                else {
+                    plugin.setTourSimulationEnabled(worldData, !plugin.isTourSimulationEnabled(worldData.uuid))
+                    MenuActionResult.Success(MenuUpdate.Refresh)
+                }
+            }
             OPERATION_EDIT_INFO -> executeMwmAction(player, worldData, WorldSettingsAction.EDIT_INFO, context.click)
             OPERATION_SELECT_ICON -> executeMwmAction(player, worldData, WorldSettingsAction.SELECT_ICON, context.click)
             OPERATION_SET_SPAWN -> executeMwmAction(player, worldData, WorldSettingsAction.SET_SPAWN, context.click)
@@ -235,6 +245,21 @@ class ChanponWorldSettingsMenu(
         // 保護ワールドのオーナー向け短縮画面だけは、既存の配置契約を維持します。
         val size = if (protected && owner) PROTECTED_SETTINGS_SIZE else 54
         val elements = mutableListOf<MenuElement>()
+        if (plugin.isRepairBypassEnabled() && (actualOwner || moderator || member)) {
+            val enabled = plugin.isTourSimulationEnabled(worldData.uuid)
+            elements += CCSystem.getAPI().getGuiElementService().menuEntry(player, GuiMenuEntrySpec(
+                slot = 0,
+                material = if (enabled) Material.LIME_DYE else Material.GRAY_DYE,
+                name = fixedName(i18n(player, ChanponPhaseKeys.CHANPON_SIMULATION_DISPLAY), GuiNameStyle.PRIMARY),
+                role = GuiElementRole.ACTION,
+                description = listOf(i18n(player, ChanponPhaseKeys.CHANPON_SIMULATION_DESCRIPTION)),
+                data = listOf(GuiMenuEntryData(i18n(player, ChanponPhaseKeys.CHANPON_CONTROLS_BUILD_CURRENT), i18n(player, if (enabled) ChanponPhaseKeys.CHANPON_STATE_ENABLED else ChanponPhaseKeys.CHANPON_STATE_DISABLED))),
+                actions = listOf(chanponGestureAction(ACTION_SELECT, MenuGesture.ANY,
+                    i18n(player, if (enabled) ChanponPhaseKeys.CHANPON_SIMULATION_DISABLE else ChanponPhaseKeys.CHANPON_SIMULATION_ENABLE),
+                    mapOf(OPERATION to OPERATION_SIMULATION), safety = MenuActionSafety.EXTERNAL_SIDE_EFFECT)),
+                glint = enabled,
+            ))
+        }
 
         if (protected && owner) {
             addCapability(elements, player, worldData, ChanponWorldSettingsPlacements.PUBLISH_ACTION, 21)
@@ -1453,6 +1478,7 @@ class ChanponWorldSettingsMenu(
         private const val PAYLOAD_DIRECTION = "direction"
         private const val PAYLOAD_FINAL_STEP = "final_step"
         private const val OPERATION = "operation"
+        private const val OPERATION_SIMULATION = "simulation"
         private const val OPERATION_BACK = "back"
         private const val OPERATION_CONFIRM = "confirm"
         private const val OPERATION_DELETE = "delete"

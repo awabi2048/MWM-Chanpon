@@ -217,7 +217,7 @@ class EasyVoidWorldCreationService(
                     if (error != null) add(error)
                 },
                 inputs = listOf(
-                    MenuDialogInput.Text(NAME_INPUT, component(player, ChanponSystemKeys.CHANPON_PLAYER_WORLD_EASY_CREATION_NAME_LABEL), initial, maxLength = 32),
+                    MenuDialogInput.Text(NAME_INPUT, component(player, ChanponSystemKeys.CHANPON_PLAYER_WORLD_EASY_CREATION_NAME_LABEL), initial, maxLength = 50),
                 ),
                 confirm = MenuDialogButton(
                     component(player, ChanponSystemKeys.CHANPON_PLAYER_WORLD_EASY_CREATION_NEXT),
