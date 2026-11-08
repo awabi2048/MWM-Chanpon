@@ -64,6 +64,7 @@ import me.awabi2048.mwmchanpon.tour.PreviewTourStorage
 import me.awabi2048.mwmchanpon.tool.LuckPermsToolPermissionService
 import me.awabi2048.mwmchanpon.tool.ToolPermissionConfig
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
+import me.awabi2048.mwmchanpon.tool.ToolPermissionDefinition
 import me.awabi2048.mwmchanpon.ui.AutomationSettingsMenu
 import me.awabi2048.mwmchanpon.ui.AnnualArchiveFlow
 import me.awabi2048.mwmchanpon.ui.BackupListMenu
@@ -81,11 +82,14 @@ import me.awabi2048.mwmchanpon.ui.WorldDataExportMenu
 import me.awabi2048.mwmchanpon.ui.WorldDataManagementMenu
 import me.awabi2048.mwmchanpon.ui.bedrock.AdminWizardForm
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
+import me.awabi2048.myworldmanager.api.event.MwmSystemReloadEvent
 import me.awabi2048.myworldmanager.api.service.ApiMigrationParticipant
 import me.awabi2048.myworldmanager.api.service.ApiMigrationParticipantState
 import me.awabi2048.myworldmanager.api.service.ApiMacroService
 import net.luckperms.api.LuckPermsProvider
 import org.bukkit.entity.Player
+import org.bukkit.event.EventHandler
+import org.bukkit.event.Listener
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
 import java.nio.channels.FileChannel
@@ -135,6 +139,7 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var adminCommand: ChanponAdminCommand
     private lateinit var spawnWorldService: ChanponSpawnWorldService
     private lateinit var toolController: ToolPermissionController
+    private lateinit var toolDefinitions: MutableList<ToolPermissionDefinition>
     private lateinit var offlineMemberInviteNotifier: OfflineMemberInviteNotifier
     private lateinit var spawnProtectionService: SpawnWorldProtectionService
     private lateinit var buildPermissionService: WorldBuildPermissionService
@@ -189,7 +194,7 @@ class MWMChanponPlugin : JavaPlugin() {
         ).also {
             it.setConfigurationAvailability(::isConfigurationMigrationCurrent)
         }
-        val toolDefinitions = ToolPermissionConfig(config).load()
+        toolDefinitions = ToolPermissionConfig(config).load().toMutableList()
         val isAutoRollbackEnabled = {
             isConfigurationMigrationCurrent() && config.getBoolean("backup.auto_rollback.enabled", false)
         }
@@ -357,6 +362,15 @@ class MWMChanponPlugin : JavaPlugin() {
             command.setExecutor(adminCommand)
             command.tabCompleter = adminCommand
         }
+        server.pluginManager.registerEvents(object : Listener {
+            @EventHandler
+            fun onReload(event: MwmSystemReloadEvent) {
+                runCatching { reloadChanponSettings() }.onFailure { error ->
+                    logger.log(java.util.logging.Level.SEVERE, "MWM-Chanpon の設定再読込に失敗しました", error)
+                    event.reportFailure("MWM-Chanpon")
+                }
+            }
+        }, this)
         server.pluginManager.registerEvents(productionToggleExtension, this)
         if (server.pluginManager.isPluginEnabled("Chanpon-Utilities")) {
             server.pluginManager.registerEvents(FreecamWorldPolicyListener(chanponStorage), this)
@@ -543,6 +557,29 @@ class MWMChanponPlugin : JavaPlugin() {
             toolController.clearOnlineActivePermissions()
         }
         logger.info("MWM-Chanpon addon has been disabled.")
+    }
+
+    /** 外部編集された設定の検証後、共有中の定義とワールド権限を同じ状態へ更新します。 */
+    private fun reloadChanponSettings() {
+        val status = configMigrationParticipant.status()
+        check(status.state == ApiMigrationParticipantState.CURRENT) {
+            status.message ?: "MWM-Chanpon の設定を検証できませんでした"
+        }
+        reloadConfig()
+        val definitions = ToolPermissionConfig(config).load()
+        // 旧グループを先に外し、既存画面が保持するリストの参照を維持します。
+        toolController.clearOnlineActivePermissions()
+        toolDefinitions.clear()
+        toolDefinitions.addAll(definitions)
+        productionToggleExtension.syncForcedTagsForProductionWorlds()
+        publishLevelSynchronizer.syncAll()
+        MyWorldManagerApi.getWorldRepository()?.findAll()?.let { worlds ->
+            worldSafetyDefaultsService.syncAll(worlds)
+            submittedProtectionService.syncAll(worlds)
+            worlds.forEach(toolController::syncWorld)
+        }
+        syncBuildingState()
+        logger.info("MWM-Chanpon の設定を再読込しました。")
     }
 
     private fun syncBuildPermissions() {

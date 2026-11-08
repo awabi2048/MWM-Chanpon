@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "me.awabi2048"
-version = "26.1108.4"
+version = "26.1108.5"
 
 repositories {
     mavenLocal()
@@ -31,9 +31,9 @@ kotlin {
 val providedDeps = listOf(
     "io.papermc.paper:paper-api:26.2.build.129-stable",
     "org.jetbrains.kotlin:kotlin-stdlib:2.3.20",
-    "com.awabi2048:CC-System:26.1108.1",
+    "com.awabi2048:CC-System:26.1108.3",
     "me.awabi2048:chanpon-utilities:26.905.2",
-    "awabi2048:my-world-manager:26.1108.1",
+    "awabi2048:my-world-manager:26.1108.6",
     "net.luckperms:api:5.4",
     "com.sk89q.worldedit:worldedit-bukkit:7.3.16",
     "com.sk89q.worldguard:worldguard-bukkit:7.0.14",

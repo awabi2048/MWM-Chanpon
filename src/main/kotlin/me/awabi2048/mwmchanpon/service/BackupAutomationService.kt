@@ -18,6 +18,7 @@ import org.bukkit.entity.Player
 import org.bukkit.scheduler.BukkitTask
 import java.time.Duration
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
@@ -32,14 +33,18 @@ class BackupAutomationService(
     private var task: BukkitTask? = null
     private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
     private val activeRuns = mutableMapOf<AutomationType, AutomationRun>()
+    private val executionGates = AutomationType.entries.associateWith { ScheduledExecutionGate() }
+    private val lastPreparationSecond = mutableMapOf<AutomationType, LocalDateTime>()
+    private var lastMigrationCheckSecond: LocalDateTime? = null
+    private var migrationCurrent = false
 
     fun start() {
         stop()
         task = plugin.server.scheduler.runTaskTimer(
             plugin,
             Runnable { tick() },
-            20L,
-            plugin.config.getLong("backup.automation.check_interval_ticks", 100L).coerceIn(20L, 100L)
+            1L,
+            1L
         )
     }
 
@@ -61,47 +66,73 @@ class BackupAutomationService(
         // 旧形式の設定を読み込んだまま自動処理を進めると、実行日時などの書き込みだけが
         // 先に発生し、移行前の設定と処理状態が食い違います。/mwm migration 完了まで
         // タスク自体は保持しますが、判定と書き込みを含む自動処理は停止します。
-        if (!plugin.isConfigurationMigrationCurrent()) return
+        // 時刻は毎 tick 判定し、ディスクを伴う設定検査と準備処理は毎秒に抑えます。
+        val second = LocalDateTime.now().withNano(0)
+        if (lastMigrationCheckSecond != second) {
+            lastMigrationCheckSecond = second
+            migrationCurrent = plugin.isConfigurationMigrationCurrent()
+        }
+        if (!migrationCurrent) return
         handleAutoBackup()
         handleAutoRollback()
     }
 
     private fun handleAutoBackup() {
         if (!plugin.config.getBoolean("backup.auto_backup.enabled", false)) {
+            executionGates.getValue(AutomationType.BACKUP).reset()
             finishRun(AutomationType.BACKUP)
             return
         }
         val today = LocalDate.now().toString()
         if (plugin.config.getString("backup.auto_backup.last_run_date") == today) return
         val targetTime = parseTime(plugin.config.getString("backup.auto_backup.time", "04:00")) ?: return
+        val decision = executionGates.getValue(AutomationType.BACKUP).observe(LocalDateTime.now(), targetTime)
+        if (decision == ScheduledExecutionGate.Decision.SKIP) {
+            finishRun(AutomationType.BACKUP)
+            plugin.logger.warning("定時バックアップを定刻に実行できなかったため、今回はスキップしました。")
+            return
+        }
+        if (!shouldPrepare(AutomationType.BACKUP, decision)) return
         val worldUuids = productionWorldUuids()
-        handleRun(AutomationType.BACKUP, today, targetTime, worldUuids) {
-            backupService.createVisitedScheduledBackup().thenApply { it.status == BackupOperationStatus.SUCCESS }
+        handleRun(AutomationType.BACKUP, today, targetTime, worldUuids, decision == ScheduledExecutionGate.Decision.EXECUTE) {
+            backupService.createVisitedScheduledBackup().thenApply { it.status }
         }
     }
 
     private fun handleAutoRollback() {
         if (!plugin.config.getBoolean("backup.auto_rollback.enabled", false)) {
+            executionGates.getValue(AutomationType.ROLLBACK).reset()
             finishRun(AutomationType.ROLLBACK)
             return
         }
         val today = LocalDate.now().toString()
         if (plugin.config.getString("backup.auto_rollback.last_run_date") == today) return
         val targetTime = parseTime(plugin.config.getString("backup.auto_rollback.time", "05:00")) ?: return
+        val decision = executionGates.getValue(AutomationType.ROLLBACK).observe(LocalDateTime.now(), targetTime)
+        if (decision == ScheduledExecutionGate.Decision.SKIP) {
+            finishRun(AutomationType.ROLLBACK)
+            plugin.logger.warning("自動ロールバックを定刻に実行できなかったため、今回はスキップしました。")
+            return
+        }
+        if (!shouldPrepare(AutomationType.ROLLBACK, decision)) return
         val restorePoint = backupService.latestRestorePoint()
         if (restorePoint == null) {
-            if (isDue(LocalTime.now(), targetTime)) {
+            if (decision == ScheduledExecutionGate.Decision.EXECUTE) {
                 plugin.config.set("backup.auto_rollback.last_run_date", today)
                 plugin.saveConfigIfCurrent()
                 plugin.logger.warning("Auto rollback skipped because restore point is missing.")
             }
             return
         }
-        handleRun(AutomationType.ROLLBACK, today, targetTime, restorePoint.worldUuids) {
-            backupService.restoreBackup(restorePoint).thenApply {
-                it.status == BackupOperationStatus.SUCCESS || it.status == BackupOperationStatus.RECOVERED
-            }
+        handleRun(AutomationType.ROLLBACK, today, targetTime, restorePoint.worldUuids, decision == ScheduledExecutionGate.Decision.EXECUTE) {
+            backupService.restoreBackup(restorePoint).thenApply { it.status }
         }
+    }
+
+    private fun shouldPrepare(type: AutomationType, decision: ScheduledExecutionGate.Decision): Boolean {
+        if (decision == ScheduledExecutionGate.Decision.EXECUTE) return true
+        val second = LocalDateTime.now().withNano(0)
+        return lastPreparationSecond.put(type, second) != second
     }
 
     private fun handleRun(
@@ -109,7 +140,8 @@ class BackupAutomationService(
         today: String,
         targetTime: LocalTime,
         worldUuids: List<UUID>,
-        operation: () -> CompletableFuture<Boolean>
+        execute: Boolean,
+        operation: () -> CompletableFuture<BackupOperationStatus>
     ) {
         if (worldUuids.isEmpty()) return
         val remaining = secondsUntil(targetTime)
@@ -123,32 +155,57 @@ class BackupAutomationService(
         val current = activeRuns[type] ?: return
         updateBossBar(current, max(remaining, 0L))
         notifyWarnings(current, remaining)
-        if (remaining <= 0L && !current.started) {
+        if (execute && !current.started) {
             startOperation(current, operation)
         }
     }
 
-    private fun startOperation(run: AutomationRun, operation: () -> CompletableFuture<Boolean>) {
+    private fun startOperation(run: AutomationRun, operation: () -> CompletableFuture<BackupOperationStatus>) {
         run.started = true
         val configPath = if (run.type == AutomationType.BACKUP) "backup.auto_backup.last_run_date" else "backup.auto_rollback.last_run_date"
         plugin.config.set(configPath, run.date)
         plugin.saveConfigIfCurrent()
 
-        run.evacuatedPlayers = evacuatePlayers(run.worldUuids) ?: emptyList()
+        // ロールバックの退避は BackupService がロック取得後に担当します。
+        // ここで先に退避させると失敗時の復帰と通知先が失われます。
+        run.audience.addAll(run.players().map { it.uniqueId })
+        if (run.type == AutomationType.BACKUP) {
+            val evacuated = evacuatePlayers(run.worldUuids)
+            if (evacuated == null) {
+                run.players().forEach { it.sendMessage(i18nComponentFor(it, ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_BACKUP_FAILED)) }
+                finishRun(run.type)
+                return
+            }
+            run.evacuatedPlayers = evacuated
+        }
         run.bossBar?.setTitle(i18n(run.type.runningKey))
         run.bossBar?.progress = 1.0
+        run.players().forEach { it.sendMessage(i18nComponentFor(it, run.type.runningKey)) }
 
-        operation().whenComplete { success, throwable ->
+        val future = try {
+            operation()
+        } catch (error: Exception) {
+            CompletableFuture.failedFuture(error)
+        }
+        future.whenComplete { status, throwable ->
             Bukkit.getScheduler().runTask(plugin, Runnable {
                 if (throwable != null) {
                     plugin.logger.warning("${run.type.logName} failed: ${throwable.message}")
                 }
-                val succeeded = throwable == null && success == true
-                if (succeeded) {
+                if (run.type == AutomationType.BACKUP) {
                     restoreEvacuatedPlayers(run.evacuatedPlayers, run.worldUuids)
                 }
-                run.players().forEach { it.sendMessage(i18nComponent(run.type.finishedKey)) }
-                finishRun(run.type)
+                val result = if (throwable == null) status else BackupOperationStatus.FAILED
+                val key = if (run.type == AutomationType.BACKUP) {
+                    if (result == BackupOperationStatus.SUCCESS) run.type.finishedKey else ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_BACKUP_FAILED
+                } else when (result) {
+                    BackupOperationStatus.SUCCESS -> run.type.finishedKey
+                    BackupOperationStatus.RECOVERED -> ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_RESTORE_RECOVERED
+                    BackupOperationStatus.RECOVERY_FAILED -> ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_RESTORE_RECOVERY_FAILED
+                    else -> ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_RESTORE_FAILED
+                }
+                run.players().forEach { it.sendMessage(i18nComponentFor(it, key)) }
+                if (activeRuns[run.type] === run) finishRun(run.type)
             })
         }
     }
@@ -181,13 +238,21 @@ class BackupAutomationService(
     }
 
     private fun evacuatePlayers(worldUuids: List<UUID>): List<EvacuatedPlayer>? {
+        val targets = playersInWorlds(worldUuids)
+        if (targets.isEmpty()) return emptyList()
         val location = MyWorldManagerApi.getEvacuationLocationOverride() ?: return null
-        return playersInWorlds(worldUuids).map { player ->
-            val worldUuid = currentWorldUuid(player) ?: return@map null
+        val evacuatedPlayers = mutableListOf<EvacuatedPlayer>()
+        for (player in targets) {
+            val worldUuid = currentWorldUuid(player) ?: continue
             val evacuated = EvacuatedPlayer(player.uniqueId, worldUuid, player.location.clone())
-            player.teleport(location)
-            evacuated
-        }.filterNotNull()
+            if (!player.teleport(location)) {
+                // 一人でも退避できなければ処理せず、先に退避した人を元の場所へ戻します。
+                evacuatedPlayers.forEach { previous -> Bukkit.getPlayer(previous.playerUuid)?.teleport(previous.location) }
+                return null
+            }
+            evacuatedPlayers.add(evacuated)
+        }
+        return evacuatedPlayers
     }
 
     private fun restoreEvacuatedPlayers(evacuatedPlayers: List<EvacuatedPlayer>, safeWorldUuids: List<UUID>) {
@@ -206,8 +271,8 @@ class BackupAutomationService(
         }
     }
 
-    private fun AutomationRun.players(): List<Player> = playersInWorlds(worldUuids) +
-        evacuatedPlayers.mapNotNull { Bukkit.getPlayer(it.playerUuid) }.filter { it.isOnline }
+    private fun AutomationRun.players(): List<Player> = (playersInWorlds(worldUuids) +
+        audience.mapNotNull { Bukkit.getPlayer(it) }.filter { it.isOnline }).distinctBy { it.uniqueId }
 
     private fun playersInWorlds(worldUuids: List<UUID>): List<Player> {
         val targetSet = worldUuids.toSet()
@@ -229,10 +294,6 @@ class BackupAutomationService(
 
     private fun secondsUntil(target: LocalTime): Long {
         return Duration.between(LocalTime.now(), target).seconds
-    }
-
-    private fun isDue(now: LocalTime, target: LocalTime): Boolean {
-        return Duration.between(target, now).seconds in 0..59
     }
 
     private fun parseTime(raw: String?): LocalTime? {
@@ -266,6 +327,9 @@ class BackupAutomationService(
         return CCSystem.getAPI().getI18nComponent(null, key, placeholders)
     }
 
+    private fun i18nComponentFor(player: Player, key: LocalizationKey<String>): Component =
+        CCSystem.getAPI().getI18nComponent(player, key, emptyMap())
+
     private enum class AutomationType(
         val logName: String,
         val warningKey: LocalizationKey<String>,
@@ -284,6 +348,7 @@ class BackupAutomationService(
         val worldUuids: List<UUID>,
         val notifiedWarnings: MutableSet<Long> = mutableSetOf(),
         var bossBar: BossBar? = null,
+        val audience: MutableSet<UUID> = mutableSetOf(),
         var evacuatedPlayers: List<EvacuatedPlayer> = emptyList(),
         var started: Boolean = false
     )

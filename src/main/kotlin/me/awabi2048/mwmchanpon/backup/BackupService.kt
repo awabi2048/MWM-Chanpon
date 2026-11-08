@@ -1299,8 +1299,16 @@ class BackupService(
             }
         if (targets.isEmpty()) return emptyList()
         val location = MyWorldManagerApi.getEvacuationLocationOverride() ?: return null
-        targets.forEach { (player, _) -> player.teleport(location) }
-        return targets.map { it.second }
+        val evacuated = mutableListOf<EvacuatedPlayer>()
+        for ((player, previous) in targets) {
+            if (!player.teleport(location)) {
+                // 退避不能な人を残したままアンロードせず、先に退避した人も戻します。
+                evacuated.forEach { Bukkit.getPlayer(it.playerUuid)?.teleport(it.location) }
+                return null
+            }
+            evacuated.add(previous)
+        }
+        return evacuated
     }
 
     private fun restoreEvacuatedPlayers(evacuatedPlayers: List<EvacuatedPlayer>, result: RestoreOperationResult) {
