@@ -559,11 +559,18 @@ class MWMChanponPlugin : JavaPlugin() {
     fun isTourSimulationEnabled(worldUuid: java.util.UUID): Boolean = globalStorage.isTourSimulationEnabled(worldUuid)
 
     private fun syncRepairProtection() {
+        val failures = mutableListOf<Throwable>()
+        // 1ワールドの失敗で残りの保護同期を中断せず、最後に呼び出し元へ失敗を返します。
         MyWorldManagerApi.getWorldRepository()?.findAll()?.forEach { world ->
-            submittedProtectionService.sync(world)
-            toolController.syncWorld(world)
+            runCatching { submittedProtectionService.sync(world) }.onFailure(failures::add)
+            runCatching { toolController.syncWorld(world) }.onFailure(failures::add)
         }
-        syncBuildingState()
+        runCatching { syncBuildingState() }.onFailure(failures::add)
+        if (failures.isNotEmpty()) {
+            throw IllegalStateException("修正期間の状態を一部のワールドへ反映できませんでした", failures.first()).also { error ->
+                failures.drop(1).forEach(error::addSuppressed)
+            }
+        }
     }
 
     fun setBuildingAllowed(allowed: Boolean) {

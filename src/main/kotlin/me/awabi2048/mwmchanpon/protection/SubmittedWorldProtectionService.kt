@@ -83,8 +83,7 @@ class SubmittedWorldProtectionService(
             .get(BukkitAdapter.adapt(bukkitWorld))
 
         if (regionManager == null) {
-            logger.warning("WorldGuard region data is unavailable for ${bukkitWorld.name}")
-            return
+            throw IllegalStateException("WorldGuard region data is unavailable for ${bukkitWorld.name}")
         }
 
         if (protected) {
