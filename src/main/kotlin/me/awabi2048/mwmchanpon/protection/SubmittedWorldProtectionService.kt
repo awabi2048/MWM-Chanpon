@@ -51,28 +51,18 @@ class SubmittedWorldProtectionService(
 
     fun protectionReasons(worldData: WorldData): Set<ProtectionReason> {
         if (!storage.hasCurrentWorldData(worldData.uuid)) return emptySet()
-        val reasons = linkedSetOf<ProtectionReason>()
-        // シミュレーションは非本番ワールドでも提出後と同じ保護を適用します。
-        if (tourSimulationEnabled(worldData.uuid)) reasons.add(ProtectionReason.SIMULATION)
-        if (!storage.isProductionWorld(worldData.uuid)) return reasons
-        if (autoRollbackEnabled()) {
-            reasons.add(ProtectionReason.AUTO_ROLLBACK)
+        val production = storage.isProductionWorld(worldData.uuid)
+        val state = if (production) storage.getSubmissionStateOrNull(worldData.uuid) else null
+        if (production && state == null) {
+            logger.warning("Cannot determine submission protection because submission state is invalid: ${worldData.uuid}")
         }
-        val state = try {
-            storage.getSubmissionState(worldData.uuid)
-        } catch (ex: IllegalStateException) {
-            if (reasons.isEmpty()) {
-                logger.warning("Cannot sync submitted protection because submission state is invalid: ${worldData.uuid}")
-            }
-            reasons.add(ProtectionReason.INVALID_STATE)
-            return reasons
-        }
-        when (state) {
-            SubmissionState.SUBMITTED -> if (!repairBypassEnabled()) reasons.add(ProtectionReason.SUBMITTED)
-            SubmissionState.COMPLETED -> if (!repairBypassEnabled()) reasons.add(ProtectionReason.COMPLETED)
-            SubmissionState.UNSUBMITTED -> Unit
-        }
-        return reasons
+        return effectiveProtectionReasons(
+            production = production,
+            state = state,
+            autoRollback = production && autoRollbackEnabled(),
+            bypass = repairBypassEnabled(),
+            simulation = tourSimulationEnabled(worldData.uuid),
+        )
     }
 
     fun setProtected(worldData: WorldData, protected: Boolean) {
@@ -136,4 +126,24 @@ enum class ProtectionReason {
     AUTO_ROLLBACK,
     INVALID_STATE,
     SIMULATION
+}
+
+/** 提出状態と一時操作を合成し、判定不能時は提出保護を維持します。 */
+internal fun effectiveProtectionReasons(
+    production: Boolean,
+    state: SubmissionState?,
+    autoRollback: Boolean,
+    bypass: Boolean,
+    simulation: Boolean,
+): Set<ProtectionReason> = buildSet {
+    if (simulation) add(ProtectionReason.SIMULATION)
+    if (production) {
+        if (autoRollback) add(ProtectionReason.AUTO_ROLLBACK)
+        when (state) {
+            null -> add(ProtectionReason.INVALID_STATE)
+            SubmissionState.SUBMITTED -> if (!bypass) add(ProtectionReason.SUBMITTED)
+            SubmissionState.COMPLETED -> if (!bypass) add(ProtectionReason.COMPLETED)
+            SubmissionState.UNSUBMITTED -> Unit
+        }
+    }
 }
