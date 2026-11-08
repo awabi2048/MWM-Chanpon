@@ -17,6 +17,7 @@ import me.awabi2048.myworldmanager.model.ManagedDimension
 import me.awabi2048.myworldmanager.model.WorldData
 import org.bukkit.Material
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
@@ -131,6 +132,24 @@ class WorldBuildPermissionContractTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun `シミュレーションの管理者所属は提出保護のみ解除し通常保護を維持する`() {
+        val admin = UUID.randomUUID()
+        val member = UUID.randomUUID()
+        val lock = ProtectedCuboidRegion("simulation", BlockVector3.at(-10, -64, -10), BlockVector3.at(10, 320, 10))
+        configureSubmittedLock(lock)
+        lock.priority = 1_000_000
+        lock.owners.addPlayer(admin)
+        val global = GlobalProtectedRegion("__global__")
+        val result = RegionResultSet(mutableListOf<ProtectedRegion>(lock), global)
+        assertTrue(result.testState(localPlayer(admin), Flags.BUILD))
+        assertFalse(result.testState(localPlayer(member), Flags.BUILD))
+        assertEquals(setOf(admin), lock.owners.uniqueIds)
+        // 次の通常提出保護への再同期で、シミュレーション専用所属が残らないことも確認します。
+        configureSubmittedLock(lock)
+        assertFalse(RegionResultSet(mutableListOf<ProtectedRegion>(lock), global).testState(localPlayer(admin), Flags.BUILD))
     }
 
     private fun localPlayer(uuid: UUID): LocalPlayer =

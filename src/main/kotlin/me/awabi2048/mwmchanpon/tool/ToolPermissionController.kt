@@ -22,11 +22,11 @@ class ToolPermissionController(
     },
     // メンバー変更と取り消しを含む既存の全ワールド同期経路で、建築側の所属も更新します。
     private val syncBuildPermissions: (WorldData) -> Unit = {},
-    private val effectiveProtection: ((WorldData) -> Boolean)? = null,
+    private val effectiveProtection: ((WorldData, UUID) -> Boolean)? = null,
 ) {
     fun isEnabled(worldData: WorldData, playerUuid: UUID, toolId: String): Boolean {
         if (!storage.hasCurrentWorldData(worldData.uuid)) return false
-        if (isSubmissionLocked(worldData.uuid)) return false
+        if (isSubmissionLocked(worldData.uuid, playerUuid)) return false
         if (isGloballySuspended(worldData.uuid, playerUuid)) return false
         // 非メンバーには過去の個人設定を適用せず、公開中の共通設定だけを参照します。
         if (!isParticipant(worldData, playerUuid)) {
@@ -44,7 +44,7 @@ class ToolPermissionController(
 
     /** 実際に保存される値を公開し、可逆操作のCAS期待値と通常操作を一致させます。 */
     fun storedEnabledAfterSet(worldData: WorldData, playerUuid: UUID, enabled: Boolean): Boolean {
-        if (isSubmissionLocked(worldData.uuid)) return false
+        if (isSubmissionLocked(worldData.uuid, playerUuid)) return false
         if (isGloballySuspended(worldData.uuid, playerUuid)) return false
         return enabled
     }
@@ -107,7 +107,7 @@ class ToolPermissionController(
     }
 
     private fun getEffectiveEnabledTools(worldData: WorldData, playerUuid: UUID): Set<String> {
-        if (isSubmissionLocked(worldData.uuid)) return emptySet()
+        if (isSubmissionLocked(worldData.uuid, playerUuid)) return emptySet()
         if (isGloballySuspended(worldData.uuid, playerUuid)) return emptySet()
         return definitions
             .filter { isEnabled(worldData, playerUuid, it.id) }
@@ -119,9 +119,9 @@ class ToolPermissionController(
     private fun isGloballySuspended(worldUuid: UUID, playerUuid: UUID): Boolean =
         !globalBuildingAllowed() && !isGlobalBypassAllowed(worldUuid, playerUuid)
 
-    private fun isSubmissionLocked(worldUuid: UUID): Boolean {
+    private fun isSubmissionLocked(worldUuid: UUID, playerUuid: UUID): Boolean {
         val worldData = MyWorldManagerApi.getWorldRepository()?.findByUuid(worldUuid)
-        if (effectiveProtection != null) return worldData == null || effectiveProtection.invoke(worldData)
+        if (effectiveProtection != null) return worldData == null || effectiveProtection.invoke(worldData, playerUuid)
         val hasCurrentData = storage.hasCurrentWorldData(worldUuid)
         val production = storage.isProductionWorld(worldUuid)
         val submissionState = storage.getSubmissionStateOrNull(worldUuid)

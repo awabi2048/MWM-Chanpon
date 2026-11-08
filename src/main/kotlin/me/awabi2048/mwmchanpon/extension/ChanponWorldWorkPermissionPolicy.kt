@@ -14,7 +14,7 @@ class ChanponWorldWorkPermissionPolicy(
     private val globalStorage: ChanponGlobalStorage,
     private val autoRollbackLocked: () -> Boolean,
     private val protectionMode: (WorldData) -> ChanponWorldProtectionMode,
-    private val effectiveProtection: ((WorldData) -> Boolean)? = null,
+    private val effectiveProtection: ((WorldData, UUID) -> Boolean)? = null,
 ) : WorldWorkPermissionPolicy {
     private var configurationAvailable: () -> Boolean = { true }
 
@@ -41,7 +41,7 @@ class ChanponWorldWorkPermissionPolicy(
             return false
         }
         // 設定画面・リージョンと同じ実効保護を使用します。
-        effectiveProtection?.let { return !it(worldData) }
+        effectiveProtection?.let { return !it(worldData, playerUuid) }
         return try {
             storage.getSubmissionState(worldData.uuid) == SubmissionState.UNSUBMITTED
         } catch (_: IllegalStateException) {

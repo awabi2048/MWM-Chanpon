@@ -240,7 +240,7 @@ class ChanponWorldSettingsMenu(
         val owner = actualOwner && !imported
         val viewerRole = worldSettingsViewerRole(owner, moderator, member)
         val canInspectSettings = !imported && viewerRole != WorldSettingsViewerRole.NONE
-        val protected = protectionService.isProtected(worldData)
+        val protected = protectionService.isProtectedForPlayer(worldData, player)
         // メンバーも設定の全体像を確認できるよう、表示専用項目を含む通常画面は54枠を使います。
         // 保護ワールドのオーナー向け短縮画面だけは、既存の配置契約を維持します。
         val size = if (protected && owner) PROTECTED_SETTINGS_SIZE else 54

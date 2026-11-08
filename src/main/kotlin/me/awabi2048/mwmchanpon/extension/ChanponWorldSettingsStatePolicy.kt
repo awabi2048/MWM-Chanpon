@@ -15,7 +15,7 @@ class ChanponWorldSettingsStatePolicy(
     override fun restriction(
         context: WorldSettingsStateContext,
     ): WorldSettingsRestriction? = when {
-        protectionService.isProtected(context.worldData) ->
+        protectionService.isProtectedForPlayer(context.worldData, context.player) ->
             WorldSettingsRestriction.SUBMISSION_LOCKED
         storage.isImportedArchive(context.worldData.uuid) ->
             WorldSettingsRestriction.IMPORTED_ARCHIVE

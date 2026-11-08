@@ -37,7 +37,7 @@ class SubmittedWorldProtectionService(
         // 破損・旧形式をproduction=falseとして扱い、保護を解除しないようにします。
         if (!storage.hasCurrentWorldData(worldData.uuid)) return
         val reasons = protectionReasons(worldData)
-        setProtected(worldData, reasons.isNotEmpty())
+        setProtected(worldData, reasons.isNotEmpty(), reasons == setOf(ProtectionReason.SIMULATION))
     }
 
     /**
@@ -48,6 +48,14 @@ class SubmittedWorldProtectionService(
         !configurationAvailable() ||
             !storage.hasCurrentWorldData(worldData.uuid) ||
             protectionReasons(worldData).isNotEmpty()
+
+    /** シミュレーションだけが保護理由の場合、管理者の通常操作を許可します。 */
+    fun isProtectedForPlayer(worldData: WorldData, player: org.bukkit.entity.Player?): Boolean {
+        if (!configurationAvailable() || !storage.hasCurrentWorldData(worldData.uuid)) return true
+        val reasons = protectionReasons(worldData)
+        return reasons.any { it != ProtectionReason.SIMULATION } ||
+            (ProtectionReason.SIMULATION in reasons && (player == null || !isSimulationAdmin(player)))
+    }
 
     fun protectionReasons(worldData: WorldData): Set<ProtectionReason> {
         if (!storage.hasCurrentWorldData(worldData.uuid)) return emptySet()
@@ -65,7 +73,7 @@ class SubmittedWorldProtectionService(
         )
     }
 
-    fun setProtected(worldData: WorldData, protected: Boolean) {
+    fun setProtected(worldData: WorldData, protected: Boolean, simulationOnly: Boolean = false) {
         val bukkitWorld = Bukkit.getWorld(worldData.customWorldName ?: "my_world.${worldData.uuid}") ?: return
         val regionManager = WorldGuard.getInstance()
             .platform
@@ -80,6 +88,10 @@ class SubmittedWorldProtectionService(
             val region = regionManager.getRegion(REGION_ID) ?: createWorldRegion(bukkitWorld)
             region.priority = PRIORITY
             configureSubmittedLock(region)
+            // 提出保護リージョンだけの所属を付与し、他のWorldGuard保護は迂回しません。
+            if (simulationOnly) Bukkit.getOnlinePlayers().filter(::isSimulationAdmin).forEach {
+                region.owners.addPlayer(it.uniqueId)
+            }
             regionManager.addRegion(region)
         } else if (regionManager.hasRegion(REGION_ID)) {
             regionManager.removeRegion(REGION_ID, RemovalStrategy.UNSET_PARENT_IN_CHILDREN)
@@ -147,3 +159,7 @@ internal fun effectiveProtectionReasons(
         }
     }
 }
+
+internal fun isSimulationAdmin(player: org.bukkit.entity.Player): Boolean =
+    player.hasPermission("myworldmanager.admin") || player.hasPermission("mwmchanpon.admin") ||
+        player.hasPermission("chanponutilities.admin")

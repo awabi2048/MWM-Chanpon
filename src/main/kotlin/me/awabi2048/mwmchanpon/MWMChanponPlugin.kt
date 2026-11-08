@@ -199,7 +199,7 @@ class MWMChanponPlugin : JavaPlugin() {
             globalStorage,
             isAutoRollbackEnabled,
             buildPermissionService::effectiveProtectionMode,
-            { submittedProtectionService.isProtected(it) },
+            { data, playerId -> submittedProtectionService.isProtectedForPlayer(data, server.getPlayer(playerId)) },
         ).also {
             it.setConfigurationAvailability(::isConfigurationMigrationCurrent)
         }
@@ -212,7 +212,7 @@ class MWMChanponPlugin : JavaPlugin() {
             chanponStorage::isGlobalBypassAllowed,
             buildPermissionService::effectiveProtectionMode,
             buildPermissionService::sync,
-            { submittedProtectionService.isProtected(it) },
+            { data, playerId -> submittedProtectionService.isProtectedForPlayer(data, server.getPlayer(playerId)) },
         )
 
         backupService = BackupService(this, chanponStorage)
@@ -239,6 +239,14 @@ class MWMChanponPlugin : JavaPlugin() {
             globalStorage::isRepairBypassEnabled, globalStorage::isTourSimulationEnabled,
         ).also {
             it.setConfigurationAvailability(::isConfigurationMigrationCurrent)
+        }
+        // LuckPermsの権限変更は別スレッドでも届くため、リージョン更新はサーバースレッドへ戻します。
+        luckPerms.eventBus.subscribe(this, net.luckperms.api.event.user.UserDataRecalculateEvent::class.java) { event ->
+            server.scheduler.runTask(this, Runnable {
+                val player = server.getPlayer(event.user.uniqueId) ?: return@Runnable
+                val world = MyWorldManagerApi.getWorldRepository()?.findByWorldKey(player.world.key.toString()) ?: return@Runnable
+                if (globalStorage.isTourSimulationEnabled(world.uuid)) submittedProtectionService.sync(world)
+            })
         }
         automationSettingsMenu = AutomationSettingsMenu(this, backupService, automationService) {
             MyWorldManagerApi.getWorldRepository()?.findAll()?.let { worlds ->
