@@ -38,10 +38,9 @@ class ChanponWorldPlayerStatePolicy(
         if (globalStorage.isBuildingAllowed()) {
             return WorldPlayerStateDecision(buildAllowed = true)
         }
-        return WorldPlayerStateDecision(
-            buildAllowed = false,
-            flightAllowed = false
-        )
+        // 全体の建築停止は飛行設定ではありません。飛行可否はワールド設定と
+        // 他の飛行ポリシーに委ね、観光中の移動まで巻き込まないようにします。
+        return WorldPlayerStateDecision(buildAllowed = false)
     }
 
     private fun isAdmin(player: Player): Boolean =
