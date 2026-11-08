@@ -10,6 +10,13 @@ class ScheduledExecutionGateTest {
     private val time: LocalTime = target.toLocalTime()
 
     @Test
+    fun `引用符のない時刻がYAMLの60進数として読み込まれても解釈できる`() {
+        assertEquals(LocalTime.of(22, 46), ScheduledExecutionGate.parseConfiguredTime(1366))
+        assertEquals(LocalTime.of(22, 46), ScheduledExecutionGate.parseConfiguredTime("22:46"))
+        assertEquals(null, ScheduledExecutionGate.parseConfiguredTime(1440))
+    }
+
+    @Test
     fun `日付をまたぐ零時の定刻も前日から監視できる`() {
         val gate = ScheduledExecutionGate()
         val midnight = target.toLocalDate().plusDays(1).atStartOfDay()

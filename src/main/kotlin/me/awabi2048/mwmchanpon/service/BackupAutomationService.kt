@@ -20,7 +20,6 @@ import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
-import java.time.format.DateTimeFormatter
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import kotlin.math.max
@@ -31,7 +30,6 @@ class BackupAutomationService(
     private val backupService: BackupService
 ) {
     private var task: BukkitTask? = null
-    private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
     private val activeRuns = mutableMapOf<AutomationType, AutomationRun>()
     private val executionGates = AutomationType.entries.associateWith { ScheduledExecutionGate() }
     private val lastPreparationSecond = mutableMapOf<AutomationType, LocalDateTime>()
@@ -73,7 +71,7 @@ class BackupAutomationService(
         val now = LocalTime.now()
         val near = listOf("backup.auto_backup", "backup.auto_rollback").any { path ->
             if (!plugin.config.getBoolean("$path.enabled", false)) return@any false
-            val target = parseTime(plugin.config.getString("$path.time")) ?: return@any false
+            val target = configuredTime("$path.time") ?: return@any false
             val diff = Duration.between(now, target).toMillis().let {
                 if (target == LocalTime.MIDNIGHT && now >= LocalTime.NOON) it + 86_400_000L else it
             }
@@ -120,7 +118,7 @@ class BackupAutomationService(
             if (activeRuns[AutomationType.BACKUP]?.started != true) finishRun(AutomationType.BACKUP)
             return
         }
-        val targetTime = parseTime(plugin.config.getString("backup.auto_backup.time", "04:00")) ?: return
+        val targetTime = configuredTime("backup.auto_backup.time", "04:00") ?: return
         val today = ScheduledExecutionGate.scheduledDate(LocalDateTime.now(), targetTime).toString()
         if (settledDates[AutomationType.BACKUP] == today) return
         if (plugin.config.getString("backup.auto_backup.last_run_date") == today) return
@@ -150,7 +148,7 @@ class BackupAutomationService(
             if (activeRuns[AutomationType.ROLLBACK]?.started != true) finishRun(AutomationType.ROLLBACK)
             return
         }
-        val targetTime = parseTime(plugin.config.getString("backup.auto_rollback.time", "05:00")) ?: return
+        val targetTime = configuredTime("backup.auto_rollback.time", "05:00") ?: return
         val today = ScheduledExecutionGate.scheduledDate(LocalDateTime.now(), targetTime).toString()
         if (settledDates[AutomationType.ROLLBACK] == today) return
         if (plugin.config.getString("backup.auto_rollback.last_run_date") == today) return
@@ -405,13 +403,12 @@ class BackupAutomationService(
         return if (target == LocalTime.MIDNIGHT && now >= LocalTime.NOON) seconds + 86_400L else seconds
     }
 
-    private fun parseTime(raw: String?): LocalTime? {
-        return runCatching { LocalTime.parse(raw ?: return null, timeFormatter) }.getOrNull()
-    }
+    private fun configuredTime(path: String, default: String? = null): LocalTime? =
+        ScheduledExecutionGate.parseConfiguredTime(plugin.config.get(path) ?: default)
 
     private fun isWithinManualLockWindow(path: String): Boolean {
         if (!plugin.config.getBoolean("$path.enabled", false)) return false
-        val target = parseTime(plugin.config.getString("$path.time")) ?: return false
+        val target = configuredTime("$path.time") ?: return false
         val windowSeconds = plugin.config.getLong("backup.automation.manual_lock_minutes", 10L).coerceAtLeast(0L) * 60L
         val diff = kotlin.math.abs(Duration.between(target, LocalTime.now()).seconds)
         val circularDiff = minOf(diff, 24L * 60L * 60L - diff)

@@ -39,6 +39,13 @@ internal class ScheduledExecutionGate {
     }
 
     companion object {
+        /** YAML 1.1 は引用符のない 22:46 を 1366 分として解釈するため両形式を扱います。 */
+        fun parseConfiguredTime(value: Any?): LocalTime? = when (value) {
+            is String -> runCatching { LocalTime.parse(value, java.time.format.DateTimeFormatter.ofPattern("HH:mm")) }.getOrNull()
+            is Int -> if (value in 0 until 24 * 60) LocalTime.of(value / 60, value % 60) else null
+            else -> null
+        }
+
         /** 0時の定刻は前日から監視し、日付が変わっても事前観測を維持します。 */
         fun scheduledDate(now: LocalDateTime, time: LocalTime): java.time.LocalDate =
             if (time == LocalTime.MIDNIGHT && now.toLocalTime() >= LocalTime.NOON) now.toLocalDate().plusDays(1)
