@@ -553,6 +553,9 @@ class MWMChanponPlugin : JavaPlugin() {
         if (::automationService.isInitialized) {
             automationService.stop()
         }
+        if (::manualRollbackService.isInitialized) {
+            manualRollbackService.stop()
+        }
         if (::toolController.isInitialized) {
             toolController.clearOnlineActivePermissions()
         }
@@ -580,6 +583,7 @@ class MWMChanponPlugin : JavaPlugin() {
             worlds.forEach(toolController::syncWorld)
         }
         syncBuildingState()
+        automationService.start()
         logger.info("MWM-Chanpon の設定を再読込しました。")
     }
 

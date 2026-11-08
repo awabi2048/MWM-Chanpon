@@ -10,6 +10,14 @@ class ScheduledExecutionGateTest {
     private val time: LocalTime = target.toLocalTime()
 
     @Test
+    fun `日付をまたぐ零時の定刻も前日から監視できる`() {
+        val gate = ScheduledExecutionGate()
+        val midnight = target.toLocalDate().plusDays(1).atStartOfDay()
+        assertEquals(ScheduledExecutionGate.Decision.WAIT, gate.observe(midnight.minusSeconds(1), LocalTime.MIDNIGHT))
+        assertEquals(ScheduledExecutionGate.Decision.EXECUTE, gate.observe(midnight, LocalTime.MIDNIGHT))
+    }
+
+    @Test
     fun `指定時刻より前には実行せず五秒以内に一度だけ実行する`() {
         val gate = ScheduledExecutionGate()
         assertEquals(ScheduledExecutionGate.Decision.WAIT, gate.observe(target.minusNanos(1), time))

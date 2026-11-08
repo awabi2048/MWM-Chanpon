@@ -1396,7 +1396,8 @@ class BackupService(
             actorName = config.getString("actor_name"),
             reason = config.getString("reason"),
             name = config.getString("name"),
-            sizeBytes = config.getLong("size_bytes", folderSize(dir))
+            // Kotlin の引数は先に評価されるため、保存済みの値がある場合は走査を呼び出しません。
+            sizeBytes = if (config.isLong("size_bytes") || config.isInt("size_bytes")) config.getLong("size_bytes") else folderSize(dir)
         )
     }
 

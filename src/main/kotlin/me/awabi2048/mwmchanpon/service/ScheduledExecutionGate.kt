@@ -13,7 +13,7 @@ internal class ScheduledExecutionGate {
     private var decided = false
 
     fun observe(now: LocalDateTime, time: LocalTime): Decision {
-        val scheduled = now.toLocalDate().atTime(time)
+        val scheduled = scheduledDate(now, time).atTime(time)
         if (target != scheduled) {
             target = scheduled
             armed = false
@@ -36,5 +36,12 @@ internal class ScheduledExecutionGate {
         target = null
         armed = false
         decided = false
+    }
+
+    companion object {
+        /** 0時の定刻は前日から監視し、日付が変わっても事前観測を維持します。 */
+        fun scheduledDate(now: LocalDateTime, time: LocalTime): java.time.LocalDate =
+            if (time == LocalTime.MIDNIGHT && now.toLocalTime() >= LocalTime.NOON) now.toLocalDate().plusDays(1)
+            else now.toLocalDate()
     }
 }

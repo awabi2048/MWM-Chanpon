@@ -7,12 +7,18 @@ import me.awabi2048.mwmchanpon.MWMChanponPlugin
 import me.awabi2048.mwmchanpon.backup.BackupOperationStatus
 import me.awabi2048.mwmchanpon.backup.RestoreOperationResult
 import org.bukkit.Bukkit
+import org.bukkit.boss.BarColor
+import org.bukkit.boss.BarStyle
+import org.bukkit.boss.BossBar
 import org.bukkit.entity.Player
+import org.bukkit.scheduler.BukkitTask
 import java.util.concurrent.CompletableFuture
 
 class ManualRollbackService(
     private val plugin: MWMChanponPlugin
 ) {
+    private val notices = mutableMapOf<BossBar, BukkitTask>()
+
     fun schedule(
         actor: Player,
         operation: () -> CompletableFuture<RestoreOperationResult>,
@@ -23,9 +29,11 @@ class ManualRollbackService(
         Bukkit.getScheduler().runTaskLater(plugin, Runnable {
             val actorName = actor.name
             broadcastResult(ChanponBackupKeys.CHANPON_BACKUP_MANUAL_ROLLBACK_STARTED)
+            val notice = startNotice()
             try {
                 operation().whenComplete { result, throwable ->
                     Bukkit.getScheduler().runTask(plugin, Runnable {
+                        finishNotice(notice)
                         if (throwable != null) {
                             plugin.logger.warning("Manual rollback failed: actor=$actorName, error=${throwable.message}")
                             broadcastResult(ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_RESTORE_FAILED, actor)
@@ -40,11 +48,35 @@ class ManualRollbackService(
                     })
                 }
             } catch (ex: Exception) {
+                finishNotice(notice)
                 plugin.logger.warning("Manual rollback failed to start: actor=$actorName, error=${ex.message}")
                 broadcastResult(ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_RESTORE_FAILED, actor)
                 onComplete(failure(ex))
             }
         }, delaySeconds * 20L)
+    }
+
+    /** 処理中に参加したプレイヤーにも同じ状態を表示し、完了時には必ず解除します。 */
+    private fun startNotice(): BossBar {
+        val title = CCSystem.getAPI().getLocalized(null, ChanponBackupKeys.CHANPON_BACKUP_MANUAL_ROLLBACK_RUNNING, emptyMap())
+        val bar = Bukkit.createBossBar(title, BarColor.RED, BarStyle.SOLID)
+        fun sync() {
+            val players = Bukkit.getOnlinePlayers().toSet()
+            players.filterNot { it in bar.players }.forEach(bar::addPlayer)
+            bar.players.filterNot { it in players }.forEach(bar::removePlayer)
+        }
+        sync()
+        notices[bar] = Bukkit.getScheduler().runTaskTimer(plugin, Runnable { sync() }, 20L, 20L)
+        return bar
+    }
+
+    private fun finishNotice(bar: BossBar) {
+        notices.remove(bar)?.cancel()
+        bar.removeAll()
+    }
+
+    fun stop() {
+        notices.keys.toList().forEach(::finishNotice)
     }
 
     private fun broadcastAnnouncement(actorName: String, delaySeconds: Long) {
