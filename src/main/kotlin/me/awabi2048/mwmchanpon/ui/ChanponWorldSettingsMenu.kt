@@ -1,6 +1,7 @@
 package me.awabi2048.mwmchanpon.ui
 
 import com.awabi2048.ccsystem.api.localization.generated.ChanponSystemKeys
+import com.awabi2048.ccsystem.api.localization.generated.CommonKeys
 import com.awabi2048.ccsystem.api.localization.generated.ChanponPhaseKeys
 
 import com.awabi2048.ccsystem.api.localization.generated.MyworldGuiBedrockKeys
@@ -117,6 +118,10 @@ class ChanponWorldSettingsMenu(
                 val authorized = player.uniqueId == worldData.owner || player.uniqueId in worldData.members ||
                     player.uniqueId in worldData.moderators || MyWorldManagerApi.hasWorldSettingsAdminAccess(player)
                 if (!authorized || !plugin.isRepairBypassEnabled()) MenuActionResult.Rejected()
+                else if (!plugin.isTourSimulationEnabled(worldData.uuid) && !plugin.isTourSimulationAvailable()) {
+                    player.sendMessage(i18nComponent(player, CommonKeys.ERROR_LOAD_FAILED))
+                    MenuActionResult.Rejected()
+                }
                 else {
                     plugin.setTourSimulationEnabled(worldData, !plugin.isTourSimulationEnabled(worldData.uuid))
                     MenuActionResult.Success(MenuUpdate.Refresh)

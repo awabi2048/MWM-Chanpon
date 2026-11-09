@@ -353,6 +353,8 @@ class MWMChanponPlugin : JavaPlugin() {
         MyWorldManagerApi.registerWorldPortalPolicy(worldPortalPolicy)
         if (server.pluginManager.isPluginEnabled("Chanpon-Utilities")) {
             tourSimulationIntegration = TourSimulationIntegration(this, globalStorage).also { it.start() }
+        } else if (globalStorage.simulatedWorldUuids().isNotEmpty()) {
+            logger.severe("観光用シミュレーションは保存されていますが、Chanpon-Utilities が無効なため観光モードを適用できません。")
         }
         MyWorldManagerApi.registerWorldWorkPermissionPolicy(worldWorkPermissionPolicy)
         MyWorldManagerApi.registerWorldPublishPolicy(worldPublishPolicy)
@@ -608,6 +610,7 @@ class MWMChanponPlugin : JavaPlugin() {
     }
 
     fun setTourSimulationEnabled(worldData: me.awabi2048.myworldmanager.model.WorldData, enabled: Boolean) {
+        check(!enabled || isTourSimulationAvailable()) { "Chanpon-Utilities が利用できないため観光用シミュレーションを開始できません" }
         globalStorage.setTourSimulationEnabled(worldData.uuid, enabled)
         tourSimulationIntegration?.refresh()
         submittedProtectionService.sync(worldData)
@@ -616,6 +619,7 @@ class MWMChanponPlugin : JavaPlugin() {
     }
 
     fun isRepairBypassEnabled(): Boolean = globalStorage.isRepairBypassEnabled()
+    fun isTourSimulationAvailable(): Boolean = tourSimulationIntegration != null && server.pluginManager.isPluginEnabled("Chanpon-Utilities")
     fun isTourSimulationEnabled(worldUuid: java.util.UUID): Boolean = globalStorage.isTourSimulationEnabled(worldUuid)
 
     private fun syncRepairProtection() {
