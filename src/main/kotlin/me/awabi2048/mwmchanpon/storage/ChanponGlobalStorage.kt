@@ -114,6 +114,13 @@ class ChanponGlobalStorage(dataFolder: File) {
             worldUuid.toString() in config.getStringList("repair_period.simulated_worlds")
     }
 
+    /** イベントごとのディスク読込を避けるため、連携先へ有効な対象集合を渡します。 */
+    fun simulatedWorldUuids(): Set<UUID> {
+        val config = settings()
+        if (!config.getBoolean("repair_period.enabled", false)) return emptySet()
+        return config.getStringList("repair_period.simulated_worlds").mapNotNull(::parseUuid).toSet()
+    }
+
     fun setRepairBypassEnabled(enabled: Boolean) {
         ensureCurrentForWrite()
         val config = settings()

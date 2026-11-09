@@ -7,6 +7,7 @@ import com.awabi2048.ccsystem.api.gui.MenuTargetPolicy
 import com.awabi2048.ccsystem.api.gui.PublicMenuDefinition
 import me.awabi2048.mwmchanpon.backup.BackupService
 import me.awabi2048.mwmchanpon.bridge.CoreApiBridge
+import me.awabi2048.mwmchanpon.integration.TourSimulationIntegration
 import me.awabi2048.mwmchanpon.extension.ChanponCommandExtension
 import me.awabi2048.mwmchanpon.extension.ChanponWorldCreationGuard
 import me.awabi2048.mwmchanpon.extension.ChanponWorldAccessPolicy
@@ -99,6 +100,7 @@ import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
 
 class MWMChanponPlugin : JavaPlugin() {
+    private var tourSimulationIntegration: TourSimulationIntegration? = null
     private val coreApiBridge = CoreApiBridge()
     private lateinit var productionToggleExtension: ProductionToggleExtension
     private lateinit var productionWorldGuard: ProductionWorldGuard
@@ -349,6 +351,9 @@ class MWMChanponPlugin : JavaPlugin() {
         MyWorldManagerApi.registerWorldAccessPolicy(worldAccessPolicy)
         MyWorldManagerApi.registerWorldMenuAccessPolicy(worldMenuAccessPolicy)
         MyWorldManagerApi.registerWorldPortalPolicy(worldPortalPolicy)
+        if (server.pluginManager.isPluginEnabled("Chanpon-Utilities")) {
+            tourSimulationIntegration = TourSimulationIntegration(this, globalStorage).also { it.start() }
+        }
         MyWorldManagerApi.registerWorldWorkPermissionPolicy(worldWorkPermissionPolicy)
         MyWorldManagerApi.registerWorldPublishPolicy(worldPublishPolicy)
         MyWorldManagerApi.registerWorldRuntimePolicy(worldRuntimePolicy)
@@ -487,6 +492,8 @@ class MWMChanponPlugin : JavaPlugin() {
     }
 
     override fun onDisable() {
+        tourSimulationIntegration?.close()
+        tourSimulationIntegration = null
         if (::chanponWorldSettingsMenu.isInitialized) {
             MyWorldManagerApi.unregisterWorldSettingsRouteCapability(chanponWorldSettingsMenu)
         }
@@ -584,6 +591,7 @@ class MWMChanponPlugin : JavaPlugin() {
         }
         syncBuildingState()
         automationService.start()
+        tourSimulationIntegration?.refresh()
         logger.info("MWM-Chanpon の設定を再読込しました。")
     }
 
@@ -595,11 +603,13 @@ class MWMChanponPlugin : JavaPlugin() {
     /** 保存後に保護・作業権限を同じ実効状態へ収束させます。 */
     fun setRepairBypassEnabled(enabled: Boolean) {
         globalStorage.setRepairBypassEnabled(enabled)
+        tourSimulationIntegration?.refresh()
         syncRepairProtection()
     }
 
     fun setTourSimulationEnabled(worldData: me.awabi2048.myworldmanager.model.WorldData, enabled: Boolean) {
         globalStorage.setTourSimulationEnabled(worldData.uuid, enabled)
+        tourSimulationIntegration?.refresh()
         submittedProtectionService.sync(worldData)
         toolController.syncWorld(worldData)
         MyWorldManagerApi.syncOnlineWorldPlayerStates()
