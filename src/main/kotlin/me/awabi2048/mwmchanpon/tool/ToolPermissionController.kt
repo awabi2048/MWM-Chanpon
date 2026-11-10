@@ -28,9 +28,13 @@ class ToolPermissionController(
         if (!storage.hasCurrentWorldData(worldData.uuid)) return false
         if (isSubmissionLocked(worldData.uuid, playerUuid)) return false
         if (isGloballySuspended(worldData.uuid, playerUuid)) return false
+        val mode = protectionMode(worldData)
+        // オーナー限定は通常の建築権限と同じくツールにも適用します。
+        // 個別設定は消さず、モードを戻したときに再び利用できるよう保持します。
+        if (!ToolPermissionModePolicy.canUse(mode, playerUuid == worldData.owner)) return false
         // 非メンバーには過去の個人設定を適用せず、公開中の共通設定だけを参照します。
         if (!isParticipant(worldData, playerUuid)) {
-            return protectionMode(worldData) == me.awabi2048.mwmchanpon.storage.ChanponWorldProtectionMode.PUBLIC &&
+            return mode == me.awabi2048.mwmchanpon.storage.ChanponWorldProtectionMode.PUBLIC &&
                 storage.getPublicToolStates(worldData.uuid)[toolId] == true
         }
         return storage.getToolEnabledState(worldData.uuid, playerUuid, toolId)
@@ -144,6 +148,12 @@ class ToolPermissionController(
     private fun worldName(worldData: WorldData): String {
         return worldData.customWorldName ?: "my_world.${worldData.uuid}"
     }
+}
+
+/** 設定値を消去せず、現在の保護モードによる実効権限だけを絞ります。 */
+internal object ToolPermissionModePolicy {
+    fun canUse(mode: me.awabi2048.mwmchanpon.storage.ChanponWorldProtectionMode, owner: Boolean): Boolean =
+        mode != me.awabi2048.mwmchanpon.storage.ChanponWorldProtectionMode.OWNER_ONLY || owner
 }
 
 /**
