@@ -599,7 +599,11 @@ class MWMChanponPlugin : JavaPlugin() {
 
     private fun syncBuildPermissions() {
         if (!::buildPermissionService.isInitialized) return
-        MyWorldManagerApi.getWorldRepository()?.findAll()?.forEach(buildPermissionService::sync)
+        // スポーン指定は未設定ワールドの実効モードも変えるため、領域だけでなく
+        // 在室者の一時ツール権限と作業グループも同じ変更で更新します。
+        val worlds = MyWorldManagerApi.getWorldRepository()?.findAll() ?: return
+        if (::toolController.isInitialized) worlds.forEach(toolController::syncWorld)
+        else worlds.forEach(buildPermissionService::sync)
     }
 
     /** 保存後に保護・作業権限を同じ実効状態へ収束させます。 */
