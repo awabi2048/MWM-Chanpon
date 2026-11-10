@@ -106,6 +106,7 @@ class ChanponEnvironmentGui(
         val scale = worldData.fixedScale
         val allowFlight = worldData.allowFlight
         val allowFreecam = storage.isFreecamAllowed(worldData.uuid)
+        val interactionPhysicsStopped = storage.isInteractionPhysicsStopped(worldData.uuid)
         val randomTickStopped = storage.isRandomTickStopped(worldData.uuid)
         val outsideTargetWorld = !isInTargetWorld(player, worldData)
 
@@ -117,6 +118,7 @@ class ChanponEnvironmentGui(
                 directSettingEntry(player, 20, worldData.uuid, ACTION_TIME, Material.CLOCK, timeDisplay(player, time), timeOptions(player, time), timeOptionKey(time), outsideTargetWorld, customTimeAction = true),
                 directSettingEntry(player, 21, worldData.uuid, ACTION_GRAVITY, Material.FEATHER, gravityDisplay(player, gravity), gravityOptions(player), (gravity ?: DEFAULT_GRAVITY).toString(), outsideTargetWorld),
                 directSettingEntry(player, 22, worldData.uuid, ACTION_FREECAM, Material.ENDER_EYE, freecamDisplay(player, allowFreecam), freecamOptions(player), allowFreecam.toString(), outsideTargetWorld),
+                directSettingEntry(player, 10, worldData.uuid, ACTION_INTERACTION_PHYSICS, Material.LANTERN, interactionPhysicsDisplay(player, interactionPhysicsStopped), interactionPhysicsOptions(player), interactionPhysicsStopped.toString(), outsideTargetWorld),
                 directSettingEntry(player, 26, worldData.uuid, ACTION_RANDOM_TICK, Material.WHEAT, randomTickDisplay(player, randomTickStopped), randomTickOptions(player), randomTickStopped.toString(), outsideTargetWorld),
                 directSettingEntry(player, 23, worldData.uuid, ACTION_SCALE, Material.PLAYER_HEAD, scaleDisplay(player, scale), scaleOptions(player), scale?.toString(), outsideTargetWorld),
                 directSettingEntry(player, 24, worldData.uuid, ACTION_FLIGHT, Material.ELYTRA, flightDisplay(player, allowFlight), flightOptions(player), allowFlight.toString(), outsideTargetWorld),
@@ -154,6 +156,7 @@ class ChanponEnvironmentGui(
             ACTION_SCALE -> cycleScale(worldData, direction ?: return MenuActionResult.Ignored)
             ACTION_FLIGHT -> toggleFlight(worldData)
             ACTION_FREECAM -> toggleFreecam(worldData)
+            ACTION_INTERACTION_PHYSICS -> storage.setInteractionPhysicsStopped(worldData.uuid, !storage.isInteractionPhysicsStopped(worldData.uuid))
             ACTION_RANDOM_TICK -> toggleRandomTick(worldData)
             ACTION_PROTECTION -> {
                 // パスワードの設定・変更はメンバー管理メニュー（フッター3マス目）へ完全に移しました。
@@ -314,6 +317,7 @@ class ChanponEnvironmentGui(
             ACTION_TIME -> SettingPresentation(ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_TIME_DISPLAY, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_TIME_DESCRIPTION)
             ACTION_GRAVITY -> SettingPresentation(ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_GRAVITY_DISPLAY, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_GRAVITY_DESCRIPTION)
             ACTION_FREECAM -> SettingPresentation(ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_FREECAM_DISPLAY, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_FREECAM_DESCRIPTION)
+            ACTION_INTERACTION_PHYSICS -> SettingPresentation(ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_INTERACTION_PHYSICS_DISPLAY, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_INTERACTION_PHYSICS_DESCRIPTION)
             ACTION_RANDOM_TICK -> SettingPresentation(ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_RANDOM_TICK_DISPLAY, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_RANDOM_TICK_DESCRIPTION)
             ACTION_SCALE -> SettingPresentation(ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_SCALE_DISPLAY, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_SCALE_DESCRIPTION)
             ACTION_FLIGHT -> SettingPresentation(ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_FLIGHT_DISPLAY, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_FLIGHT_DESCRIPTION)
@@ -517,6 +521,14 @@ class ChanponEnvironmentGui(
         )
     }
 
+    private fun interactionPhysicsDisplay(player: Player, stopped: Boolean): String =
+        i18n(player, if (stopped) ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_INTERACTION_PHYSICS_ENABLED else ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_INTERACTION_PHYSICS_DISABLED)
+
+    private fun interactionPhysicsOptions(player: Player): List<SettingOption> = listOf(
+        SettingOption("true", i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_INTERACTION_PHYSICS_ENABLED), "§a"),
+        SettingOption("false", i18n(player, ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_INTERACTION_PHYSICS_DISABLED), "§c"),
+    )
+
     private fun randomTickDisplay(player: Player, stopped: Boolean): String {
         return i18n(player, if (stopped) ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_RANDOM_TICK_ENABLED else ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_RANDOM_TICK_DISABLED)
     }
@@ -651,6 +663,7 @@ class ChanponEnvironmentGui(
         private const val ACTION_SCALE = "scale"
         private const val ACTION_FLIGHT = "flight"
         private const val ACTION_FREECAM = "freecam"
+        private const val ACTION_INTERACTION_PHYSICS = "interaction_physics"
         private const val ACTION_RANDOM_TICK = "random_tick"
         private const val ACTION_PROTECTION = "protection"
         private const val RUNTIME_OWNER = "mwm-chanpon"
