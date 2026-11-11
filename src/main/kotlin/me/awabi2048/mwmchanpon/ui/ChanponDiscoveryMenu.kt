@@ -141,6 +141,8 @@ class ChanponDiscoveryMenu(
         val action = context.payload[WORLD_ACTION]
             ?.let { runCatching { DiscoveryWorldAction.valueOf(it) }.getOrNull() }
             ?: return MenuActionResult.Rejected()
+        // 古い画面や不正な操作からも参加申請へ到達させません。
+        if (action == DiscoveryWorldAction.REQUEST_MEMBERSHIP) return MenuActionResult.Rejected()
         return MyWorldManagerApi.getWorldListMenuService().executeDiscovery(context.player, worldUuid, action)
     }
 
@@ -189,15 +191,6 @@ class ChanponDiscoveryMenu(
                 )
             }
             if (!isBedrock && !isMember) {
-                add(
-                    action(
-                        DiscoveryWorldAction.REQUEST_MEMBERSHIP,
-                        MenuGesture.SHIFT_LEFT,
-                        plugin.getMessage(player, MyworldGuiDiscoveryKeys.GUI_DISCOVERY_WORLD_ITEM_MEMBER_REQUEST_HINT),
-                        payload,
-                        MenuActionSafety.CONFIRM_ENTRY,
-                    ),
-                )
                 add(
                     action(
                         DiscoveryWorldAction.TOGGLE_FAVORITE,
