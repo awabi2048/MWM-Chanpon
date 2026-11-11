@@ -427,6 +427,7 @@ class MWMChanponPlugin : JavaPlugin() {
                 }
             toolController.syncOnlinePlayers()
         })
+        me.awabi2048.mwmchanpon.service.CompletedWorldRetentionService(this, chanponStorage).start()
         automationService.start()
         previewTourService.start()
 

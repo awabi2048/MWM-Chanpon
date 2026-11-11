@@ -132,7 +132,6 @@ class WorldDataExportService(
             )
         }
         val portalSnapshots = worlds.flatMap { core.getRelatedPortals(it.uuid) }.distinctBy { it.id }
-        val primaryUuid = worlds.first().uuid
         // 外部の変換処理は実行せず、選択されたワールドの出力だけを行います。
         val serverMainWorldSource = runCatching {
             ServerMainWorldDirectory.resolve(Bukkit.getWorldContainer().toPath())
