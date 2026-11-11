@@ -1299,8 +1299,16 @@ class BackupService(
             }
         if (targets.isEmpty()) return emptyList()
         val location = MyWorldManagerApi.getEvacuationLocationOverride() ?: return null
-        targets.forEach { (player, _) -> player.teleport(location) }
-        return targets.map { it.second }
+        val evacuated = mutableListOf<EvacuatedPlayer>()
+        for ((player, previous) in targets) {
+            if (!player.teleport(location)) {
+                // 退避不能な人を残したままアンロードせず、先に退避した人も戻します。
+                evacuated.forEach { Bukkit.getPlayer(it.playerUuid)?.teleport(it.location) }
+                return null
+            }
+            evacuated.add(previous)
+        }
+        return evacuated
     }
 
     private fun restoreEvacuatedPlayers(evacuatedPlayers: List<EvacuatedPlayer>, result: RestoreOperationResult) {
@@ -1388,7 +1396,8 @@ class BackupService(
             actorName = config.getString("actor_name"),
             reason = config.getString("reason"),
             name = config.getString("name"),
-            sizeBytes = config.getLong("size_bytes", folderSize(dir))
+            // Kotlin の引数は先に評価されるため、保存済みの値がある場合は走査を呼び出しません。
+            sizeBytes = if (config.isLong("size_bytes") || config.isInt("size_bytes")) config.getLong("size_bytes") else folderSize(dir)
         )
     }
 

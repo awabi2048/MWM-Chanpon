@@ -100,6 +100,13 @@ class ChanponAdminMenu(
                             ?.let { MenuActionResult.Success(MenuUpdate.Navigate(it)) }
                             ?: MenuActionResult.Rejected()
                     },
+                    ACTION_REPAIR_BYPASS to MenuActionHandler { context ->
+                        if (!context.player.hasPermission("mwmchanpon.admin") || !plugin.isConfigurationMigrationCurrent()) MenuActionResult.Rejected()
+                        else {
+                            plugin.setRepairBypassEnabled(!plugin.isRepairBypassEnabled())
+                            MenuActionResult.Success(MenuUpdate.Refresh)
+                        }
+                    },
                     ACTION_BUILDING_ALLOWED to MenuActionHandler(::toggleBuilding),
                     ACTION_WORLD_CREATION to MenuActionHandler(::cycleWorldCreation),
                     ACTION_SET_SPAWN_WORLD to MenuActionHandler(::showSpawnConfirmation),
@@ -169,6 +176,7 @@ class ChanponAdminMenu(
             actionEntry(player, 23, Material.CLOCK, adminPresentation(ACTION_AUTOMATION), ACTION_AUTOMATION),
             actionEntry(player, 25, Material.DISPENSER, adminPresentation(ACTION_EXPORT), ACTION_EXPORT),
             actionEntry(player, 13, Material.MAP, adminPresentation(ACTION_PREVIEW_TOUR), ACTION_PREVIEW_TOUR),
+            repairBypassItem(player),
             buildingPermissionItem(player),
             worldCreationAvailabilityItem(player),
             switchToMwmItem(player),
@@ -315,6 +323,22 @@ class ChanponAdminMenu(
                 ),
             ),
         )
+
+    private fun repairBypassItem(player: Player): MenuElement {
+        val enabled = plugin.isRepairBypassEnabled()
+        return CCSystem.getAPI().getGuiElementService().menuEntry(player, GuiMenuEntrySpec(
+            slot = 36,
+            material = if (enabled) Material.LIME_DYE else Material.GRAY_DYE,
+            name = fixedName(i18n(player, ChanponPhaseKeys.CHANPON_REPAIR_BYPASS_DISPLAY), GuiNameStyle.PRIMARY),
+            role = GuiElementRole.ACTION,
+            description = listOf(i18n(player, ChanponPhaseKeys.CHANPON_REPAIR_BYPASS_DESCRIPTION)),
+            data = listOf(GuiMenuEntryData(i18n(player, ChanponPhaseKeys.CHANPON_CONTROLS_BUILD_CURRENT), i18n(player, if (enabled) ChanponPhaseKeys.CHANPON_STATE_ENABLED else ChanponPhaseKeys.CHANPON_STATE_DISABLED))),
+            actions = listOf(chanponGestureAction(ACTION_REPAIR_BYPASS, MenuGesture.ANY,
+                i18n(player, if (enabled) ChanponPhaseKeys.CHANPON_REPAIR_BYPASS_DISABLE else ChanponPhaseKeys.CHANPON_REPAIR_BYPASS_ENABLE),
+                safety = MenuActionSafety.EXTERNAL_SIDE_EFFECT)),
+            glint = enabled,
+        ))
+    }
 
     private fun buildingPermissionItem(player: Player): MenuElement {
         val allowed = globalStorage.isBuildingAllowed()
@@ -544,6 +568,7 @@ class ChanponAdminMenu(
         private const val ACTION_EXPORT = "export"
         private const val ACTION_PREVIEW_TOUR = "preview_tour"
         private const val ACTION_SWITCH_MWM = "switch_mwm"
+        private const val ACTION_REPAIR_BYPASS = "repair-bypass"
         private const val ACTION_BUILDING_ALLOWED = "building_allowed"
         private const val ACTION_WORLD_CREATION = "world_creation"
         private const val ACTION_SET_SPAWN_WORLD = "set_spawn_world"

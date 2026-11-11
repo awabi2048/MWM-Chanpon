@@ -298,7 +298,9 @@ class BackupListMenu(
         }
         val rollbackService = manualRollbackService
         if (rollbackService == null) {
-            executeRestore(player, backup, source)
+            // 通知サービスの初期化失敗時に、告知なしで復元を実行しないようにします。
+            player.sendMessage(i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_RESTORE_FAILED))
+            return MenuActionResult.Rejected()
         } else {
             rollbackService.schedule(
                 player,
@@ -346,25 +348,6 @@ class BackupListMenu(
             ),
         )
         return MenuActionResult.Success(MenuUpdate.Back)
-    }
-
-    private fun executeRestore(player: Player, backup: BackupEntry, source: BackupListSource) {
-        val future = if (source.mode == BackupListMode.WORLD && source.worldUuid != null) {
-            backupService.restoreWorldBackup(backup, source.worldUuid)
-        } else {
-            backupService.restoreBackup(backup)
-        }
-        future.thenAccept { result ->
-            Bukkit.getScheduler().runTask(plugin, Runnable {
-                if (
-                    result.status == BackupOperationStatus.SUCCESS ||
-                    result.status == BackupOperationStatus.RECOVERED
-                ) {
-                    backupService.markManualRollbackExecuted(result.restoredWorlds)
-                }
-                sendRestoreResult(player, result)
-            })
-        }
     }
 
     private fun sendRestoreResult(player: Player, result: RestoreOperationResult) {

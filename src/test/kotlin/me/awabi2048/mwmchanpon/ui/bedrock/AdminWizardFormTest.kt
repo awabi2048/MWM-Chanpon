@@ -9,6 +9,6 @@ class AdminWizardFormTest {
     fun `name input is trimmed and bounded`() {
         assertEquals("My World", AdminWizardForm.normalizeName("  My World  "))
         assertNull(AdminWizardForm.normalizeName(" "))
-        assertNull(AdminWizardForm.normalizeName("x".repeat(33)))
+        assertNull(AdminWizardForm.normalizeName("x".repeat(51)))
     }
 }

@@ -39,7 +39,7 @@ internal class WorldSettingsAccessGuard(
 
         // 完成済み/提出済みの保護。提出後は原則として設定変更を認めないが、
         // 公開レベル・訪問通知・ポータル取得の3項目は管理者/所有者が事後調整できるよう例外として許可する。
-        if (protectionService.isProtected(worldData) && protectedSettings == ProtectedSettingsKind.NONE) {
+        if (protectionService.isProtectedForPlayer(worldData, player) && protectedSettings == ProtectedSettingsKind.NONE) {
             player.sendMessage(
                 CCSystem.getAPI().getI18nComponent(player, ChanponSystemKeys.CHANPON_MESSAGE_PROTECTED_WORLD),
             )
