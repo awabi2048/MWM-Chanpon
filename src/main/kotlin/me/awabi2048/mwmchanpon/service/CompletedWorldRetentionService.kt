@@ -7,7 +7,6 @@ import me.awabi2048.myworldmanager.api.event.MwmAutomaticWorldUnloadEvent
 import org.bukkit.Bukkit
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
-import org.bukkit.plugin.java.JavaPlugin
 import java.util.UUID
 
 /** 観光中は完成済みワールドを常駐させ、明示的な保守操作は妨げません。 */
@@ -25,13 +24,13 @@ class CompletedWorldRetentionService(
 
     @EventHandler(ignoreCancelled = true)
     fun onAutomaticUnload(event: MwmAutomaticWorldUnloadEvent) {
-        if (tourModeEnabled() && storage.isSubmissionCompleted(event.worldData.uuid)) {
+        if (TourModeState.isEnabled() && storage.isSubmissionCompleted(event.worldData.uuid)) {
             event.isCancelled = true
         }
     }
 
     private fun synchronize() {
-        if (!tourModeEnabled()) return
+        if (!TourModeState.isEnabled()) return
         val repository = MyWorldManagerApi.getWorldRepository() ?: return
         val worlds = MyWorldManagerApi.getWorldService() ?: return
         for (world in repository.findAll()) {
@@ -48,8 +47,4 @@ class CompletedWorldRetentionService(
         }
     }
 
-    private fun tourModeEnabled(): Boolean {
-        val utilities = Bukkit.getPluginManager().getPlugin("Chanpon-Utilities") as? JavaPlugin ?: return false
-        return utilities.isEnabled && utilities.config.getBoolean("features.tour_mode.enabled", false)
-    }
 }

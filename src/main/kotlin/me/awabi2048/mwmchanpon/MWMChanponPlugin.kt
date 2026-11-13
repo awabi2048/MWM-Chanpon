@@ -382,7 +382,7 @@ class MWMChanponPlugin : JavaPlugin() {
         if (server.pluginManager.isPluginEnabled("Chanpon-Utilities")) {
             server.pluginManager.registerEvents(FreecamWorldPolicyListener(chanponStorage), this)
         }
-        server.pluginManager.registerEvents(me.awabi2048.mwmchanpon.listener.InteractionAdjacentPhysicsListener(this, chanponStorage), this)
+        server.pluginManager.registerEvents(me.awabi2048.mwmchanpon.listener.InteractionAdjacentPhysicsListener(this), this)
         server.pluginManager.registerEvents(publishLevelSynchronizer, this)
         server.pluginManager.registerEvents(SubmittedWorldProtectionListener(this, submittedProtectionService), this)
         server.pluginManager.registerEvents(WorldBuildPermissionListener(this, buildPermissionService), this)

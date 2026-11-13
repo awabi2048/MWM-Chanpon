@@ -78,4 +78,20 @@ class InteractionAdjacentPhysicsListenerTest {
         assertFalse(physics(lantern).isCancelled)
     }
 
+    @Test
+    fun `観光モード切替はワールド設定に依存せず進行中の保護にも即時反映される`() {
+        var enabled = false
+        val pending = mutableListOf<() -> Unit>()
+        val listener = InteractionAdjacentPhysicsListener({ enabled }, { pending.add(it) })
+        val trapdoor = block(0, 64, Material.OAK_TRAPDOOR)
+        val grass = block(1, 64, Material.TALL_GRASS)
+        fun physics() = BlockPhysicsEvent(grass, grass.blockData, trapdoor).also(listener::onPhysics)
+        listener.onInteract(interact(trapdoor))
+        assertFalse(physics().isCancelled)
+        enabled = true
+        listener.onInteract(interact(trapdoor))
+        assertTrue(physics().isCancelled)
+        enabled = false
+        assertFalse(physics().isCancelled)
+    }
 }

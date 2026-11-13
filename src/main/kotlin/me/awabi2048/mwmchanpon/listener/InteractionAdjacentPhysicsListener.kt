@@ -2,8 +2,7 @@ package me.awabi2048.mwmchanpon.listener
 
 import com.destroystokyo.paper.event.block.BlockDestroyEvent
 import me.awabi2048.mwmchanpon.MWMChanponPlugin
-import me.awabi2048.mwmchanpon.storage.ChanponWorldStorage
-import me.awabi2048.myworldmanager.api.MyWorldManagerApi
+import me.awabi2048.mwmchanpon.service.TourModeState
 import org.bukkit.Material
 import org.bukkit.block.Block
 import org.bukkit.block.data.AnaloguePowerable
@@ -21,13 +20,13 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
-/** ワールド設定が有効な操作直後だけ、６方向の装飾ブロックへの物理更新を止めます。 */
+/** 観光モード中の操作直後だけ、６方向の装飾ブロックへの物理更新を止めます。 */
 internal class InteractionAdjacentPhysicsListener(
     private val isActive: (org.bukkit.World) -> Boolean,
     private val nextTick: (() -> Unit) -> Unit,
 ) : Listener {
-    constructor(plugin: MWMChanponPlugin, storage: ChanponWorldStorage) : this(
-        { world -> MyWorldManagerApi.getWorldRepository()?.findByWorldName(world.name)?.let { storage.isInteractionPhysicsStopped(it.uuid) } == true },
+    constructor(plugin: MWMChanponPlugin) : this(
+        { TourModeState.isEnabled() },
         { action -> plugin.server.scheduler.runTask(plugin, Runnable { action() }) },
     )
     private val interactions = ConcurrentHashMap<BlockPosition, Long>()
@@ -60,7 +59,7 @@ internal class InteractionAdjacentPhysicsListener(
     }
 
     private fun shouldProtect(block: Block): Boolean {
-        if (interactions.isEmpty()) return false
+        if (interactions.isEmpty() || !isActive(block.world)) return false
         val target = BlockPosition.of(block)
         // 監視中の操作件数に関係なく、対象の６近傍だけを調べます。
         if (target.adjacent().none(interactions::containsKey)) return false

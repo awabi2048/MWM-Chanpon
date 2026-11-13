@@ -385,18 +385,6 @@ class ChanponWorldStorage(
         saveAtomic(worldUuid, config)
     }
 
-    /** 未設定のワールドでは周囲更新を抑止しません。 */
-    fun isInteractionPhysicsStopped(worldUuid: UUID): Boolean =
-        load(worldUuid)?.getBoolean("environment.interaction_physics_stopped", false) ?: false
-
-    @Synchronized
-    fun setInteractionPhysicsStopped(worldUuid: UUID, stopped: Boolean) {
-        ensureWritable(worldUuid)
-        val config = loadOrCreate(worldUuid)
-        config.set("environment.interaction_physics_stopped", stopped)
-        saveAtomic(worldUuid, config)
-    }
-
     fun isSubmissionCompleted(worldUuid: UUID): Boolean {
         val config = load(worldUuid) ?: return false
         return SubmissionState.fromStorageValue(config.getString("submission.state")) == SubmissionState.COMPLETED

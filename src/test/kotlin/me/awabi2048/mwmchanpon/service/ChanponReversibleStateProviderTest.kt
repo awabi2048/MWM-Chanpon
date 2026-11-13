@@ -103,18 +103,6 @@ class ChanponReversibleStateProviderTest {
         assertEquals(listOf(world.uuid), applied)
         assertRejected(environment, player, environmentContext, captured(environment, environmentContext))
 
-        // ワールド別の更新抑止も通常設定と同様に保存・復元し、他ワールドへ波及しません。
-        assertEquals(false, storage.isInteractionPhysicsStopped(world.uuid))
-        val physicsContext = captureContext(
-            player, ChanponReversibleContracts.environment(world.uuid),
-            arguments = mapOf("setting" to "interaction_physics"),
-        )
-        val physicsState = captured(environment, physicsContext)
-        storage.setInteractionPhysicsStopped(world.uuid, true)
-        assertEquals(false, storage.isInteractionPhysicsStopped(UUID.randomUUID()))
-        assertRestored(environment, player, physicsContext, physicsState)
-        assertEquals(false, storage.isInteractionPhysicsStopped(world.uuid))
-
         val publication = PublicationProvider(storage)
         val publicationContext = captureContext(
             player,
