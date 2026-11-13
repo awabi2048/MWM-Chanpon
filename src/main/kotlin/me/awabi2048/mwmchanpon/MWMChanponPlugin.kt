@@ -7,6 +7,7 @@ import com.awabi2048.ccsystem.api.gui.MenuTargetPolicy
 import com.awabi2048.ccsystem.api.gui.PublicMenuDefinition
 import me.awabi2048.mwmchanpon.backup.BackupService
 import me.awabi2048.mwmchanpon.bridge.CoreApiBridge
+import me.awabi2048.mwmchanpon.integration.TourSimulationIntegration
 import me.awabi2048.mwmchanpon.extension.ChanponCommandExtension
 import me.awabi2048.mwmchanpon.extension.ChanponWorldCreationGuard
 import me.awabi2048.mwmchanpon.extension.ChanponWorldAccessPolicy
@@ -33,6 +34,7 @@ import me.awabi2048.mwmchanpon.listener.MyWorldSafetyDefaultsListener
 import me.awabi2048.mwmchanpon.listener.PlayerJoinListener
 import me.awabi2048.mwmchanpon.listener.SubmittedWorldProtectionListener
 import me.awabi2048.mwmchanpon.listener.WorldBuildPermissionListener
+import me.awabi2048.mwmchanpon.listener.PortalSettingsAccessListener
 import me.awabi2048.mwmchanpon.listener.SpawnWorldProtectionListener
 import me.awabi2048.mwmchanpon.listener.ToolPermissionWorldListener
 import me.awabi2048.mwmchanpon.listener.WorldCleanupListener
@@ -63,6 +65,7 @@ import me.awabi2048.mwmchanpon.tour.PreviewTourStorage
 import me.awabi2048.mwmchanpon.tool.LuckPermsToolPermissionService
 import me.awabi2048.mwmchanpon.tool.ToolPermissionConfig
 import me.awabi2048.mwmchanpon.tool.ToolPermissionController
+import me.awabi2048.mwmchanpon.tool.ToolPermissionDefinition
 import me.awabi2048.mwmchanpon.ui.AutomationSettingsMenu
 import me.awabi2048.mwmchanpon.ui.AnnualArchiveFlow
 import me.awabi2048.mwmchanpon.ui.BackupListMenu
@@ -80,11 +83,14 @@ import me.awabi2048.mwmchanpon.ui.WorldDataExportMenu
 import me.awabi2048.mwmchanpon.ui.WorldDataManagementMenu
 import me.awabi2048.mwmchanpon.ui.bedrock.AdminWizardForm
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
+import me.awabi2048.myworldmanager.api.event.MwmSystemReloadEvent
 import me.awabi2048.myworldmanager.api.service.ApiMigrationParticipant
 import me.awabi2048.myworldmanager.api.service.ApiMigrationParticipantState
 import me.awabi2048.myworldmanager.api.service.ApiMacroService
 import net.luckperms.api.LuckPermsProvider
 import org.bukkit.entity.Player
+import org.bukkit.event.EventHandler
+import org.bukkit.event.Listener
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
 import java.nio.channels.FileChannel
@@ -94,6 +100,7 @@ import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
 
 class MWMChanponPlugin : JavaPlugin() {
+    private var tourSimulationIntegration: TourSimulationIntegration? = null
     private val coreApiBridge = CoreApiBridge()
     private lateinit var productionToggleExtension: ProductionToggleExtension
     private lateinit var productionWorldGuard: ProductionWorldGuard
@@ -134,6 +141,7 @@ class MWMChanponPlugin : JavaPlugin() {
     private lateinit var adminCommand: ChanponAdminCommand
     private lateinit var spawnWorldService: ChanponSpawnWorldService
     private lateinit var toolController: ToolPermissionController
+    private lateinit var toolDefinitions: MutableList<ToolPermissionDefinition>
     private lateinit var offlineMemberInviteNotifier: OfflineMemberInviteNotifier
     private lateinit var spawnProtectionService: SpawnWorldProtectionService
     private lateinit var buildPermissionService: WorldBuildPermissionService
@@ -188,7 +196,7 @@ class MWMChanponPlugin : JavaPlugin() {
         ).also {
             it.setConfigurationAvailability(::isConfigurationMigrationCurrent)
         }
-        val toolDefinitions = ToolPermissionConfig(config).load()
+        toolDefinitions = ToolPermissionConfig(config).load().toMutableList()
         val isAutoRollbackEnabled = {
             isConfigurationMigrationCurrent() && config.getBoolean("backup.auto_rollback.enabled", false)
         }
@@ -198,6 +206,7 @@ class MWMChanponPlugin : JavaPlugin() {
             globalStorage,
             isAutoRollbackEnabled,
             buildPermissionService::effectiveProtectionMode,
+            { data, playerId -> submittedProtectionService.isProtectedForPlayer(data, server.getPlayer(playerId)) },
         ).also {
             it.setConfigurationAvailability(::isConfigurationMigrationCurrent)
         }
@@ -210,6 +219,7 @@ class MWMChanponPlugin : JavaPlugin() {
             chanponStorage::isGlobalBypassAllowed,
             buildPermissionService::effectiveProtectionMode,
             buildPermissionService::sync,
+            { data, playerId -> submittedProtectionService.isProtectedForPlayer(data, server.getPlayer(playerId)) },
         )
 
         backupService = BackupService(this, chanponStorage)
@@ -231,8 +241,19 @@ class MWMChanponPlugin : JavaPlugin() {
         backupListMenu.setManualRollbackService(manualRollbackService)
 
         productionWorldGuard = ProductionWorldGuard(chanponStorage)
-        submittedProtectionService = SubmittedWorldProtectionService(chanponStorage, logger, isAutoRollbackEnabled).also {
+        submittedProtectionService = SubmittedWorldProtectionService(
+            chanponStorage, logger, isAutoRollbackEnabled,
+            globalStorage::isRepairBypassEnabled, globalStorage::isTourSimulationEnabled,
+        ).also {
             it.setConfigurationAvailability(::isConfigurationMigrationCurrent)
+        }
+        // LuckPermsの権限変更は別スレッドでも届くため、リージョン更新はサーバースレッドへ戻します。
+        luckPerms.eventBus.subscribe(this, net.luckperms.api.event.user.UserDataRecalculateEvent::class.java) { event ->
+            server.scheduler.runTask(this, Runnable {
+                val player = server.getPlayer(event.user.uniqueId) ?: return@Runnable
+                val world = MyWorldManagerApi.getWorldRepository()?.findByWorldKey(player.world.key.toString()) ?: return@Runnable
+                if (globalStorage.isTourSimulationEnabled(world.uuid)) submittedProtectionService.sync(world)
+            })
         }
         automationSettingsMenu = AutomationSettingsMenu(this, backupService, automationService) {
             MyWorldManagerApi.getWorldRepository()?.findAll()?.let { worlds ->
@@ -330,6 +351,11 @@ class MWMChanponPlugin : JavaPlugin() {
         MyWorldManagerApi.registerWorldAccessPolicy(worldAccessPolicy)
         MyWorldManagerApi.registerWorldMenuAccessPolicy(worldMenuAccessPolicy)
         MyWorldManagerApi.registerWorldPortalPolicy(worldPortalPolicy)
+        if (server.pluginManager.isPluginEnabled("Chanpon-Utilities")) {
+            tourSimulationIntegration = TourSimulationIntegration(this, globalStorage).also { it.start() }
+        } else if (globalStorage.simulatedWorldUuids().isNotEmpty()) {
+            logger.severe("観光用シミュレーションは保存されていますが、Chanpon-Utilities が無効なため観光モードを適用できません。")
+        }
         MyWorldManagerApi.registerWorldWorkPermissionPolicy(worldWorkPermissionPolicy)
         MyWorldManagerApi.registerWorldPublishPolicy(worldPublishPolicy)
         MyWorldManagerApi.registerWorldRuntimePolicy(worldRuntimePolicy)
@@ -343,6 +369,15 @@ class MWMChanponPlugin : JavaPlugin() {
             command.setExecutor(adminCommand)
             command.tabCompleter = adminCommand
         }
+        server.pluginManager.registerEvents(object : Listener {
+            @EventHandler
+            fun onReload(event: MwmSystemReloadEvent) {
+                runCatching { reloadChanponSettings() }.onFailure { error ->
+                    logger.log(java.util.logging.Level.SEVERE, "MWM-Chanpon の設定再読込に失敗しました", error)
+                    event.reportFailure("MWM-Chanpon")
+                }
+            }
+        }, this)
         server.pluginManager.registerEvents(productionToggleExtension, this)
         if (server.pluginManager.isPluginEnabled("Chanpon-Utilities")) {
             server.pluginManager.registerEvents(FreecamWorldPolicyListener(chanponStorage), this)
@@ -350,6 +385,7 @@ class MWMChanponPlugin : JavaPlugin() {
         server.pluginManager.registerEvents(publishLevelSynchronizer, this)
         server.pluginManager.registerEvents(SubmittedWorldProtectionListener(this, submittedProtectionService), this)
         server.pluginManager.registerEvents(WorldBuildPermissionListener(this, buildPermissionService), this)
+        server.pluginManager.registerEvents(PortalSettingsAccessListener(globalStorage::isBuildingAllowed), this)
         server.pluginManager.registerEvents(SpawnWorldProtectionListener(this, globalStorage, spawnProtectionService), this)
         server.pluginManager.registerEvents(MyWorldSafetyDefaultsListener(this, worldSafetyDefaultsService), this)
         server.pluginManager.registerEvents(MyWorldNaturalEntityCleanupListener(this), this)
@@ -427,6 +463,7 @@ class MWMChanponPlugin : JavaPlugin() {
                 }
             toolController.syncOnlinePlayers()
         })
+        me.awabi2048.mwmchanpon.service.CompletedWorldRetentionService(this, chanponStorage).start()
         automationService.start()
         previewTourService.start()
 
@@ -458,6 +495,8 @@ class MWMChanponPlugin : JavaPlugin() {
     }
 
     override fun onDisable() {
+        tourSimulationIntegration?.close()
+        tourSimulationIntegration = null
         if (::chanponWorldSettingsMenu.isInitialized) {
             MyWorldManagerApi.unregisterWorldSettingsRouteCapability(chanponWorldSettingsMenu)
         }
@@ -524,19 +563,91 @@ class MWMChanponPlugin : JavaPlugin() {
         if (::automationService.isInitialized) {
             automationService.stop()
         }
+        if (::manualRollbackService.isInitialized) {
+            manualRollbackService.stop()
+        }
         if (::toolController.isInitialized) {
             toolController.clearOnlineActivePermissions()
         }
         logger.info("MWM-Chanpon addon has been disabled.")
     }
 
+    /** 外部編集された設定の検証後、共有中の定義とワールド権限を同じ状態へ更新します。 */
+    private fun reloadChanponSettings() {
+        val status = configMigrationParticipant.status()
+        check(status.state == ApiMigrationParticipantState.CURRENT) {
+            status.message ?: "MWM-Chanpon の設定を検証できませんでした"
+        }
+        chanponMacroService.reload()
+        reloadConfig()
+        val definitions = ToolPermissionConfig(config).load()
+        // 旧グループを先に外し、既存画面が保持するリストの参照を維持します。
+        toolController.clearOnlineActivePermissions()
+        toolDefinitions.clear()
+        toolDefinitions.addAll(definitions)
+        productionToggleExtension.syncForcedTagsForProductionWorlds()
+        publishLevelSynchronizer.syncAll()
+        MyWorldManagerApi.getWorldRepository()?.findAll()?.let { worlds ->
+            worldSafetyDefaultsService.syncAll(worlds)
+            submittedProtectionService.syncAll(worlds)
+            worlds.forEach(toolController::syncWorld)
+        }
+        syncBuildingState()
+        automationService.start()
+        tourSimulationIntegration?.refresh()
+        logger.info("MWM-Chanpon の設定を再読込しました。")
+    }
+
     private fun syncBuildPermissions() {
         if (!::buildPermissionService.isInitialized) return
-        MyWorldManagerApi.getWorldRepository()?.findAll()?.forEach(buildPermissionService::sync)
+        // スポーン指定は未設定ワールドの実効モードも変えるため、領域だけでなく
+        // 在室者の一時ツール権限と作業グループも同じ変更で更新します。
+        val worlds = MyWorldManagerApi.getWorldRepository()?.findAll() ?: return
+        if (::toolController.isInitialized) worlds.forEach(toolController::syncWorld)
+        else worlds.forEach(buildPermissionService::sync)
+    }
+
+    /** 保存後に保護・作業権限を同じ実効状態へ収束させます。 */
+    fun setRepairBypassEnabled(enabled: Boolean) {
+        globalStorage.setRepairBypassEnabled(enabled)
+        tourSimulationIntegration?.refresh()
+        syncRepairProtection()
+    }
+
+    fun setTourSimulationEnabled(worldData: me.awabi2048.myworldmanager.model.WorldData, enabled: Boolean) {
+        check(!enabled || isTourSimulationAvailable()) { "Chanpon-Utilities が利用できないため観光用シミュレーションを開始できません" }
+        globalStorage.setTourSimulationEnabled(worldData.uuid, enabled)
+        tourSimulationIntegration?.refresh()
+        submittedProtectionService.sync(worldData)
+        toolController.syncWorld(worldData)
+        MyWorldManagerApi.syncOnlineWorldPlayerStates()
+    }
+
+    fun isRepairBypassEnabled(): Boolean = globalStorage.isRepairBypassEnabled()
+    fun isTourSimulationAvailable(): Boolean = tourSimulationIntegration != null && server.pluginManager.isPluginEnabled("Chanpon-Utilities")
+    fun isTourSimulationEnabled(worldUuid: java.util.UUID): Boolean = globalStorage.isTourSimulationEnabled(worldUuid)
+
+    private fun syncRepairProtection() {
+        val failures = mutableListOf<Throwable>()
+        // 1ワールドの失敗で残りの保護同期を中断せず、最後に呼び出し元へ失敗を返します。
+        MyWorldManagerApi.getWorldRepository()?.findAll()?.forEach { world ->
+            runCatching { submittedProtectionService.sync(world) }.onFailure(failures::add)
+            runCatching { toolController.syncWorld(world) }.onFailure(failures::add)
+        }
+        runCatching { syncBuildingState() }.onFailure(failures::add)
+        if (failures.isNotEmpty()) {
+            throw IllegalStateException("修正期間の状態を一部のワールドへ反映できませんでした", failures.first()).also { error ->
+                failures.drop(1).forEach(error::addSuppressed)
+            }
+        }
     }
 
     fun setBuildingAllowed(allowed: Boolean) {
         globalStorage.setBuildingAllowed(allowed)
+        syncBuildingState()
+    }
+
+    private fun syncBuildingState() {
         MyWorldManagerApi.syncOnlineWorldPlayerStates()
         // 全体の建築許可はツール活動と作業グループ付与の可否でもあるため、切替時に再同期します。
         toolController.syncOnlinePlayers()

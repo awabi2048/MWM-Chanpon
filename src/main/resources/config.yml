@@ -43,7 +43,6 @@ backup:
     time: "05:00"
     last_run_date: ""
   automation:
-    check_interval_ticks: 1200
     manual_lock_minutes: 10
   manual_rollback:
     delay_seconds: 15

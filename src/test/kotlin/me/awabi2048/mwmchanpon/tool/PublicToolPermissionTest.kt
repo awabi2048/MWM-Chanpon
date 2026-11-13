@@ -22,6 +22,21 @@ class PublicToolPermissionTest {
     private val guest = UUID.randomUUID()
     private val member = UUID.randomUUID()
     private val moderator = UUID.randomUUID()
+
+    @Test fun `オーナー限定では有効な個別ツールも停止しモードを戻すと再び使える`() {
+        val storage = ChanponWorldStorage(folder.toFile())
+        val world = world()
+        val controller = controller(storage)
+        storage.setToolEnabled(world.uuid, member, "worldedit", true)
+        storage.setToolEnabled(world.uuid, moderator, "worldedit", true)
+        storage.setProtectionMode(world.uuid, ChanponWorldProtectionMode.OWNER_ONLY)
+        assertTrue(controller.isEnabled(world, owner, "worldedit"))
+        assertFalse(controller.isEnabled(world, member, "worldedit"))
+        assertFalse(controller.isEnabled(world, moderator, "worldedit"))
+        storage.setProtectionMode(world.uuid, ChanponWorldProtectionMode.MEMBERS)
+        assertTrue(controller.isEnabled(world, member, "worldedit"))
+        assertTrue(controller.isEnabled(world, moderator, "worldedit"))
+    }
     private fun world() = WorldData(
         UUID.randomUUID(), ManagedDimension.OVERWORLD, "test", "", Material.STONE, "test", "", owner,
     ).also { it.members.add(member); it.moderators.add(moderator) }

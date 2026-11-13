@@ -10,6 +10,33 @@ import org.junit.jupiter.api.Test
 
 class ChanponGlobalStorageTest {
     @Test
+    fun `修正期間とシミュレーションは保存され終了時に解除される`() {
+        val folder = Files.createTempDirectory("chanpon-repair-period").toFile()
+        try {
+            val first = UUID.randomUUID()
+            val second = UUID.randomUUID()
+            val storage = ChanponGlobalStorage(folder)
+            storage.setBuildingAllowed(false)
+            storage.setRepairBypassEnabled(true)
+            storage.setTourSimulationEnabled(first, true)
+            storage.setTourSimulationEnabled(second, true)
+            val reloaded = ChanponGlobalStorage(folder)
+            assertTrue(reloaded.isRepairBypassEnabled())
+            assertTrue(reloaded.isBuildingAllowed())
+            assertTrue(reloaded.isTourSimulationEnabled(first))
+            reloaded.setRepairBypassEnabled(false)
+            val ended = ChanponGlobalStorage(folder)
+            assertFalse(ended.isRepairBypassEnabled())
+            assertFalse(ended.isBuildingAllowed())
+            assertFalse(ended.isTourSimulationEnabled(first))
+            ended.setRepairBypassEnabled(true)
+            assertFalse(ended.isTourSimulationEnabled(second))
+        } finally {
+            folder.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `independent controls default to building and production creation allowed`() {
         val folder = Files.createTempDirectory("chanpon-global-storage").toFile()
         try {

@@ -517,6 +517,7 @@ class ChanponEnvironmentGui(
         )
     }
 
+
     private fun randomTickDisplay(player: Player, stopped: Boolean): String {
         return i18n(player, if (stopped) ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_RANDOM_TICK_ENABLED else ChanponEnvironmentKeys.CHANPON_ENVIRONMENT_RANDOM_TICK_DISABLED)
     }

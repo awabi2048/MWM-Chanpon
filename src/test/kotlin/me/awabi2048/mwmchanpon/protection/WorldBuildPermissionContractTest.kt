@@ -17,6 +17,7 @@ import me.awabi2048.myworldmanager.model.ManagedDimension
 import me.awabi2048.myworldmanager.model.WorldData
 import org.bukkit.Material
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
@@ -85,6 +86,28 @@ class WorldBuildPermissionContractTest {
                 ).apply {
                     priority = 1_000_000
                     setFlag(Flags.BUILD, StateFlag.State.DENY)
+                    setFlag(Flags.PVP, StateFlag.State.DENY)
+                    owners.addPlayer(owner)
+                    members.addPlayer(member)
+                    configureSubmittedLock(this)
+                    assertNull(getFlag(Flags.BUILD))
+                    assertEquals(emptySet<UUID>(), owners.uniqueIds)
+                    assertEquals(emptySet<UUID>(), members.uniqueIds)
+                    assertEquals(mapOf(
+                        Flags.PASSTHROUGH to StateFlag.State.DENY,
+                        Flags.PASSTHROUGH.regionGroupFlag to RegionGroup.NON_OWNERS,
+                        Flags.OTHER_EXPLOSION to StateFlag.State.DENY,
+                        Flags.CREEPER_EXPLOSION to StateFlag.State.DENY,
+                        Flags.POTION_SPLASH to StateFlag.State.DENY,
+                        Flags.PLACE_VEHICLE to StateFlag.State.DENY,
+                        Flags.USE to StateFlag.State.ALLOW,
+                        Flags.INTERACT to StateFlag.State.ALLOW,
+                        Flags.DESTROY_VEHICLE to StateFlag.State.DENY,
+                        Flags.RESPAWN_ANCHORS to StateFlag.State.DENY,
+                        Flags.CHEST_ACCESS to StateFlag.State.ALLOW,
+                        Flags.PISTONS to StateFlag.State.ALLOW,
+                        Flags.RIDE to StateFlag.State.ALLOW,
+                    ), flags)
                 } else null
                 val regions = buildList<ProtectedRegion> {
                     access?.let { add(it) }
@@ -109,6 +132,24 @@ class WorldBuildPermissionContractTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun `シミュレーションの管理者所属は提出保護のみ解除し通常保護を維持する`() {
+        val admin = UUID.randomUUID()
+        val member = UUID.randomUUID()
+        val lock = ProtectedCuboidRegion("simulation", BlockVector3.at(-10, -64, -10), BlockVector3.at(10, 320, 10))
+        configureSubmittedLock(lock)
+        lock.priority = 1_000_000
+        lock.owners.addPlayer(admin)
+        val global = GlobalProtectedRegion("__global__")
+        val result = RegionResultSet(mutableListOf<ProtectedRegion>(lock), global)
+        assertTrue(result.testState(localPlayer(admin), Flags.BUILD))
+        assertFalse(result.testState(localPlayer(member), Flags.BUILD))
+        assertEquals(setOf(admin), lock.owners.uniqueIds)
+        // 次の通常提出保護への再同期で、シミュレーション専用所属が残らないことも確認します。
+        configureSubmittedLock(lock)
+        assertFalse(RegionResultSet(mutableListOf<ProtectedRegion>(lock), global).testState(localPlayer(admin), Flags.BUILD))
     }
 
     private fun localPlayer(uuid: UUID): LocalPlayer =
