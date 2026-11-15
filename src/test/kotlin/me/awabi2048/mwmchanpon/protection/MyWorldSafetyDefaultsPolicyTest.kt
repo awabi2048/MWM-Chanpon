@@ -17,6 +17,7 @@ class MyWorldSafetyDefaultsPolicyTest {
             .associate { it.key to it.value }
 
         assertEquals("true", values["keepInventory"])
+        assertEquals("false", values["show_advancements_message"])
         // randomTickSpeed は固定の不変条件ではなく、ワールド環境設定から導出する。
         assertFalse(values.containsKey("randomTickSpeed"))
         assertEquals("false", values["doVinesSpread"])

@@ -27,6 +27,7 @@ internal object MyWorldSafetyDefaultsPolicy {
     /** テスト可能なゲームルール契約です。実適用時は Paper の型付き API を使います。 */
     val gameRuleAssignments: List<GameRuleAssignment> = listOf(
         GameRuleAssignment("keepInventory", "true"),
+        GameRuleAssignment("show_advancements_message", "false"),
         GameRuleAssignment("doVinesSpread", "false"),
         GameRuleAssignment("tntExplodes", "false"),
         GameRuleAssignment("fire_spread_radius_around_player", "0"),
@@ -54,6 +55,8 @@ internal object MyWorldSafetyDefaultsPolicy {
     fun applyGameRules(world: World, randomTickSpeed: Int) {
         // ゲームルールは管理対象の不変条件として、同期時に必ず指定値へ戻します。
         world.setGameRule(GameRules.KEEP_INVENTORY, true)
+        // マイワールド内の進捗達成を全体チャットへ通知しません。
+        world.setGameRule(GameRules.SHOW_ADVANCEMENT_MESSAGES, false)
         world.setGameRule(GameRules.RANDOM_TICK_SPEED, randomTickSpeed)
         world.setGameRule(GameRules.SPREAD_VINES, false)
         world.setGameRule(GameRules.TNT_EXPLODES, false)
