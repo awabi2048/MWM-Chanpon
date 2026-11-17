@@ -47,4 +47,9 @@
 - 個別ZIPでは自己リンクだけを変換し、別ZIPへのリンクはmanifestで除外されることを確認しました。
 - 実プレイヤーによる感圧板の踏み込み、キック後の再接続、GUIの目視操作は未実施です。
 - テスト用設定6ファイルを退避元とバイト一致で復元し、セーブ名変更によるMultiverse設定の変更と検証用ワールド・生成物も整理しました。
-- 日英の説明を揃えた最終カタログへ依存を更新し、MWM-ChanponとCC-Systemを26.1118.1へ更新しました。最終成果物のdev-env/full-env起動確認は後続で実施します。
+- 最終版: MWM-Chanpon 26.1118.1、CC-System 26.1118.1、KantanCommander 26.1117.1。各build成功、計2079テスト成功（231 / 513 / 1335、失敗・スキップなし）。
+- 最終成果物を規定ショートカットでdev-env、full-envの順に起動し、PID、起動完了ログ、RCON、各バージョン、JAR SHA256一致を確認しました。full-envはPID 32244、25565/25578で稼働しています。
+- dev-env/full-envのsmokeと、full-envの専用起動スイート（CC-System / MyWorldManager / MWMChanpon / KantanCommanderの有効状態を検証）が成功しました。
+- 既存mwm-smokeはMultiverse-CoreのgetPluginMeta()でAbstractMethodErrorとなり未完走です。今回の変更対象外であり、ハーネスやMultiverseの修正は行っていません。
+- 実セーブ検証版26.1117.3と最終版26.1118.1のMWM-Chanpon全584クラスがバイト一致し、最終差分はバージョンと日英カタログ依存です。
+- 検証証跡はワークスペースの `.worktrees/world-export-verification/`（native-final-results.txt、full-final-results.txt、各ログ、配置ハッシュ、検証用ZIP）へ保存しました。検証用スイートは実行後に削除して再ロード済みです。
