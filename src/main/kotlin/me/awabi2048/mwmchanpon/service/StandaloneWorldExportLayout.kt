@@ -4,7 +4,9 @@ import java.util.UUID
 
 object StandaloneWorldExportLayout {
     const val NAMESPACE = "mwm_export"
-    const val DATA_PACK_FORMAT = 101
+    // 稼働サーバー26.2のversion.json（data_major=107、data_minor=1）に合わせます。
+    const val DATA_PACK_FORMAT = 107
+    const val DATA_PACK_MINOR = 1
 
     fun dimensionId(worldUuid: UUID): String =
         "world_${worldUuid.toString().replace("-", "")}"
@@ -31,7 +33,8 @@ object StandaloneWorldExportLayout {
         """
         {
           "pack": {
-            "pack_format": $DATA_PACK_FORMAT,
+            "min_format": [$DATA_PACK_FORMAT, $DATA_PACK_MINOR],
+            "max_format": [$DATA_PACK_FORMAT, $DATA_PACK_MINOR],
             "description": "MWM-Chanpon standalone world dimensions"
           }
         }

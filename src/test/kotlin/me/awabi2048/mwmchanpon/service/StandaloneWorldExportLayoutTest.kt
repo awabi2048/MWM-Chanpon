@@ -21,7 +21,7 @@ class StandaloneWorldExportLayoutTest {
 
     @Test
     fun `data pack metadata targets current server format`() {
-        assertTrue(StandaloneWorldExportLayout.packMetadata().contains("\"pack_format\": 101"))
+        assertTrue(StandaloneWorldExportLayout.packMetadata().contains("\"min_format\": [107, 1]"))
         assertTrue(StandaloneWorldExportLayout.dimensionDefinition().contains("\"type\": \"minecraft:overworld\""))
     }
 }
