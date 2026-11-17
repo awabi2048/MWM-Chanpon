@@ -5,7 +5,7 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 
 internal object StandalonePrimaryWorldAssembler {
-    private val rootExcludedFiles = setOf("session.lock", "uid.dat")
+    const val PRIMARY_DIRECTORY = "dimensions/minecraft/overworld"
     private val serverMainDataPaths = setOf("level.dat", "level.dat_old", "data")
 
     fun copy(representativeWorld: Path, serverMainWorld: Path, target: Path) {
@@ -16,12 +16,9 @@ internal object StandalonePrimaryWorldAssembler {
             "server main world level.dat is missing: $serverMainWorld"
         }
 
-        copyTree(representativeWorld, target) { path ->
-            val relative = representativeWorld.relativize(path)
-            val first = relative.iterator().asSequence().firstOrNull()?.toString()
-            path.fileName?.toString() !in rootExcludedFiles &&
-                first !in serverMainDataPaths
-        }
+        // 26.2では生成設定・天候・ゲームルール等もディメンション固有データです。
+        // セーブ直下の共有data/と混ぜず、overworldも他ディメンションと同じ構造にします。
+        copyDimension(representativeWorld, target.resolve(PRIMARY_DIRECTORY))
         serverMainDataPaths.forEach { name ->
             val source = serverMainWorld.resolve(name)
             val destination = target.resolve(name)
@@ -36,6 +33,17 @@ internal object StandalonePrimaryWorldAssembler {
                         StandardCopyOption.COPY_ATTRIBUTES,
                     )
                 }
+            }
+        }
+    }
+
+    fun copyDimension(source: Path, target: Path) {
+        listOf("region", "entities", "poi", "data").forEach { name ->
+            val directory = source.resolve(name)
+            if (Files.isDirectory(directory)) copyTree(directory, target.resolve(name)) { path ->
+                // Paperのゲームモード上書きやプラグイン用データを単体セーブへ持ち込みません。
+                val relative = directory.relativize(path)
+                name != "data" || relative.iterator().asSequence().firstOrNull()?.toString() != "paper"
             }
         }
     }

@@ -40,19 +40,14 @@ class WorldDataExportService(
     init {
         Bukkit.getPluginManager().registerEvents(object : org.bukkit.event.Listener {
             @org.bukkit.event.EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST)
-            fun onLogin(event: org.bukkit.event.player.AsyncPlayerPreLoginEvent) {
-                if (running.get()) event.disallow(
-                    org.bukkit.event.player.AsyncPlayerPreLoginEvent.Result.KICK_OTHER, maintenanceMessage(),
-                )
+            fun onLogin(event: io.papermc.paper.event.connection.PlayerConnectionValidateLoginEvent) {
+                if (running.get()) event.kickMessage(maintenanceMessage())
             }
 
-            // pre-login通過後に出力が始まった接続も参加前に拒否します。
-            @Suppress("DEPRECATION")
-            @org.bukkit.event.EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST)
-            fun onLogin(event: org.bukkit.event.player.PlayerLoginEvent) {
-                if (running.get()) event.disallow(
-                    org.bukkit.event.player.PlayerLoginEvent.Result.KICK_OTHER, maintenanceMessage(),
-                )
+            // ログイン検証通過直後に保守が始まった接続も、退出待ちと同じ扱いにします。
+            @org.bukkit.event.EventHandler(priority = org.bukkit.event.EventPriority.LOWEST)
+            fun onJoin(event: org.bukkit.event.player.PlayerJoinEvent) {
+                if (running.get()) event.player.kick(maintenanceMessage())
             }
         }, plugin)
     }
@@ -273,10 +268,13 @@ class WorldDataExportService(
         copyPrimaryWorld(directories.getValue(primary.uuid), shared, root)
         val spawn = spawns.getValue(primary.uuid)
         val metadata = StandaloneLevelMetadata(primary.name, System.currentTimeMillis(), dataVersion, minecraftVersion,
-            kotlin.math.floor(spawn.x).toInt(), kotlin.math.floor(spawn.y).toInt(), kotlin.math.floor(spawn.z).toInt(), spawn.yaw)
+            kotlin.math.floor(spawn.x).toInt(), kotlin.math.floor(spawn.y).toInt(), kotlin.math.floor(spawn.z).toInt(), spawn.yaw, worlds.size > 1)
         listOf("level.dat", "level.dat_old").forEach { name ->
             val path = root.resolve(name)
             if (Files.isRegularFile(path)) StandaloneLevelDatRewriter.rewrite(path, path, metadata)
+        }
+        require(Files.isRegularFile(root.resolve(StandalonePrimaryWorldAssembler.PRIMARY_DIRECTORY).resolve("data/minecraft/world_gen_settings.dat"))) {
+            "代表ワールドの26.2生成設定がありません。先にMinecraft側で移行してください。"
         }
         writeDimensions(root, worlds.drop(1), directories)
         val selectedIds = worlds.mapTo(mutableSetOf()) { it.uuid }
@@ -313,12 +311,7 @@ class WorldDataExportService(
             val target = root.resolve(
                 "dimensions/${StandaloneWorldExportLayout.NAMESPACE}/$dimensionId"
             )
-            DIMENSION_DIRECTORIES.forEach { name ->
-                val sourceDirectory = source.resolve(name)
-                if (Files.isDirectory(sourceDirectory)) {
-                    copyTree(sourceDirectory, target.resolve(name))
-                }
-            }
+            StandalonePrimaryWorldAssembler.copyDimension(source, target)
         }
     }
 
@@ -402,7 +395,7 @@ class WorldDataExportService(
             val targetDimension = dimensionByWorld[targetUuid] ?: return@forEach
             val spawn = spawnCoordinates[targetUuid] ?: return@forEach
             val sourceRoot = if (sourceUuid == primary.uuid) {
-                root
+                root.resolve(StandalonePrimaryWorldAssembler.PRIMARY_DIRECTORY)
             } else {
                 root.resolve(
                     "dimensions/${StandaloneWorldExportLayout.NAMESPACE}/${StandaloneWorldExportLayout.dimensionId(sourceUuid)}",
@@ -461,9 +454,6 @@ class WorldDataExportService(
         }
     }
 
-    companion object {
-        private val DIMENSION_DIRECTORIES = listOf("region", "entities", "poi")
-    }
 }
 
 private data class ExportCoordinates(val x: Double, val y: Double, val z: Double, val yaw: Float)

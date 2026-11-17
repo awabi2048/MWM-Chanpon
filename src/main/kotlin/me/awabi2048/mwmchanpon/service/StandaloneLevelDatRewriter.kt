@@ -15,6 +15,7 @@ internal data class StandaloneLevelMetadata(
     val spawnY: Int,
     val spawnZ: Int,
     val spawnAngle: Float,
+    val hasAdditionalDimensions: Boolean = false,
 )
 
 internal object StandaloneLevelDatRewriter {
@@ -35,10 +36,22 @@ internal object StandaloneLevelDatRewriter {
         data.putString("LevelName", metadata.levelName)
         data.putInt("GameType", 1)
         data.putByte("allowCommands", 1)
-        data.putInt("SpawnX", metadata.spawnX)
-        data.putInt("SpawnY", metadata.spawnY)
-        data.putInt("SpawnZ", metadata.spawnZ)
-        data.putFloat("SpawnAngle", metadata.spawnAngle)
+        // 26.2のスポーンは旧SpawnX/Y/Zではなくspawnコンパウンドへ保存されます。
+        data.put("spawn", CompoundTag().apply {
+            putString("dimension", "minecraft:overworld")
+            putIntArray("pos", intArrayOf(metadata.spawnX, metadata.spawnY, metadata.spawnZ))
+            putFloat("yaw", metadata.spawnAngle)
+            putFloat("pitch", 0.0f)
+        })
+        listOf("SpawnX", "SpawnY", "SpawnZ", "SpawnAngle", "paperSpawnDimension", "Bukkit.Version").forEach(data::remove)
+        // 稼働サーバー専用packを参照しない、出力内で完結する有効pack集合にします。
+        data.put("DataPacks", CompoundTag().apply {
+            put("Enabled", net.querz.nbt.tag.ListTag(net.querz.nbt.tag.StringTag::class.java).apply {
+                add(net.querz.nbt.tag.StringTag("vanilla"))
+                if (metadata.hasAdditionalDimensions) add(net.querz.nbt.tag.StringTag("file/mwm-standalone-export"))
+            })
+            put("Disabled", net.querz.nbt.tag.ListTag(net.querz.nbt.tag.StringTag::class.java))
+        })
         data.put("Version", version)
 
         data.getCompoundTag("Player")?.clone()?.let { player ->

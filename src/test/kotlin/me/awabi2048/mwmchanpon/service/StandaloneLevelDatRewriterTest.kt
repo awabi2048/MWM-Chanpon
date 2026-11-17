@@ -3,7 +3,7 @@ package me.awabi2048.mwmchanpon.service
 import java.nio.file.Files
 import net.querz.nbt.io.NBTUtil
 import net.querz.nbt.tag.CompoundTag
-import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class StandaloneLevelDatRewriterTest {
@@ -24,21 +24,23 @@ class StandaloneLevelDatRewriterTest {
             StandaloneLevelDatRewriter.rewrite(
                 levelDat,
                 levelDat,
-                StandaloneLevelMetadata("展示場", 1234L, 4444, "1.21.11", 10, 64, -20, 90f),
+                StandaloneLevelMetadata("展示場", 1234L, 4903, "26.2", 10, -60, -20, 90f, true),
             )
 
             val data = (NBTUtil.read(levelDat.toFile(), true).tag as CompoundTag)
                 .getCompoundTag("Data")
             assertEquals("展示場", data.getString("LevelName"))
             assertEquals(1234L, data.getLong("LastPlayed"))
-            assertEquals(4444, data.getInt("DataVersion"))
+            assertEquals(4903, data.getInt("DataVersion"))
             assertEquals(1, data.getInt("GameType"))
             assertEquals(1, data.getByte("allowCommands").toInt())
-            assertEquals(10, data.getInt("SpawnX"))
-            assertEquals(64, data.getInt("SpawnY"))
-            assertEquals(-20, data.getInt("SpawnZ"))
-            assertEquals(90f, data.getFloat("SpawnAngle"))
-            assertEquals("1.21.11", data.getCompoundTag("Version").getString("Name"))
+            val spawn = data.getCompoundTag("spawn")
+            assertArrayEquals(intArrayOf(10, -60, -20), spawn.getIntArray("pos"))
+            assertEquals("minecraft:overworld", spawn.getString("dimension"))
+            assertEquals(90f, spawn.getFloat("yaw"))
+            assertFalse(data.containsKey("SpawnX"))
+            assertEquals(listOf("vanilla", "file/mwm-standalone-export"), data.getCompoundTag("DataPacks").getListTag("Enabled").asStringTagList().map { it.value })
+            assertEquals("26.2", data.getCompoundTag("Version").getString("Name"))
         } finally {
             directory.toFile().deleteRecursively()
         }
