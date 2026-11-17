@@ -45,7 +45,16 @@ class WorldDataExportMenu(
 ) {
     private val runtime = CCSystem.getAPI().getMenuRuntimeService()
 
+    private val pendingResults = mutableMapOf<UUID, me.awabi2048.mwmchanpon.service.WorldDataExportResult>()
+
     init {
+        Bukkit.getPluginManager().registerEvents(object : org.bukkit.event.Listener {
+            @org.bukkit.event.EventHandler
+            fun onJoin(event: org.bukkit.event.player.PlayerJoinEvent) {
+                val result = pendingResults.remove(event.player.uniqueId) ?: return
+                Bukkit.getScheduler().runTask(plugin, Runnable { deliverResult(event.player, result) })
+            }
+        }, plugin)
         runtime.register(
             InventoryMenuDefinition(
                 owner = OWNER,
@@ -58,6 +67,7 @@ class WorldDataExportMenu(
                     ACTION_SELECT_ALL to MenuActionHandler(::selectAll),
                     ACTION_CLEAR_SELECTION to MenuActionHandler(::clear),
                     ACTION_EXPORT_SELECTION to MenuActionHandler(::showConfirmation),
+                    ACTION_EXPORT_ALL_INDIVIDUAL to MenuActionHandler { MenuActionResult.Success(MenuUpdate.Navigate(MenuRoute(OWNER, ROUTE_CONFIRM, mapOf(MODE to INDIVIDUAL)))) },
                 ),
             ),
         )
@@ -83,7 +93,7 @@ class WorldDataExportMenu(
         listRoute(page, selected.toList())
 
     private fun renderList(player: Player, route: MenuRoute): InventoryMenuView {
-        val worlds = exportService.productionWorlds()
+        val worlds = exportService.completedWorlds()
         val pages = if (worlds.isEmpty()) 1 else (worlds.size + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE
         val safePage = page(route).coerceIn(0, pages - 1)
         val exportableIds = worlds.mapTo(mutableSetOf()) { it.uuid }
@@ -116,32 +126,35 @@ class WorldDataExportMenu(
         elements += controlEntry(player, 47, Material.CHEST, ControlPresentation(ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_SELECT_ALL_DISPLAY, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_SELECT_ALL_DESCRIPTION, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_SELECT_ALL_ACTION), ACTION_SELECT_ALL)
         elements += controlEntry(player, 48, Material.BARRIER, ControlPresentation(ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_CLEAR_DISPLAY, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_CLEAR_DESCRIPTION, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_CLEAR_ACTION), ACTION_CLEAR_SELECTION)
         elements += exportSelectionItem(player, 51, safeSelected.size)
+        elements += controlEntry(player, 52, Material.ENDER_CHEST, ControlPresentation(ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_BATCH_DISPLAY, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_BATCH_DESCRIPTION, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_BATCH_ACTION), ACTION_EXPORT_ALL_INDIVIDUAL)
         return InventoryMenuView(layout.size, i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_TITLE), elements)
     }
 
     private fun renderConfirmation(player: Player, route: MenuRoute): InventoryMenuView {
         val selected = selection(route)
-        val worlds = exportService.productionWorlds().associateBy { it.uuid }
-        val selectedWorlds = selected.mapNotNull(worlds::get)
+        val worlds = exportService.completedWorlds().associateBy { it.uuid }
+        val individual = route.payload[MODE] == INDIVIDUAL
+        val batch = runCatching { exportService.individualWorlds() }
+        val selectedWorlds = if (individual) batch.getOrDefault(emptyList()) else selected.mapNotNull(worlds::get)
         val primary = selectedWorlds.firstOrNull()
         val fiscalYear = plugin.config.getInt("standalone_export.fiscal_year")
         val fileName = runCatching {
-            me.awabi2048.mwmchanpon.service.StandaloneExportFileName.create(fiscalYear, selectedWorlds.map { it.name })
+            me.awabi2048.mwmchanpon.service.StandaloneExportPlan.create(fiscalYear, selectedWorlds.map { me.awabi2048.mwmchanpon.service.ExportWorldIdentity(it.uuid, it.name) }, individual).fileName
         }.getOrDefault("-")
         val layout = ChanponGuiElements.confirmationLayout()
         val elements = listOf(
             confirmationInfoEntry(
                 player, layout.previewSlot,
-                primary?.name ?: "-", selectedWorlds.size, fileName,
+                if (individual) i18n(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_BATCH_PRIMARY) else primary?.name ?: "-", selectedWorlds.size, fileName, individual, if (individual) batch.exceptionOrNull()?.message else null,
             ),
             controlEntry(
                 player,
                 layout.confirmSlot,
-                if (primary != null) Material.LIME_CONCRETE else Material.GRAY_DYE,
+                if (primary != null && fileName != "-") Material.LIME_CONCRETE else Material.GRAY_DYE,
                 ControlPresentation(ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_CONFIRM_EXECUTE_DISPLAY, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_CONFIRM_EXECUTE_DESCRIPTION, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_CONFIRM_EXECUTE_ACTION),
                 ACTION_CONFIRM,
                 GuiElementRole.CONFIRM,
-                primary != null,
+                primary != null && fileName != "-",
             ),
             simpleActionEntry(
                 player, layout.cancelSlot, Material.REDSTONE, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_BACK),
@@ -168,7 +181,7 @@ class WorldDataExportMenu(
     }
 
     private fun selectAll(context: MenuActionContext) =
-        MenuActionResult.Success(MenuUpdate.Replace(listRoute(page(context.route), exportService.productionWorlds().map { it.uuid })))
+        MenuActionResult.Success(MenuUpdate.Replace(listRoute(page(context.route), exportService.completedWorlds().map { it.uuid })))
 
     private fun clear(context: MenuActionContext) =
         MenuActionResult.Success(MenuUpdate.Replace(listRoute(page(context.route), emptyList())))
@@ -181,26 +194,22 @@ class WorldDataExportMenu(
 
     private fun confirmExport(context: MenuActionContext): MenuActionResult {
         val selected = selection(context.route)
-        if (selected.isEmpty()) return MenuActionResult.Rejected()
-        exportService.exportStandaloneWorld(selected).thenAccept { result ->
-            Bukkit.getScheduler().runTask(plugin, Runnable {
-                context.player.sendMessage(resultMessage(context.player, result.success, result.file?.name))
-                if (!result.success) {
-                    result.message.lineSequence()
-                        .filter(String::isNotBlank)
-                        .forEach { detail ->
-                            context.player.sendMessage(
-                                i18nComponent(
-                                    context.player,
-                                    ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_EXPORT_FAILURE_DETAIL,
-                                    mapOf("detail" to detail),
-                                )
-                            )
-                        }
-                }
-            })
+        val individual = context.route.payload[MODE] == INDIVIDUAL
+        if (!individual && selected.isEmpty()) return MenuActionResult.Rejected()
+        val future = if (individual) exportService.exportAllIndividualWorlds() else exportService.exportStandaloneWorld(selected)
+        future.thenAccept { result ->
+            // 実行者自身もキックされるため、結果は再接続時に一度だけ通知します。
+            if (context.player.isOnline) deliverResult(context.player, result)
+            else pendingResults[context.player.uniqueId] = result
         }
         return MenuActionResult.Success(MenuUpdate.Close)
+    }
+
+    private fun deliverResult(player: Player, result: me.awabi2048.mwmchanpon.service.WorldDataExportResult) {
+        player.sendMessage(resultMessage(player, result.success, result.file?.name))
+        if (!result.success) result.message.lineSequence().filter(String::isNotBlank).forEach { detail ->
+            player.sendMessage(i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_EXPORT_FAILURE_DETAIL, mapOf("detail" to detail)))
+        }
     }
 
     private fun worldItem(
@@ -315,16 +324,21 @@ class WorldDataExportMenu(
         primaryName: String,
         selectedCount: Int,
         fileName: String,
+        individual: Boolean,
+        failure: String?,
     ): MenuElement = displayEntry(
         slot,
         Material.BOOK,
         GuiNameSpec.FixedLabel(i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_CONFIRM_INFO_DISPLAY)),
         me.awabi2048.mwmchanpon.ui.framedLore(
-                    listOf(
+                    listOfNotNull(
+                        failure?.let { GuiLoreLine.Warning(it) },
                         GuiLoreLine.Data(i18n(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_CONFIRM_INFO_PRIMARY_LABEL), primaryName, "§f"),
                         GuiLoreLine.Data(i18n(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_CONFIRM_INFO_COUNT_LABEL), selectedCount, "§f"),
                         GuiLoreLine.Data(i18n(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_CONFIRM_INFO_FILE_LABEL), fileName, "§f"),
-                        GuiLoreLine.Warning(i18n(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_CONFIRM_INFO_WARNING)),
+                        GuiLoreLine.Data(i18n(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_MODE_LABEL), i18n(player, if (individual) ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_MODE_INDIVIDUAL else ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_MODE_COMBINED), "§f"),
+                        GuiLoreLine.Warning(i18n(player, if (individual) ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_BATCH_WARNING else ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_CONFIRM_INFO_WARNING)),
+                        GuiLoreLine.Warning(i18n(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_MAINTENANCE_WARNING)),
                     ),
             GuiLoreFrame.BOTH,
         ),
@@ -419,7 +433,7 @@ class WorldDataExportMenu(
 
     private fun exportActionSafety(actionId: String): MenuActionSafety = when (actionId) {
         ACTION_BACK, ACTION_PAGE, ACTION_TOGGLE, ACTION_SELECT_ALL, ACTION_CLEAR_SELECTION -> MenuActionSafety.NAVIGATION_ONLY
-        ACTION_EXPORT_SELECTION -> MenuActionSafety.CONFIRM_ENTRY
+        ACTION_EXPORT_SELECTION, ACTION_EXPORT_ALL_INDIVIDUAL -> MenuActionSafety.CONFIRM_ENTRY
         ACTION_CONFIRM -> MenuActionSafety.IRREVERSIBLE
         else -> error("World-data export action must declare a dedicated safety mapping: $actionId")
     }
@@ -438,6 +452,9 @@ class WorldDataExportMenu(
         private const val ROUTE_LIST = "world_data_export"
         private const val ROUTE_CONFIRM = "world_data_export_confirm"
         private const val PAGE = "page"
+        private const val MODE = "mode"
+        private const val INDIVIDUAL = "individual"
+        private const val ACTION_EXPORT_ALL_INDIVIDUAL = "export_all_individual"
         private const val SELECTION = "selection"
         private const val WORLD_UUID = "world_uuid"
         private const val ITEMS_PER_PAGE = 36

@@ -19,7 +19,8 @@ import org.bukkit.entity.Player
 class ChanponAdminCommand(
     private val adminMenu: ChanponAdminMenu,
     private val archiveService: ArchiveService,
-    private val adminWizardForm: AdminWizardForm
+    private val adminWizardForm: AdminWizardForm,
+    private val exportService: me.awabi2048.mwmchanpon.service.WorldDataExportService,
 ) : CommandExecutor, TabCompleter {
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
         if (!sender.hasPermission("mwmchanpon.admin")) {
@@ -43,6 +44,7 @@ class ChanponAdminCommand(
 
     private fun handleSubCommand(sender: CommandSender, args: Array<out String>): Boolean {
         return when (args[0].lowercase()) {
+            "export_worlds" -> handleExportWorlds(sender, args)
             "get_linked_portal" -> handleGetLinkedPortal(sender, args)
             "unzip_archive" -> handleUnzipArchive(sender, args)
             "create_world" -> handleCreateWorld(sender, args)
@@ -51,6 +53,40 @@ class ChanponAdminCommand(
                 true
             }
         }
+    }
+
+    /** コンソールからの明示実行用です。ゲーム内ではキック警告のある確認画面を使います。 */
+    private fun handleExportWorlds(sender: CommandSender, args: Array<out String>): Boolean {
+        if (sender is Player || args.size < 2) {
+            sender.sendMessage(message(sender, ChanponPhaseKeys.CHANPON_CONTROLS_COMMAND_UNKNOWN_SUBCOMMAND))
+            return true
+        }
+        val future = runCatching {
+            when (args[1]) {
+                "individual" -> {
+                    require(args.size == 2)
+                    exportService.exportAllIndividualWorlds()
+                }
+                "combined" -> {
+                    require(args.size > 2)
+                    exportService.exportStandaloneWorld(args.drop(2).map(java.util.UUID::fromString))
+                }
+                else -> error("出力方式はindividualまたはcombinedを指定してください。")
+            }
+        }.getOrElse {
+            sender.sendMessage(message(sender, com.awabi2048.ccsystem.api.localization.generated.ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_EXPORT_FAILURE_DETAIL, "detail" to (it.message ?: "引数が不正です。")))
+            return true
+        }
+        future.thenAccept { result ->
+            sender.sendMessage(message(sender, if (result.success)
+                com.awabi2048.ccsystem.api.localization.generated.ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_EXPORT_SUCCESS
+                else com.awabi2048.ccsystem.api.localization.generated.ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_EXPORT_FAILED,
+                "file" to (result.file?.name ?: "-")))
+            if (!result.success) sender.sendMessage(message(sender,
+                com.awabi2048.ccsystem.api.localization.generated.ChanponBackupKeys.CHANPON_BACKUP_MESSAGE_EXPORT_FAILURE_DETAIL,
+                "detail" to result.message))
+        }
+        return true
     }
 
     private fun handleGetLinkedPortal(sender: CommandSender, args: Array<out String>): Boolean {

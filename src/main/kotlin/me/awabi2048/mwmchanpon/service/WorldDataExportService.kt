@@ -21,7 +21,8 @@ import org.bukkit.configuration.file.YamlConfiguration
 
 class WorldDataExportService(
     private val plugin: MWMChanponPlugin,
-    private val storage: ChanponWorldStorage
+    private val storage: ChanponWorldStorage,
+    private val globalStorage: me.awabi2048.mwmchanpon.storage.ChanponGlobalStorage,
 ) {
     private val exportDir = File(plugin.dataFolder, "exports")
 
@@ -29,229 +30,260 @@ class WorldDataExportService(
         exportDir.mkdirs()
     }
 
-    fun exportStandaloneWorld(selectedWorldUuids: List<UUID>): CompletableFuture<WorldDataExportResult> {
-        if (selectedWorldUuids.distinct().size != selectedWorldUuids.size) {
-            return CompletableFuture.completedFuture(
-                WorldDataExportResult(false, null, "selection contains duplicate worlds")
-            )
-        }
-        val available = productionWorlds().associateBy { it.uuid }
-        val worlds = selectedWorldUuids.mapNotNull(available::get)
-        if (worlds.isEmpty()) {
-            return CompletableFuture.completedFuture(
-                WorldDataExportResult(false, null, "no worlds selected")
-            )
-        }
-        if (worlds.size != selectedWorldUuids.size) {
-            return CompletableFuture.completedFuture(
-                WorldDataExportResult(false, null, "selection contains a world that is not exportable")
-            )
-        }
+    // 全件出力と統合出力は、同じ保守セッションで対象確定・凍結・復元を行います。
+    private val running = java.util.concurrent.atomic.AtomicBoolean(false)
+    private var abortExport: (() -> Unit)? = null
 
-        // Exportはワールド本体・MWMメタデータ・Chanponデータを一つの成果物へ
-        // 固定するため、対象の一部だけが旧形式のままなら開始しません。
-        // UIの選択制限だけに依存せず、このサービス境界で再検証します。
-        val migration = MyWorldManagerApi.evaluateMigration(
-            worldUuids = worlds.map { it.uuid },
-            includeGlobal = true,
-            includeUnresolved = false,
-        )
-        if (!migration.allowed) {
-            return CompletableFuture.completedFuture(
-                WorldDataExportResult(false, null, migration.blocks.first().message)
-            )
-        }
-        val nonCurrentChanpon = worlds.firstOrNull { !storage.isWorldDataCurrent(it.uuid) }
-        if (nonCurrentChanpon != null) {
-            return CompletableFuture.completedFuture(
-                WorldDataExportResult(
-                    false,
-                    null,
-                    "Chanpon world data requires /mwm migration: ${nonCurrentChanpon.uuid}",
-                )
-            )
-        }
+    /** プラグイン停止時も保守ロックとアンロード状態を残しません。 */
+    fun shutdown() { abortExport?.invoke() }
 
-        val core = MyWorldManagerApi.getWorldService()
-            ?: return CompletableFuture.completedFuture(
-                WorldDataExportResult(false, null, "core api unavailable")
-            )
-        // 状態確認後にロード済みワールドを保存します。以降のファイル生成は
-        // この不変スナップショットを基準に行い、移行中データを混在させません。
-        val leases = worlds.mapNotNull {
-            MyWorldManagerApi.tryAcquireWorldOperation(it.uuid, WorldOperation.BACKUP)
-        }
-        if (leases.size != worlds.size) {
-            leases.forEach(WorldOperationLease::close)
-            return CompletableFuture.completedFuture(
-                WorldDataExportResult(false, null, "world is locked")
-            )
-        }
-        var handedOffToAsync = false
-        try {
-        val lockedMigration = MyWorldManagerApi.evaluateMigration(
-            worldUuids = worlds.map { it.uuid },
-            includeGlobal = true,
-            includeUnresolved = false,
-        )
-        if (!lockedMigration.allowed) {
-            return CompletableFuture.completedFuture(
-                WorldDataExportResult(false, null, lockedMigration.blocks.first().message)
-            )
-        }
-        val lockedNonCurrentChanpon = worlds.firstOrNull { !storage.isWorldDataCurrent(it.uuid) }
-        if (lockedNonCurrentChanpon != null) {
-            return CompletableFuture.completedFuture(
-                WorldDataExportResult(
-                    false,
-                    null,
-                    "Chanpon world data requires /mwm migration: ${lockedNonCurrentChanpon.uuid}",
+    init {
+        Bukkit.getPluginManager().registerEvents(object : org.bukkit.event.Listener {
+            @org.bukkit.event.EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST)
+            fun onLogin(event: org.bukkit.event.player.AsyncPlayerPreLoginEvent) {
+                if (running.get()) event.disallow(
+                    org.bukkit.event.player.AsyncPlayerPreLoginEvent.Result.KICK_OTHER, maintenanceMessage(),
                 )
-            )
-        }
-        try {
-            saveLoadedWorlds(worlds)
-        } catch (error: Exception) {
-            return CompletableFuture.completedFuture(
-                WorldDataExportResult(false, null, error.message ?: "failed to save worlds")
-            )
-        }
-        // 以降の読み取りはこのリースで保護します。
-        val worldDirectories = worlds.associate { it.uuid to core.getWorldDirectory(it).toPath() }
-        val worldKeys = worlds.associate { world ->
-            world.uuid to "minecraft:${core.getWorldFolderName(world)}"
-        }
-        val spawnCoordinates = worlds.associate { world ->
-            val loaded = Bukkit.getWorld(core.getWorldFolderName(world))
-            val spawn = world.spawnPosGuest ?: world.spawnPosMember ?: loaded?.spawnLocation
-            world.uuid to ExportCoordinates(
-                spawn?.x ?: 0.5,
-                spawn?.y ?: 100.0,
-                spawn?.z ?: 0.5,
-                spawn?.yaw ?: 0.0f
-            )
-        }
-        val portalSnapshots = worlds.flatMap { core.getRelatedPortals(it.uuid) }.distinctBy { it.id }
-        // 外部の変換処理は実行せず、選択されたワールドの出力だけを行います。
-        val serverMainWorldSource = runCatching {
-            ServerMainWorldDirectory.resolve(Bukkit.getWorldContainer().toPath())
-        }.getOrElse { error ->
-            return CompletableFuture.completedFuture(
-                WorldDataExportResult(false, null, error.message ?: "server main world level.dat is unavailable")
-            )
-        }
-        Bukkit.getWorlds()
-            .firstOrNull {
-                it.worldFolder.toPath().toAbsolutePath().normalize() == serverMainWorldSource.path
             }
-            ?.save()
-        val serverMainWorldDirectory = serverMainWorldSource.path
 
-        val fiscalYear = plugin.config.getInt("standalone_export.fiscal_year")
-        val output = File(exportDir, StandaloneExportFileName.create(fiscalYear, worlds.map { it.name }))
-        val future = CompletableFuture<WorldDataExportResult>()
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, Runnable {
-            val staging = File(exportDir, ".${output.nameWithoutExtension}-${UUID.randomUUID()}")
-            val temporaryZip = File(exportDir, "${output.name}.tmp")
-            try {
-                staging.mkdirs()
-                val primary = worlds.first()
-                copyPrimaryWorld(
-                    worldDirectories.getValue(primary.uuid),
-                    serverMainWorldDirectory,
-                    staging.toPath()
+            // pre-login通過後に出力が始まった接続も参加前に拒否します。
+            @Suppress("DEPRECATION")
+            @org.bukkit.event.EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST)
+            fun onLogin(event: org.bukkit.event.player.PlayerLoginEvent) {
+                if (running.get()) event.disallow(
+                    org.bukkit.event.player.PlayerLoginEvent.Result.KICK_OTHER, maintenanceMessage(),
                 )
-                val now = System.currentTimeMillis()
-                val primarySpawn = spawnCoordinates.getValue(primary.uuid)
-                @Suppress("DEPRECATION")
-                val serverDataVersion = Bukkit.getUnsafe().dataVersion
-                val metadata = StandaloneLevelMetadata(
-                    levelName = primary.name,
-                    lastPlayed = now,
-                    // level.dat のDataVersionはワールド書き出し時点の実行環境に合わせます。
-                    dataVersion = serverDataVersion,
-                    versionName = Bukkit.getMinecraftVersion(),
-                    spawnX = kotlin.math.floor(primarySpawn.x).toInt(),
-                    spawnY = kotlin.math.floor(primarySpawn.y).toInt(),
-                    spawnZ = kotlin.math.floor(primarySpawn.z).toInt(),
-                    spawnAngle = primarySpawn.yaw,
-                )
-                StandaloneLevelDatRewriter.rewrite(
-                    staging.toPath().resolve("level.dat"),
-                    staging.toPath().resolve("level.dat"),
-                    metadata,
-                )
-                val oldLevelData = staging.toPath().resolve("level.dat_old")
-                if (Files.isRegularFile(oldLevelData)) {
-                    StandaloneLevelDatRewriter.rewrite(oldLevelData, oldLevelData, metadata)
-                }
-                writeDimensions(staging.toPath(), worlds.drop(1), worldDirectories)
-                writePortalCommandBlocks(
-                    staging.toPath(),
-                    primary,
-                    worlds,
-                    worldKeys,
-                    spawnCoordinates,
-                    portalSnapshots
-                )
-                writeManifest(
-                    staging,
-                    output.name,
-                    fiscalYear,
-                    primary,
-                    worlds,
-                    portalSnapshots,
-                    serverMainWorldSource.levelName,
-                )
-                zipWorld(staging.toPath(), temporaryZip.toPath())
-                try {
-                    Files.move(
-                        temporaryZip.toPath(),
-                        output.toPath(),
-                        StandardCopyOption.REPLACE_EXISTING,
-                        StandardCopyOption.ATOMIC_MOVE
-                    )
-                } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
-                    Files.move(
-                        temporaryZip.toPath(),
-                        output.toPath(),
-                        StandardCopyOption.REPLACE_EXISTING
-                    )
-                }
-                future.complete(WorldDataExportResult(true, output, "standalone export completed"))
-            } catch (ex: Exception) {
-                plugin.logger.warning("Standalone world export failed: ${ex.message}")
-                temporaryZip.delete()
-                output.delete()
-                future.complete(WorldDataExportResult(false, null, ex.message ?: "export failed"))
-            } finally {
-                staging.deleteRecursively()
-                leases.forEach(WorldOperationLease::close)
             }
-        })
-        handedOffToAsync = true
-        return future
-        } catch (error: Exception) {
-            return CompletableFuture.completedFuture(
-                WorldDataExportResult(false, null, error.message ?: "standalone export preparation failed")
-            )
-        } finally {
-            if (!handedOffToAsync) {
-                leases.forEach(WorldOperationLease::close)
-            }
-        }
+        }, plugin)
     }
 
-    fun productionWorlds(): List<WorldData> =
+    private fun maintenanceMessage() = com.awabi2048.ccsystem.CCSystem.getAPI().getI18nComponent(
+        null, com.awabi2048.ccsystem.api.localization.generated.ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_MAINTENANCE_KICK,
+    )
+
+    fun completedWorlds(): List<WorldData> =
         MyWorldManagerApi.getWorldRepository()?.findAll().orEmpty()
-            .filter { storage.isProductionWorld(it.uuid) }
+            .filter { !it.isArchived && storage.isSubmissionCompleted(it.uuid) }
             .sortedByDescending { it.createdAt }
 
-    private fun saveLoadedWorlds(worlds: List<WorldData>) {
-        val core = MyWorldManagerApi.getWorldService() ?: return
-        worlds.forEach { worldData ->
-            Bukkit.getWorld(core.getWorldFolderName(worldData))?.save()
+    fun individualWorlds(): List<WorldData> {
+        val spawnUuid = globalStorage.getSpawnWorldUuid() ?: error("スポーンワールドが設定されていません。")
+        val spawn = MyWorldManagerApi.getWorldRepository()?.findByUuid(spawnUuid)
+            ?: error("スポーンワールドが見つかりません: $spawnUuid")
+        require(!spawn.isArchived) { "スポーンワールドがアーカイブされています。" }
+        return (completedWorlds() + spawn).distinctBy { it.uuid }
+    }
+
+    fun exportAllIndividualWorlds(): CompletableFuture<WorldDataExportResult> =
+        runCatching { startExport(individualWorlds().map { it.uuid }, individual = true) }
+            .getOrElse { failed(it.message ?: "出力対象を取得できません。") }
+
+    fun exportStandaloneWorld(selectedWorldUuids: List<UUID>): CompletableFuture<WorldDataExportResult> =
+        startExport(selectedWorldUuids, individual = false)
+
+    private fun failed(message: String) = CompletableFuture.completedFuture(WorldDataExportResult(false, null, message))
+
+    private fun validateWorlds(worlds: List<WorldData>, individual: Boolean) {
+        val eligible = (if (individual) individualWorlds() else completedWorlds()).mapTo(mutableSetOf()) { it.uuid }
+        require(worlds.isNotEmpty() && worlds.all { it.uuid in eligible }) { "出力対象の完成状態が変更されています。" }
+        if (individual) require(worlds.map { it.uuid }.toSet() == eligible) { "全件出力の対象が変更されています。再実行してください。" }
+        val migration = MyWorldManagerApi.evaluateMigration(worlds.map { it.uuid }, includeGlobal = true, includeUnresolved = false)
+        require(migration.allowed) { migration.blocks.first().message }
+        require(worlds.all { storage.isWorldDataCurrent(it.uuid) }) { "Chanponデータの移行が必要です。/mwm migration を実行してください。" }
+    }
+
+    private fun startExport(selectedWorldUuids: List<UUID>, individual: Boolean): CompletableFuture<WorldDataExportResult> {
+        check(Bukkit.isPrimaryThread()) { "出力はサーバースレッドから開始してください。" }
+        if (!running.compareAndSet(false, true)) return failed("ワールド出力を実行中です。")
+        val leases = mutableListOf<WorldOperationLease>()
+        val snapshots = mutableListOf<me.awabi2048.myworldmanager.api.service.ApiWorldSnapshot>()
+        val future = CompletableFuture<WorldDataExportResult>()
+        val work = File(exportDir, ".export-${UUID.randomUUID()}")
+        val originallyLoaded = mutableSetOf<UUID>()
+        val core = MyWorldManagerApi.getWorldService()
+        var finished = false
+        val cancelled = java.util.concurrent.atomic.AtomicBoolean(false)
+
+        fun finish(result: WorldDataExportResult, temporaryZip: Path? = null) {
+            check(Bukkit.isPrimaryThread())
+            if (finished) return
+            finished = true
+            var finalResult = result
+            // closeによる再ロードもロック保持中に完了させ、途中で入場できる隙間を作りません。
+            try {
+                val restoreErrors = snapshots.asReversed().mapNotNull { snapshot ->
+                    runCatching { snapshot.close() }.exceptionOrNull()
+                }
+                check(restoreErrors.isEmpty()) { "ワールド復元失敗: ${restoreErrors.first().message}" }
+                originallyLoaded.forEach { uuid ->
+                    val world = MyWorldManagerApi.getWorldRepository()?.findByUuid(uuid)
+                    check(world != null && Bukkit.getWorld(core!!.getWorldFolderName(world)) != null) {
+                        "出力後のワールド再ロードに失敗しました: $uuid"
+                    }
+                }
+                if (result.success && temporaryZip != null) {
+                    val output = requireNotNull(result.file).toPath()
+                    try {
+                        Files.move(temporaryZip, output, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+                    } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+                        Files.move(temporaryZip, output, StandardCopyOption.REPLACE_EXISTING)
+                    }
+                }
+            } catch (error: Exception) {
+                plugin.logger.severe("ワールド出力の復元・公開失敗: ${error.message}")
+                finalResult = WorldDataExportResult(false, null, error.message ?: "ワールドの復元に失敗しました。")
+            } finally {
+                leases.asReversed().forEach { it.close() }
+                runCatching { work.deleteRecursively() }
+                abortExport = null
+                running.set(false)
+            }
+            plugin.logger.info("ワールド出力: ${finalResult.message} ${finalResult.file ?: ""}")
+            future.complete(finalResult)
         }
+
+        abortExport = {
+            cancelled.set(true)
+            finish(WorldDataExportResult(false, null, "プラグイン停止のため出力を中止しました。"))
+        }
+        try {
+            require(core != null) { "MWM APIを利用できません。" }
+            require(selectedWorldUuids.distinct().size == selectedWorldUuids.size) { "出力対象が重複しています。" }
+            val repository = requireNotNull(MyWorldManagerApi.getWorldRepository())
+            val worlds = selectedWorldUuids.map { repository.findByUuid(it) ?: error("ワールドが見つかりません: $it") }
+            validateWorlds(worlds, individual)
+            val fiscalYear = plugin.config.getInt("standalone_export.fiscal_year")
+            val plan = StandaloneExportPlan.create(fiscalYear, worlds.map { ExportWorldIdentity(it.uuid, it.name) }, individual)
+            worlds.forEach { world ->
+                leases += MyWorldManagerApi.tryAcquireWorldOperation(world.uuid, WorldOperation.BACKUP)
+                    ?: error("ワールドは別の操作中です: ${world.name}")
+            }
+            validateWorlds(worlds, individual)
+            val worldDirectories = worlds.associate { it.uuid to core.getWorldDirectory(it).toPath() }
+            val worldKeys = worlds.associate { it.uuid to "minecraft:${core.getWorldFolderName(it)}" }
+            val spawns = worlds.associate { world ->
+                val loaded = Bukkit.getWorld(core.getWorldFolderName(world))
+                if (loaded != null) originallyLoaded += world.uuid
+                val spawn = world.spawnPosGuest ?: world.spawnPosMember ?: loaded?.spawnLocation
+                world.uuid to ExportCoordinates(spawn?.x ?: 0.5, spawn?.y ?: 100.0, spawn?.z ?: 0.5, spawn?.yaw ?: 0.0f)
+            }
+            val portals = worlds.flatMap { core.getRelatedPortals(it.uuid) }.distinctBy { it.id }
+            val sharedSource = ServerMainWorldDirectory.resolve(Bukkit.getWorldContainer().toPath())
+            @Suppress("DEPRECATION")
+            val dataVersion = Bukkit.getUnsafe().dataVersion
+            val minecraftVersion = Bukkit.getMinecraftVersion()
+            require(work.mkdirs()) { "一時ディレクトリを作成できません。" }
+            // スポーンも対象になるため退避ではなくキックします。退出リスナーの完了後に凍結します。
+            Bukkit.getOnlinePlayers().toList().forEach { it.kick(maintenanceMessage()) }
+            var waitTicks = 0
+            object : org.bukkit.scheduler.BukkitRunnable() {
+                override fun run() {
+                    if (finished) { cancel(); return }
+                    if (Bukkit.getOnlinePlayers().isNotEmpty()) {
+                        if (++waitTicks < 100) return
+                        cancel()
+                        finish(WorldDataExportResult(false, null, "プレイヤーの退出が完了しませんでした。"))
+                        return
+                    }
+                    cancel()
+                    try {
+                        validateWorlds(worlds, individual)
+                        worlds.forEachIndexed { index, world ->
+                            val snapshot = core.beginWorldSnapshot(world.uuid, leases[index])
+                            snapshots += snapshot
+                            require(snapshot.quiescent) { snapshot.failureReason ?: "ワールドを凍結できません。" }
+                            require(Bukkit.getWorld(core.getWorldFolderName(world)) == null) { "ワールドをアンロードできません: ${world.name}" }
+                        }
+                        // サーバーメインワールドは必須ワールドのため、同期flushと同一tick内のコピーで
+                        // 共有データだけを一度固定します。非同期処理は稼働中の共有データを読みません。
+                        Bukkit.getWorlds().firstOrNull {
+                            it.worldFolder.toPath().toAbsolutePath().normalize() == sharedSource.path
+                        }?.save(true)
+                        val shared = work.toPath().resolve("shared")
+                        Files.createDirectories(shared)
+                        listOf("level.dat", "level.dat_old", "data").forEach { name ->
+                            val source = sharedSource.path.resolve(name)
+                            if (Files.isDirectory(source)) copyTree(source, shared.resolve(name))
+                            else if (Files.isRegularFile(source)) Files.copy(source, shared.resolve(name))
+                        }
+                        Bukkit.getScheduler().runTaskAsynchronously(plugin, Runnable {
+                            try {
+                                val bundle = work.toPath().resolve("bundle")
+                                Files.createDirectories(bundle)
+                                plan.archives.forEachIndexed { index, archive ->
+                                    check(!cancelled.get()) { "出力が中止されました。" }
+                                    val included = archive.worldUuids.map { id -> worlds.first { it.uuid == id } }
+                                    val staging = work.toPath().resolve("world-$index")
+                                    assembleWorld(staging, included, worldDirectories, worldKeys, spawns, portals, shared,
+                                        archive.fileName, fiscalYear, sharedSource.levelName, dataVersion, minecraftVersion)
+                                    zipWorld(staging, bundle.resolve(archive.fileName))
+                                    staging.toFile().deleteRecursively()
+                                }
+                                val temporaryZip = work.toPath().resolve("output.zip")
+                                if (individual) {
+                                    val manifest = YamlConfiguration()
+                                    manifest.set("format", 1)
+                                    manifest.set("mode", "individual")
+                                    manifest.set("archives", plan.archives.map { linkedMapOf("file" to it.fileName, "world_uuid" to it.worldUuids.single().toString()) })
+                                    manifest.save(bundle.resolve("mwm-export-bundle.yml").toFile())
+                                    zipWorld(bundle, temporaryZip)
+                                } else Files.move(bundle.resolve(plan.archives.single().fileName), temporaryZip)
+                                check(!cancelled.get()) { "出力が中止されました。" }
+                                Bukkit.getScheduler().runTask(plugin, Runnable {
+                                    try {
+                                        require(snapshots.all { it.isStillQuiescent() }) { "コピー中にワールドが更新されたため、出力を破棄します。" }
+                                        finish(WorldDataExportResult(true, File(exportDir, plan.fileName), "ワールド出力が完了しました。"), temporaryZip)
+                                    } catch (error: Exception) {
+                                        finish(WorldDataExportResult(false, null, error.message ?: "静止状態の確認に失敗しました。"))
+                                    }
+                                })
+                            } catch (error: Exception) {
+                                if (cancelled.get()) { work.deleteRecursively(); return@Runnable }
+                                Bukkit.getScheduler().runTask(plugin, Runnable {
+                                    finish(WorldDataExportResult(false, null, error.message ?: "ZIPの生成に失敗しました。"))
+                                })
+                            }
+                        })
+                    } catch (error: Exception) {
+                        finish(WorldDataExportResult(false, null, error.message ?: "ワールドの凍結に失敗しました。"))
+                    }
+                }
+            }.runTaskTimer(plugin, 1L, 1L)
+        } catch (error: Exception) {
+            finish(WorldDataExportResult(false, null, error.message ?: "出力準備に失敗しました。"))
+        }
+        return future
+    }
+
+    private fun assembleWorld(
+        root: Path,
+        worlds: List<WorldData>,
+        directories: Map<UUID, Path>,
+        worldKeys: Map<UUID, String>,
+        spawns: Map<UUID, ExportCoordinates>,
+        portals: List<me.awabi2048.myworldmanager.api.service.ApiPortalSnapshot>,
+        shared: Path,
+        fileName: String,
+        fiscalYear: Int,
+        sharedSourceName: String,
+        dataVersion: Int,
+        minecraftVersion: String,
+    ) {
+        val primary = worlds.first()
+        copyPrimaryWorld(directories.getValue(primary.uuid), shared, root)
+        val spawn = spawns.getValue(primary.uuid)
+        val metadata = StandaloneLevelMetadata(primary.name, System.currentTimeMillis(), dataVersion, minecraftVersion,
+            kotlin.math.floor(spawn.x).toInt(), kotlin.math.floor(spawn.y).toInt(), kotlin.math.floor(spawn.z).toInt(), spawn.yaw)
+        listOf("level.dat", "level.dat_old").forEach { name ->
+            val path = root.resolve(name)
+            if (Files.isRegularFile(path)) StandaloneLevelDatRewriter.rewrite(path, path, metadata)
+        }
+        writeDimensions(root, worlds.drop(1), directories)
+        val selectedIds = worlds.mapTo(mutableSetOf()) { it.uuid }
+        val selectedKeys = worldKeys.filterKeys { it in selectedIds }
+        val relatedPortals = portals.filter { it.worldKey in selectedKeys.values }
+        writePortalCommandBlocks(root, primary, worlds, selectedKeys, spawns, relatedPortals)
+        writeManifest(root.toFile(), fileName, fiscalYear, primary, worlds, relatedPortals, sharedSourceName, selectedKeys)
     }
 
     private fun copyPrimaryWorld(source: Path, serverMainWorld: Path, target: Path) {
@@ -298,6 +330,7 @@ class WorldDataExportService(
         worlds: List<WorldData>,
         portals: List<me.awabi2048.myworldmanager.api.service.ApiPortalSnapshot>,
         serverMainWorldName: String,
+        worldKeys: Map<UUID, String>,
     ) {
         val manifest = YamlConfiguration()
         manifest.set("format", 2)
@@ -335,7 +368,8 @@ class WorldDataExportService(
                     "z" to portal.z,
                     "target_world_uuid" to portal.worldUuid?.toString(),
                     "target_world_key" to portal.targetWorldKey,
-                    "included_target" to (portal.worldUuid == null || portal.worldUuid in selectedIds),
+                    "included_target" to (StandalonePortalTargets.resolve(portal, worldKeys) in selectedIds),
+                    "converted" to (StandalonePortalTargets.resolve(portal, worldKeys) in selectedIds),
                     "type" to portal.type,
                     "min" to listOf(portal.minX, portal.minY, portal.minZ),
                     "max" to listOf(portal.maxX, portal.maxY, portal.maxZ)
@@ -363,7 +397,7 @@ class WorldDataExportService(
         val sourceWorldByKey = worldKeys.entries.associate { it.value to it.key }
         portals.forEach { portal ->
             val sourceUuid = sourceWorldByKey[portal.worldKey] ?: return@forEach
-            val targetUuid = portal.worldUuid ?: return@forEach
+            val targetUuid = StandalonePortalTargets.resolve(portal, worldKeys) ?: return@forEach
             dimensionByWorld[sourceUuid] ?: return@forEach
             val targetDimension = dimensionByWorld[targetUuid] ?: return@forEach
             val spawn = spawnCoordinates[targetUuid] ?: return@forEach

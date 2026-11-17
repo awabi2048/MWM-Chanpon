@@ -223,7 +223,7 @@ class MWMChanponPlugin : JavaPlugin() {
         )
 
         backupService = BackupService(this, chanponStorage)
-        worldDataExportService = WorldDataExportService(this, chanponStorage)
+        worldDataExportService = WorldDataExportService(this, chanponStorage, globalStorage)
         backupListMenu = BackupListMenu(this, backupService)
         archiveService = ArchiveService(this, chanponStorage, globalStorage)
         annualArchiveFlow = AnnualArchiveFlow(this, archiveService)
@@ -363,7 +363,8 @@ class MWMChanponPlugin : JavaPlugin() {
         adminCommand = ChanponAdminCommand(
             chanponAdminMenu,
             archiveService,
-            AdminWizardForm(this)
+            AdminWizardForm(this),
+            worldDataExportService,
         )
         getCommand("chanpon-mwm")?.let { command ->
             command.setExecutor(adminCommand)
@@ -495,6 +496,7 @@ class MWMChanponPlugin : JavaPlugin() {
     }
 
     override fun onDisable() {
+        if (::worldDataExportService.isInitialized) worldDataExportService.shutdown()
         tourSimulationIntegration?.close()
         tourSimulationIntegration = null
         if (::chanponWorldSettingsMenu.isInitialized) {
