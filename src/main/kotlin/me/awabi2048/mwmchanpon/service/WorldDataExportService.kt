@@ -61,33 +61,51 @@ class WorldDataExportService(
             .filter { !it.isArchived && storage.isSubmissionCompleted(it.uuid) }
             .sortedByDescending { it.createdAt }
 
-    fun individualWorlds(): List<WorldData> {
+    private fun spawnWorld(): WorldData {
         val spawnUuid = globalStorage.getSpawnWorldUuid() ?: error("スポーンワールドが設定されていません。")
         val spawn = MyWorldManagerApi.getWorldRepository()?.findByUuid(spawnUuid)
             ?: error("スポーンワールドが見つかりません: $spawnUuid")
         require(!spawn.isArchived) { "スポーンワールドがアーカイブされています。" }
-        return (completedWorlds() + spawn).distinctBy { it.uuid }
+        return spawn
     }
 
+    fun individualWorlds(): List<WorldData> =
+        withSpawnFirst(spawnWorld(), completedWorlds())
+
+    fun combinedWorlds(selectedWorldUuids: List<UUID>): List<WorldData> {
+        require(selectedWorldUuids.distinct().size == selectedWorldUuids.size) { "出力対象が重複しています。" }
+        val spawn = spawnWorld()
+        val eligible = completedWorlds().associateBy { it.uuid }
+        val selected = selectedWorldUuids.filterNot { it == spawn.uuid }.map { uuid ->
+            requireNotNull(eligible[uuid]) { "完成済みの出力対象が見つかりません: $uuid" }
+        }
+        return withSpawnFirst(spawn, selected)
+    }
+
+    // スポーンが完成済み一覧にもある場合は、代表の1件としてだけ含めます。
+    private fun withSpawnFirst(spawn: WorldData, others: List<WorldData>) =
+        listOf(spawn) + others.filterNot { it.uuid == spawn.uuid }
+
     fun exportAllIndividualWorlds(): CompletableFuture<WorldDataExportResult> =
-        runCatching { startExport(individualWorlds().map { it.uuid }, individual = true) }
+        runCatching { startExport(individualWorlds(), individual = true) }
             .getOrElse { failed(it.message ?: "出力対象を取得できません。") }
 
     fun exportStandaloneWorld(selectedWorldUuids: List<UUID>): CompletableFuture<WorldDataExportResult> =
-        startExport(selectedWorldUuids, individual = false)
+        runCatching { startExport(combinedWorlds(selectedWorldUuids), individual = false) }
+            .getOrElse { failed(it.message ?: "出力対象を取得できません。") }
 
     private fun failed(message: String) = CompletableFuture.completedFuture(WorldDataExportResult(false, null, message))
 
     private fun validateWorlds(worlds: List<WorldData>, individual: Boolean) {
-        val eligible = (if (individual) individualWorlds() else completedWorlds()).mapTo(mutableSetOf()) { it.uuid }
-        require(worlds.isNotEmpty() && worlds.all { it.uuid in eligible }) { "出力対象の完成状態が変更されています。" }
-        if (individual) require(worlds.map { it.uuid }.toSet() == eligible) { "全件出力の対象が変更されています。再実行してください。" }
+        val requested = worlds.map { it.uuid }
+        val current = if (individual) individualWorlds() else combinedWorlds(requested)
+        require(current.map { it.uuid } == requested) { "スポーンワールドまたは出力対象が変更されています。再実行してください。" }
         val migration = MyWorldManagerApi.evaluateMigration(worlds.map { it.uuid }, includeGlobal = true, includeUnresolved = false)
         require(migration.allowed) { migration.blocks.first().message }
         require(worlds.all { storage.isWorldDataCurrent(it.uuid) }) { "Chanponデータの移行が必要です。/mwm migration を実行してください。" }
     }
 
-    private fun startExport(selectedWorldUuids: List<UUID>, individual: Boolean): CompletableFuture<WorldDataExportResult> {
+    private fun startExport(worlds: List<WorldData>, individual: Boolean): CompletableFuture<WorldDataExportResult> {
         check(Bukkit.isPrimaryThread()) { "出力はサーバースレッドから開始してください。" }
         if (!running.compareAndSet(false, true)) return failed("ワールド出力を実行中です。")
         val leases = mutableListOf<WorldOperationLease>()
@@ -143,9 +161,6 @@ class WorldDataExportService(
         }
         try {
             require(core != null) { "MWM APIを利用できません。" }
-            require(selectedWorldUuids.distinct().size == selectedWorldUuids.size) { "出力対象が重複しています。" }
-            val repository = requireNotNull(MyWorldManagerApi.getWorldRepository())
-            val worlds = selectedWorldUuids.map { repository.findByUuid(it) ?: error("ワールドが見つかりません: $it") }
             validateWorlds(worlds, individual)
             val fiscalYear = plugin.config.getInt("standalone_export.fiscal_year")
             val plan = StandaloneExportPlan.create(fiscalYear, worlds.map { ExportWorldIdentity(it.uuid, it.name) }, individual)
@@ -219,6 +234,7 @@ class WorldDataExportService(
                                     val manifest = YamlConfiguration()
                                     manifest.set("format", 1)
                                     manifest.set("mode", "individual")
+                                    manifest.set("primary_world_uuid", worlds.first().uuid.toString())
                                     manifest.set("archives", plan.archives.map { linkedMapOf("file" to it.fileName, "world_uuid" to it.worldUuids.single().toString()) })
                                     manifest.save(bundle.resolve("mwm-export-bundle.yml").toFile())
                                     zipWorld(bundle, temporaryZip)
@@ -272,9 +288,6 @@ class WorldDataExportService(
         listOf("level.dat", "level.dat_old").forEach { name ->
             val path = root.resolve(name)
             if (Files.isRegularFile(path)) StandaloneLevelDatRewriter.rewrite(path, path, metadata)
-        }
-        require(Files.isRegularFile(root.resolve(StandalonePrimaryWorldAssembler.PRIMARY_DIRECTORY).resolve("data/minecraft/world_gen_settings.dat"))) {
-            "代表ワールドの26.2生成設定がありません。先にMinecraft側で移行してください。"
         }
         writeDimensions(root, worlds.drop(1), directories)
         val selectedIds = worlds.mapTo(mutableSetOf()) { it.uuid }

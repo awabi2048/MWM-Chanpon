@@ -6,6 +6,7 @@ import java.nio.file.StandardCopyOption
 
 internal object StandalonePrimaryWorldAssembler {
     const val PRIMARY_DIRECTORY = "dimensions/minecraft/overworld"
+    private const val WORLD_GEN_SETTINGS = "data/minecraft/world_gen_settings.dat"
     private val serverMainDataPaths = setOf("level.dat", "level.dat_old", "data")
 
     fun copy(representativeWorld: Path, serverMainWorld: Path, target: Path) {
@@ -14,6 +15,10 @@ internal object StandalonePrimaryWorldAssembler {
         }
         require(Files.isRegularFile(serverMainWorld.resolve("level.dat"))) {
             "server main world level.dat is missing: $serverMainWorld"
+        }
+        val generatorSettings = representativeWorld.resolve(WORLD_GEN_SETTINGS)
+        require(Files.isRegularFile(generatorSettings)) {
+            "代表ワールドの26.2生成設定がありません。先にMinecraft側で移行してください。"
         }
 
         // 26.2では生成設定・天候・ゲームルール等もディメンション固有データです。
@@ -35,6 +40,11 @@ internal object StandalonePrimaryWorldAssembler {
                 }
             }
         }
+        // Paper/Chiyogamiはディメンション配下を、Java版クライアントはセーブ直下を読みます。
+        // 共有データに同名ファイルがあっても、代表ワールドの設定で統一します。
+        val clientSettings = target.resolve(WORLD_GEN_SETTINGS)
+        Files.createDirectories(clientSettings.parent)
+        Files.copy(generatorSettings, clientSettings, StandardCopyOption.REPLACE_EXISTING)
     }
 
     fun copyDimension(source: Path, target: Path) {

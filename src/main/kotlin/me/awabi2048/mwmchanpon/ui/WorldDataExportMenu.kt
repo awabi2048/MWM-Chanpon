@@ -132,29 +132,31 @@ class WorldDataExportMenu(
 
     private fun renderConfirmation(player: Player, route: MenuRoute): InventoryMenuView {
         val selected = selection(route)
-        val worlds = exportService.completedWorlds().associateBy { it.uuid }
         val individual = route.payload[MODE] == INDIVIDUAL
-        val batch = runCatching { exportService.individualWorlds() }
-        val selectedWorlds = if (individual) batch.getOrDefault(emptyList()) else selected.mapNotNull(worlds::get)
+        val targets = runCatching {
+            if (individual) exportService.individualWorlds() else exportService.combinedWorlds(selected)
+        }
+        val selectedWorlds = targets.getOrDefault(emptyList())
         val primary = selectedWorlds.firstOrNull()
         val fiscalYear = plugin.config.getInt("standalone_export.fiscal_year")
-        val fileName = runCatching {
+        val plan = targets.mapCatching {
             me.awabi2048.mwmchanpon.service.StandaloneExportPlan.create(fiscalYear, selectedWorlds.map { me.awabi2048.mwmchanpon.service.ExportWorldIdentity(it.uuid, it.name) }, individual).fileName
-        }.getOrDefault("-")
+        }
+        val fileName = plan.getOrDefault("-")
         val layout = ChanponGuiElements.confirmationLayout()
         val elements = listOf(
             confirmationInfoEntry(
                 player, layout.previewSlot,
-                if (individual) i18n(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_BATCH_PRIMARY) else primary?.name ?: "-", selectedWorlds.size, fileName, individual, if (individual) batch.exceptionOrNull()?.message else null,
+                primary?.name ?: "-", selectedWorlds.size, fileName, individual, plan.exceptionOrNull()?.message,
             ),
             controlEntry(
                 player,
                 layout.confirmSlot,
-                if (primary != null && fileName != "-") Material.LIME_CONCRETE else Material.GRAY_DYE,
+                if (plan.isSuccess) Material.LIME_CONCRETE else Material.GRAY_DYE,
                 ControlPresentation(ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_CONFIRM_EXECUTE_DISPLAY, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_CONFIRM_EXECUTE_DESCRIPTION, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_CONFIRM_EXECUTE_ACTION),
                 ACTION_CONFIRM,
                 GuiElementRole.CONFIRM,
-                primary != null && fileName != "-",
+                unavailableReason = plan.exceptionOrNull()?.message,
             ),
             simpleActionEntry(
                 player, layout.cancelSlot, Material.REDSTONE, i18n(player, ChanponBackupKeys.CHANPON_BACKUP_COMMON_BACK),
@@ -188,14 +190,12 @@ class WorldDataExportMenu(
 
     private fun showConfirmation(context: MenuActionContext): MenuActionResult {
         val selected = selection(context.route)
-        if (selected.isEmpty()) return MenuActionResult.Rejected()
         return MenuActionResult.Success(MenuUpdate.Navigate(confirmRoute(selected)))
     }
 
     private fun confirmExport(context: MenuActionContext): MenuActionResult {
         val selected = selection(context.route)
         val individual = context.route.payload[MODE] == INDIVIDUAL
-        if (!individual && selected.isEmpty()) return MenuActionResult.Rejected()
         val future = if (individual) exportService.exportAllIndividualWorlds() else exportService.exportStandaloneWorld(selected)
         future.thenAccept { result ->
             // 実行者自身もキックされるため、結果は再接続時に一度だけ通知します。
@@ -253,32 +253,24 @@ class WorldDataExportMenu(
     }
 
     private fun exportSelectionItem(player: Player, slot: Int, selectedCount: Int): MenuElement {
-        val enabled = selectedCount > 0
         val gui = CCSystem.getAPI().getGuiElementService()
         val spec = GuiMenuEntrySpec(
                 slot = slot,
-                material = if (enabled) Material.DISPENSER else Material.GRAY_DYE,
-                name = GuiNameSpec.FixedLabel(i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_EXECUTE_DISPLAY)),
-                role = if (enabled) GuiElementRole.CONFIRM else GuiElementRole.CONTENT,
+                material = Material.DISPENSER,
+                name = GuiNameSpec.FixedLabel(i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_MODE_COMBINED)),
+                role = GuiElementRole.CONFIRM,
                 data = listOf(GuiMenuEntryData(
                     i18n(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_EXECUTE_SELECTED_LABEL),
                     selectedCount,
                 )),
-                warnings = if (enabled) emptyList() else {
-                    listOf(i18n(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_EXECUTE_DISABLED))
-                },
-                actions = if (enabled) listOf(chanponGestureAction(
+                actions = listOf(chanponGestureAction(
                     ACTION_EXPORT_SELECTION,
                     MenuGesture.ANY,
                     i18n(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_EXECUTE_ACTION),
                     safety = MenuActionSafety.CONFIRM_ENTRY,
-                )) else emptyList(),
+                )),
             )
-        return if (enabled) gui.menuEntry(player, spec) else gui.menuUnavailable(
-            player,
-            spec,
-            i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_EXECUTE_DISABLED),
-        )
+        return gui.menuEntry(player, spec)
     }
 
     private fun controlEntry(
@@ -288,9 +280,10 @@ class WorldDataExportMenu(
         presentation: ControlPresentation,
         actionId: String,
         role: GuiElementRole = GuiElementRole.ACTION,
-        enabled: Boolean = true,
+        unavailableReason: String? = null,
     ): MenuElement {
         val gui = CCSystem.getAPI().getGuiElementService()
+        val enabled = unavailableReason == null
         val spec = GuiMenuEntrySpec(
             slot = slot,
             material = material,
@@ -305,10 +298,10 @@ class WorldDataExportMenu(
                 classification = exportRouteClassification(actionId),
             )) else emptyList(),
         )
-        return if (enabled) gui.menuEntry(player, spec) else gui.menuUnavailable(
+        return if (unavailableReason == null) gui.menuEntry(player, spec) else gui.menuUnavailable(
             player,
             spec,
-            i18nComponent(player, ChanponBackupKeys.CHANPON_BACKUP_EXPORT_MENU_EXECUTE_DISABLED),
+            Component.text(unavailableReason),
         )
     }
 

@@ -31,6 +31,8 @@ class StandalonePrimaryWorldAssemblerTest {
         serverMain.resolve("level.dat_old").writeText("server-main-old-level")
         serverMain.resolve("data").createDirectories()
         serverMain.resolve("data/map_0.dat").writeText("server-main-map")
+        serverMain.resolve("data/minecraft").createDirectories()
+        serverMain.resolve("data/minecraft/world_gen_settings.dat").writeText("server-main-worldgen")
 
         StandalonePrimaryWorldAssembler.copy(representative, serverMain, output)
 
@@ -39,6 +41,7 @@ class StandalonePrimaryWorldAssemblerTest {
         assertEquals("server-main-old-level", output.resolve("level.dat_old").readText())
         assertEquals("server-main-map", output.resolve("data/map_0.dat").readText())
         assertEquals("representative-worldgen", output.resolve("dimensions/minecraft/overworld/data/minecraft/world_gen_settings.dat").readText())
+        assertEquals("representative-worldgen", output.resolve("data/minecraft/world_gen_settings.dat").readText())
         assertFalse(Files.exists(output.resolve("dimensions/minecraft/overworld/data/paper")))
         assertFalse(Files.exists(output.resolve("region")))
         assertFalse(Files.exists(output.resolve("session.lock")))

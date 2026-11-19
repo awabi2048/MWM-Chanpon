@@ -2,7 +2,7 @@
 
 ## 出力方式と対象
 
-- 統合出力は、完成済み（`submission.state: completed`）の非アーカイブワールドから順序付きで選択します。先頭がoverworld、以降がカスタムディメンションになります。26.2形式に合わせ、overworldも `dimensions/minecraft/overworld/` へ配置します。
+- 統合出力は設定済みスポーンを必ずoverworldに置き、選択した完成済みワールドを追加ディメンションにします。追加選択なしでスポーン単体を出力できます。
 - 個別一括出力は、完成済み全件と設定済みスポーンワールドを重複排除して対象とし、選択操作は不要です。スポーンは完成状態を問いません。未設定・削除済み・アーカイブ済みなら開始しません。
 - 個別一括出力の外側ZIPには、各ワールドの独立したセーブZIPと `mwm-export-bundle.yml` を入れます。同名ZIPはUUIDを付加して区別します。
 - 全方式で同一セーブ内にリンク先を含むポータルだけを変換します。個別ZIPをまたぐリンクは変換しません。対象指定は `@p` を維持し、ゲートは対応対象にしません。
@@ -25,7 +25,7 @@
 ゲーム内は確認画面を使用します。管理コンソール・RCONからは次の明示操作が可能です。実行時は全プレイヤーが一時切断されます。
 
 - `chanpon-mwm export_worlds individual`
-- `chanpon-mwm export_worlds combined <ワールドUUID> [ワールドUUID ...]`
+- `chanpon-mwm export_worlds combined [ワールドUUID ...]`
 
 ## 26.2の保存構造
 
@@ -53,3 +53,5 @@
 - 既存mwm-smokeはMultiverse-CoreのgetPluginMeta()でAbstractMethodErrorとなり未完走です。今回の変更対象外であり、ハーネスやMultiverseの修正は行っていません。
 - 実セーブ検証版26.1117.3と最終版26.1118.1のMWM-Chanpon全584クラスがバイト一致し、最終差分はバージョンと日英カタログ依存です。
 - 検証証跡はワークスペースの `.worktrees/world-export-verification/`（native-final-results.txt、full-final-results.txt、各ログ、配置ハッシュ、検証用ZIP）へ保存しました。検証用スイートは実行後に削除して再ロード済みです。
+
+スポーンは完成状態にかかわらず両方式に含めます。個別一括ではスポーンを束の代表としてmanifestに記録し、各ZIPは対象ごとに独立したセーブです。確認画面には両方式ともスポーンの名前を表示します。Java版クライアント向けに代表ワールドの生成設定をセーブ直下の `data/minecraft/world_gen_settings.dat` に配置し、Chiyogamiが読む `dimensions/minecraft/overworld/data/minecraft/world_gen_settings.dat` にも同じ設定を保持します。

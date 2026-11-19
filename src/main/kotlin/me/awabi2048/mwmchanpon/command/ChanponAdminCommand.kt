@@ -68,7 +68,6 @@ class ChanponAdminCommand(
                     exportService.exportAllIndividualWorlds()
                 }
                 "combined" -> {
-                    require(args.size > 2)
                     exportService.exportStandaloneWorld(args.drop(2).map(java.util.UUID::fromString))
                 }
                 else -> error("出力方式はindividualまたはcombinedを指定してください。")
