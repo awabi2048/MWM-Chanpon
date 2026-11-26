@@ -2,12 +2,14 @@ package me.awabi2048.mwmchanpon
 
 import me.awabi2048.mwmchanpon.extension.ChanponWorldRuntimePolicy
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class ChanponWorldRuntimePolicyTest {
     @Test
     fun `capabilityを数値へ符号化せず無効化する`() {
         val policy = ChanponWorldRuntimePolicy()
+        assertTrue(policy.isWorldEnvironmentEnabled())
 
         assertFalse(policy.isWorldPointEconomyEnabled())
         assertFalse(policy.isWorldSlotSystemEnabled())
